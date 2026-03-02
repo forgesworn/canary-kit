@@ -187,7 +187,7 @@ body {
   background-color: var(--bg-deep);
   color: var(--text-primary);
   font-family: var(--font-body);
-  font-size: 0.875rem;
+  font-size: 1.0625rem;
   line-height: 1.6;
   min-height: 100vh;
   position: relative;
@@ -325,7 +325,7 @@ input::placeholder {
 .brand {
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 1.125rem;
   letter-spacing: 0.2em;
   color: var(--amber-500);
   text-transform: uppercase;
@@ -377,7 +377,7 @@ input::placeholder {
 
 .relay-label {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   letter-spacing: 0.04em;
 }
@@ -386,14 +386,14 @@ input::placeholder {
 
 .auth-btn {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 500;
   letter-spacing: 0.06em;
   color: var(--text-secondary);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 0.35rem 0.85rem;
+  padding: 0.44rem 1.0625rem;
   transition: color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   white-space: nowrap;
   flex-shrink: 0;
@@ -428,7 +428,7 @@ input::placeholder {
   overflow-y: auto;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
-  padding: 1.5rem 1.25rem 2rem;
+  padding: 2rem 1.5rem 2.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -437,7 +437,7 @@ input::placeholder {
 
 .tagline {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   font-style: italic;
   line-height: 1.7;
@@ -449,12 +449,12 @@ input::placeholder {
 
 .identity-badge {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 0.4rem 0.65rem;
+  padding: 0.5rem 0.8125rem;
   letter-spacing: 0.04em;
   word-break: break-all;
   line-height: 1.5;
@@ -475,10 +475,10 @@ input::placeholder {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.65rem;
+  padding: 0.625rem 0.8125rem;
   border-radius: 4px;
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 1rem;
   color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
@@ -513,7 +513,7 @@ input::placeholder {
 
 .group-item__badge {
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   background: var(--bg-raised);
   padding: 0.125rem 0.375rem;
@@ -523,11 +523,11 @@ input::placeholder {
 
 .create-group-btn {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 1rem;
   color: var(--text-muted);
   border: 1px dashed var(--text-muted);
   border-radius: 4px;
-  padding: 0.5rem 0.75rem;
+  padding: 0.625rem 0.9375rem;
   width: 100%;
   text-align: center;
   background: transparent;
@@ -548,7 +548,7 @@ input::placeholder {
 
 .content {
   flex: 1;
-  padding: 2.5rem 3rem;
+  padding: 3rem 3.5rem;
   max-width: var(--content-max);
   width: 100%;
   display: flex;
@@ -573,7 +573,7 @@ input::placeholder {
 .hero-word {
   font-family: var(--font-display);
   font-weight: 900;
-  font-size: 5.5rem;
+  font-size: clamp(3.5rem, 10vw, 9rem);
   line-height: 1.05;
   letter-spacing: -0.01em;
   text-transform: uppercase;
@@ -614,7 +614,7 @@ input::placeholder {
 
 .countdown-label {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.9375rem;
   color: var(--text-muted);
   letter-spacing: 0.08em;
 }
@@ -623,12 +623,12 @@ input::placeholder {
 
 .duress-trigger {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.9375rem;
   color: var(--text-muted);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
-  padding: 0.35rem 0.75rem;
+  padding: 0.44rem 0.9375rem;
   letter-spacing: 0.08em;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
   cursor: pointer;
@@ -668,7 +668,7 @@ input::placeholder {
 
 .duress-label {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   color: var(--amber-600);
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -677,7 +677,7 @@ input::placeholder {
 .duress-word {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.75rem;
+  font-size: 2.5rem;
   color: var(--amber-400);
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -699,7 +699,7 @@ input::placeholder {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 1.25rem 1.5rem;
+  padding: 1.5rem 2rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -707,7 +707,7 @@ input::placeholder {
 
 .panel-title {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -726,20 +726,20 @@ input::placeholder {
 .verify-input {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 1rem;
   min-width: 0;
 }
 
 .verify-btn {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 500;
   letter-spacing: 0.06em;
   color: var(--bg-deep);
   background: var(--amber-500);
   border: none;
   border-radius: 4px;
-  padding: 0.5rem 1rem;
+  padding: 0.625rem 1.25rem;
   transition: background 0.15s ease, box-shadow 0.15s ease;
   white-space: nowrap;
 }
@@ -755,11 +755,11 @@ input::placeholder {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.65rem 0.85rem;
+  padding: 0.8125rem 1.0625rem;
   border-radius: 5px;
   border: 1px solid transparent;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 1rem;
   animation: result-appear 0.3s var(--ease-out) both;
 }
 
@@ -793,7 +793,7 @@ input::placeholder {
 }
 
 .verify-icon {
-  font-size: 1rem;
+  font-size: 1.25rem;
   flex-shrink: 0;
 }
 
@@ -836,7 +836,7 @@ input::placeholder {
 
 .member-row__name {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 1rem;
   color: var(--text-secondary);
   flex: 1;
   overflow: hidden;
@@ -846,12 +846,12 @@ input::placeholder {
 
 .member-row__btn {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 3px;
-  padding: 0.2rem 0.5rem;
+  padding: 0.25rem 0.625rem;
   cursor: pointer;
   transition: color 0.12s ease, border-color 0.12s ease;
   flex-shrink: 0;
@@ -871,12 +871,12 @@ input::placeholder {
 .member-row__duress {
   display: none;
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: 0.875rem;
   color: var(--amber-400);
   background: var(--duress-bg);
   border: 1px solid var(--border-amber);
   border-radius: 3px;
-  padding: 0.15rem 0.45rem;
+  padding: 0.1875rem 0.5625rem;
   letter-spacing: 0.06em;
   flex-shrink: 0;
 }
@@ -896,19 +896,19 @@ input::placeholder {
 .invite-input {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 1rem;
   min-width: 0;
 }
 
 .invite-btn {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 500;
   color: var(--text-secondary);
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 0.5rem 0.85rem;
+  padding: 0.625rem 1.0625rem;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
   white-space: nowrap;
 }
@@ -933,12 +933,12 @@ input::placeholder {
 
 .settings-summary {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding: 0.85rem 1.25rem;
+  padding: 1.0625rem 1.5625rem;
   cursor: pointer;
   user-select: none;
   list-style: none;
@@ -1004,7 +1004,7 @@ input::placeholder {
 
 .setting-label {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--text-muted);
   min-width: 7rem;
   flex-shrink: 0;
@@ -1014,7 +1014,7 @@ input::placeholder {
 .setting-input {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 1rem;
   min-width: 0;
 }
 
@@ -1029,12 +1029,12 @@ input::placeholder {
 
 .seg-btn {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--text-secondary);
   background: var(--bg-raised);
   border: none;
   border-right: 1px solid var(--border);
-  padding: 0.35rem 0.85rem;
+  padding: 0.44rem 1.0625rem;
   transition: color 0.12s ease, background 0.12s ease;
   letter-spacing: 0.04em;
 }
@@ -1074,20 +1074,20 @@ input::placeholder {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 0.3rem 0.6rem;
+  padding: 0.375rem 0.75rem;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.875rem;
   color: var(--text-secondary);
 }
 
 .relay-tag__remove {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 0 0.2rem;
+  padding: 0 0.25rem;
   line-height: 1;
   transition: color 0.12s ease;
 }
@@ -1105,18 +1105,18 @@ input::placeholder {
 .relay-add-input {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 1rem;
   min-width: 0;
 }
 
 .relay-add-btn {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--text-secondary);
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 0.4rem 0.75rem;
+  padding: 0.5rem 0.9375rem;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -1129,13 +1129,13 @@ input::placeholder {
 
 .danger-btn {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   font-weight: 500;
   color: var(--amber-500);
   background: transparent;
   border: 1px solid var(--border-amber);
   border-radius: 4px;
-  padding: 0.4rem 0.85rem;
+  padding: 0.5rem 1.0625rem;
   letter-spacing: 0.04em;
   transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -1181,14 +1181,14 @@ input::placeholder {
 .modal-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.35rem;
+  font-size: 1.75rem;
   color: var(--text-bright);
   margin-bottom: 1.25rem;
 }
 
 .modal-message {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 1rem;
   color: var(--text-secondary);
   line-height: 1.6;
   margin-bottom: 1.5rem;
@@ -1202,7 +1202,7 @@ input::placeholder {
 
 .modal-label {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.9375rem;
   color: var(--text-muted);
   letter-spacing: 0.06em;
 }
@@ -1211,7 +1211,7 @@ input::placeholder {
 .modal-select {
   width: 100%;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 1rem;
 }
 
 .modal-actions {
@@ -1223,11 +1223,11 @@ input::placeholder {
 
 .modal-btn {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 500;
   letter-spacing: 0.06em;
   border-radius: 4px;
-  padding: 0.5rem 1.1rem;
+  padding: 0.625rem 1.375rem;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   border: 1px solid transparent;
 }
@@ -1338,13 +1338,13 @@ input::placeholder {
 .content__empty-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.5rem;
+  font-size: 2rem;
   color: var(--text-primary);
 }
 
 .content__empty-sub {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 1rem;
   color: var(--text-muted);
   line-height: 1.7;
   max-width: 36ch;
@@ -1395,12 +1395,12 @@ button:focus-visible {
   left: 50%;
   transform: translateX(-50%);
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   background: var(--bg-raised);
   border: 1px solid var(--border, rgba(148, 163, 184, 0.1));
   border-radius: 6px;
-  padding: 0.5rem 1rem;
+  padding: 0.625rem 1.25rem;
   z-index: 50;
   letter-spacing: 0.03em;
 }
