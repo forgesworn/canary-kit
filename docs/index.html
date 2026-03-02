@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wordchain — Secure Words for Trusted Circles</title>
+  <meta name="description" content="Deterministic spoken-word identity verification. Defeat voice clones, signal duress, trust your circle." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app">
+
+    <header class="header">
+      <span class="brand">WORDCHAIN</span>
+      <div class="relay-status">
+        <span id="relay-dot" class="relay-dot"></span>
+        <span id="relay-label" class="relay-label">Connecting…</span>
+      </div>
+      <button id="auth-btn" class="auth-btn">Sign In</button>
+    </header>
+
+    <div class="layout">
+
+      <aside class="sidebar">
+        <p class="tagline">Deterministic spoken-word identity verification. Defeat voice clones, signal duress, trust your circle.</p>
+
+        <div id="identity-badge" class="identity-badge"></div>
+
+        <nav id="group-list" class="group-list"></nav>
+
+        <button id="create-group-btn" class="create-group-btn">+ Create Group</button>
+      </aside>
+
+      <main class="content" id="main-content">
+
+        <section id="hero" class="hero">
+          <div id="hero-word" class="hero-word"></div>
+          <div class="countdown-bar">
+            <div id="countdown-fill" class="countdown-fill"></div>
+          </div>
+          <span id="countdown-label" class="countdown-label"></span>
+          <button id="duress-trigger" class="duress-trigger">Signal Duress</button>
+          <div id="duress-reveal" class="duress-reveal" hidden>
+            <span class="duress-label">Duress word:</span>
+            <span id="duress-word" class="duress-word"></span>
+          </div>
+        </section>
+
+        <div class="panels-grid">
+
+          <section class="panel verify-panel">
+            <h2 class="panel-title">Verify Someone</h2>
+            <form id="verify-form" class="verify-form">
+              <input
+                id="verify-input"
+                class="verify-input"
+                type="text"
+                placeholder="Enter their word…"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="submit" class="verify-btn">Verify</button>
+            </form>
+            <div id="verify-result" class="verify-result" hidden>
+              <span id="verify-icon" class="verify-icon"></span>
+              <span id="verify-text" class="verify-text"></span>
+            </div>
+          </section>
+
+          <section class="panel members-panel">
+            <h2 class="panel-title">Members</h2>
+            <ul id="members-list" class="members-list"></ul>
+            <div id="members-invite" class="members-invite">
+              <input
+                id="invite-input"
+                class="invite-input"
+                type="text"
+                placeholder="npub or nip05…"
+                autocomplete="off"
+              />
+              <button id="invite-btn" class="invite-btn">Invite</button>
+            </div>
+          </section>
+
+        </div>
+
+        <details id="settings-panel" class="settings-panel">
+          <summary class="settings-summary">Group Settings</summary>
+
+          <div class="settings-body">
+
+            <div class="setting-row">
+              <label class="setting-label" for="setting-name">Group name</label>
+              <input id="setting-name" class="setting-input" type="text" />
+            </div>
+
+            <div class="setting-row">
+              <span class="setting-label">Rotation interval</span>
+              <div id="setting-rotation" class="button-group">
+                <button class="seg-btn" data-value="86400">24 h</button>
+                <button class="seg-btn" data-value="604800">7 d</button>
+                <button class="seg-btn" data-value="2592000">30 d</button>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <span class="setting-label">Word count</span>
+              <div id="setting-wordcount" class="button-group">
+                <button class="seg-btn" data-value="1">1</button>
+                <button class="seg-btn" data-value="2">2</button>
+                <button class="seg-btn" data-value="3">3</button>
+              </div>
+            </div>
+
+            <div class="setting-row setting-row--relays">
+              <span class="setting-label">Relays</span>
+              <ul id="setting-relays" class="relay-list"></ul>
+              <div class="relay-add">
+                <input
+                  id="relay-add-input"
+                  class="relay-add-input"
+                  type="url"
+                  placeholder="wss://relay.example.com"
+                  autocomplete="off"
+                />
+                <button id="relay-add-btn" class="relay-add-btn">Add</button>
+              </div>
+            </div>
+
+            <div class="setting-row setting-row--actions">
+              <button id="reseed-btn" class="danger-btn">Reseed Group</button>
+              <button id="dissolve-btn" class="danger-btn danger-btn--destructive">Dissolve Group</button>
+            </div>
+
+          </div>
+        </details>
+
+      </main>
+    </div>
+
+  </div>
+
+  <dialog id="create-modal" class="modal">
+    <h2 class="modal-title">Create Group</h2>
+    <form id="create-form" method="dialog" class="modal-form">
+      <label class="modal-label" for="new-group-name">Group name</label>
+      <input
+        id="new-group-name"
+        class="modal-input"
+        type="text"
+        placeholder="My trusted circle"
+        required
+        autocomplete="off"
+      />
+      <label class="modal-label" for="new-group-rotation">Rotation interval</label>
+      <select id="new-group-rotation" class="modal-select">
+        <option value="86400">Every 24 hours</option>
+        <option value="604800" selected>Every 7 days</option>
+        <option value="2592000">Every 30 days</option>
+      </select>
+      <div class="modal-actions">
+        <button type="button" id="create-cancel" class="modal-btn modal-btn--cancel">Cancel</button>
+        <button type="submit" class="modal-btn modal-btn--primary">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-modal" class="modal">
+    <h2 id="confirm-title" class="modal-title"></h2>
+    <p id="confirm-message" class="modal-message"></p>
+    <div class="modal-actions">
+      <button id="confirm-cancel" class="modal-btn modal-btn--cancel">Cancel</button>
+      <button id="confirm-ok" class="modal-btn modal-btn--destructive">Confirm</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="demo.js"></script>
+</body>
+</html>
