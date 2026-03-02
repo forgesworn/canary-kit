@@ -1,0 +1,124 @@
+import { randomBytes } from 'node:crypto'
+import { getCounter, DEFAULT_ROTATION_INTERVAL } from './counter.js'
+import {
+  deriveVerificationWord,
+  deriveVerificationPhrase,
+  deriveDuressWord,
+  deriveDuressPhrase,
+} from './derive.js'
+
+/** Configuration provided when creating a new group. */
+export interface GroupConfig {
+  name: string
+  members: string[]
+  rotationInterval?: number
+  wordCount?: 1 | 2 | 3
+  wordlist?: string
+}
+
+/** Persistent state for a wordchain group. All fields are serialisable. */
+export interface GroupState {
+  name: string
+  seed: string
+  members: string[]
+  rotationInterval: number
+  wordCount: 1 | 2 | 3
+  wordlist: string
+  /** Time-based counter at group creation. Advances with rotation interval. */
+  counter: number
+  /** Burn-after-use offset applied on top of the time-based counter. */
+  usageOffset: number
+  createdAt: number
+}
+
+/** Generate a cryptographically secure 32-byte seed as a hex string. */
+function generateSeed(): string {
+  return randomBytes(32).toString('hex')
+}
+
+/**
+ * Combine the time-based counter with the usage offset to produce the
+ * effective counter used for word derivation.
+ */
+function effectiveCounter(state: GroupState): number {
+  return state.counter + state.usageOffset
+}
+
+/** Create a new group with a freshly generated seed and time-based counter. */
+export function createGroup(config: GroupConfig): GroupState {
+  const now = Math.floor(Date.now() / 1000)
+  const interval = config.rotationInterval ?? DEFAULT_ROTATION_INTERVAL
+  return {
+    name: config.name,
+    seed: generateSeed(),
+    members: [...config.members],
+    rotationInterval: interval,
+    wordCount: config.wordCount ?? 1,
+    wordlist: config.wordlist ?? 'en-v1',
+    counter: getCounter(now, interval),
+    usageOffset: 0,
+    createdAt: now,
+  }
+}
+
+/**
+ * Return the current verification word (or space-joined phrase) that all
+ * group members should use to authenticate with one another.
+ */
+export function getCurrentWord(state: GroupState): string {
+  const counter = effectiveCounter(state)
+  if (state.wordCount === 1) {
+    return deriveVerificationWord(state.seed, counter)
+  }
+  return deriveVerificationPhrase(state.seed, counter, state.wordCount).join(' ')
+}
+
+/**
+ * Return the duress word (or phrase) for a specific member at the current
+ * counter. Duress words are member-specific and distinct from the verification
+ * word, allowing silent distress signalling.
+ */
+export function getCurrentDuressWord(state: GroupState, memberPubkey: string): string {
+  const counter = effectiveCounter(state)
+  if (state.wordCount === 1) {
+    return deriveDuressWord(state.seed, memberPubkey, counter)
+  }
+  return deriveDuressPhrase(state.seed, memberPubkey, counter, state.wordCount).join(' ')
+}
+
+/**
+ * Advance the usage offset by one, rotating the current word (burn-after-use).
+ * Returns new state — does not mutate the input.
+ */
+export function advanceCounter(state: GroupState): GroupState {
+  return { ...state, usageOffset: state.usageOffset + 1 }
+}
+
+/**
+ * Generate a fresh seed and reset the usage offset to zero.
+ * Call this after a security event (e.g. suspected compromise).
+ * Returns new state — does not mutate the input.
+ */
+export function reseed(state: GroupState): GroupState {
+  return { ...state, seed: generateSeed(), usageOffset: 0 }
+}
+
+/**
+ * Add a member to the group. If the pubkey is already present, returns the
+ * existing state unchanged (idempotent).
+ * Returns new state — does not mutate the input.
+ */
+export function addMember(state: GroupState, pubkey: string): GroupState {
+  if (state.members.includes(pubkey)) return state
+  return { ...state, members: [...state.members, pubkey] }
+}
+
+/**
+ * Remove a member from the group and immediately reseed to invalidate the old
+ * shared secret. The departing member can no longer derive valid words.
+ * Returns new state — does not mutate the input.
+ */
+export function removeMember(state: GroupState, pubkey: string): GroupState {
+  const members = state.members.filter((m) => m !== pubkey)
+  return { ...reseed({ ...state, members }), members }
+}
