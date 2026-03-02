@@ -1005,6 +1005,7 @@ function setupAuth() {
         renderIdentityBadge()
         renderAuthButton()
         subscribeToInvitations()
+        document.getElementById('demo-banner').hidden = true
         return
       } catch {
         // User rejected or extension failed — fall through to ephemeral
@@ -1043,6 +1044,7 @@ function setupAuth() {
       renderIdentityBadge()
       renderAuthButton()
       subscribeToInvitations()
+      document.getElementById('demo-banner').hidden = true
     } catch {
       alert('Could not generate an ephemeral identity. Your browser may not support Web Crypto.')
     }
@@ -1103,6 +1105,11 @@ function init() {
   loadNostrTools().then(() => {
     if (state.identity) subscribeToInvitations()
   })
+
+  // Show demo banner if no NIP-07 extension and no saved identity
+  if (!window.nostr && !state.identity) {
+    document.getElementById('demo-banner').hidden = false
+  }
 }
 
 init()

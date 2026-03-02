@@ -329,6 +329,7 @@ input::placeholder {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  animation: slide-in-left 0.5s var(--ease-out) both;
 }
 
 .tagline {
@@ -453,6 +454,7 @@ input::placeholder {
   flex-direction: column;
   align-items: center;
   gap: 1.25rem;
+  animation: fade-in 0.8s var(--ease-out) 0.2s both;
 }
 
 .hero-word {
@@ -467,7 +469,8 @@ input::placeholder {
   text-shadow:
     0 0 40px rgba(245, 158, 11, 0.18),
     0 0 80px rgba(245, 158, 11, 0.08),
-    0 2px 4px rgba(0, 0, 0, 0.4);
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 0 40px rgba(248, 250, 252, 0.05);
   animation: word-appear 0.6s var(--ease-out) both;
   /* Keep long words from overflowing */
   word-break: break-word;
@@ -573,6 +576,7 @@ input::placeholder {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.25rem;
+  animation: fade-in 0.8s var(--ease-out) 0.4s both;
 }
 
 .panel {
@@ -808,6 +812,7 @@ input::placeholder {
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
+  animation: fade-in 0.8s var(--ease-out) 0.5s both;
 }
 
 .settings-summary {
@@ -1148,6 +1153,16 @@ input::placeholder {
 /* ============================================================
    18. ANIMATIONS
    ============================================================ */
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 @keyframes word-appear {
   from {
