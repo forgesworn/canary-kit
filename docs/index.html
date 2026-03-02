@@ -177,6 +177,18 @@
     </div>
   </dialog>
 
+  <!--
+    Local development: resolves esm.sh URLs to built dist/ folder.
+    Remove this block once wordchain is published to npm.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "https://esm.sh/wordchain@latest": "../dist/index.js"
+    }
+  }
+  </script>
+
   <script type="module" src="demo.js"></script>
 </body>
 </html>
