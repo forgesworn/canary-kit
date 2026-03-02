@@ -19,9 +19,9 @@ describe('wordlist', () => {
   })
 
   it('all words are 3-8 characters', () => {
-    // Some BIP-39 words exceed 8 chars — this test will be enabled after curation (Task 10)
     for (const word of WORDLIST) {
       expect(word.length).toBeGreaterThanOrEqual(3)
+      expect(word.length).toBeLessThanOrEqual(8)
     }
   })
 
