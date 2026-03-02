@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+dist/
+*.tsbuildinfo
+.worktrees/
+docs/plans/
+.env
+.env.*

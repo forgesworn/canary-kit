@@ -1,0 +1,33 @@
+{
+  "name": "wordchain",
+  "version": "0.0.0-development",
+  "description": "Deterministic spoken-word identity verification for trusted groups",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./wordlist": { "types": "./dist/wordlist.d.ts", "default": "./dist/wordlist.js" },
+    "./nostr": { "types": "./dist/nostr.d.ts", "default": "./dist/nostr.js" }
+  },
+  "files": ["dist/", "LICENSE"],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "bench": "vitest bench"
+  },
+  "keywords": ["wordchain", "verification", "identity", "duress", "safe-word", "nostr", "hmac", "totp", "deepfake", "voice-clone", "meshtastic"],
+  "author": "TheCryptoDonkey",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/TheCryptoDonkey/wordchain.git" },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "semantic-release": "^25.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.0"
+  }
+}
