@@ -1,20 +1,20 @@
-import { createHmac } from 'node:crypto'
+import { hmacSha256, hexToBytes, concatBytes, readUint16BE } from './crypto.js'
 import { counterToBytes } from './counter.js'
 import { getWord, WORDLIST_SIZE } from './wordlist.js'
 
 /**
  * Compute HMAC-SHA256(key, data) and return the raw 32-byte digest.
  */
-function hmac(key: Uint8Array | Buffer, data: Uint8Array | Buffer): Buffer {
-  return createHmac('sha256', key).update(data).digest()
+function hmac(key: Uint8Array, data: Uint8Array): Uint8Array {
+  return hmacSha256(key, data)
 }
 
-/** Parse a hex-encoded seed string to a Buffer. */
-function seedToBuffer(seedHex: string): Buffer {
+/** Parse a hex-encoded seed string to a Uint8Array. */
+function seedToBytes(seedHex: string): Uint8Array {
   if (seedHex.length !== 64) {
     throw new Error(`Seed must be 64 hex characters (256 bits), got ${seedHex.length}`)
   }
-  return Buffer.from(seedHex, 'hex')
+  return hexToBytes(seedHex)
 }
 
 /**
@@ -27,8 +27,8 @@ function seedToBuffer(seedHex: string): Buffer {
  * to yield the wordlist index.
  */
 export function deriveVerificationWord(seedHex: string, counter: number): string {
-  const raw = hmac(seedToBuffer(seedHex), counterToBytes(counter))
-  const index = raw.readUInt16BE(0) % WORDLIST_SIZE
+  const raw = hmac(seedToBytes(seedHex), counterToBytes(counter))
+  const index = readUint16BE(raw, 0) % WORDLIST_SIZE
   return getWord(index)
 }
 
@@ -44,10 +44,10 @@ export function deriveVerificationPhrase(
   counter: number,
   wordCount: 1 | 2 | 3,
 ): string[] {
-  const raw = hmac(seedToBuffer(seedHex), counterToBytes(counter))
+  const raw = hmac(seedToBytes(seedHex), counterToBytes(counter))
   const words: string[] = []
   for (let i = 0; i < wordCount; i++) {
-    const index = raw.readUInt16BE(i * 2) % WORDLIST_SIZE
+    const index = readUint16BE(raw, i * 2) % WORDLIST_SIZE
     words.push(getWord(index))
   }
   return words
@@ -64,21 +64,21 @@ export function deriveDuressWord(
   memberPubkeyHex: string,
   counter: number,
 ): string {
-  const seedBuf = seedToBuffer(seedHex)
-  const pubkeyBuf = Buffer.from(memberPubkeyHex, 'hex')
+  const seedBuf = seedToBytes(seedHex)
+  const pubkeyBuf = hexToBytes(memberPubkeyHex)
   const counterBuf = counterToBytes(counter)
   const verificationWord = deriveVerificationWord(seedHex, counter)
 
-  let key = Buffer.concat([seedBuf, pubkeyBuf])
+  let key = concatBytes(seedBuf, pubkeyBuf)
   let raw = hmac(key, counterBuf)
-  let index = raw.readUInt16BE(0) % WORDLIST_SIZE
+  let index = readUint16BE(raw, 0) % WORDLIST_SIZE
   let word = getWord(index)
 
   // Collision avoidance: if duress word matches verification word, re-derive
   if (word === verificationWord) {
-    key = Buffer.concat([seedBuf, pubkeyBuf, Buffer.from([0x01])])
+    key = concatBytes(seedBuf, pubkeyBuf, new Uint8Array([0x01]))
     raw = hmac(key, counterBuf)
-    index = raw.readUInt16BE(0) % WORDLIST_SIZE
+    index = readUint16BE(raw, 0) % WORDLIST_SIZE
     word = getWord(index)
   }
 
@@ -97,26 +97,26 @@ export function deriveDuressPhrase(
   counter: number,
   wordCount: 1 | 2 | 3,
 ): string[] {
-  const seedBuf = seedToBuffer(seedHex)
-  const pubkeyBuf = Buffer.from(memberPubkeyHex, 'hex')
+  const seedBuf = seedToBytes(seedHex)
+  const pubkeyBuf = hexToBytes(memberPubkeyHex)
   const counterBuf = counterToBytes(counter)
   const verifyPhrase = deriveVerificationPhrase(seedHex, counter, wordCount)
 
-  let key = Buffer.concat([seedBuf, pubkeyBuf])
+  let key = concatBytes(seedBuf, pubkeyBuf)
   let raw = hmac(key, counterBuf)
   const words: string[] = []
 
   for (let i = 0; i < wordCount; i++) {
-    const index = raw.readUInt16BE(i * 2) % WORDLIST_SIZE
+    const index = readUint16BE(raw, i * 2) % WORDLIST_SIZE
     words.push(getWord(index))
   }
 
   // If entire phrase matches verification phrase, re-derive with disambiguation suffix
   if (words.every((w, i) => w === verifyPhrase[i])) {
-    key = Buffer.concat([seedBuf, pubkeyBuf, Buffer.from([0x01])])
+    key = concatBytes(seedBuf, pubkeyBuf, new Uint8Array([0x01]))
     raw = hmac(key, counterBuf)
     for (let i = 0; i < wordCount; i++) {
-      words[i] = getWord(raw.readUInt16BE(i * 2) % WORDLIST_SIZE)
+      words[i] = getWord(readUint16BE(raw, i * 2) % WORDLIST_SIZE)
     }
   }
 
