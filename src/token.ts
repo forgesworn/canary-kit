@@ -46,3 +46,51 @@ export function deriveToken(
   const bytes = deriveTokenBytes(secret, context, counter)
   return encodeToken(bytes, encoding)
 }
+
+/**
+ * CANARY-DURESS: Derive raw duress token bytes for a specific identity.
+ *
+ * Algorithm: HMAC-SHA256(secret, utf8(context + ":duress") || utf8(identity) || counter_be32)
+ *
+ * NOTE: Returns raw bytes without collision avoidance. Use deriveDuressToken()
+ * for encoded output with guaranteed non-collision against the normal token.
+ */
+export function deriveDuressTokenBytes(
+  secret: Uint8Array | string,
+  context: string,
+  identity: string,
+  counter: number,
+): Uint8Array {
+  const key = normaliseSecret(secret)
+  const data = concatBytes(utf8(context + ':duress'), utf8(identity), counterBe32(counter))
+  return hmacSha256(key, data)
+}
+
+/**
+ * CANARY-DURESS: Derive an encoded duress token with collision avoidance.
+ *
+ * If the duress token collides with the normal verification token (at the encoding level),
+ * re-derives with a 0x01 suffix to guarantee they are always distinct.
+ */
+export function deriveDuressToken(
+  secret: Uint8Array | string,
+  context: string,
+  identity: string,
+  counter: number,
+  encoding: TokenEncoding = DEFAULT_ENCODING,
+): string {
+  const normalToken = deriveToken(secret, context, counter, encoding)
+  const key = normaliseSecret(secret)
+  const baseData = concatBytes(utf8(context + ':duress'), utf8(identity), counterBe32(counter))
+
+  let bytes = hmacSha256(key, baseData)
+  let token = encodeToken(bytes, encoding)
+
+  // Collision avoidance: if duress token matches normal token, re-derive with suffix
+  if (token === normalToken) {
+    bytes = hmacSha256(key, concatBytes(baseData, new Uint8Array([0x01])))
+    token = encodeToken(bytes, encoding)
+  }
+
+  return token
+}
