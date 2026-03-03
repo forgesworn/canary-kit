@@ -1098,6 +1098,63 @@ async function showShareModal(groupId) {
   document.getElementById('share-modal').showModal()
 }
 
+function checkInviteFragment() {
+  const hash = location.hash
+  if (!hash.startsWith('#join/')) return
+
+  const encoded = hash.slice(6) // Remove '#join/'
+  try {
+    const payload = JSON.parse(atob(encoded))
+    if (!payload.seed || !payload.name) return
+
+    // Clear the hash so it doesn't re-trigger
+    history.replaceState(null, '', location.pathname)
+
+    showInviteModal(payload)
+  } catch {
+    console.warn('Invalid invite link')
+  }
+}
+
+function showInviteModal(payload) {
+  const title = document.getElementById('confirm-title')
+  const message = document.getElementById('confirm-message')
+  const modal = document.getElementById('confirm-modal')
+  const okBtn = document.getElementById('confirm-ok')
+
+  title.textContent = 'Join Group'
+  message.textContent = `You've been invited to "${payload.name}". Join this group?`
+
+  // Temporarily change OK button to non-destructive style
+  okBtn.textContent = 'Join'
+  okBtn.className = 'modal-btn modal-btn--primary'
+
+  confirmCallback = () => {
+    const id = crypto.randomUUID?.() ?? Date.now().toString(36) + Math.random().toString(36).slice(2)
+    const now = Math.floor(Date.now() / 1000)
+    state.groups[id] = {
+      name: payload.name,
+      seed: payload.seed,
+      members: payload.members || [],
+      rotationInterval: payload.rotationInterval || DEFAULT_ROTATION_INTERVAL,
+      wordCount: payload.wordCount || 1,
+      wordlist: 'en-v1',
+      counter: getCounter(now, payload.rotationInterval || DEFAULT_ROTATION_INTERVAL),
+      usageOffset: 0,
+      createdAt: now,
+    }
+    state.activeGroupId = id
+    saveGroups()
+    render()
+
+    // Reset OK button
+    okBtn.textContent = 'Confirm'
+    okBtn.className = 'modal-btn modal-btn--destructive'
+  }
+
+  modal.showModal()
+}
+
 function setupShareModal() {
   document.getElementById('share-close-btn').addEventListener('click', () => {
     document.getElementById('share-modal').close()
@@ -1386,6 +1443,7 @@ function startTick() {
 
 function init() {
   loadState()
+  checkInviteFragment()
   render()
 
   // Event bindings
