@@ -75,10 +75,11 @@ export function deriveDuressTokenBytes(
 /**
  * CANARY-DURESS: Derive an encoded duress token with collision avoidance.
  *
- * If the duress token collides with the normal verification token (at the encoding level),
- * re-derives with incrementing suffix bytes (0x01, 0x02, ..., 0xFF) until distinct.
- * If all 255 suffixes collide (astronomically unlikely), throws an error rather than
- * failing open (returning a token that would be classified as 'valid' instead of 'duress').
+ * If the duress token collides with any normal verification token within
+ * ±maxTolerance counter values (at the encoding level), re-derives with
+ * incrementing suffix bytes (0x01, 0x02, ..., 0xFF) until distinct.
+ * If all 255 suffixes collide (astronomically unlikely), throws an error
+ * rather than failing open.
  */
 export function deriveDuressToken(
   secret: Uint8Array | string,
@@ -86,8 +87,19 @@ export function deriveDuressToken(
   identity: string,
   counter: number,
   encoding: TokenEncoding = DEFAULT_ENCODING,
+  maxTolerance: number = 1,
 ): string {
-  const normalToken = deriveToken(secret, context, counter, encoding)
+  if (!Number.isInteger(maxTolerance) || maxTolerance < 0) {
+    throw new RangeError('maxTolerance must be a non-negative integer')
+  }
+  // Collect normal tokens within ±maxTolerance for cross-counter collision avoidance.
+  const forbidden = new Set<string>()
+  const lo = Math.max(0, counter - maxTolerance)
+  const hi = Math.min(0xFFFFFFFF, counter + maxTolerance)
+  for (let c = lo; c <= hi; c++) {
+    forbidden.add(deriveToken(secret, context, c, encoding))
+  }
+
   const key = normaliseSecret(secret)
   const baseData = concatBytes(utf8(context + ':duress'), new Uint8Array([0x00]), utf8(identity), counterBe32(counter))
 
@@ -96,13 +108,13 @@ export function deriveDuressToken(
 
   // Collision avoidance: deterministic multi-suffix retry
   let suffix = 1
-  while (token === normalToken && suffix <= 255) {
+  while (forbidden.has(token) && suffix <= 255) {
     bytes = hmacSha256(key, concatBytes(baseData, new Uint8Array([suffix])))
     token = encodeToken(bytes, encoding)
     suffix++
   }
 
-  if (token === normalToken) {
+  if (forbidden.has(token)) {
     throw new Error('Duress token collision unresolvable after 255 retries')
   }
 
@@ -128,10 +140,15 @@ export interface VerifyOptions {
 /**
  * CANARY-DURESS: Verify a spoken/entered token against a group.
  *
- * Checks in order:
- * 1. Normal verification token (within tolerance window) → 'valid'
+ * Checks in priority order (exact-counter-first):
+ * 1. Normal verification token at exact counter → 'valid'
  * 2. ALL identities' duress tokens (within tolerance window) → 'duress' with all matches
- * 3. No match → 'invalid'
+ * 3. Normal verification token at remaining tolerance window → 'valid'
+ * 4. No match → 'invalid'
+ *
+ * Exact-counter normal is checked first because same-counter collision avoidance
+ * guarantees no ambiguity. Duress across the full window is checked next so that
+ * duress at the exact counter is never masked by normal at an adjacent counter.
  *
  * Per CANARY-DURESS: the verifier MUST check all identities and collect all matches.
  * The verifier MUST NOT short-circuit after the first duress match.
@@ -151,16 +168,14 @@ export function verifyToken(
   }
   const normalised = input.toLowerCase().trim()
 
-  // 1. Check normal token within tolerance window (clamped to valid counter range)
-  const lo = Math.max(0, counter - tolerance)
-  const hi = Math.min(0xFFFFFFFF, counter + tolerance)
-  for (let c = lo; c <= hi; c++) {
-    if (normalised === deriveToken(secret, context, c, encoding)) {
-      return { status: 'valid' }
-    }
+  // 1. Check normal token at exact counter (collision avoidance guarantees no ambiguity here)
+  if (normalised === deriveToken(secret, context, counter, encoding)) {
+    return { status: 'valid' }
   }
 
-  // 2. Check duress tokens for ALL identities — collect all matches
+  // 2. Check duress tokens for ALL identities across entire tolerance window
+  const lo = Math.max(0, counter - tolerance)
+  const hi = Math.min(0xFFFFFFFF, counter + tolerance)
   const matches: string[] = []
   for (const identity of identities) {
     for (let c = lo; c <= hi; c++) {
@@ -174,7 +189,15 @@ export function verifyToken(
     return { status: 'duress', identities: matches }
   }
 
-  // 3. No match
+  // 3. Check normal token at remaining tolerance window (non-exact counters)
+  for (let c = lo; c <= hi; c++) {
+    if (c === counter) continue // already checked in step 1
+    if (normalised === deriveToken(secret, context, c, encoding)) {
+      return { status: 'valid' }
+    }
+  }
+
+  // 4. No match
   return { status: 'invalid' }
 }
 

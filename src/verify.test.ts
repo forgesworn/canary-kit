@@ -102,3 +102,25 @@ describe('verifyWord', () => {
     expect(result.members!.length).toBe(2)
   })
 })
+
+describe('cross-counter collision avoidance (verifyWord)', () => {
+  it('stale verification word is never misclassified as duress', () => {
+    // Reviewer's reproduction: seed='a'*64, counter=2, member ...05ff
+    // Before derivation fix: verifyWord(staleVerifyWord, seed, [member], 2) → duress
+    // After derivation fix: → stale
+    const seed = 'a'.repeat(64)
+    const member = '05ff'.padStart(64, '0')
+
+    // Check across a range of counters to exercise the fix thoroughly
+    for (let c = 1; c < 300; c++) {
+      const prevVerify = deriveVerificationWord(seed, c - 1)
+      const result = verifyWord(prevVerify, seed, [member], c)
+      // Must be 'stale' (correct) or 'verified' (if prev happens to equal current — unlikely but valid)
+      // Must NEVER be 'duress'
+      expect(
+        result.status,
+        `counter=${c}: stale word "${prevVerify}" classified as "${result.status}"`,
+      ).not.toBe('duress')
+    }
+  })
+})

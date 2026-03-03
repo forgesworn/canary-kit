@@ -273,6 +273,9 @@ Per the CANARY protocol counter acceptance rules (see [CANARY.md](CANARY.md)):
 - `new_counter` MUST NOT exceed `time_based_counter + 100`. Clients MUST reject
   larger jumps to bound counter drift from compromised senders.
 - Clients MUST deduplicate events by event ID.
+- `used_by` in the encrypted payload MUST equal the event signer's pubkey. Clients MUST
+  reject events where `used_by` does not match the signer. If `used_by` is omitted,
+  the signer is assumed to be the user who triggered the advancement.
 
 ## Group Lifecycle
 

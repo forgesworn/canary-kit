@@ -286,22 +286,29 @@ secret can check for both.
 
 ### Collision Avoidance
 
-If the duress token, after encoding, is identical to the verification token at the same
-counter, the implementation MUST re-derive by appending incrementing suffix bytes to the
-HMAC data:
+If the duress token, after encoding, is identical to any verification token within the
+tolerance window, the implementation MUST re-derive by appending incrementing suffix bytes
+to the HMAC data.
+
+For fixed-window verifiers (e.g. group verification with ±1 lookback), the forbidden set
+is the verification tokens at counters `[max(0, counter-1), counter, counter+1]`. For
+configurable-tolerance verifiers, the forbidden set is verification tokens at counters
+`[max(0, counter-maxTolerance), ..., min(MAX_UINT32, counter+maxTolerance)]`.
 
 ```
+forbidden_tokens = { encode(derive(secret, context, c)) for c in tolerance_window }
+
 duress_data = utf8(context + ":duress") || 0x00 || utf8(identity) || counter_be32
 duress_bytes = HMAC-SHA256(secret, duress_data)
 duress_token = encode(duress_bytes, encoding)
 
 suffix = 1
-while duress_token == normal_token and suffix <= 255:
+while duress_token in forbidden_tokens and suffix <= 255:
     duress_bytes = HMAC-SHA256(secret, duress_data || byte(suffix))
     duress_token = encode(duress_bytes, encoding)
     suffix += 1
 
-if duress_token == normal_token:
+if duress_token in forbidden_tokens:
     ERROR: duress collision unresolvable
 ```
 
@@ -309,9 +316,9 @@ Collision avoidance operates at the encoding level, not the byte level, because 
 byte arrays can encode to the same output via modulo reduction. Implementations MUST
 apply this check whenever computing a duress token. If all 255 suffix retries produce
 a collision (probability effectively zero for any practical encoding), the implementation
-MUST raise an error. Implementations MUST NOT return a duress token that matches the
-normal token — this would cause a duress signal to be classified as valid, suppressing the
-silent alarm.
+MUST raise an error. Implementations MUST NOT return a duress token that matches any
+verification token in the tolerance window — this would cause a duress signal to be
+classified as valid, suppressing the silent alarm.
 
 ### Verification Flow
 
@@ -322,16 +329,23 @@ verify(secret, context, counter, input, identities[], tolerance?) ->
   { status: 'invalid' }
 ```
 
-The verification algorithm checks in order:
+The verification algorithm uses exact-counter-first priority:
 
-1. For each counter in `[counter - tolerance, ..., counter + tolerance]`:
-   derive the verification token. If the input matches → `valid`.
+1. Derive the verification token at the **exact** counter. If the input matches → `valid`.
+   Same-counter collision avoidance guarantees no ambiguity at this step.
 
-2. For each identity, for each counter in the tolerance window:
+2. For each identity, for each counter in the tolerance window
+   `[counter - tolerance, ..., counter + tolerance]`:
    derive the duress token. Collect all matching identities. If any match →
    `duress` with all matching identities.
 
-3. No match → `invalid`.
+3. For each counter in the tolerance window **excluding the exact counter**:
+   derive the verification token. If the input matches → `valid`.
+
+4. No match → `invalid`.
+
+This ordering ensures that a duress token at the expected counter is never masked by a
+normal token at an adjacent counter (fail-safe).
 
 #### Multi-Match Attribution
 

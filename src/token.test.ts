@@ -355,3 +355,45 @@ describe('deriveDirectionalPair', () => {
     expect(pair.agent.split(' ')).toHaveLength(2)
   })
 })
+
+describe('cross-counter collision avoidance', () => {
+  it('deriveDuressToken never matches normal token at adjacent counters (default maxTolerance=1)', () => {
+    // Reviewer's reproduction: secret=...0001, context=canary:verify, identity=alice, counter=1946
+    // Before fix: deriveDuressToken at 1946 collides with deriveToken at 1945 or 1947
+    const secret = SECRET_1
+    const context = 'canary:verify'
+
+    for (let c = 0; c < 200; c++) {
+      const duress = deriveDuressToken(secret, context, IDENTITY_A, c)
+      const lo = Math.max(0, c - 1)
+      const hi = c + 1
+      for (let adj = lo; adj <= hi; adj++) {
+        const normal = deriveToken(secret, context, adj)
+        expect(duress, `duress(${c}) collided with normal(${adj}): "${duress}"`).not.toBe(normal)
+      }
+    }
+  })
+
+  it('deriveDuressToken avoids collisions within custom maxTolerance=2', () => {
+    const secret = SECRET_1
+    const context = 'canary:verify'
+
+    for (let c = 0; c < 100; c++) {
+      const duress = deriveDuressToken(secret, context, IDENTITY_A, c, undefined, 2)
+      const lo = Math.max(0, c - 2)
+      const hi = c + 2
+      for (let adj = lo; adj <= hi; adj++) {
+        const normal = deriveToken(secret, context, adj)
+        expect(duress, `duress(${c}) collided with normal(${adj}): "${duress}"`).not.toBe(normal)
+      }
+    }
+  })
+
+  it('verifyToken: duress at exact counter wins over normal at adjacent counter', () => {
+    // Even with tolerance, a duress token at the exact counter must be detected
+    const duress = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 10)
+    const result = verifyToken(SECRET_1, 'test', 10, duress, [IDENTITY_A, IDENTITY_B], { tolerance: 1 })
+    expect(result.status).toBe('duress')
+    expect(result.identities).toEqual([IDENTITY_A])
+  })
+})

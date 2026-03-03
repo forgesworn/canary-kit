@@ -49,9 +49,10 @@ export function deriveVerificationPhrase(
 /**
  * Derive a member's duress word for a given seed, pubkey, and counter.
  * Unique per member, derivable by all group members who know the seed.
- * If the result collides with the verification word, re-derives with
+ * If the result collides with any verification word within the ±1
+ * tolerance window (counter-1, counter, counter+1), re-derives with
  * incrementing suffix bytes (0x01..0xFF) to guarantee the duress word
- * never matches the verification word. Throws if all 255 suffixes collide.
+ * is distinct. Throws if all 255 suffixes collide.
  */
 export function deriveDuressWord(
   seedHex: string,
@@ -61,7 +62,16 @@ export function deriveDuressWord(
   const seedBuf = seedToBytes(seedHex)
   const pubkeyBuf = hexToBytes(memberPubkeyHex)
   const counterBuf = counterToBytes(counter)
-  const verificationWord = deriveVerificationWord(seedHex, counter)
+
+  // Collect verification words at counter and ±1 adjacent counters.
+  // Cross-counter collision avoidance: duress word must not match any
+  // verification word within verifyWord's fixed ±1 lookback window.
+  const forbidden = new Set<string>()
+  const lo = Math.max(0, counter - 1)
+  const hi = Math.min(0xFFFFFFFF, counter + 1)
+  for (let c = lo; c <= hi; c++) {
+    forbidden.add(deriveVerificationWord(seedHex, c))
+  }
 
   const baseKey = concatBytes(seedBuf, pubkeyBuf)
   let raw = hmacSha256(baseKey, counterBuf)
@@ -69,14 +79,14 @@ export function deriveDuressWord(
 
   // Collision avoidance: deterministic multi-suffix retry
   let suffix = 1
-  while (word === verificationWord && suffix <= 255) {
+  while (forbidden.has(word) && suffix <= 255) {
     const reKey = concatBytes(seedBuf, pubkeyBuf, new Uint8Array([suffix]))
     raw = hmacSha256(reKey, counterBuf)
     word = getWord(readUint16BE(raw, 0) % WORDLIST_SIZE)
     suffix++
   }
 
-  if (word === verificationWord) {
+  if (forbidden.has(word)) {
     throw new Error('Duress word collision unresolvable after 255 retries')
   }
 
@@ -86,7 +96,8 @@ export function deriveDuressWord(
 /**
  * Derive a multi-word duress phrase for a given member.
  * Each word uses a consecutive 2-byte slice of the HMAC digest.
- * If the entire phrase matches the verification phrase, re-derives with
+ * If the entire phrase matches any verification phrase within the ±1
+ * tolerance window (counter-1, counter, counter+1), re-derives with
  * incrementing suffix bytes (0x01..0xFF) until distinct. Throws if all
  * 255 suffixes collide.
  */
@@ -99,7 +110,14 @@ export function deriveDuressPhrase(
   const seedBuf = seedToBytes(seedHex)
   const pubkeyBuf = hexToBytes(memberPubkeyHex)
   const counterBuf = counterToBytes(counter)
-  const verifyPhrase = deriveVerificationPhrase(seedHex, counter, wordCount)
+
+  // Collect verification phrases at counter and ±1 adjacent counters.
+  const forbiddenPhrases: string[][] = []
+  const lo = Math.max(0, counter - 1)
+  const hi = Math.min(0xFFFFFFFF, counter + 1)
+  for (let c = lo; c <= hi; c++) {
+    forbiddenPhrases.push(deriveVerificationPhrase(seedHex, c, wordCount))
+  }
 
   const baseKey = concatBytes(seedBuf, pubkeyBuf)
   let raw = hmacSha256(baseKey, counterBuf)
@@ -110,9 +128,12 @@ export function deriveDuressPhrase(
     words.push(getWord(index))
   }
 
+  const matchesForbidden = () =>
+    forbiddenPhrases.some(fp => words.every((w, i) => w === fp[i]))
+
   // Collision avoidance: deterministic multi-suffix retry
   let suffix = 1
-  while (words.every((w, i) => w === verifyPhrase[i]) && suffix <= 255) {
+  while (matchesForbidden() && suffix <= 255) {
     raw = hmacSha256(concatBytes(seedBuf, pubkeyBuf, new Uint8Array([suffix])), counterBuf)
     for (let i = 0; i < wordCount; i++) {
       words[i] = getWord(readUint16BE(raw, i * 2) % WORDLIST_SIZE)
@@ -120,7 +141,7 @@ export function deriveDuressPhrase(
     suffix++
   }
 
-  if (words.every((w, i) => w === verifyPhrase[i])) {
+  if (matchesForbidden()) {
     throw new Error('Duress phrase collision unresolvable after 255 retries')
   }
 

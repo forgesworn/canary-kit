@@ -132,3 +132,38 @@ describe('deriveDuressPhrase', () => {
     }
   })
 })
+
+describe('cross-counter collision avoidance', () => {
+  it('deriveDuressWord never matches verification word at adjacent counters', () => {
+    // Reviewer's reproduction: seed='a'*64, counter=2, member=...05ff
+    // Before fix: deriveDuressWord(seed, member, 2) === deriveVerificationWord(seed, 1)
+    const seed = 'a'.repeat(64)
+    const member = '05ff'.padStart(64, '0')
+
+    for (let c = 0; c < 500; c++) {
+      const duress = deriveDuressWord(seed, member, c)
+      // Must not match verification word at c-1, c, or c+1
+      const lo = Math.max(0, c - 1)
+      const hi = c + 1
+      for (let adj = lo; adj <= hi; adj++) {
+        const verify = deriveVerificationWord(seed, adj)
+        expect(duress, `duress(${c}) collided with verify(${adj}): "${duress}"`).not.toBe(verify)
+      }
+    }
+  })
+
+  it('deriveDuressPhrase never matches verification phrase at adjacent counters', () => {
+    const seed = 'a'.repeat(64)
+    const member = '05ff'.padStart(64, '0')
+
+    for (let c = 0; c < 200; c++) {
+      const duress = deriveDuressPhrase(seed, member, c, 2)
+      const lo = Math.max(0, c - 1)
+      const hi = c + 1
+      for (let adj = lo; adj <= hi; adj++) {
+        const verify = deriveVerificationPhrase(seed, adj, 2)
+        expect(duress, `duressPhrase(${c}) collided with verifyPhrase(${adj})`).not.toEqual(verify)
+      }
+    }
+  })
+})
