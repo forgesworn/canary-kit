@@ -410,6 +410,11 @@ function getMemberName(pubkey, isDemo) {
 // State machine
 // ---------------------------------------------------------------------------
 
+function getActiveGroup() {
+  if (!state.activeGroupId) return null
+  return state.groups[state.activeGroupId] ?? null
+}
+
 function getAppState() {
   if (!state.identity && Object.keys(state.groups).length === 0) return 'welcome'
   if (state.activeGroupId === 'demo') return 'demo'
@@ -595,6 +600,99 @@ function stopBeaconSimulation() {
 }
 
 // ---------------------------------------------------------------------------
+// Duress alert display
+// ---------------------------------------------------------------------------
+
+function showDuressAlert(memberPubkey) {
+  const isDemoGroup = state.activeGroupId === 'demo'
+  const name = getMemberName(memberPubkey, isDemoGroup)
+  const pos = beaconPositions[memberPubkey]
+
+  const banner = document.getElementById('duress-alert-banner')
+  const nameEl = document.getElementById('duress-alert-name')
+  const locationEl = document.getElementById('duress-alert-location')
+
+  if (banner && nameEl) {
+    nameEl.textContent = name
+    if (pos && locationEl) {
+      locationEl.textContent = `Last known: ${pos.geohash} (precision ${pos.precision})`
+    } else if (locationEl) {
+      locationEl.textContent = 'Location unknown'
+    }
+    banner.removeAttribute('hidden')
+  }
+
+  setMarkerDuress(memberPubkey)
+
+  if (beaconMap && pos) {
+    beaconMap.flyTo({
+      center: [pos.lon, pos.lat],
+      zoom: 16,
+      speed: 1.2,
+    })
+  }
+
+  duressAlertActive = { member: memberPubkey, timestamp: Date.now() }
+}
+
+function dismissDuressAlert() {
+  const banner = document.getElementById('duress-alert-banner')
+  if (banner) banner.setAttribute('hidden', '')
+  duressAlertActive = null
+
+  for (const { el } of Object.values(beaconMarkers)) {
+    el.style.background = '#22c55e'
+    el.style.boxShadow = '0 0 8px rgba(34, 197, 94, 0.4)'
+    el.style.width = '14px'
+    el.style.height = '14px'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Browser Geolocation for active mode
+// ---------------------------------------------------------------------------
+
+let geolocationWatchId = null
+
+function startRealBeacons(group) {
+  if (!navigator.geolocation) {
+    console.warn('Geolocation not available')
+    return
+  }
+
+  geolocationWatchId = navigator.geolocation.watchPosition(
+    async (position) => {
+      const gh = await loadGeohashKit()
+      if (!gh) return
+
+      const { latitude, longitude } = position.coords
+      const precision = group.beaconPrecision ?? 6
+      const geohash = gh.encode(latitude, longitude, precision)
+
+      const pubkey = state.identity?.pubkey
+      if (pubkey) {
+        beaconPositions[pubkey] = {
+          lat: latitude, lon: longitude,
+          geohash, precision,
+          timestamp: Math.floor(Date.now() / 1000),
+        }
+        updateBeaconMarker(pubkey, latitude, longitude)
+        renderBeaconMembers()
+      }
+    },
+    (err) => console.warn('Geolocation error:', err),
+    { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 },
+  )
+}
+
+function stopRealBeacons() {
+  if (geolocationWatchId !== null) {
+    navigator.geolocation.clearWatch(geolocationWatchId)
+    geolocationWatchId = null
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Beacon member list renderer
 // ---------------------------------------------------------------------------
 
@@ -653,6 +751,9 @@ function setupBeaconPanel() {
       const appState = getAppState()
       if (appState === 'demo') {
         startBeaconSimulation()
+      } else if (appState === 'active') {
+        const group = getActiveGroup()
+        if (group) startRealBeacons(group)
       }
     })
   }
@@ -1057,6 +1158,9 @@ function handleVerify(e) {
         ? getMemberName(result.member, state.activeGroupId === 'demo')
         : 'someone'
       textEl.textContent = `Duress — ${memberName} may be under coercion.`
+      if (result.member) {
+        showDuressAlert(result.member)
+      }
       break
     }
     case 'stale':
@@ -1673,8 +1777,8 @@ function setupAuth() {
       revealTimeout = null
       revealCountdown = null
       stopBeaconSimulation()
-      duressAlertActive = null
-      document.getElementById('duress-alert-banner')?.setAttribute('hidden', '')
+      stopRealBeacons()
+      dismissDuressAlert()
       localStorage.removeItem(STORAGE_KEYS.groups)
       localStorage.removeItem(STORAGE_KEYS.identity)
       localStorage.removeItem(STORAGE_KEYS.settings)
