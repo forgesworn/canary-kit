@@ -5,6 +5,8 @@ import {
   buildMemberUpdateEvent,
   buildReseedEvent,
   buildWordUsedEvent,
+  buildBeaconEvent,
+  buildDuressAlertEvent,
   KINDS,
 } from './nostr.js'
 
@@ -16,8 +18,8 @@ const GROUP_D = 'family-2026'
 const GROUP_EVENT_ID = 'e'.repeat(64)
 
 describe('KINDS', () => {
-  it('defines 5 event kinds', () => {
-    expect(Object.keys(KINDS)).toHaveLength(5)
+  it('defines 6 event kinds', () => {
+    expect(Object.keys(KINDS)).toHaveLength(6)
     expect(KINDS.group).toBeDefined()
     expect(KINDS.seedDistribution).toBeDefined()
     expect(KINDS.memberUpdate).toBeDefined()
@@ -127,5 +129,43 @@ describe('buildWordUsedEvent', () => {
     })
     expect(event.kind).toBe(KINDS.wordUsed)
     expect(event.tags).toContainEqual(['e', GROUP_EVENT_ID])
+  })
+})
+
+describe('buildBeaconEvent', () => {
+  it('builds an ephemeral event with correct kind and tags', () => {
+    const event = buildBeaconEvent({
+      groupId: GROUP_D,
+      encryptedContent: '<encrypted-beacon>',
+      expiration: 1_800_000_300,
+    })
+    expect(event.kind).toBe(KINDS.beacon)
+    expect(event.content).toBe('<encrypted-beacon>')
+    expect(event.tags).toContainEqual(['g', GROUP_D])
+    expect(event.tags).toContainEqual(['expiration', '1800000300'])
+  })
+
+  it('omits expiration tag when not provided', () => {
+    const event = buildBeaconEvent({
+      groupId: GROUP_D,
+      encryptedContent: '<encrypted>',
+    })
+    const expirationTags = event.tags.filter(t => t[0] === 'expiration')
+    expect(expirationTags).toHaveLength(0)
+  })
+})
+
+describe('buildDuressAlertEvent', () => {
+  it('builds event with correct kind, g tag, p tag, and t tag', () => {
+    const event = buildDuressAlertEvent({
+      groupId: GROUP_D,
+      memberPubkey: ALICE,
+      encryptedContent: '<encrypted-alert>',
+    })
+    expect(event.kind).toBe(KINDS.wordUsed)
+    expect(event.content).toBe('<encrypted-alert>')
+    expect(event.tags).toContainEqual(['g', GROUP_D])
+    expect(event.tags).toContainEqual(['p', ALICE])
+    expect(event.tags).toContainEqual(['t', 'duress'])
   })
 })

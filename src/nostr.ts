@@ -13,6 +13,7 @@ export const KINDS = {
   memberUpdate: 38_801,
   reseed: 28_801,
   wordUsed: 28_802,
+  beacon: 20_800,
 } as const
 
 /** Unsigned Nostr event (consumer signs with their own library). */
@@ -121,6 +122,39 @@ export function buildWordUsedEvent(params: WordUsedParams): UnsignedEvent {
     kind: KINDS.wordUsed,
     content: params.encryptedContent,
     tags: [['e', params.groupEventId]],
+    created_at: now(),
+  }
+}
+
+export interface BeaconEventParams {
+  groupId: string
+  encryptedContent: string
+  expiration?: number
+}
+
+export function buildBeaconEvent(params: BeaconEventParams): UnsignedEvent {
+  const tags: string[][] = [['g', params.groupId]]
+  if (params.expiration) {
+    tags.push(['expiration', String(params.expiration)])
+  }
+  return { kind: KINDS.beacon, content: params.encryptedContent, tags, created_at: now() }
+}
+
+export interface DuressAlertEventParams {
+  groupId: string
+  memberPubkey: string
+  encryptedContent: string
+}
+
+export function buildDuressAlertEvent(params: DuressAlertEventParams): UnsignedEvent {
+  return {
+    kind: KINDS.wordUsed,
+    content: params.encryptedContent,
+    tags: [
+      ['g', params.groupId],
+      ['p', params.memberPubkey],
+      ['t', 'duress'],
+    ],
     created_at: now(),
   }
 }
