@@ -1,8 +1,8 @@
 // app/panels/hero.ts — Hero panel: verification word display with press-and-hold reveal
 
-import { getCurrentWord, advanceCounter, syncCounter, getCounter } from 'canary-kit'
-import { deriveTokenBytes } from 'canary-kit/token'
-import { encodeAsPin, encodeAsHex } from 'canary-kit/encoding'
+import { advanceCounter, syncCounter, getCounter } from 'canary-kit'
+import { deriveToken } from 'canary-kit/token'
+import type { TokenEncoding } from 'canary-kit/encoding'
 import { getState, updateGroup } from '../state.js'
 import type { AppGroup } from '../types.js'
 
@@ -76,32 +76,26 @@ const ENCODING_VALUES: AppGroup['encodingFormat'][] = ['words', 'pin', 'hex']
 
 // ── Display token derivation ────────────────────────────────────
 
+/** Map the app's simple encoding name to a TokenEncoding object. */
+function toTokenEncoding(group: AppGroup): TokenEncoding {
+  switch (group.encodingFormat) {
+    case 'pin': return { format: 'pin', digits: 6 }
+    case 'hex': return { format: 'hex', length: 8 }
+    case 'words':
+    default: return { format: 'words', count: group.wordCount }
+  }
+}
+
+/** Context string for group-mode token derivation. */
+const GROUP_CONTEXT = 'canary:group'
+
 /**
- * Derive the current display token for a group according to its encodingFormat.
- *
- * For 'words': delegates to getCurrentWord() which uses the group's own HMAC-SHA256
- * derivation (supports multi-word phrases via wordCount).
- *
- * For 'pin' and 'hex': uses the universal CANARY token API (deriveTokenBytes + encode*)
- * so that any conformant implementation produces the same output from the same seed.
- * These produce different output from the same seed than the word path — by design.
+ * Derive the current display token using the universal CANARY token API.
+ * All encoding formats use the same derivation path.
  */
 function getDisplayToken(group: AppGroup): string {
   const effectiveCounter = group.counter + group.usageOffset
-
-  switch (group.encodingFormat) {
-    case 'pin': {
-      const bytes = deriveTokenBytes(group.seed, 'canary:verify', effectiveCounter)
-      return encodeAsPin(bytes, 6)
-    }
-    case 'hex': {
-      const bytes = deriveTokenBytes(group.seed, 'canary:verify', effectiveCounter)
-      return encodeAsHex(bytes, 8)
-    }
-    case 'words':
-    default:
-      return getCurrentWord(group)
-  }
+  return deriveToken(group.seed, GROUP_CONTEXT, effectiveCounter, toTokenEncoding(group))
 }
 
 // ── Render ─────────────────────────────────────────────────────
