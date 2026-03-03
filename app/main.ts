@@ -29,6 +29,7 @@ import { renderMembers } from './panels/members.js'
 import { renderBeacons } from './panels/beacons.js'
 import { renderLiveness } from './panels/liveness.js'
 import { renderSettings } from './panels/settings.js'
+import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
 import { acceptInvite } from './invite.js'
 import type { PresetName } from 'canary-kit'
 
@@ -163,7 +164,7 @@ function buildShell(): void {
 
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-    <div class="layout">
+    <div class="layout" id="groups-view">
       <aside class="sidebar" id="sidebar"></aside>
 
       <main class="content" id="content">
@@ -178,6 +179,12 @@ function buildShell(): void {
         </div>
         <div id="liveness-container"></div>
         <div id="settings-container"></div>
+      </main>
+    </div>
+
+    <div id="call-demo-view" hidden>
+      <main class="content" style="max-width: 100%;">
+        <div id="call-simulation-container"></div>
       </main>
     </div>
   `
@@ -230,32 +237,51 @@ function wireSidebarToggle(): void {
 
 /** Re-render all reactive components from current state. */
 function render(): void {
-  const welcome = document.getElementById('welcome-container')
-  if (welcome) renderWelcome(welcome)
+  const { view } = getState()
 
-  const sidebar = document.getElementById('sidebar')
-  if (sidebar) renderSidebar(sidebar)
+  const groupsView = document.getElementById('groups-view')
+  const callDemoView = document.getElementById('call-demo-view')
 
-  const hero = document.getElementById('hero-container')
-  if (hero) renderHero(hero)
+  if (groupsView) groupsView.hidden = view !== 'groups'
+  if (callDemoView) callDemoView.hidden = view !== 'call-demo'
 
-  const duress = document.getElementById('duress-container')
-  if (duress) renderDuress(duress)
+  // Re-render header (tab active state)
+  const header = document.getElementById('header')
+  if (header) renderHeader(header)
 
-  const verify = document.getElementById('verify-container')
-  if (verify) renderVerify(verify)
+  if (view === 'groups') {
+    destroyCallSimulation()
 
-  const members = document.getElementById('members-container')
-  if (members) renderMembers(members)
+    const welcome = document.getElementById('welcome-container')
+    if (welcome) renderWelcome(welcome)
 
-  const beacons = document.getElementById('beacon-container')
-  if (beacons) void renderBeacons(beacons)
+    const sidebar = document.getElementById('sidebar')
+    if (sidebar) renderSidebar(sidebar)
 
-  const liveness = document.getElementById('liveness-container')
-  if (liveness) renderLiveness(liveness)
+    const hero = document.getElementById('hero-container')
+    if (hero) renderHero(hero)
 
-  const settings = document.getElementById('settings-container')
-  if (settings) renderSettings(settings)
+    const duress = document.getElementById('duress-container')
+    if (duress) renderDuress(duress)
+
+    const verify = document.getElementById('verify-container')
+    if (verify) renderVerify(verify)
+
+    const members = document.getElementById('members-container')
+    if (members) renderMembers(members)
+
+    const beacons = document.getElementById('beacon-container')
+    if (beacons) void renderBeacons(beacons)
+
+    const liveness = document.getElementById('liveness-container')
+    if (liveness) renderLiveness(liveness)
+
+    const settings = document.getElementById('settings-container')
+    if (settings) renderSettings(settings)
+  } else if (view === 'call-demo') {
+    const callContainer = document.getElementById('call-simulation-container')
+    if (callContainer) renderCallSimulation(callContainer)
+  }
 }
 
 // ── Modal: create group ────────────────────────────────────────
@@ -436,6 +462,11 @@ function init(): void {
     // No PIN — restore state directly and boot the app.
     restoreState()
     buildShell()
+
+    if (window.location.hash === '#call') {
+      update({ view: 'call-demo' })
+    }
+
     checkInviteFragment()
 
     const header = document.getElementById('header')

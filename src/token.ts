@@ -199,3 +199,29 @@ export function deriveLivenessToken(
   const data = concatBytes(utf8(context + ':alive'), new Uint8Array([0x00]), utf8(identity), counterBe32(counter))
   return hmacSha256(key, data)
 }
+
+/** A pair of directional tokens keyed by role name. */
+export interface DirectionalPair {
+  [role: string]: string
+}
+
+/**
+ * Derive a directional pair: two distinct tokens from the same secret,
+ * one per role. Each token uses context = `${namespace}:${role}`.
+ *
+ * Neither token can be derived from the other without the shared secret.
+ * This prevents the "echo problem" where the second speaker could parrot
+ * the first.
+ */
+export function deriveDirectionalPair(
+  secret: Uint8Array | string,
+  namespace: string,
+  roles: [string, string],
+  counter: number,
+  encoding: TokenEncoding = DEFAULT_ENCODING,
+): DirectionalPair {
+  return {
+    [roles[0]]: deriveToken(secret, `${namespace}:${roles[0]}`, counter, encoding),
+    [roles[1]]: deriveToken(secret, `${namespace}:${roles[1]}`, counter, encoding),
+  }
+}

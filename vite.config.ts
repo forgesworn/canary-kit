@@ -17,6 +17,7 @@ export default defineConfig({
       'canary-kit/beacon':    resolve(__dirname, 'src/beacon.ts'),
       'canary-kit/token':     resolve(__dirname, 'src/token.ts'),
       'canary-kit/encoding':  resolve(__dirname, 'src/encoding.ts'),
+      'canary-kit/session':   resolve(__dirname, 'src/session.ts'),
       // Root export must come last (longest-match-first is not guaranteed)
       'canary-kit':           resolve(__dirname, 'src/index.ts'),
     },

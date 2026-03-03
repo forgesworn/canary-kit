@@ -1,6 +1,6 @@
 # canary-kit
 
-> Spoken-word identity verification for trusted groups
+> Deepfake-proof identity verification. Open protocol, zero dependencies.
 
 [![npm](https://img.shields.io/npm/v/canary-kit)](https://www.npmjs.com/package/canary-kit)
 [![CI](https://github.com/TheCryptoDonkey/canary-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/TheCryptoDonkey/canary-kit/actions)
@@ -8,18 +8,20 @@
 
 ## The Problem
 
-AI voice cloning takes three seconds of audio. The security advice — "agree on a
-family safe word" — is widespread, but common implementations are dangerously naive:
-static words that never rotate, no duress signalling, and no protocol behind them.
+Voice phishing surged 442% in 2025. AI can clone a voice from three seconds of
+audio. The tools that were supposed to protect us are failing:
 
-Existing standards solve parts of this:
-- **TOTP/HOTP** rotate tokens automatically, but output digits for machines, not words for humans
-- **ZRTP SAS** produces human-readable strings, but doesn't rotate or signal duress
-- **BIP-39** provides a spoken wordlist, but has no verification or coercion resistance
+- **Security questions** are one-directional and socially engineerable
+- **Voice biometrics** — 91% of US banks are reconsidering after deepfake attacks
+- **TOTP codes** prove you to a server, but never prove the server to you
+- **"Family safe words"** are static, never rotate, and have no duress signalling
 
-CANARY combines these ideas into a single protocol: deterministic rotation (like TOTP),
-coercion-resistant duress signalling, and spoken-word output — three properties that
-have never been combined in a standard before.
+CANARY is the first protocol that combines **bidirectional verification** (both
+sides prove identity), **coercion resistance** (duress tokens), and **spoken-word
+output** — three properties that have never existed together in a standard.
+
+It works because cloning a voice doesn't help you derive the right word. Only
+knowledge of the shared secret does.
 
 ## Quick Start
 
@@ -27,46 +29,144 @@ have never been combined in a standard before.
 npm install canary-kit
 ```
 
-```typescript
-import { createGroup, getCurrentWord, getCurrentDuressWord, verifyWord, getCounter } from 'canary-kit'
+### Phone Verification (Insurance, Banking)
 
-// Create a group
+```typescript
+import { createSession } from 'canary-kit/session'
+
+const session = createSession({
+  secret: sharedSeed,
+  namespace: 'aviva',
+  roles: ['caller', 'agent'],
+  myRole: 'agent',
+  preset: 'call',
+})
+
+session.myToken()        // "choose" — what I speak
+session.theirToken()     // "bid" — what I expect to hear
+session.verify('bid')    // { status: 'valid' }
+```
+
+### Family / Team Verification
+
+```typescript
+import { createGroup, getCurrentWord, verifyWord, getCounter } from 'canary-kit'
+
 const group = createGroup({
   name: 'Family',
   members: [alicePubkey, bobPubkey],
+  preset: 'family',
 })
 
-// Get the current verification word (all members derive the same word)
-const word = getCurrentWord(group)
-// => "falcon"
-
-// Get Alice's duress word (only she should use this if coerced)
-const duress = getCurrentDuressWord(group, alicePubkey)
-// => "bridge"
-
-// Verify a spoken word (uses getCurrentWord internally for comparison)
-const result = verifyWord(word, group.seed, group.members,
-  getCounter(Math.floor(Date.now() / 1000), group.rotationInterval) + group.usageOffset)
-// => { status: 'verified' }
+getCurrentWord(group)  // "falcon"
 ```
+
+## Use Cases
+
+| Use case | Preset | Rotation | What it replaces |
+|----------|--------|----------|------------------|
+| Insurance phone calls | `call` | 30 seconds | Security questions |
+| Banking phone calls | `call` | 30 seconds | Voice biometrics, callbacks |
+| Rideshare/delivery handoff | `handoff` | Single-use | Random PINs |
+| Family safety | `family` | 7 days | Static safe words |
+| Journalism / activism | `field-ops` | 24 hours | Nothing (no existing standard) |
+| Enterprise incident response | `enterprise` | 48 hours | Challenge-response over email |
+
+## Why Not Just...
+
+| Solution | Limitation CANARY solves |
+|----------|------------------------|
+| Security questions | One-directional. Socially engineerable. No rotation. |
+| Voice biometrics | Defeated by AI voice cloning. One-directional. |
+| TOTP (Google Auth) | Machine-readable digits, not spoken words. No duress. One-directional. |
+| Callback numbers | Slow. Doesn't prove the agent's identity. |
+| BIP-39 wordlist | No verification protocol. No rotation. No duress. |
+| "Family safe word" | Static. No rotation. No duress. No protocol. |
+| **CANARY** | **Bidirectional. Deepfake-proof. Duress-aware. Rotating. Offline. Open.** |
 
 ## Why Canary
 
-**Built on proven primitives.** CANARY extends the HMAC-counter pattern from HOTP (RFC 4226) and TOTP (RFC 6238) to human-to-human spoken verification, adding duress signalling and coercion resistance. If TOTP proves you have a secret to a server, CANARY proves you're safe to another person.
+**Bidirectional.** Both sides prove identity. The caller proves they know the secret, and the agent proves it back. Neither can impersonate the other.
+
+**Built on proven primitives.** CANARY extends the HMAC-counter pattern from HOTP (RFC 4226) and TOTP (RFC 6238) to human-to-human spoken verification, adding duress signalling and coercion resistance.
 
 **Offline-first.** Words are derived locally from a shared seed and a time-based counter. No network is required after initial setup.
 
-**Duress-aware.** Every member has a personal duress word distinct from the verification word. Speaking it silently alerts the group while giving the attacker plausible deniability.
+**Duress-aware.** Every party has a personal duress word distinct from the verification word. Speaking it silently alerts the system while giving the attacker plausible deniability.
 
-**Automatic rotation.** The counter advances on a configurable interval (default: 7 days). Burn-after-use increments the counter immediately after each verification, so words cannot be replayed.
-
-**Multi-channel.** Seed distribution uses Nostr relays with NIP-44 encryption. Meshtastic mesh provides a resilient offline fallback.
+**Automatic rotation.** Configurable intervals — 30 seconds for phone calls, 7 days for family groups.
 
 **Zero dependencies.** Pure JavaScript — no runtime dependencies. Requires `globalThis.crypto` (Web Crypto API): all browsers, Node.js 22+, Deno, and edge runtimes.
 
 **Protocol-grade.** Formal specification with published test vectors and a curated 2048-word spoken-clarity wordlist.
 
 ## API Reference
+
+### Session API (Directional Verification)
+
+```typescript
+import {
+  createSession,
+  generateSeed,
+  deriveSeed,
+  SESSION_PRESETS,
+  type Session,
+  type SessionConfig,
+  type SessionPresetName,
+} from 'canary-kit/session'
+```
+
+| Function | Description |
+|---|---|
+| `createSession(config: SessionConfig)` | Create a role-aware verification session |
+| `generateSeed()` | Generate a 256-bit cryptographic seed |
+| `deriveSeed(masterKey, ...components)` | Derive a seed deterministically from a master key |
+
+**Session interface:**
+
+| Method | Description |
+|---|---|
+| `session.myToken(nowSec?)` | Token I speak to prove my identity |
+| `session.theirToken(nowSec?)` | Token I expect to hear from the other party |
+| `session.verify(spoken, nowSec?)` | Verify a spoken word — returns `valid`, `duress`, or `invalid` |
+| `session.counter(nowSec?)` | Current counter value (time-based or fixed) |
+| `session.pair(nowSec?)` | Both tokens at once, keyed by role name |
+
+**Session presets:**
+
+| Preset | Words | Rotation | Tolerance | Use case |
+|--------|-------|----------|-----------|----------|
+| `call` | 1 | 30 seconds | ±1 | Phone verification (insurance, banking) |
+| `handoff` | 1 | Single-use | 0 | Physical handoff (rideshare, delivery) |
+
+### CANARY Protocol (Universal)
+
+The universal protocol API works with any transport — not just Nostr groups.
+
+```typescript
+import {
+  deriveToken, deriveTokenBytes,
+  deriveDuressToken, deriveDuressTokenBytes,
+  verifyToken,
+  deriveLivenessToken,
+  deriveDirectionalPair,
+  type TokenVerifyResult, type VerifyOptions,
+  type DirectionalPair,
+} from 'canary-kit/token'
+
+import {
+  encodeAsWords, encodeAsPin, encodeAsHex,
+  encodeToken, type TokenEncoding,
+} from 'canary-kit/encoding'
+```
+
+| Function | Description |
+|---|---|
+| `deriveToken(secret, context, counter, encoding?)` | Derive an encoded verification token |
+| `deriveDuressToken(secret, context, identity, counter, encoding?)` | Derive a duress token for a specific identity |
+| `verifyToken(secret, context, counter, input, identities, options?)` | Verify a token — returns `valid`, `duress` (with matching identities), or `invalid` |
+| `deriveLivenessToken(secret, context, identity, counter)` | Derive a liveness heartbeat token for dead man's switch |
+| `deriveDirectionalPair(secret, namespace, roles, counter, encoding?)` | Derive two directional tokens from the same secret |
 
 ### Core Derivation
 
@@ -83,34 +183,8 @@ import {
 |---|---|---|
 | `deriveVerificationWord` | `(seedHex: string, counter: number) => string` | Derives the single verification word for all group members |
 | `deriveVerificationPhrase` | `(seedHex: string, counter: number, wordCount: 1 \| 2 \| 3) => string[]` | Derives a multi-word verification phrase |
-| `deriveDuressWord` | `(seedHex: string, memberPubkeyHex: string, counter: number) => string` | Derives a member's duress word; guaranteed distinct from the verification word via multi-suffix retry |
+| `deriveDuressWord` | `(seedHex: string, memberPubkeyHex: string, counter: number) => string` | Derives a member's duress word |
 | `deriveDuressPhrase` | `(seedHex: string, memberPubkeyHex: string, counter: number, wordCount: 1 \| 2 \| 3) => string[]` | Derives a member's multi-word duress phrase |
-
-### CANARY Protocol (Universal)
-
-The universal protocol API works with any transport — not just Nostr groups.
-
-```typescript
-import {
-  deriveToken, deriveTokenBytes,
-  deriveDuressToken, deriveDuressTokenBytes,
-  verifyToken,
-  deriveLivenessToken,
-  type TokenVerifyResult, type VerifyOptions,
-} from 'canary-kit/token'
-
-import {
-  encodeAsWords, encodeAsPin, encodeAsHex,
-  encodeToken, type TokenEncoding,
-} from 'canary-kit/encoding'
-```
-
-| Function | Description |
-|---|---|
-| `deriveToken(secret, context, counter, encoding?)` | Derive an encoded verification token |
-| `deriveDuressToken(secret, context, identity, counter, encoding?)` | Derive a duress token for a specific identity |
-| `verifyToken(secret, context, counter, input, identities, options?)` | Verify a token — returns `valid`, `duress` (with matching identities), or `invalid` |
-| `deriveLivenessToken(secret, context, identity, counter)` | Derive a liveness heartbeat token for dead man's switch |
 
 ### Verification
 
@@ -155,20 +229,9 @@ All functions are pure — they return new state without mutating the input.
 | `getCurrentWord(state: GroupState)` | Returns the current verification word or space-joined phrase |
 | `getCurrentDuressWord(state: GroupState, memberPubkey: string)` | Returns the current duress word or phrase for a specific member |
 | `advanceCounter(state: GroupState)` | Increments the usage offset (burn-after-use rotation) |
-| `reseed(state: GroupState)` | Generates a fresh seed and resets the usage offset; call after a suspected compromise |
+| `reseed(state: GroupState)` | Generates a fresh seed and resets the usage offset |
 | `addMember(state: GroupState, pubkey: string)` | Adds a member; idempotent if already present |
-| `removeMember(state: GroupState, pubkey: string)` | Removes a member and immediately reseeds to invalidate the old shared secret |
-
-```typescript
-interface GroupConfig {
-  name: string
-  members: string[]           // hex-encoded Nostr pubkeys
-  preset?: PresetName         // threat-profile preset; explicit fields override
-  rotationInterval?: number   // seconds; default 604800 (7 days)
-  wordCount?: 1 | 2 | 3      // words per challenge; default 1
-  wordlist?: string           // wordlist identifier; default 'en-v1'
-}
-```
+| `removeMember(state: GroupState, pubkey: string)` | Removes a member and immediately reseeds |
 
 ### Threat-Profile Presets
 
@@ -176,30 +239,13 @@ interface GroupConfig {
 import { createGroup, PRESETS, type PresetName } from 'canary-kit'
 ```
 
-Pre-configured group settings for common risk profiles:
+**Group presets:**
 
 | Preset | Words | Rotation | Use case |
 |--------|-------|----------|----------|
 | `family` | 1 | 7 days | Casual family/friend verification |
 | `field-ops` | 2 | 24 hours | Journalism, activism, field work |
 | `enterprise` | 2 | 48 hours | Corporate incident response |
-
-```typescript
-// Use a preset
-const group = createGroup({
-  name: 'Newsroom',
-  members: [alicePubkey, bobPubkey],
-  preset: 'field-ops',
-})
-
-// Override specific preset values
-const custom = createGroup({
-  name: 'Custom',
-  members: [alicePubkey, bobPubkey],
-  preset: 'field-ops',
-  wordCount: 3, // override preset's 2
-})
-```
 
 Explicit config values always override preset defaults.
 
@@ -219,8 +265,7 @@ import { getCounter, counterToBytes, DEFAULT_ROTATION_INTERVAL } from 'canary-ki
 
 ```typescript
 import { WORDLIST, WORDLIST_SIZE, getWord, indexOf } from 'canary-kit'
-// or, for direct access:
-import { WORDLIST, WORDLIST_SIZE, getWord, indexOf } from 'canary-kit/wordlist'
+// or: import { WORDLIST, WORDLIST_SIZE, getWord, indexOf } from 'canary-kit/wordlist'
 ```
 
 | Export | Description |
@@ -270,7 +315,7 @@ import {
 
 ## Protocol
 
-The full protocol specification is in [CANARY.md](CANARY.md). The Nostr binding is in [NIP-CANARY.md](NIP-CANARY.md).
+The full protocol specification is in [CANARY.md](CANARY.md). The Nostr binding is in [NIP-CANARY.md](NIP-CANARY.md). The integration guide for finance/enterprise is in [INTEGRATION.md](INTEGRATION.md).
 
 | Event | Kind | Type |
 |---|---|---|

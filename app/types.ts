@@ -36,6 +36,7 @@ export interface AppSettings {
 
 /** Root application state. */
 export interface AppState {
+  view: 'groups' | 'call-demo'
   groups: Record<string, AppGroup>
   activeGroupId: string | null
   identity: AppIdentity | null

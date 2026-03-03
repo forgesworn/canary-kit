@@ -37,12 +37,18 @@ function handleThemeToggle(btn: HTMLButtonElement): void {
 
 /**
  * Render the header chrome into the given container element.
- * Produces: brand div, relay status indicator, and theme toggle button.
+ * Produces: brand div, nav tabs, relay status indicator, and theme toggle button.
  */
 export function renderHeader(container: HTMLElement): void {
+  const view = getState().view
+
   container.innerHTML = `
     <button class="header__hamburger" id="hamburger" aria-label="Toggle menu">&#9776;</button>
     <div class="header__brand">CANARY</div>
+    <nav class="header__nav" id="header-nav">
+      <button class="header__nav-tab${view === 'groups' ? ' header__nav-tab--active' : ''}" data-view="groups">Groups</button>
+      <button class="header__nav-tab${view === 'call-demo' ? ' header__nav-tab--active' : ''}" data-view="call-demo">Call Demo</button>
+    </nav>
     <div class="header__actions">
       <span id="relay-status" hidden>
         <span class="relay-dot"></span>
@@ -57,6 +63,16 @@ export function renderHeader(container: HTMLElement): void {
     updateToggleLabel(btn)
     btn.addEventListener('click', () => handleThemeToggle(btn))
   }
+
+  const nav = container.querySelector<HTMLElement>('#header-nav')
+  nav?.addEventListener('click', (e) => {
+    const tab = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-view]')
+    if (!tab) return
+    const targetView = tab.dataset.view as 'groups' | 'call-demo'
+    if (targetView && targetView !== getState().view) {
+      update({ view: targetView })
+    }
+  })
 }
 
 /**

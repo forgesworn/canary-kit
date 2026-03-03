@@ -82,3 +82,19 @@ describe('CANARY-DURESS protocol vectors', () => {
     expect(hex).toBe('b38a10676ea8d4e716ad606e0b2ae7d9678e47ff44b0920a68ed6cb02e9bb858')
   })
 })
+
+describe('Directional pair protocol vectors', () => {
+  it('vector 11: caller token — context="aviva:caller"', () => {
+    expect(deriveToken(SECRET, 'aviva:caller', 0)).toBe('bid')
+  })
+
+  it('vector 12: agent token — context="aviva:agent"', () => {
+    expect(deriveToken(SECRET, 'aviva:agent', 0)).toBe('choose')
+  })
+
+  it('vectors 11 and 12 are different (directional property)', () => {
+    const caller = deriveToken(SECRET, 'aviva:caller', 0)
+    const agent = deriveToken(SECRET, 'aviva:agent', 0)
+    expect(caller).not.toBe(agent)
+  })
+})

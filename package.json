@@ -1,7 +1,7 @@
 {
   "name": "canary-kit",
   "version": "0.0.0-development",
-  "description": "Spoken-word identity verification for trusted groups",
+  "description": "Deepfake-proof identity verification. Open protocol, zero dependencies.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -33,13 +33,18 @@
     "./encoding": {
       "types": "./dist/encoding.d.ts",
       "import": "./dist/encoding.js"
+    },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "import": "./dist/session.js"
     }
   },
   "files": [
     "dist/",
     "LICENSE",
     "CANARY.md",
-    "NIP-CANARY.md"
+    "NIP-CANARY.md",
+    "INTEGRATION.md"
   ],
   "scripts": {
     "build": "tsc",

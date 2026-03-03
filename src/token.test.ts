@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveTokenBytes, deriveToken, deriveDuressTokenBytes, deriveDuressToken, verifyToken, deriveLivenessToken } from './token.js'
+import { deriveTokenBytes, deriveToken, deriveDuressTokenBytes, deriveDuressToken, verifyToken, deriveLivenessToken, deriveDirectionalPair } from './token.js'
 import { hexToBytes, bytesToHex } from './crypto.js'
 
 const SECRET_1 = '0000000000000000000000000000000000000000000000000000000000000001'
@@ -292,5 +292,66 @@ describe('deriveLivenessToken', () => {
     const a = deriveLivenessToken(SECRET_1, 'test', IDENTITY_A, 0)
     const b = deriveLivenessToken(SECRET_1, 'test', IDENTITY_A, 1)
     expect(bytesToHex(a)).not.toBe(bytesToHex(b))
+  })
+})
+
+describe('deriveDirectionalPair', () => {
+  it('returns an object with both role keys', () => {
+    const pair = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
+    expect(pair).toHaveProperty('caller')
+    expect(pair).toHaveProperty('agent')
+  })
+
+  it('both values are non-empty strings', () => {
+    const pair = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
+    expect(typeof pair.caller).toBe('string')
+    expect(typeof pair.agent).toBe('string')
+    expect(pair.caller.length).toBeGreaterThan(0)
+    expect(pair.agent.length).toBeGreaterThan(0)
+  })
+
+  it('produces different tokens for each role', () => {
+    const pair = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
+    expect(pair.caller).not.toBe(pair.agent)
+  })
+
+  it('is deterministic', () => {
+    const a = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
+    const b = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
+    expect(a).toEqual(b)
+  })
+
+  it('different counter produces different pair', () => {
+    const a = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
+    const b = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 1)
+    expect(a.caller).not.toBe(b.caller)
+    expect(a.agent).not.toBe(b.agent)
+  })
+
+  it('different namespace produces different pair', () => {
+    const a = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
+    const b = deriveDirectionalPair(SECRET_1, 'barclays', ['caller', 'agent'], 0)
+    expect(a.caller).not.toBe(b.caller)
+  })
+
+  it('role tokens match individual deriveToken calls', () => {
+    const pair = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
+    expect(pair.caller).toBe(deriveToken(SECRET_1, 'aviva:caller', 0))
+    expect(pair.agent).toBe(deriveToken(SECRET_1, 'aviva:agent', 0))
+  })
+
+  it('works with PIN encoding', () => {
+    const encoding = { format: 'pin' as const, digits: 4 }
+    const pair = deriveDirectionalPair(SECRET_1, 'trott', ['requester', 'provider'], 0, encoding)
+    expect(pair.requester).toHaveLength(4)
+    expect(pair.provider).toHaveLength(4)
+    expect(pair.requester).not.toBe(pair.provider)
+  })
+
+  it('works with multi-word encoding', () => {
+    const encoding = { format: 'words' as const, count: 2 }
+    const pair = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0, encoding)
+    expect(pair.caller.split(' ')).toHaveLength(2)
+    expect(pair.agent.split(' ')).toHaveLength(2)
   })
 })

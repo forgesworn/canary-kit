@@ -5,6 +5,7 @@ import type { AppState } from './types.js'
 // ── Default state ──────────────────────────────────────────────
 
 const DEFAULT_STATE: AppState = {
+  view: 'groups',
   groups: {},
   activeGroupId: null,
   identity: null,

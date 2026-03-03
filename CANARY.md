@@ -196,6 +196,65 @@ More output = more security, harder to speak:
 | 4-digit PIN  | ~13.3 | 10,000        | Quick handoff (TROTT)            |
 | 6-digit code | ~19.9 | 1,000,000     | TOTP-equivalent                  |
 
+### Directional Pair Pattern
+
+A single shared token has an echo problem: the second party to speak could parrot
+the first. CANARY solves this with **directional context strings** — each side
+derives a different token from the same secret.
+
+A directional pair uses a namespace and two role identifiers to construct two
+context strings:
+
+```
+context_a = namespace + ":" + role_a
+context_b = namespace + ":" + role_b
+```
+
+Each party derives BOTH tokens. Party A speaks their token; Party B verifies it
+against context_a. Then Party B speaks their token; Party A verifies against
+context_b. Neither token can be derived from the other without the shared secret.
+
+#### Example — Insurance Phone Call
+
+```
+caller_word = HMAC-SHA256(secret, utf8("aviva:caller") || counter_be32)
+agent_word  = HMAC-SHA256(secret, utf8("aviva:agent")  || counter_be32)
+```
+
+1. Agent: "What's your verification word?"
+2. Caller speaks **"bid"** — Agent verifies against `aviva:caller` context ✓
+3. Caller: "And what's mine?"
+4. Agent speaks **"choose"** — Caller verifies against `aviva:agent` context ✓
+
+An eavesdropper hearing "bid" cannot derive "choose". Both parties have
+independently proved knowledge of the shared secret.
+
+#### Duress in Directional Pairs
+
+Each party's duress token is derived from their OWN directional context:
+
+```
+caller_duress = HMAC-SHA256(secret, utf8("aviva:caller:duress") || 0x00 || utf8(caller_id) || counter_be32)
+agent_duress  = HMAC-SHA256(secret, utf8("aviva:agent:duress")  || 0x00 || utf8(agent_id)  || counter_be32)
+```
+
+If the caller speaks their duress word instead of their verification word, the
+agent's system detects it and triggers the appropriate response — without the
+caller ever revealing they are under coercion.
+
+#### Convention
+
+Implementations SHOULD use the format `namespace:role` for directional context
+strings. The namespace identifies the application or domain. The roles identify
+the two parties. Example namespaces:
+
+| Namespace   | Roles                        | Use case                       |
+|-------------|------------------------------|--------------------------------|
+| `trott`     | `requester`, `provider`      | Task handoff verification      |
+| `aviva`     | `caller`, `agent`            | Insurance phone verification   |
+| `barclays`  | `customer`, `agent`          | Banking phone verification     |
+| `signet`    | `subject`, `verifier`        | Identity verification          |
+
 ---
 
 ## CANARY-DURESS
@@ -538,6 +597,8 @@ Liveness:
 | 8  | verifyToken        | `canary:verify`  | `alice`    | 0       | input: `net`   | `{ status: 'valid' }`                                           |
 | 9  | verifyToken        | `canary:verify`  | `alice`    | 0       | input: `airport`| `{ status: 'duress', identities: ['alice'] }`                  |
 | 10 | deriveLivenessToken| `canary:verify`  | `alice`    | 0       | raw hex     | `b38a10676ea8d4e716ad606e0b2ae7d9678e47ff44b0920a68ed6cb02e9bb858` |
+| 11 | deriveToken        | `aviva:caller`   | —          | 0       | 1 word      | `bid`                                                              |
+| 12 | deriveToken        | `aviva:agent`    | —          | 0       | 1 word      | `choose`                                                           |
 
 Notes:
 
@@ -547,6 +608,8 @@ Notes:
 - Vector 7: `0325` is distinct from `2796` — no collision re-derivation needed.
 - Vectors 8–9: Round-trip verification confirms correct classification of normal tokens
   as `valid` and duress tokens as `duress` with the correct identity.
+- Vectors 11–12: Directional pair — same secret, different context strings produce
+  different tokens (`bid` vs `choose`). An eavesdropper hearing one cannot derive the other.
 
 ---
 
