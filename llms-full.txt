@@ -1,0 +1,1396 @@
+# canary-kit — Full API Reference
+
+> Deepfake-proof spoken-word identity verification. Open protocol, zero dependencies.
+
+Zero dependencies. ESM-only. TypeScript native.
+
+Repository: https://github.com/TheCryptoDonkey/canary-kit
+Interactive demo: https://thecryptodonkey.github.io/canary-kit/
+Licence: MIT
+
+## Install
+
+```
+npm install canary-kit
+```
+
+## Imports
+
+```typescript
+// Barrel (main API — group management, token protocol, beacon, wordlist)
+import {
+  createGroup, getCurrentWord, getCurrentDuressWord, advanceCounter, reseed,
+  addMember, removeMember, syncCounter,
+  deriveToken, deriveDuressToken, verifyToken, deriveLivenessToken,
+  encodeAsWords, encodeAsPin, encodeAsHex, encodeToken,
+  deriveVerificationWord, deriveVerificationPhrase,
+  deriveDuressWord, deriveDuressPhrase,
+  verifyWord,
+  PRESETS,
+  deriveBeaconKey, encryptBeacon, decryptBeacon,
+  buildDuressAlert, encryptDuressAlert, decryptDuressAlert,
+  getCounter, counterToBytes,
+  WORDLIST, WORDLIST_SIZE, getWord, indexOf,
+} from 'canary-kit'
+
+// Subpath imports (tree-shakeable)
+import { deriveToken, deriveDuressToken, verifyToken, deriveLivenessToken, deriveDirectionalPair } from 'canary-kit/token'
+import { encodeAsWords, encodeAsPin, encodeAsHex, encodeToken } from 'canary-kit/encoding'
+import { createSession, generateSeed, deriveSeed, SESSION_PRESETS } from 'canary-kit/session'
+import { WORDLIST, WORDLIST_SIZE, getWord, indexOf } from 'canary-kit/wordlist'
+import { KINDS, buildGroupEvent, buildSeedDistributionEvent, buildMemberUpdateEvent, buildReseedEvent, buildWordUsedEvent, buildBeaconEvent } from 'canary-kit/nostr'
+import { deriveBeaconKey, encryptBeacon, decryptBeacon, buildDuressAlert, encryptDuressAlert, decryptDuressAlert } from 'canary-kit/beacon'
+```
+
+---
+
+## Types
+
+```typescript
+// ── Encoding ─────────────────────────────────────────────────────────────────
+
+/** Controls how a token is encoded for spoken/displayed output. */
+type TokenEncoding =
+  | { format: 'words'; count?: number; wordlist?: readonly string[] }
+  | { format: 'pin'; digits?: number }
+  | { format: 'hex'; length?: number }
+
+/** Default encoding: a single word from the en-v1 wordlist. */
+const DEFAULT_ENCODING: TokenEncoding  // { format: 'words', count: 1 }
+
+/** Maximum allowed tolerance/maxTolerance value. Prevents pathological iteration. */
+const MAX_TOLERANCE = 10
+
+// ── Token Protocol ────────────────────────────────────────────────────────────
+
+/** Result of verifying a token against a group's secret and identities. */
+interface TokenVerifyResult {
+  /** 'valid' = matches normal token, 'duress' = matches a duress token, 'invalid' = no match. */
+  status: 'valid' | 'duress' | 'invalid'
+  /** Identities of duress signallers (only present when status = 'duress'). */
+  identities?: string[]
+}
+
+/** Options for token verification. */
+interface VerifyOptions {
+  /** Output encoding to use for comparison (default: single word). */
+  encoding?: TokenEncoding
+  /** Counter tolerance window: accept tokens within ±tolerance counter values (default: 0). */
+  tolerance?: number
+}
+
+/** A pair of directional tokens keyed by role name. */
+interface DirectionalPair {
+  [role: string]: string
+}
+
+// ── Group Verification ────────────────────────────────────────────────────────
+
+/** Outcome of group word verification. */
+type VerifyStatus = 'verified' | 'duress' | 'stale' | 'failed'
+
+/** Result of verifying a spoken word against a group. */
+interface VerifyResult {
+  status: VerifyStatus
+  /** Pubkeys of members whose duress word matched (only when status = 'duress'). */
+  members?: string[]
+}
+
+// ── Group Management ──────────────────────────────────────────────────────────
+
+/** Configuration for creating a new group. */
+interface GroupConfig {
+  name: string
+  members: string[]                    // Nostr pubkeys (64-char hex)
+  preset?: PresetName                  // Named threat-profile preset
+  rotationInterval?: number            // Seconds; overrides preset value
+  wordCount?: 1 | 2 | 3               // Words per challenge; overrides preset value
+  wordlist?: string                    // Wordlist identifier (default: 'en-v1')
+  beaconInterval?: number              // Beacon broadcast interval in seconds (default: 300)
+  beaconPrecision?: number             // Geohash precision for normal beacons 1–11 (default: 6)
+}
+
+/** Serialisable persistent state for a canary group. */
+interface GroupState {
+  name: string
+  seed: string                         // 64-char hex (256-bit shared secret)
+  members: string[]                    // Nostr pubkeys (64-char hex)
+  rotationInterval: number             // Seconds
+  wordCount: 1 | 2 | 3
+  wordlist: string                     // e.g. 'en-v1'
+  counter: number                      // Time-based counter at last sync
+  usageOffset: number                  // Burn-after-use offset on top of counter
+  createdAt: number                    // Unix timestamp
+  beaconInterval: number               // Seconds
+  beaconPrecision: number              // 1–11
+}
+
+// ── Group Presets ─────────────────────────────────────────────────────────────
+
+/** Named threat-profile preset identifier. */
+type PresetName = 'family' | 'field-ops' | 'enterprise'
+
+/** A threat-profile preset for group creation. */
+interface GroupPreset {
+  wordCount: 1 | 2 | 3
+  rotationInterval: number
+  description: string
+}
+
+// ── Session (two-party directional verification) ──────────────────────────────
+
+/** Named session preset identifier. */
+type SessionPresetName = 'call' | 'handoff'
+
+/** A session preset for directional two-party verification. */
+interface SessionPreset {
+  wordCount: number
+  rotationSeconds: number              // 0 = fixed counter (single-use)
+  tolerance: number
+  directional: boolean
+  description: string
+}
+
+/** Configuration for creating a directional verification session. */
+interface SessionConfig {
+  secret: Uint8Array | string          // Shared secret (hex string or raw bytes)
+  namespace: string                    // Context namespace (e.g. 'aviva', 'dispatch')
+  roles: [string, string]             // The two roles (e.g. ['caller', 'agent'])
+  myRole: string                      // Which role I am
+  rotationSeconds?: number            // Default: 30
+  encoding?: TokenEncoding
+  tolerance?: number                  // Default: from preset or 0
+  theirIdentity?: string              // Their identity string for duress detection
+  preset?: SessionPresetName
+  counter?: number                    // Fixed counter for single-use mode (rotationSeconds=0)
+}
+
+/** A role-aware, time-managed session for two-party verification. */
+interface Session {
+  counter(nowSec?: number): number
+  myToken(nowSec?: number): string
+  theirToken(nowSec?: number): string
+  verify(spoken: string, nowSec?: number): TokenVerifyResult
+  pair(nowSec?: number): DirectionalPair
+}
+
+// ── Beacon ────────────────────────────────────────────────────────────────────
+
+/** Decrypted content of a kind 20800 location beacon event. */
+interface BeaconPayload {
+  geohash: string
+  precision: number
+  timestamp: number
+}
+
+/** Decrypted content of a duress alert beacon. */
+interface DuressAlert {
+  type: 'duress'
+  member: string                       // Signalling member's pubkey
+  geohash: string
+  precision: number
+  locationSource: 'beacon' | 'verifier' | 'none'
+  timestamp: number
+}
+
+/** Location info supplied when building a duress alert. Null means no location. */
+interface DuressLocation {
+  geohash: string
+  precision: number
+  locationSource: 'beacon' | 'verifier'
+}
+
+// ── Nostr ─────────────────────────────────────────────────────────────────────
+
+/** Unsigned Nostr event (consumer signs with their own library). */
+interface UnsignedEvent {
+  kind: number
+  content: string
+  tags: string[][]
+  created_at: number
+}
+
+interface GroupEventParams {
+  groupId: string
+  name: string
+  members: string[]
+  rotationInterval: number
+  wordCount: 1 | 2 | 3
+  wordlist: string
+  encryptedContent: string
+  expiration?: number
+}
+
+interface SeedDistributionParams {
+  recipientPubkey: string
+  groupEventId: string
+  encryptedContent: string
+}
+
+interface MemberUpdateParams {
+  groupId: string
+  action: 'add' | 'remove'
+  memberPubkey: string
+  reseed: boolean
+  encryptedContent: string
+}
+
+interface ReseedParams {
+  groupEventId: string
+  reason: 'member_removed' | 'compromise' | 'scheduled' | 'duress'
+  encryptedContent: string
+}
+
+interface WordUsedParams {
+  groupEventId: string
+  encryptedContent: string
+}
+
+interface BeaconEventParams {
+  groupId: string
+  encryptedContent: string
+  expiration?: number
+}
+```
+
+---
+
+## canary-kit (main)
+
+The barrel export. Covers group management, the CANARY protocol token API, encoding, wordlist, counter, and beacon functions. Omits session-specific exports (`createSession`, `generateSeed`, `deriveSeed`, `SESSION_PRESETS`) — import those from `canary-kit/session`.
+
+### deriveVerificationWord(seedHex, counter)
+
+Derive the single verification word shared by all group members for a given counter.
+
+```typescript
+deriveVerificationWord(seedHex: string, counter: number): string
+
+deriveVerificationWord(
+  'a'.repeat(64),  // 64-char hex seed
+  42,              // current counter
+)
+// e.g. 'marble'
+```
+
+Algorithm: `HMAC-SHA256(seed, counterToBytes(counter))`. First two bytes of digest `% 2048` → wordlist index.
+
+### deriveVerificationPhrase(seedHex, counter, wordCount)
+
+Derive a multi-word verification phrase. Each word is derived from a consecutive 2-byte slice of the HMAC-SHA256 digest.
+
+```typescript
+deriveVerificationPhrase(
+  seedHex: string,
+  counter: number,
+  wordCount: 1 | 2 | 3,
+): string[]
+
+deriveVerificationPhrase('a'.repeat(64), 42, 2)
+// e.g. ['marble', 'lantern']
+```
+
+### deriveDuressWord(seedHex, memberPubkeyHex, counter)
+
+Derive a member's duress word — unique per member, derivable by all group members, guaranteed distinct from the current verification word (and adjacent counters). Collision avoidance retries up to 255 times with incrementing suffix bytes.
+
+```typescript
+deriveDuressWord(
+  seedHex: string,
+  memberPubkeyHex: string,  // 64-char hex Nostr pubkey
+  counter: number,
+): string
+
+deriveDuressWord('a'.repeat(64), 'b'.repeat(64), 42)
+// e.g. 'crystal'  (always ≠ current verification word)
+```
+
+### deriveDuressPhrase(seedHex, memberPubkeyHex, counter, wordCount)
+
+Derive a multi-word duress phrase for a given member. The entire phrase is guaranteed distinct from the verification phrase within the ±1 tolerance window.
+
+```typescript
+deriveDuressPhrase(
+  seedHex: string,
+  memberPubkeyHex: string,
+  counter: number,
+  wordCount: 1 | 2 | 3,
+): string[]
+
+deriveDuressPhrase('a'.repeat(64), 'b'.repeat(64), 42, 2)
+// e.g. ['crystal', 'anchor']
+```
+
+### verifyWord(spokenWord, seedHex, memberPubkeys, counter, wordCount?)
+
+Verify a spoken word (or phrase) against the group's current state. Returns a structured result indicating whether verification succeeded, duress was signalled, the token was stale, or no match was found.
+
+Priority order:
+1. Current verification word → `verified`
+2. ALL members' duress words at current counter → `duress` (all matching members collected)
+3. ALL members' duress words at previous counter → `duress` (stale but still duress)
+4. Previous window's verification word → `stale`
+5. No match → `failed`
+
+```typescript
+verifyWord(
+  spokenWord: string,
+  seedHex: string,
+  memberPubkeys: string[],
+  counter: number,
+  wordCount: 1 | 2 | 3 = 1,
+): VerifyResult
+
+verifyWord('marble', seed, [alicePubkey, bobPubkey], 42)
+// { status: 'verified' }
+
+verifyWord('crystal', seed, [alicePubkey, bobPubkey], 42)
+// { status: 'duress', members: ['<alice-pubkey>'] }
+
+verifyWord('unknown', seed, [alicePubkey], 42)
+// { status: 'failed' }
+```
+
+### createGroup(config)
+
+Create a new group with a freshly generated seed and time-based counter.
+
+```typescript
+createGroup(config: GroupConfig): GroupState
+
+const state = createGroup({
+  name: 'Alpine Team',
+  members: ['<alice-64hex-pubkey>', '<bob-64hex-pubkey>'],
+  preset: 'field-ops',
+})
+
+// With explicit options
+const state = createGroup({
+  name: 'Family',
+  members: ['<alice-pubkey>'],
+  rotationInterval: 604_800,  // 7 days
+  wordCount: 1,
+})
+```
+
+### getCurrentWord(state)
+
+Return the current verification word (or space-joined phrase) for all group members.
+
+```typescript
+getCurrentWord(state: GroupState): string
+
+getCurrentWord(state)  // e.g. 'marble'  or  'marble lantern'  (if wordCount=2)
+```
+
+### getCurrentDuressWord(state, memberPubkey)
+
+Return the duress word (or phrase) for a specific member at the current counter.
+
+```typescript
+getCurrentDuressWord(state: GroupState, memberPubkey: string): string
+
+getCurrentDuressWord(state, '<alice-pubkey>')  // e.g. 'crystal'
+```
+
+### advanceCounter(state)
+
+Advance the usage offset by one, rotating the current word (burn-after-use). Returns new state — does not mutate.
+
+```typescript
+advanceCounter(state: GroupState): GroupState
+
+const next = advanceCounter(state)
+getCurrentWord(next)  // different word from getCurrentWord(state)
+```
+
+### reseed(state)
+
+Generate a fresh seed and reset the usage offset. Call after a suspected security event. Returns new state — does not mutate.
+
+```typescript
+reseed(state: GroupState): GroupState
+
+const safe = reseed(state)
+// safe.seed is a new random 64-char hex string
+// safe.usageOffset === 0
+```
+
+### addMember(state, pubkey)
+
+Add a member to the group. Idempotent — returns existing state if pubkey already present. Returns new state — does not mutate.
+
+```typescript
+addMember(state: GroupState, pubkey: string): GroupState
+
+const updated = addMember(state, '<charlie-pubkey>')
+```
+
+### removeMember(state, pubkey)
+
+Remove a member from the group and immediately reseed to invalidate the old shared secret. Returns new state — does not mutate.
+
+```typescript
+removeMember(state: GroupState, pubkey: string): GroupState
+
+const updated = removeMember(state, '<alice-pubkey>')
+// updated.seed !== state.seed  (reseeded)
+// updated.members does not include alice
+```
+
+### syncCounter(state, nowSec?)
+
+Refresh the counter to the current time window. Call after loading persisted state. Returns new state — does not mutate.
+
+```typescript
+syncCounter(
+  state: GroupState,
+  nowSec: number = Math.floor(Date.now() / 1000),
+): GroupState
+
+const current = syncCounter(state)
+// current.counter is up to date with the current time window
+```
+
+### deriveToken(secret, context, counter, encoding?)
+
+CANARY-DERIVE: Derive an encoded token string from a shared secret, context string, and counter.
+
+Algorithm: `HMAC-SHA256(secret, utf8(context) || counter_be32)`, then encoded per the `encoding` option.
+
+```typescript
+deriveToken(
+  secret: Uint8Array | string,  // hex string or raw bytes
+  context: string,              // application-specific context string
+  counter: number,              // 32-bit unsigned integer
+  encoding: TokenEncoding = DEFAULT_ENCODING,
+): string
+
+deriveToken(secret, 'aviva:caller', 42)
+// e.g. 'marble'  (single word, default encoding)
+
+deriveToken(secret, 'aviva:caller', 42, { format: 'pin', digits: 6 })
+// e.g. '047291'
+
+deriveToken(secret, 'aviva:caller', 42, { format: 'hex', length: 16 })
+// e.g. 'a3f2c1d4e5b60789'
+```
+
+### deriveTokenBytes(secret, context, counter)
+
+CANARY-DERIVE: Derive raw 32-byte token bytes without encoding.
+
+```typescript
+deriveTokenBytes(
+  secret: Uint8Array | string,
+  context: string,
+  counter: number,
+): Uint8Array
+
+const bytes = deriveTokenBytes(secret, 'aviva:caller', 42)
+// Uint8Array(32) [...]
+```
+
+### deriveDuressToken(secret, context, identity, counter, encoding, maxTolerance)
+
+CANARY-DURESS: Derive an encoded duress token for a specific identity, with collision avoidance against normal tokens within ±(2 × maxTolerance) counter values. **maxTolerance is required** — it must match the tolerance used by verifiers. Both maxTolerance and tolerance are capped at MAX_TOLERANCE (10).
+
+Algorithm: `HMAC-SHA256(secret, utf8(context + ":duress") || 0x00 || utf8(identity) || counter_be32)`. Retries with suffix bytes 0x01–0xFF until the encoded token is distinct from any normal token in the tolerance window.
+
+```typescript
+deriveDuressToken(
+  secret: Uint8Array | string,
+  context: string,
+  identity: string,          // e.g. customer ID, Nostr pubkey
+  counter: number,
+  encoding: TokenEncoding,   // use DEFAULT_ENCODING for single word
+  maxTolerance: number,      // REQUIRED — must match verifier's tolerance
+): string
+
+deriveDuressToken(secret, 'aviva', 'customer-123', 42, DEFAULT_ENCODING, 1)
+// e.g. 'anchor'  (guaranteed ≠ any normal token in ±2 window)
+```
+
+### deriveDuressTokenBytes(secret, context, identity, counter)
+
+CANARY-DURESS: Derive raw duress token bytes without encoding or collision avoidance.
+
+```typescript
+deriveDuressTokenBytes(
+  secret: Uint8Array | string,
+  context: string,
+  identity: string,
+  counter: number,
+): Uint8Array
+```
+
+### verifyToken(secret, context, counter, input, identities, options?)
+
+CANARY-DURESS: Verify a spoken/entered token against a group. Checks in priority order: normal (exact counter) → duress (all identities, full tolerance window) → normal (remaining tolerance window) → invalid.
+
+```typescript
+verifyToken(
+  secret: Uint8Array | string,
+  context: string,
+  counter: number,
+  input: string,
+  identities: string[],   // identity strings for duress detection
+  options?: VerifyOptions,
+): TokenVerifyResult
+
+verifyToken(secret, 'aviva', 42, 'marble', ['customer-123'])
+// { status: 'valid' }
+
+verifyToken(secret, 'aviva', 42, 'anchor', ['customer-123'])
+// { status: 'duress', identities: ['customer-123'] }
+
+verifyToken(secret, 'aviva', 42, 'unknown', ['customer-123'])
+// { status: 'invalid' }
+
+// With tolerance window
+verifyToken(secret, 'aviva', 42, 'marble', [], { tolerance: 1 })
+// { status: 'valid' }  — accepts tokens from counter 41, 42, or 43
+```
+
+### deriveLivenessToken(secret, context, identity, counter)
+
+CANARY-DURESS: Derive a liveness heartbeat token for a dead man's switch. If heartbeats stop arriving, the implementation triggers its DMS response.
+
+Algorithm: `HMAC-SHA256(secret, utf8(context + ":alive") || 0x00 || utf8(identity) || counter_be32)`
+
+```typescript
+deriveLivenessToken(
+  secret: Uint8Array | string,
+  context: string,
+  identity: string,
+  counter: number,
+): Uint8Array
+
+const heartbeat = deriveLivenessToken(secret, 'my-app', 'alice', currentCounter)
+// Uint8Array(32) [...]  — publish periodically; absence triggers DMS
+```
+
+### PRESETS
+
+Built-in threat-profile presets for group creation. See Preset Tables section.
+
+```typescript
+const PRESETS: Readonly<Record<PresetName, Readonly<GroupPreset>>>
+
+PRESETS['family']     // { wordCount: 1, rotationInterval: 604800, description: '...' }
+PRESETS['field-ops']  // { wordCount: 2, rotationInterval: 86400,  description: '...' }
+PRESETS['enterprise'] // { wordCount: 2, rotationInterval: 172800, description: '...' }
+```
+
+### deriveBeaconKey(seedHex)
+
+Derive a 256-bit AES key from the group seed for beacon and duress encryption. Deterministic: same seed always yields the same key.
+
+```typescript
+deriveBeaconKey(seedHex: string): Uint8Array
+
+const key = deriveBeaconKey(state.seed)
+// Uint8Array(32) [...]
+```
+
+### encryptBeacon(key, geohash, precision)
+
+Encrypt a location beacon payload with the group's beacon key. Returns a base64 string for a Nostr event's `content` field. (async, AES-256-GCM)
+
+```typescript
+encryptBeacon(
+  key: Uint8Array,
+  geohash: string,
+  precision: number,
+): Promise<string>
+
+const key = deriveBeaconKey(state.seed)
+const content = await encryptBeacon(key, 'gcpvjb', 6)
+// 'base64-encoded-ciphertext...'
+```
+
+### decryptBeacon(key, content)
+
+Decrypt a location beacon event's content. Throws if the key is wrong or the ciphertext is tampered with.
+
+```typescript
+decryptBeacon(key: Uint8Array, content: string): Promise<BeaconPayload>
+
+const payload = await decryptBeacon(key, content)
+// { geohash: 'gcpvjb', precision: 6, timestamp: 1709461234 }
+```
+
+### buildDuressAlert(memberPubkey, location)
+
+Construct a duress alert payload. Pass `null` for location when no location is available.
+
+```typescript
+buildDuressAlert(
+  memberPubkey: string,
+  location: DuressLocation | null,
+): DuressAlert
+
+buildDuressAlert('<alice-pubkey>', { geohash: 'gcpvjbsm5', precision: 9, locationSource: 'verifier' })
+// { type: 'duress', member: '<alice-pubkey>', geohash: 'gcpvjbsm5', precision: 9, locationSource: 'verifier', timestamp: ... }
+
+buildDuressAlert('<alice-pubkey>', null)
+// { type: 'duress', member: '<alice-pubkey>', geohash: '', precision: 0, locationSource: 'none', timestamp: ... }
+```
+
+### encryptDuressAlert(key, alert)
+
+Encrypt a duress alert with the group's beacon key. (async, AES-256-GCM)
+
+```typescript
+encryptDuressAlert(key: Uint8Array, alert: DuressAlert): Promise<string>
+
+const content = await encryptDuressAlert(key, alert)
+// 'base64-encoded-ciphertext...'
+```
+
+### decryptDuressAlert(key, content)
+
+Decrypt a duress alert event's content.
+
+```typescript
+decryptDuressAlert(key: Uint8Array, content: string): Promise<DuressAlert>
+
+const alert = await decryptDuressAlert(key, content)
+// { type: 'duress', member: '...', geohash: '...', ... }
+```
+
+### getCounter(timestampSec, rotationIntervalSec?)
+
+Derive the current counter from a Unix timestamp and rotation interval.
+
+```typescript
+getCounter(
+  timestampSec: number,
+  rotationIntervalSec: number = 604_800,  // 7 days
+): number
+
+getCounter(Math.floor(Date.now() / 1000))          // current weekly counter
+getCounter(Math.floor(Date.now() / 1000), 86_400)   // current daily counter
+getCounter(1_000_000, 604_800)                       // 1
+```
+
+### counterToBytes(counter)
+
+Serialise a counter to an 8-byte big-endian Uint8Array (same encoding as TOTP, RFC 6238).
+
+```typescript
+counterToBytes(counter: number): Uint8Array
+
+counterToBytes(42)  // Uint8Array(8) [0, 0, 0, 0, 0, 0, 0, 42]
+```
+
+### DEFAULT_ROTATION_INTERVAL
+
+Seven days in seconds.
+
+```typescript
+const DEFAULT_ROTATION_INTERVAL: number  // 604_800
+```
+
+### WORDLIST
+
+The complete 2048-word en-v1 English wordlist for spoken-word encoding.
+
+```typescript
+const WORDLIST: readonly string[]  // 2048 entries
+```
+
+### WORDLIST_SIZE
+
+```typescript
+const WORDLIST_SIZE: number  // 2048
+```
+
+### getWord(index)
+
+Return the word at the given index. Throws `RangeError` if index is outside 0–2047.
+
+```typescript
+getWord(index: number): string
+
+getWord(0)     // 'ability'
+getWord(2047)  // 'zoo'
+getWord(2048)  // throws RangeError
+```
+
+### indexOf(word)
+
+Return the index of a word, or -1 if not in the wordlist.
+
+```typescript
+indexOf(word: string): number
+
+indexOf('marble')   // e.g. 1103
+indexOf('unknown')  // -1
+```
+
+---
+
+## canary-kit/token
+
+The universal CANARY protocol — context-string-based derivation, duress, and liveness. Use this directly when you need fine-grained control (custom context strings, arbitrary identity sets, raw bytes).
+
+All functions from the main barrel (`deriveToken`, `deriveTokenBytes`, `deriveDuressToken`, `deriveDuressTokenBytes`, `verifyToken`, `deriveLivenessToken`) are in this module, plus:
+
+### deriveDirectionalPair(secret, namespace, roles, counter, encoding?)
+
+Derive two distinct tokens from the same secret — one per role. Neither token can be derived from the other without the shared secret, preventing the "echo problem" where the second speaker parrots the first.
+
+Each token uses `context = ${namespace}:${role}`.
+
+```typescript
+deriveDirectionalPair(
+  secret: Uint8Array | string,
+  namespace: string,
+  roles: [string, string],
+  counter: number,
+  encoding: TokenEncoding = DEFAULT_ENCODING,
+): DirectionalPair
+
+deriveDirectionalPair(secret, 'aviva', ['caller', 'agent'], 42)
+// { caller: 'marble', agent: 'lantern' }
+// caller speaks 'marble', agent speaks 'lantern'
+// neither can be derived from the other
+```
+
+---
+
+## canary-kit/encoding
+
+Output encoding for CANARY tokens. All functions accept raw `Uint8Array` bytes and return human-readable strings.
+
+### encodeAsWords(bytes, count?, wordlist?)
+
+Encode raw bytes as words using 11-bit indices into the wordlist. Each word uses 2 consecutive bytes: `readUint16BE(bytes, i*2) % 2048`.
+
+```typescript
+encodeAsWords(
+  bytes: Uint8Array,
+  count: number = 1,
+  wordlist: readonly string[] = WORDLIST,
+): string[]
+
+encodeAsWords(someBytes, 1)  // ['marble']
+encodeAsWords(someBytes, 3)  // ['marble', 'lantern', 'copper']
+
+// Custom wordlist (must be exactly 2048 entries)
+encodeAsWords(someBytes, 1, myCustomWordlist)
+```
+
+Throws `RangeError` if `wordlist.length !== 2048`, `count` is outside 1–16, or `bytes.length < count * 2`.
+
+### encodeAsPin(bytes, digits?)
+
+Encode raw bytes as a zero-padded numeric PIN.
+
+```typescript
+encodeAsPin(bytes: Uint8Array, digits: number = 4): string
+
+encodeAsPin(someBytes, 4)   // '0472'
+encodeAsPin(someBytes, 6)   // '047291'
+encodeAsPin(someBytes, 10)  // '0472918345'
+```
+
+Throws `RangeError` if `digits` is outside 1–10.
+
+### encodeAsHex(bytes, length?)
+
+Encode raw bytes as a lowercase hex string.
+
+```typescript
+encodeAsHex(bytes: Uint8Array, length: number = 8): string
+
+encodeAsHex(someBytes, 8)   // 'a3f2c1d4'
+encodeAsHex(someBytes, 16)  // 'a3f2c1d4e5b60789'
+encodeAsHex(someBytes, 64)  // full 32-byte hex
+```
+
+Throws `RangeError` if `length` is outside 1–64.
+
+### encodeToken(bytes, encoding?)
+
+Encode raw bytes using the specified encoding format. Words are space-joined.
+
+```typescript
+encodeToken(bytes: Uint8Array, encoding: TokenEncoding = DEFAULT_ENCODING): string
+
+encodeToken(bytes)
+// 'marble'  (default: single word)
+
+encodeToken(bytes, { format: 'words', count: 2 })
+// 'marble lantern'
+
+encodeToken(bytes, { format: 'pin', digits: 6 })
+// '047291'
+
+encodeToken(bytes, { format: 'hex', length: 16 })
+// 'a3f2c1d4e5b60789'
+
+encodeToken(bytes, { format: 'words', count: 1, wordlist: myWordlist })
+// 'custom-word'
+```
+
+---
+
+## canary-kit/session
+
+High-level two-party directional verification sessions. Wraps the low-level token API with role awareness, time-based counter management, and optional duress detection.
+
+### generateSeed()
+
+Generate a cryptographically secure 256-bit session seed using `crypto.getRandomValues`.
+
+```typescript
+generateSeed(): Uint8Array
+
+const seed = generateSeed()
+// Uint8Array(32) [random bytes...]
+```
+
+### deriveSeed(masterKey, ...components)
+
+Derive a seed deterministically from a master key and string components. Null-byte separators prevent concatenation ambiguity.
+
+Algorithm: `HMAC-SHA256(masterKey, utf8(components[0]) || 0x00 || utf8(components[1]) || ...)`
+
+```typescript
+deriveSeed(
+  masterKey: Uint8Array | string,
+  ...components: string[]
+): Uint8Array
+
+deriveSeed(masterKey, 'session', 'customer-123')
+// Uint8Array(32) [deterministic bytes...]
+
+// Different components always produce different seeds
+deriveSeed(masterKey, 'session', 'customer-456')
+// Uint8Array(32) [different deterministic bytes...]
+```
+
+### createSession(config)
+
+Create a directional verification session with role awareness and time management.
+
+```typescript
+createSession(config: SessionConfig): Session
+
+// Phone call verification (using preset)
+const callerSession = createSession({
+  secret: sharedSecret,
+  namespace: 'aviva',
+  roles: ['caller', 'agent'],
+  myRole: 'caller',
+  preset: 'call',
+  theirIdentity: 'customer-123',  // for duress detection
+})
+
+// Physical handoff (single-use)
+const handoffSession = createSession({
+  secret: taskSecret,
+  namespace: 'dispatch',
+  roles: ['driver', 'recipient'],
+  myRole: 'driver',
+  preset: 'handoff',
+  counter: taskId,
+})
+
+// Manual configuration
+const session = createSession({
+  secret: sharedSecret,
+  namespace: 'my-app',
+  roles: ['alice', 'bob'],
+  myRole: 'alice',
+  rotationSeconds: 30,
+  tolerance: 1,
+  encoding: { format: 'words', count: 2 },
+})
+```
+
+Throws if `roles[0] === roles[1]` or if `myRole` is not one of the two roles.
+
+#### session.counter(nowSec?)
+
+Get the current counter (time-based or fixed).
+
+```typescript
+session.counter(): number
+session.counter(nowSec)  // pass explicit time for testing
+```
+
+#### session.myToken(nowSec?)
+
+Get the token I speak to prove my identity.
+
+```typescript
+session.myToken(): string   // e.g. 'marble'
+```
+
+#### session.theirToken(nowSec?)
+
+Get the token I expect to hear from the other party.
+
+```typescript
+session.theirToken(): string   // e.g. 'lantern'
+```
+
+#### session.verify(spoken, nowSec?)
+
+Verify a word spoken to me against the other party's context. Applies the configured tolerance window and duress detection.
+
+```typescript
+session.verify(spoken: string, nowSec?: number): TokenVerifyResult
+
+session.verify('lantern')
+// { status: 'valid' }
+
+session.verify('anchor')  // if duress token for customer-123
+// { status: 'duress', identities: ['customer-123'] }
+
+session.verify('unknown')
+// { status: 'invalid' }
+```
+
+#### session.pair(nowSec?)
+
+Get both tokens at once, keyed by role name.
+
+```typescript
+session.pair(): DirectionalPair
+
+session.pair()
+// { caller: 'marble', agent: 'lantern' }
+```
+
+### SESSION_PRESETS
+
+Built-in session presets. See Session Preset Table section.
+
+```typescript
+const SESSION_PRESETS: Readonly<Record<SessionPresetName, Readonly<SessionPreset>>>
+
+SESSION_PRESETS.call
+// { wordCount: 1, rotationSeconds: 30, tolerance: 1, directional: true, description: '...' }
+
+SESSION_PRESETS.handoff
+// { wordCount: 1, rotationSeconds: 0, tolerance: 0, directional: true, description: '...' }
+```
+
+---
+
+## canary-kit/wordlist
+
+Direct access to the en-v1 wordlist and lookup utilities.
+
+All four exports (`WORDLIST`, `WORDLIST_SIZE`, `getWord`, `indexOf`) are documented in the main barrel section above.
+
+### Wordlist properties
+
+- 2048 words
+- Based on BIP-39 English, filtered for verbal verification
+- No homophones, no phonetic near-collisions, no emotionally charged words
+- Backfilled with concrete, unambiguous supplementary words
+- All words are 3–8 characters, lowercase alphabetic only
+
+```typescript
+WORDLIST[0]     // 'ability'
+WORDLIST[1023]  // 'merge'
+WORDLIST[2047]  // 'zoo'
+```
+
+---
+
+## canary-kit/nostr
+
+Nostr event builders for the CANARY NIP. All builders return unsigned events (`UnsignedEvent`) — sign with your own Nostr library (e.g. `nostr-tools`).
+
+### KINDS
+
+```typescript
+const KINDS = {
+  group:            38_800,  // replaceable — group announcement
+  seedDistribution: 28_800,  // ephemeral — seed delivery to member
+  memberUpdate:     38_801,  // replaceable — add/remove member
+  reseed:           28_801,  // ephemeral — new seed broadcast
+  wordUsed:         28_802,  // ephemeral — burn-after-use notification
+  beacon:           20_800,  // ephemeral — encrypted location beacon
+} as const
+```
+
+### buildGroupEvent(params)
+
+Build a kind 38800 group announcement event.
+
+```typescript
+buildGroupEvent(params: GroupEventParams): UnsignedEvent
+
+buildGroupEvent({
+  groupId: 'alpine-team-1',
+  name: 'Alpine Team',
+  members: ['<alice-pubkey>', '<bob-pubkey>'],
+  rotationInterval: 86_400,
+  wordCount: 2,
+  wordlist: 'en-v1',
+  encryptedContent: '<NIP-44 encrypted group metadata>',
+  expiration: Math.floor(Date.now() / 1000) + 30 * 86_400,  // 30 days
+})
+// { kind: 38800, content: '...', tags: [['d','alpine-team-1'],['name','Alpine Team'],['p','<alice>'],['p','<bob>'],['rotation','86400'],['words','2'],['wordlist','en-v1'],['expiration','...']], created_at: ... }
+```
+
+### buildSeedDistributionEvent(params)
+
+Build a kind 28800 seed distribution event, sent privately to each member.
+
+```typescript
+buildSeedDistributionEvent(params: SeedDistributionParams): UnsignedEvent
+
+buildSeedDistributionEvent({
+  recipientPubkey: '<alice-pubkey>',
+  groupEventId: '<kind-38800-event-id>',
+  encryptedContent: '<NIP-44 encrypted seed for alice>',
+})
+// { kind: 28800, content: '...', tags: [['p','<alice>'],['e','<group-id>']], created_at: ... }
+```
+
+### buildMemberUpdateEvent(params)
+
+Build a kind 38801 member update event.
+
+```typescript
+buildMemberUpdateEvent(params: MemberUpdateParams): UnsignedEvent
+
+buildMemberUpdateEvent({
+  groupId: 'alpine-team-1',
+  action: 'add',
+  memberPubkey: '<charlie-pubkey>',
+  reseed: true,
+  encryptedContent: '<encrypted update content>',
+})
+// { kind: 38801, ... tags: [['d','alpine-team-1'],['action','add'],['p','<charlie>'],['reseed','true']], ... }
+```
+
+### buildReseedEvent(params)
+
+Build a kind 28801 reseed event.
+
+```typescript
+buildReseedEvent(params: ReseedParams): UnsignedEvent
+
+buildReseedEvent({
+  groupEventId: '<kind-38800-event-id>',
+  reason: 'member_removed',
+  encryptedContent: '<NIP-44 encrypted new seed>',
+})
+// { kind: 28801, ... tags: [['e','<group-id>'],['reason','member_removed']], ... }
+```
+
+Valid reason values: `'member_removed'` | `'compromise'` | `'scheduled'` | `'duress'`
+
+### buildWordUsedEvent(params)
+
+Build a kind 28802 word-used (burn-after-use) notification event.
+
+```typescript
+buildWordUsedEvent(params: WordUsedParams): UnsignedEvent
+
+buildWordUsedEvent({
+  groupEventId: '<kind-38800-event-id>',
+  encryptedContent: '<encrypted burn notification>',
+})
+// { kind: 28802, ... tags: [['e','<group-id>']], ... }
+```
+
+### buildBeaconEvent(params)
+
+Build a kind 20800 encrypted location beacon event.
+
+```typescript
+buildBeaconEvent(params: BeaconEventParams): UnsignedEvent
+
+buildBeaconEvent({
+  groupId: 'alpine-team-1',
+  encryptedContent: '<AES-256-GCM encrypted beacon payload>',
+  expiration: Math.floor(Date.now() / 1000) + 3600,  // 1 hour
+})
+// { kind: 20800, ... tags: [['h','alpine-team-1'],['expiration','...']], ... }
+```
+
+---
+
+## canary-kit/beacon
+
+Encrypted location beacons and duress alerts for canary groups.
+
+Key derivation is synchronous (HMAC-SHA256). Encryption is asynchronous (AES-256-GCM via `crypto.subtle`). The IV is a random 12-byte prefix prepended to the ciphertext; the combined value is base64-encoded.
+
+All functions from the main barrel (`deriveBeaconKey`, `encryptBeacon`, `decryptBeacon`, `buildDuressAlert`, `encryptDuressAlert`, `decryptDuressAlert`) are documented in the main section above.
+
+---
+
+## Preset Tables
+
+### Group Presets
+
+Used with `createGroup({ preset: '...' })`.
+
+| Preset | Words | Rotation | Entropy | Use case |
+|---|---|---|---|---|
+| `family` | 1 | 7 days (604,800 s) | ~11 bits | Casual family/friend verification. Single word, weekly rotation. Adequate for live voice calls. |
+| `field-ops` | 2 | 24 hours (86,400 s) | ~22 bits | Journalism, activism, field operations. Two-word phrases with daily rotation. Use burn-after-use for maximum protection. |
+| `enterprise` | 2 | 48 hours (172,800 s) | ~22 bits | Corporate incident response. Two-word phrases with 48-hour rotation. Balances security with operational convenience. |
+
+Explicit `rotationInterval` or `wordCount` fields override the preset value.
+
+### Session Presets
+
+Used with `createSession({ preset: '...' })`.
+
+| Preset | Words | Rotation | Tolerance | Directional | Use case |
+|---|---|---|---|---|---|
+| `call` | 1 | 30 seconds | 1 | Yes | Phone verification for insurance, banking, and call centres. Deepfake-proof — cloning a voice does not help derive the current word. |
+| `handoff` | 1 | single-use | 0 | Yes | Physical handoff for rideshare, delivery, and task completion. Counter is the task/event ID — no time dependency. |
+
+---
+
+## Nostr Event Kinds
+
+| Kind | Type | Name | Description |
+|---|---|---|---|
+| 38800 | Replaceable | `group` | Group announcement with member list and configuration |
+| 28800 | Ephemeral | `seedDistribution` | Encrypted seed delivery to a specific member |
+| 38801 | Replaceable | `memberUpdate` | Add or remove a group member (with optional reseed) |
+| 28801 | Ephemeral | `reseed` | New seed broadcast after compromise or member removal |
+| 28802 | Ephemeral | `wordUsed` | Burn-after-use notification — advance counter for all members |
+| 20800 | Ephemeral | `beacon` | AES-256-GCM encrypted location beacon |
+
+Replaceable events (38xxx) use the `d` tag for addressability. Ephemeral events (28xxx, 20xxx) are not stored by relays.
+
+---
+
+## Usage Patterns
+
+### Phone Verification (Bank / Insurance)
+
+The bank's system and the customer both derive words from a shared per-customer secret. The customer speaks their word; the agent speaks theirs. Neither word can be derived from the other without the secret — voice cloning is defeated.
+
+```typescript
+import { createSession, deriveSeed } from 'canary-kit/session'
+
+// Bank side: derive a per-customer secret from a master key
+const masterKey = process.env.CANARY_MASTER_KEY  // 64-char hex, stored securely
+
+const customerSecret = deriveSeed(masterKey, 'aviva-verify', customerId)
+
+// Create session (bank agent's perspective)
+const agentSession = createSession({
+  secret: customerSecret,
+  namespace: 'aviva',
+  roles: ['caller', 'agent'],
+  myRole: 'agent',
+  preset: 'call',
+  theirIdentity: customerId,  // for duress detection
+})
+
+// What the agent says to prove they are the real bank:
+const agentWord = agentSession.myToken()
+console.log(`Agent says: "${agentWord}"`)
+
+// What the agent expects to hear from the caller:
+const expectedCallerWord = agentSession.theirToken()
+
+// Verify what the caller actually said:
+const spokenByCustomer = 'marble'  // received from phone
+const result = agentSession.verify(spokenByCustomer)
+
+if (result.status === 'valid') {
+  console.log('Customer verified — proceed with call')
+} else if (result.status === 'duress') {
+  console.log('DURESS SIGNAL — alert security, do not reveal to caller')
+  console.log('Signallers:', result.identities)
+} else {
+  console.log('Verification failed — possible impersonation attempt')
+}
+
+// Customer side (mobile app)
+const customerSession = createSession({
+  secret: customerSecret,
+  namespace: 'aviva',
+  roles: ['caller', 'agent'],
+  myRole: 'caller',
+  preset: 'call',
+})
+
+const customerWord = customerSession.myToken()   // 'marble' — customer speaks this
+const bankWord = customerSession.theirToken()    // 'lantern' — customer expects this from bank
+```
+
+### Family Group Verification
+
+All members derive the same word from a shared seed. On a video or voice call, everyone says the word. If someone is under duress, they say their personal duress word instead — silent distress signal.
+
+```typescript
+import { createGroup, getCurrentWord, getCurrentDuressWord, verifyWord, syncCounter } from 'canary-kit'
+
+// Create group (group admin)
+let state = createGroup({
+  name: 'Family',
+  members: ['<alice-pubkey>', '<bob-pubkey>', '<charlie-pubkey>'],
+  preset: 'family',
+})
+
+// Share state.seed with all members via secure channel (e.g. Nostr DM, NIP-44 encrypted)
+
+// On a call — all members derive the same word
+const syncedState = syncCounter(state)  // refresh after loading from storage
+const todaysWord = getCurrentWord(syncedState)
+console.log(`Say to confirm identity: "${todaysWord}"`)
+
+// Alice's personal duress word (if she's coerced):
+const aliceDuressWord = getCurrentDuressWord(syncedState, '<alice-pubkey>')
+
+// Verifying what someone said on the call:
+const spoken = 'marble'  // heard on the call
+const result = verifyWord(spoken, syncedState.seed, syncedState.members, syncedState.counter)
+
+switch (result.status) {
+  case 'verified':
+    console.log('Identity confirmed')
+    break
+  case 'duress':
+    console.log('DURESS — member under coercion:', result.members)
+    break
+  case 'stale':
+    console.log('Token is one window behind — sync clocks')
+    break
+  case 'failed':
+    console.log('Unknown word — possible impersonation')
+    break
+}
+
+// Burn-after-use (field-ops scenario)
+state = advanceCounter(state)  // next call will use a different word
+
+// Add a new member
+state = addMember(state, '<diana-pubkey>')
+// Distribute new seed to diana via encrypted Nostr DM
+
+// Remove a compromised member (auto-reseeds)
+state = removeMember(state, '<charlie-pubkey>')
+// Distribute new state.seed to remaining members
+```
+
+### Nostr Group Integration
+
+Publish group state and encrypted seeds to Nostr relays so all members can synchronise.
+
+```typescript
+import { createGroup, syncCounter, deriveBeaconKey, encryptBeacon } from 'canary-kit'
+import {
+  KINDS,
+  buildGroupEvent,
+  buildSeedDistributionEvent,
+  buildBeaconEvent,
+} from 'canary-kit/nostr'
+
+// 1. Create the group
+let state = createGroup({
+  name: 'Alpine Team',
+  members: ['<alice-pubkey>', '<bob-pubkey>'],
+  preset: 'field-ops',
+})
+
+// 2. Publish a kind 38800 group event (encrypted content via NIP-44)
+const groupEvent = buildGroupEvent({
+  groupId: 'alpine-team-1',
+  name: state.name,
+  members: state.members,
+  rotationInterval: state.rotationInterval,
+  wordCount: state.wordCount,
+  wordlist: state.wordlist,
+  encryptedContent: '<NIP-44 encrypted group config>',
+  expiration: Math.floor(Date.now() / 1000) + 30 * 86_400,
+})
+// sign and publish groupEvent to relays
+
+// 3. Send seed to each member via kind 28800 (one event per member)
+for (const memberPubkey of state.members) {
+  const seedEvent = buildSeedDistributionEvent({
+    recipientPubkey: memberPubkey,
+    groupEventId: '<signed-group-event-id>',
+    encryptedContent: '<NIP-44 encrypted seed for this member>',
+  })
+  // sign and publish seedEvent
+}
+
+// 4. Publish periodic location beacons (kind 20800)
+const beaconKey = deriveBeaconKey(state.seed)
+const encryptedBeacon = await encryptBeacon(beaconKey, 'gcpvjb', 6)
+
+const beaconEvent = buildBeaconEvent({
+  groupId: 'alpine-team-1',
+  encryptedContent: encryptedBeacon,
+  expiration: Math.floor(Date.now() / 1000) + state.beaconInterval * 2,
+})
+// sign and publish beaconEvent
+
+// 5. On receiving a beacon event from a member
+const payload = await decryptBeacon(beaconKey, receivedBeaconEvent.content)
+console.log(`Member at geohash ${payload.geohash} (precision ${payload.precision})`)
+console.log(`Last seen: ${new Date(payload.timestamp * 1000).toISOString()}`)
+```
+
+### Universal Token API (Non-Group Use)
+
+Use the low-level token API directly for any HMAC-based verification scheme — TROTT ride verification, API authentication, one-time codes.
+
+```typescript
+import { deriveToken, deriveDuressToken, verifyToken } from 'canary-kit/token'
+import { encodeToken } from 'canary-kit/encoding'
+
+// Generate a shared secret (store securely, e.g. in a database)
+const secret = crypto.getRandomValues(new Uint8Array(32))
+
+// TROTT ride handshake: driver proves to rider they are the right driver
+const rideId = 42_001  // use ride ID as counter for single-use
+const driverToken = deriveToken(secret, 'trott:driver', rideId, { format: 'words', count: 1 })
+const riderToken  = deriveToken(secret, 'trott:rider',  rideId, { format: 'words', count: 1 })
+
+// Rider's app shows: "Ask driver to say: 'marble'"
+// Driver's app shows: "Say 'lantern' to rider after they say 'marble' to you"
+
+// Time-based TOTP-style with PIN encoding
+const counter = Math.floor(Date.now() / 30_000)  // 30-second window
+const pin = deriveToken(secret, 'my-app:auth', counter, { format: 'pin', digits: 6 })
+// e.g. '047291'
+
+// Verify with tolerance (accept ±1 window for clock skew)
+const result = verifyToken(secret, 'my-app:auth', counter, enteredPin, [], {
+  encoding: { format: 'pin', digits: 6 },
+  tolerance: 1,
+})
+// { status: 'valid' } or { status: 'invalid' }
+```
+
+### Dead Man's Switch (Liveness Heartbeat)
+
+```typescript
+import { deriveLivenessToken } from 'canary-kit/token'
+import { getCounter } from 'canary-kit'
+
+const HEARTBEAT_INTERVAL = 3600  // 1 hour
+
+// Publisher: send a liveness heartbeat every hour
+setInterval(async () => {
+  const counter = getCounter(Math.floor(Date.now() / 1000), HEARTBEAT_INTERVAL)
+  const heartbeat = deriveLivenessToken(secret, 'dms:alice', 'alice', counter)
+  await publish(heartbeat)  // send to monitoring server
+}, HEARTBEAT_INTERVAL * 1000)
+
+// Monitor: if heartbeats stop arriving, trigger DMS response
+// The monitor verifies each heartbeat matches the expected derivation
+// for the current counter (within ±1 tolerance for timing drift)
+```

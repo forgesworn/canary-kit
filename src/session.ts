@@ -1,5 +1,6 @@
 import { hmacSha256, hexToBytes, concatBytes } from './crypto.js'
 import {
+  MAX_TOLERANCE,
   deriveToken,
   verifyToken,
   deriveDirectionalPair,
@@ -143,6 +144,26 @@ export function createSession(config: SessionConfig): Session {
   }
   if (config.myRole !== config.roles[0] && config.myRole !== config.roles[1]) {
     throw new Error(`myRole "${config.myRole}" is not one of the configured roles ["${config.roles[0]}", "${config.roles[1]}"]`)
+  }
+  if (!Number.isInteger(rotationSeconds) || rotationSeconds < 0) {
+    throw new RangeError(`rotationSeconds must be a non-negative integer, got ${rotationSeconds}`)
+  }
+  if (!Number.isInteger(tolerance) || tolerance < 0) {
+    throw new RangeError(`tolerance must be a non-negative integer, got ${tolerance}`)
+  }
+  if (tolerance > MAX_TOLERANCE) {
+    throw new RangeError(`tolerance must be <= ${MAX_TOLERANCE}, got ${tolerance}`)
+  }
+  if (rotationSeconds === 0 && config.counter === undefined) {
+    throw new Error('Fixed counter mode (rotationSeconds=0) requires config.counter')
+  }
+  if (rotationSeconds === 0 && config.counter !== undefined) {
+    if (!Number.isInteger(config.counter) || config.counter < 0 || config.counter > 0xFFFFFFFF) {
+      throw new RangeError(`counter must be an integer 0–${0xFFFFFFFF}, got ${config.counter}`)
+    }
+  }
+  if (rotationSeconds > 0 && config.counter !== undefined) {
+    throw new Error('counter must not be set when rotationSeconds > 0 (counter is derived from time)')
   }
 
   const secret = typeof config.secret === 'string' ? hexToBytes(config.secret) : config.secret

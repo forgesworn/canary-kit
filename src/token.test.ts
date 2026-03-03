@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { deriveTokenBytes, deriveToken, deriveDuressTokenBytes, deriveDuressToken, verifyToken, deriveLivenessToken, deriveDirectionalPair } from './token.js'
+import { MAX_TOLERANCE, deriveTokenBytes, deriveToken, deriveDuressTokenBytes, deriveDuressToken, verifyToken, deriveLivenessToken, deriveDirectionalPair } from './token.js'
 import { hexToBytes, bytesToHex } from './crypto.js'
 
 const SECRET_1 = '0000000000000000000000000000000000000000000000000000000000000001'
@@ -411,5 +411,77 @@ describe('cross-counter collision avoidance', () => {
         `counter=${c}: duress token "${duress}" classified as "${result.status}" with tolerance=${tolerance}`,
       ).toBe('duress')
     }
+  })
+
+  it('duress token avoids collisions across 2× tolerance window (P2 regression)', () => {
+    // Regression: deriveDuressToken with maxTolerance=T must avoid collisions
+    // in the range ±2T, because the verifier's counter can drift by ±T from
+    // the deriver's counter, expanding the normal-token window to ±2T.
+    const tolerance = 2
+    for (let d = 4; d < 200; d++) {
+      const duress = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, d, undefined, tolerance)
+      // Check the full ±2T window
+      const lo = Math.max(0, d - 2 * tolerance)
+      const hi = d + 2 * tolerance
+      for (let c = lo; c <= hi; c++) {
+        const normal = deriveToken(SECRET_1, 'test', c)
+        expect(duress, `duress(${d}) collided with normal(${c}): "${duress}"`).not.toBe(normal)
+      }
+    }
+  })
+
+  it('verifyToken detects duress when verifier counter drifts by tolerance (P2 regression)', () => {
+    // The exact reproduction: deriver at c=74, verifier at c=72, tolerance=2
+    const tolerance = 2
+    for (let d = tolerance; d < 100; d++) {
+      const duress = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, d, undefined, tolerance)
+      // Verifier counter can be anywhere in [d-tolerance, d+tolerance]
+      for (let v = Math.max(0, d - tolerance); v <= d + tolerance; v++) {
+        const result = verifyToken(SECRET_1, 'test', v, duress, [IDENTITY_A], { tolerance })
+        expect(
+          result.status,
+          `deriver=${d}, verifier=${v}, token="${duress}": expected duress, got ${result.status}`,
+        ).toBe('duress')
+      }
+    }
+  })
+
+  it('verifyToken detects duress with tolerance=3 (P2 regression round 2)', () => {
+    // Regression: derive at c=427, verify at vc=430, tolerance=3
+    // Before fix: duress token classified as 'valid' because collision avoidance
+    // window was insufficient for the verifier's tolerance.
+    const tolerance = 3
+    for (let d = tolerance; d < 80; d++) {
+      const duress = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, d, undefined, tolerance)
+      for (let v = Math.max(0, d - tolerance); v <= d + tolerance; v++) {
+        const result = verifyToken(SECRET_1, 'test', v, duress, [IDENTITY_A], { tolerance })
+        expect(
+          result.status,
+          `deriver=${d}, verifier=${v}, token="${duress}": expected duress, got ${result.status}`,
+        ).toBe('duress')
+      }
+    }
+  })
+})
+
+describe('MAX_TOLERANCE enforcement', () => {
+  it('deriveDuressToken throws on maxTolerance > MAX_TOLERANCE', () => {
+    expect(() => deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 0, undefined, 11)).toThrow(RangeError)
+    expect(() => deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 0, undefined, 100)).toThrow(RangeError)
+  })
+
+  it('verifyToken throws on tolerance > MAX_TOLERANCE', () => {
+    const token = deriveToken(SECRET_1, 'test', 0)
+    expect(() => verifyToken(SECRET_1, 'test', 0, token, [], { tolerance: 11 })).toThrow(RangeError)
+    expect(() => verifyToken(SECRET_1, 'test', 0, token, [], { tolerance: 100 })).toThrow(RangeError)
+  })
+
+  it('deriveDuressToken accepts maxTolerance = MAX_TOLERANCE', () => {
+    expect(() => deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 0, undefined, 10)).not.toThrow()
+  })
+
+  it('verifyToken accepts tolerance = MAX_TOLERANCE', () => {
+    const token = deriveToken(SECRET_1, 'test', 0)
+    expect(() => verifyToken(SECRET_1, 'test', 0, token, [], { tolerance: 10 })).not.toThrow()
   })
 })

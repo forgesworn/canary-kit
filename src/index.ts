@@ -58,6 +58,7 @@ export {
 
 // --- CANARY Protocol (universal API) ---
 export {
+  MAX_TOLERANCE,
   deriveTokenBytes,
   deriveToken,
   deriveDuressTokenBytes,

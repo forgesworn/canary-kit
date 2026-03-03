@@ -113,7 +113,7 @@ When a word is used for verification:
 
 ## Event Kinds
 
-This NIP defines five event kinds for Nostr transport. Kind numbers 38800–38801 are
+This NIP defines six event kinds for Nostr transport. Kind numbers 38800–38801 are
 replaceable events (NIP-16). Kind numbers 28800–28802 are ephemeral events (NIP-16).
 
 ```

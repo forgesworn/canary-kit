@@ -249,17 +249,14 @@ describe('createSession — handoff preset (fixed counter)', () => {
     expect(session.counter(999_999)).toBe(42)
   })
 
-  it('throws when handoff preset used without counter', () => {
-    expect(() => {
-      const session = createSession({
-        secret: SECRET,
-        namespace: 'dispatch',
-        roles: ['requester', 'provider'],
-        myRole: 'provider',
-        preset: 'handoff',
-      })
-      session.counter()
-    }).toThrow()
+  it('throws at construction when handoff preset used without counter', () => {
+    expect(() => createSession({
+      secret: SECRET,
+      namespace: 'dispatch',
+      roles: ['requester', 'provider'],
+      myRole: 'provider',
+      preset: 'handoff',
+    })).toThrow('Fixed counter mode (rotationSeconds=0) requires config.counter')
   })
 
   it('myToken and theirToken are different', () => {
@@ -368,5 +365,47 @@ describe('createSession — custom config (no preset)', () => {
     expect(session.counter(0)).toBe(0)
     expect(session.counter(119)).toBe(0)
     expect(session.counter(120)).toBe(1)
+  })
+})
+
+describe('createSession — numeric validation', () => {
+  const secret = generateSeed()
+  const base = { secret, namespace: 'test', roles: ['a', 'b'] as [string, string], myRole: 'a' }
+
+  it('throws on negative rotationSeconds', () => {
+    expect(() => createSession({ ...base, rotationSeconds: -30 })).toThrow(RangeError)
+  })
+
+  it('throws on fractional rotationSeconds', () => {
+    expect(() => createSession({ ...base, rotationSeconds: 1.5 })).toThrow(RangeError)
+  })
+
+  it('throws on negative tolerance', () => {
+    expect(() => createSession({ ...base, tolerance: -1 })).toThrow(RangeError)
+  })
+
+  it('throws on tolerance > MAX_TOLERANCE', () => {
+    expect(() => createSession({ ...base, tolerance: 11 })).toThrow(RangeError)
+  })
+
+  it('throws when counter set with rotationSeconds > 0', () => {
+    expect(() => createSession({ ...base, rotationSeconds: 30, counter: 42 }))
+      .toThrow('counter must not be set when rotationSeconds > 0')
+  })
+
+  it('throws on negative counter in fixed mode', () => {
+    expect(() => createSession({ ...base, rotationSeconds: 0, counter: -1 })).toThrow(RangeError)
+  })
+
+  it('throws on counter > uint32 max in fixed mode', () => {
+    expect(() => createSession({ ...base, rotationSeconds: 0, counter: 0xFFFFFFFF + 1 })).toThrow(RangeError)
+  })
+
+  it('accepts rotationSeconds=0 with valid counter', () => {
+    expect(() => createSession({ ...base, rotationSeconds: 0, counter: 42 })).not.toThrow()
+  })
+
+  it('accepts tolerance at MAX_TOLERANCE boundary', () => {
+    expect(() => createSession({ ...base, tolerance: 10 })).not.toThrow()
   })
 })

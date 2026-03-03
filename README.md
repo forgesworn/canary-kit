@@ -5,6 +5,10 @@
 [![npm](https://img.shields.io/npm/v/canary-kit)](https://www.npmjs.com/package/canary-kit)
 [![CI](https://github.com/TheCryptoDonkey/canary-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/TheCryptoDonkey/canary-kit/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-native-blue)](https://www.typescriptlang.org/)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
+
+**[Interactive Demo](https://thecryptodonkey.github.io/canary-kit/)** · [Protocol Spec](CANARY.md) · [Nostr Binding](NIP-CANARY.md) · [Integration Guide](INTEGRATION.md)
 
 ## The Problem
 
@@ -99,6 +103,39 @@ getCurrentWord(group)  // "falcon"
 **Zero dependencies.** Pure JavaScript — no runtime dependencies. Requires `globalThis.crypto` (Web Crypto API): all browsers, Node.js 22+, Deno, and edge runtimes.
 
 **Protocol-grade.** Formal specification with published test vectors and a curated 2048-word spoken-clarity wordlist.
+
+## Compatibility
+
+| Runtime | Version | Notes |
+|---------|---------|-------|
+| Node.js | 22+ | Full support (`globalThis.crypto` required) |
+| Deno | 1.x+ | Full support |
+| Bun | 1.x+ | Full support |
+| Browsers | All modern | Chrome, Firefox, Safari, Edge |
+| Cloudflare Workers | Yes | Web Crypto API available |
+| React Native | Via polyfill | Needs `crypto.subtle` polyfill |
+
+ESM-only. Seven subpath exports for tree-shaking:
+
+```typescript
+import { createSession } from 'canary-kit/session'    // just sessions
+import { deriveToken } from 'canary-kit/token'         // just derivation
+import { encodeAsWords } from 'canary-kit/encoding'    // just encoding
+import { WORDLIST } from 'canary-kit/wordlist'          // just the wordlist
+import { buildGroupEvent } from 'canary-kit/nostr'     // just Nostr
+import { encryptBeacon } from 'canary-kit/beacon'      // just beacons
+```
+
+## Security
+
+- **Zero runtime dependencies** — the published package contains only our code
+- **Automated publishing** — GitHub Actions with OIDC trusted publishing, no stored tokens
+- **Provenance signed** — npm provenance attestation enabled
+- **Protocol-grade test vectors** — 12 frozen canonical vectors; any conformant implementation must produce identical results
+- **Timing-safe byte compare** — `timingSafeEqual()` utility provided for constant-time byte operations
+- **Bounded tolerance** — `MAX_TOLERANCE` cap prevents pathological iteration
+
+See [SECURITY.md](SECURITY.md) for vulnerability disclosure and known limitations. See [CANARY.md](CANARY.md) for the full security analysis.
 
 ## API Reference
 
@@ -286,6 +323,7 @@ import {
   buildMemberUpdateEvent,
   buildReseedEvent,
   buildWordUsedEvent,
+  buildBeaconEvent,
   KINDS,
   type UnsignedEvent,
 } from 'canary-kit/nostr'
@@ -330,6 +368,11 @@ The full protocol specification is in [CANARY.md](CANARY.md). The Nostr binding 
 All kind numbers above are provisional — pending final NIP allocation.
 
 Content is encrypted with **NIP-44**. Events may carry a **NIP-40** `expiration` tag.
+
+## For AI Assistants
+
+- [llms.txt](llms.txt) — concise API summary
+- [llms-full.txt](llms-full.txt) — complete reference with all type signatures
 
 ## Licence
 

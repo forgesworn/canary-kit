@@ -133,6 +133,9 @@ Recommended tolerance values by use case:
 | High-security     | 0         | Strict; requires exact counter match         |
 | TOTP-equivalent   | ±1        | Standard TOTP practice (RFC 6238 §5.2)       |
 
+The tolerance used by verifiers MUST be communicated to duress token derivers, because the
+duress collision avoidance window (see §Collision Avoidance) is computed from this value.
+
 ### Counter Acceptance
 
 Implementations that receive counter advancement signals (burn-after-use notifications,
@@ -287,16 +290,28 @@ secret can check for both.
 ### Collision Avoidance
 
 If the duress token, after encoding, is identical to any verification token within the
-tolerance window, the implementation MUST re-derive by appending incrementing suffix bytes
+collision window, the implementation MUST re-derive by appending incrementing suffix bytes
 to the HMAC data.
 
-For fixed-window verifiers (e.g. group verification with ±1 lookback), the forbidden set
-is the verification tokens at counters `[max(0, counter-1), counter, counter+1]`. For
-configurable-tolerance verifiers, the forbidden set is verification tokens at counters
-`[max(0, counter-maxTolerance), ..., min(MAX_UINT32, counter+maxTolerance)]`.
+#### Collision Window
+
+The collision window MUST be `±(2 × maxTolerance)` counter values centred on the deriver's
+counter. The 2× factor accounts for worst-case counter drift: the deriver and the verifier
+may each be off by `maxTolerance` in opposite directions, so the verifier could check
+normal tokens anywhere in a `±(2 × maxTolerance)` range from the deriver's perspective.
+
+The `maxTolerance` used when deriving the duress token MUST equal the `tolerance` used by
+the verifier. Using an insufficient value allows duress tokens to collide with normal tokens
+at distant counters, causing silent alarm suppression.
+
+Implementations SHOULD enforce a practical upper bound on tolerance (the reference
+implementation uses `MAX_TOLERANCE = 10`).
 
 ```
-forbidden_tokens = { encode(derive(secret, context, c)) for c in tolerance_window }
+collision_window = [max(0, counter - 2 * maxTolerance),
+                    min(MAX_UINT32, counter + 2 * maxTolerance)]
+
+forbidden_tokens = { encode(derive(secret, context, c)) for c in collision_window }
 
 duress_data = utf8(context + ":duress") || 0x00 || utf8(identity) || counter_be32
 duress_bytes = HMAC-SHA256(secret, duress_data)
@@ -317,7 +332,7 @@ byte arrays can encode to the same output via modulo reduction. Implementations 
 apply this check whenever computing a duress token. If all 255 suffix retries produce
 a collision (probability effectively zero for any practical encoding), the implementation
 MUST raise an error. Implementations MUST NOT return a duress token that matches any
-verification token in the tolerance window — this would cause a duress signal to be
+verification token in the collision window — this would cause a duress signal to be
 classified as valid, suppressing the silent alarm.
 
 ### Verification Flow
@@ -336,7 +351,8 @@ The verification algorithm uses exact-counter-first priority:
 
 2. For each identity, for each counter in the tolerance window
    `[counter - tolerance, ..., counter + tolerance]`:
-   derive the duress token. Collect all matching identities. If any match →
+   derive the duress token (using `maxTolerance = tolerance`).
+   Collect all matching identities. If any match →
    `duress` with all matching identities.
 
 3. For each counter in the tolerance window **excluding the exact counter**:

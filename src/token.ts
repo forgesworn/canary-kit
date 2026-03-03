@@ -1,6 +1,13 @@
 import { hmacSha256, hexToBytes, concatBytes } from './crypto.js'
 import { encodeToken, type TokenEncoding, DEFAULT_ENCODING } from './encoding.js'
 
+/**
+ * Maximum allowed tolerance/maxTolerance value.
+ * Prevents pathological iteration: at MAX_TOLERANCE=10, the collision
+ * avoidance window is ±20 counters (41 iterations) — well within reason.
+ */
+export const MAX_TOLERANCE = 10
+
 const encoder = new TextEncoder()
 
 function utf8(str: string): Uint8Array {
@@ -76,10 +83,16 @@ export function deriveDuressTokenBytes(
  * CANARY-DURESS: Derive an encoded duress token with collision avoidance.
  *
  * If the duress token collides with any normal verification token within
- * ±maxTolerance counter values (at the encoding level), re-derives with
+ * ±(2 × maxTolerance) counter values (at the encoding level), re-derives with
  * incrementing suffix bytes (0x01, 0x02, ..., 0xFF) until distinct.
+ * The 2× factor accounts for worst-case counter drift: the deriver and verifier
+ * may each be off by maxTolerance in opposite directions.
  * If all 255 suffixes collide (astronomically unlikely), throws an error
  * rather than failing open.
+ *
+ * **maxTolerance is required** — it must match the tolerance used by verifiers.
+ * Using an insufficient value allows duress tokens to collide with normal tokens
+ * at distant counters, causing silent alarm suppression.
  */
 export function deriveDuressToken(
   secret: Uint8Array | string,
@@ -87,15 +100,20 @@ export function deriveDuressToken(
   identity: string,
   counter: number,
   encoding: TokenEncoding = DEFAULT_ENCODING,
-  maxTolerance: number = 1,
+  maxTolerance: number,
 ): string {
   if (!Number.isInteger(maxTolerance) || maxTolerance < 0) {
     throw new RangeError('maxTolerance must be a non-negative integer')
   }
-  // Collect normal tokens within ±maxTolerance for cross-counter collision avoidance.
+  if (maxTolerance > MAX_TOLERANCE) {
+    throw new RangeError(`maxTolerance must be <= ${MAX_TOLERANCE}, got ${maxTolerance}`)
+  }
+  // Collect normal tokens within ±(2 × maxTolerance) for cross-counter collision avoidance.
+  // The 2× window accounts for worst-case counter drift between deriver and verifier.
   const forbidden = new Set<string>()
-  const lo = Math.max(0, counter - maxTolerance)
-  const hi = Math.min(0xFFFFFFFF, counter + maxTolerance)
+  const window = 2 * maxTolerance
+  const lo = Math.max(0, counter - window)
+  const hi = Math.min(0xFFFFFFFF, counter + window)
   for (let c = lo; c <= hi; c++) {
     forbidden.add(deriveToken(secret, context, c, encoding))
   }
@@ -165,6 +183,9 @@ export function verifyToken(
   const tolerance = options?.tolerance ?? 0
   if (!Number.isInteger(tolerance) || tolerance < 0) {
     throw new RangeError('Tolerance must be a non-negative integer')
+  }
+  if (tolerance > MAX_TOLERANCE) {
+    throw new RangeError(`Tolerance must be <= ${MAX_TOLERANCE}, got ${tolerance}`)
   }
   const normalised = input.toLowerCase().trim()
 

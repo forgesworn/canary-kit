@@ -1,0 +1,165 @@
+# canary-kit
+
+> Need to verify a caller is really your bank — not a deepfake? canary-kit is a zero-dependency, open-protocol TypeScript library for spoken-word identity verification using HMAC-SHA256 token derivation with built-in duress signalling, dead man's switch, and encrypted location beacons.
+
+Interactive demo: https://thecryptodonkey.github.io/canary-kit/
+GitHub: https://github.com/TheCryptoDonkey/canary-kit
+
+ESM-only. Seven subpath exports: `canary-kit` (main), `canary-kit/token`, `canary-kit/encoding`, `canary-kit/session`, `canary-kit/wordlist`, `canary-kit/nostr`, `canary-kit/beacon`.
+
+## Install
+
+npm install canary-kit
+
+## Subpath Exports
+
+### canary-kit (main entry)
+
+Re-exports the full API. Includes group lifecycle, presets, and all protocol primitives.
+
+Core derivation:
+- deriveVerificationWord(seedHex, counter) → string
+- deriveVerificationPhrase(seedHex, counter, wordCount) → string[]
+- deriveDuressWord(seedHex, memberPubkeyHex, counter) → string
+- deriveDuressPhrase(seedHex, memberPubkeyHex, counter, wordCount) → string[]
+- verifyWord(spokenWord, seedHex, memberPubkeys, counter, wordCount?) → VerifyResult
+
+Group lifecycle:
+- createGroup(config) → GroupState
+- getCurrentWord(state) → string
+- getCurrentDuressWord(state, memberPubkey) → string
+- advanceCounter(state) → GroupState
+- reseed(state) → GroupState
+- addMember(state, pubkey) → GroupState
+- removeMember(state, pubkey) → GroupState
+- syncCounter(state, nowSec?) → GroupState
+
+Counter:
+- getCounter(timestampSec, rotationIntervalSec?) → number
+- counterToBytes(counter) → Uint8Array
+- DEFAULT_ROTATION_INTERVAL — 604800 (7 days)
+
+Presets:
+- PRESETS — { family, field-ops, enterprise } (wordCount, rotationInterval, description)
+- PresetName — 'family' | 'field-ops' | 'enterprise'
+
+Also re-exports all of: canary-kit/token, canary-kit/encoding, canary-kit/beacon, canary-kit/wordlist
+
+### canary-kit/token
+
+Universal CANARY protocol — context-string-based derivation. Use this to build custom integrations outside the group model.
+
+- deriveTokenBytes(secret, context, counter) → Uint8Array
+- deriveToken(secret, context, counter, encoding?) → string
+- deriveDuressTokenBytes(secret, context, identity, counter) → Uint8Array
+- MAX_TOLERANCE — 10 (upper bound for tolerance/maxTolerance)
+- deriveDuressToken(secret, context, identity, counter, encoding, maxTolerance) → string (both required — maxTolerance must match verifier's tolerance)
+- verifyToken(secret, context, counter, input, identities, options?) → TokenVerifyResult
+- deriveLivenessToken(secret, context, identity, counter) → Uint8Array
+- deriveDirectionalPair(secret, namespace, roles, counter, encoding?) → { [role]: string }
+
+Types: TokenVerifyResult ({ status: 'valid' | 'duress' | 'invalid', identities? }), VerifyOptions ({ encoding?, tolerance? })
+
+### canary-kit/encoding
+
+Encode raw HMAC bytes into human-readable formats.
+
+- encodeAsWords(bytes, count?, wordlist?) → string[]
+- encodeAsPin(bytes, digits?) → string
+- encodeAsHex(bytes, length?) → string
+- encodeToken(bytes, encoding?) → string
+- DEFAULT_ENCODING — { format: 'words', count: 1 }
+
+Type: TokenEncoding — { format: 'words', count?, wordlist? } | { format: 'pin', digits? } | { format: 'hex', length? }
+
+### canary-kit/session
+
+Role-aware, time-managed two-party verification sessions. Ideal for phone calls and physical handoffs.
+
+- createSession(config) → Session
+- generateSeed() → Uint8Array
+- deriveSeed(masterKey, ...components) → Uint8Array
+- SESSION_PRESETS — { call, handoff } (wordCount, rotationSeconds, tolerance, directional)
+- SessionPresetName — 'call' | 'handoff'
+
+Session methods:
+- session.counter(nowSec?) → number
+- session.myToken(nowSec?) → string
+- session.theirToken(nowSec?) → string
+- session.verify(spoken, nowSec?) → TokenVerifyResult
+- session.pair(nowSec?) → { [role]: string }
+
+### canary-kit/wordlist
+
+2048-word spoken-clarity wordlist (en-v1). Based on BIP-39 English, filtered for verbal clarity — no homophones, no phonetic near-collisions.
+
+- WORDLIST — readonly string[] (2048 entries)
+- WORDLIST_SIZE — 2048
+- getWord(index) → string
+- indexOf(word) → number (-1 if not found)
+
+### canary-kit/nostr
+
+Unsigned Nostr event builders for the CANARY protocol (NIP-CANARY). Sign events with your preferred Nostr library.
+
+- KINDS — { group: 38800, seedDistribution: 28800, memberUpdate: 38801, reseed: 28801, wordUsed: 28802, beacon: 20800 }
+- buildGroupEvent(params) → UnsignedEvent
+- buildSeedDistributionEvent(params) → UnsignedEvent
+- buildMemberUpdateEvent(params) → UnsignedEvent
+- buildReseedEvent(params) → UnsignedEvent
+- buildWordUsedEvent(params) → UnsignedEvent
+- buildBeaconEvent(params) → UnsignedEvent
+
+### canary-kit/beacon
+
+AES-256-GCM encrypted location beacons and duress alerts for Nostr kind 20800 events.
+
+- deriveBeaconKey(seedHex) → Uint8Array
+- encryptBeacon(key, geohash, precision) → Promise\<string\>
+- decryptBeacon(key, content) → Promise\<BeaconPayload\>
+- buildDuressAlert(memberPubkey, location) → DuressAlert
+- encryptDuressAlert(key, alert) → Promise\<string\>
+- decryptDuressAlert(key, content) → Promise\<DuressAlert\>
+
+Types: BeaconPayload ({ geohash, precision, timestamp }), DuressAlert ({ type, member, geohash, precision, locationSource, timestamp }), DuressLocation ({ geohash, precision, locationSource })
+
+## Quick Examples
+
+```typescript
+// --- Session-based phone verification (bank/insurance call centre) ---
+import { createSession } from 'canary-kit/session'
+
+const session = createSession({
+  secret: sharedSecretHex,
+  namespace: 'aviva',
+  roles: ['caller', 'agent'],
+  myRole: 'agent',
+  preset: 'call', // 30-second rotation, tolerance 1, directional
+  theirIdentity: customerId, // enables duress detection
+})
+
+// The caller speaks session.theirToken() — the agent hears and verifies:
+const result = session.verify(spokenWord)
+// result.status === 'valid' | 'duress' | 'invalid'
+// result.identities → who signalled duress (if any)
+```
+
+```typescript
+// --- Group-based family verification (weekly rotating passphrase) ---
+import { createGroup, getCurrentWord, getCurrentDuressWord, verifyWord, getCounter } from 'canary-kit'
+
+const group = createGroup({ preset: 'family', members: [alicePubkey, bobPubkey] })
+const word = getCurrentWord(group) // e.g. "granite"
+
+// On a call, Alice says the current word. Bob verifies:
+const counter = getCounter(Math.floor(Date.now() / 1000), group.rotationInterval)
+const result = verifyWord(spokenWord, group.seed, group.members, counter, group.wordCount)
+// result.status === 'verified' | 'duress' | 'stale' | 'failed'
+
+// If Alice is under coercion, she says her duress word instead:
+const duressWord = getCurrentDuressWord(group, alicePubkey) // always distinct from the normal word
+```
+
+## Optional
+
+- llms-full.txt: Full API reference with all type signatures, protocol details, and canonical test vectors
