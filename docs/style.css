@@ -140,7 +140,7 @@
 }
 
 [data-theme="light"] .beacon-map {
-  background: var(--color-surface-raised, #ede8df);
+  background: var(--bg-raised);
 }
 
 /* ── Theme toggle ──────────────────────────────────────────── */
@@ -1665,8 +1665,8 @@ input::placeholder {
   height: 300px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--color-surface-raised, #1a1a1a);
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.06));
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
   position: relative;
 }
 
@@ -1681,7 +1681,7 @@ input::placeholder {
 
 .beacon-map__placeholder-text {
   font-size: 0.875rem;
-  color: var(--color-text-muted, #666);
+  color: var(--text-muted);
   letter-spacing: 0.04em;
 }
 
@@ -1699,7 +1699,7 @@ input::placeholder {
 
 .beacon-enable-btn:hover {
   background: var(--amber-400, #fbbf24);
-  color: var(--color-bg, #0d0a06);
+  color: var(--bg-deep);
 }
 
 .beacon-members {
@@ -1716,19 +1716,19 @@ input::placeholder {
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.06));
+  border-bottom: 1px solid var(--border);
   font-size: 0.875rem;
 }
 
 .beacon-member__name {
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   font-weight: 500;
 }
 
 .beacon-member__info {
   display: flex;
   gap: 1rem;
-  color: var(--color-text-muted, #666);
+  color: var(--text-muted);
   font-size: 0.8125rem;
 }
 
@@ -1740,9 +1740,9 @@ input::placeholder {
   margin-right: 0.5rem;
 }
 
-.beacon-member__dot--active { background: var(--color-green, #22c55e); }
+.beacon-member__dot--active { background: var(--verified); }
 .beacon-member__dot--stale  { background: var(--amber-400, #fbbf24); }
-.beacon-member__dot--offline { background: var(--color-text-muted, #666); }
+.beacon-member__dot--offline { background: var(--text-muted); }
 
 /* ── Duress Alert Banner ─────────────────────────────────── */
 
@@ -1755,10 +1755,10 @@ input::placeholder {
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 8px;
-  animation: duress-pulse 2s ease-in-out infinite;
+  animation: duress-banner-pulse 2s ease-in-out infinite;
 }
 
-@keyframes duress-pulse {
+@keyframes duress-banner-pulse {
   0%, 100% { border-color: rgba(239, 68, 68, 0.3); }
   50% { border-color: rgba(239, 68, 68, 0.7); }
 }
@@ -1789,13 +1789,13 @@ input::placeholder {
 }
 
 .duress-alert-banner__label {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 0.875rem;
 }
 
 .duress-alert-banner__location {
   font-size: 0.8125rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
 }
 
@@ -1944,6 +1944,14 @@ input::placeholder {
   display: none !important;
 }
 
+/* ── Inline validation errors ─────────────────────────────── */
+
+.inline-error {
+  color: var(--failed);
+  font-size: 0.8125rem;
+  margin-top: 0.25rem;
+}
+
 /* ============================================================
    22. FOCUS VISIBLE — keyboard nav
    ============================================================ */
@@ -1957,5 +1965,17 @@ input::placeholder {
 button:focus-visible {
   outline: 2px solid var(--amber-500);
   outline-offset: 2px;
+}
+
+/* ============================================================
+   23. REDUCED MOTION
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 

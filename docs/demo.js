@@ -1263,11 +1263,17 @@ function setupConfirmModal() {
       confirmCallback()
       confirmCallback = null
     }
+    // Reset OK button to default state after use
+    okBtn.textContent = 'Confirm'
+    okBtn.className = 'modal-btn modal-btn--destructive'
   })
 
   cancelBtn.addEventListener('click', () => {
     modal.close()
     confirmCallback = null
+    // Reset OK button to default state in case it was changed by showInviteModal
+    okBtn.textContent = 'Confirm'
+    okBtn.className = 'modal-btn modal-btn--destructive'
   })
 }
 
@@ -1330,6 +1336,22 @@ function setupCreateModal() {
 }
 
 // ---------------------------------------------------------------------------
+// Inline error helper — avoids alert() for input validation feedback
+// ---------------------------------------------------------------------------
+
+function showInlineError(inputEl, message) {
+  let err = inputEl.parentElement.querySelector('.inline-error')
+  if (!err) {
+    err = document.createElement('p')
+    err.className = 'inline-error'
+    inputEl.parentElement.appendChild(err)
+  }
+  err.textContent = message
+  err.hidden = false
+  setTimeout(() => { err.hidden = true }, 4000)
+}
+
+// ---------------------------------------------------------------------------
 // Member management
 // ---------------------------------------------------------------------------
 
@@ -1373,17 +1395,17 @@ function setupInvite() {
           const decoded = nip19.decode(raw)
           pubkey = decoded.data
         } catch {
-          alert('Invalid npub.')
+          showInlineError(inviteInput, 'Invalid npub.')
           return
         }
       } else {
-        alert('Please paste a hex pubkey. npub decoding requires network connectivity.')
+        showInlineError(inviteInput, 'Please paste a hex pubkey. npub decoding requires network connectivity.')
         return
       }
     } else {
       pubkey = raw.toLowerCase()
       if (!/^[0-9a-f]{64}$/.test(pubkey)) {
-        alert('Please enter a valid 64-character hex pubkey.')
+        showInlineError(inviteInput, 'Please enter a valid 64-character hex pubkey.')
         return
       }
     }
@@ -1682,7 +1704,7 @@ function setupSettings() {
   addBtn.addEventListener('click', () => {
     const url = addInput.value.trim()
     if (!url || !url.startsWith('wss://')) {
-      alert('Please enter a valid wss:// relay URL.')
+      showInlineError(addInput, 'Please enter a valid wss:// relay URL.')
       return
     }
     if (!state.settings.relays.includes(url)) {
@@ -1844,7 +1866,8 @@ function setupAuth() {
       subscribeToInvitations()
       render()
     } catch {
-      alert('Could not generate an ephemeral identity. Your browser may not support Web Crypto.')
+      const authBtn = document.getElementById('auth-btn')
+      showInlineError(authBtn, 'Could not generate an ephemeral identity. Your browser may not support Web Crypto.')
     }
   })
 }
