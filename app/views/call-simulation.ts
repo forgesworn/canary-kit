@@ -158,7 +158,12 @@ export function renderCallSimulation(container: HTMLElement): void {
         <span class="call-sim__meta">Namespace: <strong>${_scenario.namespace}</strong></span>
         <span class="call-sim__meta">Rotation: <strong>${isHandoff ? 'single-use' : rotationSeconds + 's'}</strong></span>
         <span class="call-sim__meta">Encoding: <strong>${_scenario.encoding ?? 'words'}</strong></span>
+        <span class="call-sim__meta">Tolerance: <strong>+/-${isHandoff ? '0' : SESSION_PRESETS[_scenario.preset].tolerance}</strong></span>
         <button class="btn" id="call-reset-seed">Reset seed</button>
+      </div>
+
+      <div class="call-sim__pair" id="call-pair">
+        <span class="call-sim__meta">Pair: <code id="pair-display"></code></span>
       </div>
     </div>
   `
@@ -216,6 +221,14 @@ export function renderCallSimulation(container: HTMLElement): void {
   wireVerify('caller-verify-input', 'caller-verify-btn', 'caller-result', _callerSession)
   wireVerify('agent-verify-input', 'agent-verify-btn', 'agent-result', _agentSession)
 
+  // Populate directional pair display
+  const pairEl = container.querySelector<HTMLElement>('#pair-display')
+  if (pairEl) {
+    const pair = _callerSession.pair(nowSec)
+    const entries = Object.entries(pair).map(([role, token]) => `${role}: ${token}`).join(' | ')
+    pairEl.textContent = entries
+  }
+
   // Countdown tick
   if (!isHandoff && rotationSeconds > 0) {
     _tickInterval = setInterval(() => {
@@ -231,6 +244,13 @@ export function renderCallSimulation(container: HTMLElement): void {
       if (ap) ap.style.width = `${pct}%`
       if (cc) cc.textContent = formatCountdown(remaining)
       if (ac) ac.textContent = formatCountdown(remaining)
+
+      const pairDisplay = container.querySelector<HTMLElement>('#pair-display')
+      if (pairDisplay) {
+        const pair = _callerSession.pair()
+        const entries = Object.entries(pair).map(([role, token]) => `${role}: ${token}`).join(' | ')
+        pairDisplay.textContent = entries
+      }
 
       if (remaining === 0) {
         clearTick()
