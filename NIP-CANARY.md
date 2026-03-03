@@ -89,13 +89,19 @@ advance in step.
 
 When verifying a spoken response:
 
-1. If it matches the current verification word → identity confirmed.
-2. Derive the duress word for every member. Collect all matches. If any match →
-   **DURESS DETECTED**. Act normally, broadcast silent duress event. Per CANARY-DURESS,
-   the verifier MUST check all members and collect all matches (see [CANARY.md](CANARY.md)).
-3. Check the verification word at `counter - 1` (one window lookback for stale counters).
-   If it matches → identity confirmed, member out of sync.
-4. Otherwise → verification failed.
+1. If it matches the current verification word (or phrase, when `words > 1`) →
+   identity confirmed.
+2. Derive the duress word (or phrase) for every member at the **current counter**.
+   Collect all matches. Per CANARY-DURESS, the verifier MUST check all members and
+   collect all matches (see [CANARY.md](CANARY.md)).
+3. Derive the duress word (or phrase) for every member at `counter - 1`.
+   Collect all matches. This catches duress signals from members whose counter is
+   one window behind.
+4. If any duress matches from steps 2 or 3 → **DURESS DETECTED**. Act normally,
+   broadcast silent duress event.
+5. Check the verification word (or phrase) at `counter - 1` (one window lookback
+   for stale counters). If it matches → identity confirmed, member out of sync.
+6. Otherwise → verification failed.
 
 ### Burn-After-Use
 
@@ -360,15 +366,20 @@ counter. No network is required for derivation. When a word is used:
 
 ### Member Removal
 
-1. Creator publishes a Member Update event (kind 38801) with `action=remove`.
-2. Creator generates a new group seed.
-3. Creator publishes a Re-seed event (kind 28801) with `reason=member_removed`.
-4. Creator distributes the new seed to all remaining members (kind 28800).
+1. Creator publishes an updated Canary Group event (kind 38800) with the removed member's
+   `p` tag deleted. This is the canonical membership update — all clients derive the
+   member list from 38800's `p` tags.
+2. Creator publishes a Member Update event (kind 38801) with `action=remove`.
+3. Creator generates a new group seed.
+4. Creator publishes a Re-seed event (kind 28801) with `reason=member_removed`.
+5. Creator distributes the new seed to all remaining members (kind 28800).
 
 ### Member Addition
 
-1. Creator publishes a Member Update event (kind 38801) with `action=add`.
-2. Creator distributes the current seed to the new member (kind 28800). A re-seed is
+1. Creator publishes an updated Canary Group event (kind 38800) with the new member's
+   `p` tag added.
+2. Creator publishes a Member Update event (kind 38801) with `action=add`.
+3. Creator distributes the current seed to the new member (kind 28800). A re-seed is
    NOT required.
 
 ### Duress Detection
@@ -467,14 +478,19 @@ duress:
   mac   = HMAC-SHA256(key=key, data=uint64_be(counter))
   index = uint16_be(mac[0:2]) mod 2048
   word  = wordlist[index]
-  if word == verification_word:
-    # CANARY-DURESS multi-suffix retry (see CANARY.md)
+
+  # Cross-counter collision avoidance: forbidden set is verification
+  # words at counter−1, counter, and counter+1 (clamped at 0).
+  forbidden = { verification_word(max(0, counter-1)),
+                verification_word(counter),
+                verification_word(counter+1) }
+  if word in forbidden:
     for suffix in 0x01..0xFF:
       key   = seed || pubkey || byte(suffix)
       mac   = HMAC-SHA256(key=key, data=uint64_be(counter))
       index = uint16_be(mac[0:2]) mod 2048
       word  = wordlist[index]
-      if word != verification_word: break
+      if word not in forbidden: break
 ```
 
 **Vector Table:**

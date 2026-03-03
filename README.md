@@ -163,7 +163,7 @@ import {
 | Function | Description |
 |---|---|
 | `deriveToken(secret, context, counter, encoding?)` | Derive an encoded verification token |
-| `deriveDuressToken(secret, context, identity, counter, encoding?)` | Derive a duress token for a specific identity |
+| `deriveDuressToken(secret, context, identity, counter, encoding?, maxTolerance?)` | Derive a duress token for a specific identity |
 | `verifyToken(secret, context, counter, input, identities, options?)` | Verify a token — returns `valid`, `duress` (with matching identities), or `invalid` |
 | `deriveLivenessToken(secret, context, identity, counter)` | Derive a liveness heartbeat token for dead man's switch |
 | `deriveDirectionalPair(secret, namespace, roles, counter, encoding?)` | Derive two directional tokens from the same secret |
@@ -192,7 +192,7 @@ import {
 import { verifyWord, type VerifyResult, type VerifyStatus } from 'canary-kit'
 ```
 
-`verifyWord(spokenWord, seedHex, memberPubkeys, counter): VerifyResult`
+`verifyWord(spokenWord, seedHex, memberPubkeys, counter, wordCount?): VerifyResult`
 
 Checks a spoken word in order: current verification word → each member's duress word → previous window (stale) → failed.
 
@@ -300,8 +300,9 @@ All builders return an `UnsignedEvent`. Sign with your own Nostr library.
 | `buildMemberUpdateEvent(params)` | `38801` | Replaceable event recording a member add or remove |
 | `buildReseedEvent(params)` | `28801` | Ephemeral event signalling a seed rotation |
 | `buildWordUsedEvent(params)` | `28802` | Ephemeral event recording that a verification word was consumed |
+| `buildBeaconEvent(params)` | `20800` | Ephemeral event carrying an encrypted location beacon |
 
-`KINDS` exports all five kind numbers as named constants.
+`KINDS` exports all six kind numbers as named constants.
 
 ### Beacon & Duress Alerts
 
@@ -324,6 +325,7 @@ The full protocol specification is in [CANARY.md](CANARY.md). The Nostr binding 
 | Member update | `38801` | Replaceable |
 | Reseed | `28801` | Ephemeral |
 | Word used | `28802` | Ephemeral |
+| Encrypted location beacon | `20800` | Ephemeral |
 
 All kind numbers above are provisional — pending final NIP allocation.
 

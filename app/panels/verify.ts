@@ -90,7 +90,7 @@ export function renderVerify(container: HTMLElement): void {
     const nowSec = Math.floor(Date.now() / 1000)
     const counter = getCounter(nowSec, currentGroup.rotationInterval) + currentGroup.usageOffset
 
-    const result = verifyWord(spokenWord, currentGroup.seed, currentGroup.members, counter)
+    const result = verifyWord(spokenWord, currentGroup.seed, currentGroup.members, counter, currentGroup.wordCount)
 
     // Remove all status classes before adding the new one
     resultEl!.className = 'verify-result'

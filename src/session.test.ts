@@ -296,6 +296,37 @@ describe('createSession — handoff preset (fixed counter)', () => {
   })
 })
 
+describe('createSession — role validation', () => {
+  const secret = generateSeed()
+
+  it('throws when roles are identical', () => {
+    expect(() => createSession({
+      secret,
+      namespace: 'test',
+      roles: ['caller', 'caller'],
+      myRole: 'caller',
+    })).toThrow('Roles must be distinct')
+  })
+
+  it('throws when myRole is not one of the roles', () => {
+    expect(() => createSession({
+      secret,
+      namespace: 'test',
+      roles: ['caller', 'agent'],
+      myRole: 'calller',  // typo
+    })).toThrow('myRole "calller" is not one of the configured roles')
+  })
+
+  it('accepts valid role configuration', () => {
+    expect(() => createSession({
+      secret,
+      namespace: 'test',
+      roles: ['caller', 'agent'],
+      myRole: 'caller',
+    })).not.toThrow()
+  })
+})
+
 describe('createSession — custom config (no preset)', () => {
   it('uses explicit rotationSeconds', () => {
     const session = createSession({

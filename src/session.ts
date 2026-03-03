@@ -138,6 +138,13 @@ export function createSession(config: SessionConfig): Session {
   const wordCount = preset?.wordCount ?? 1
   const encoding: TokenEncoding = config.encoding ?? { format: 'words', count: wordCount }
 
+  if (config.roles[0] === config.roles[1]) {
+    throw new Error(`Roles must be distinct, got ["${config.roles[0]}", "${config.roles[1]}"]`)
+  }
+  if (config.myRole !== config.roles[0] && config.myRole !== config.roles[1]) {
+    throw new Error(`myRole "${config.myRole}" is not one of the configured roles ["${config.roles[0]}", "${config.roles[1]}"]`)
+  }
+
   const secret = typeof config.secret === 'string' ? hexToBytes(config.secret) : config.secret
   const theirRole = config.roles[0] === config.myRole ? config.roles[1] : config.roles[0]
   const myContext = `${config.namespace}:${config.myRole}`
