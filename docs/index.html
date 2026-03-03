@@ -108,6 +108,15 @@
           </div>
         </section>
 
+        <div id="duress-alert-banner" class="duress-alert-banner" hidden>
+          <div class="duress-alert-banner__icon">!</div>
+          <div class="duress-alert-banner__body">
+            <strong id="duress-alert-name" class="duress-alert-banner__name"></strong>
+            <span class="duress-alert-banner__label">may be under duress</span>
+            <span id="duress-alert-location" class="duress-alert-banner__location"></span>
+          </div>
+        </div>
+
         <div class="panels-grid">
 
           <section class="panel verify-panel">
@@ -145,6 +154,17 @@
               />
               <button id="invite-btn" class="invite-btn">Invite</button>
             </div>
+          </section>
+
+          <section class="panel beacon-panel">
+            <h2 class="panel-title">Location</h2>
+            <div id="beacon-map" class="beacon-map">
+              <div class="beacon-map__placeholder">
+                <span class="beacon-map__placeholder-text">Enable location to see group members</span>
+                <button id="enable-beacon-btn" class="beacon-enable-btn">Enable Beacons</button>
+              </div>
+            </div>
+            <ul id="beacon-members" class="beacon-members"></ul>
           </section>
 
         </div>
