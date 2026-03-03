@@ -397,22 +397,37 @@ function getAppState() {
 
 function render() {
   const appState = getAppState()
+  const isWelcome = appState === 'welcome'
 
   // Sidebar — hidden in welcome state
   const sidebar = document.querySelector('.sidebar')
-  if (sidebar) sidebar.hidden = appState === 'welcome'
+  if (sidebar) sidebar.hidden = isWelcome
 
   // Layout class for welcome centering
   const layout = document.querySelector('.layout')
-  if (layout) layout.classList.toggle('layout--welcome', appState === 'welcome')
+  if (layout) layout.classList.toggle('layout--welcome', isWelcome)
 
   // Relay status — hidden in welcome
   const relayStatus = document.querySelector('.relay-status')
-  if (relayStatus) relayStatus.hidden = appState === 'welcome'
+  if (relayStatus) relayStatus.hidden = isWelcome
 
-  if (appState === 'welcome') {
+  // Welcome screen and main content sections
+  const welcomeScreen = document.getElementById('welcome-screen')
+  const hero = document.getElementById('hero')
+  const panelsGrid = document.querySelector('.panels-grid')
+  const settingsPanel = document.getElementById('settings-panel')
+
+  if (isWelcome) {
+    if (welcomeScreen) welcomeScreen.hidden = false
+    if (hero) hero.hidden = true
+    if (panelsGrid) panelsGrid.hidden = true
+    if (settingsPanel) settingsPanel.hidden = true
     renderWelcome()
   } else {
+    if (welcomeScreen) welcomeScreen.hidden = true
+    if (hero) hero.hidden = false
+    if (panelsGrid) panelsGrid.hidden = false
+    if (settingsPanel) settingsPanel.hidden = false
     renderGroupList()
     renderHero()
     renderMembers()
@@ -427,8 +442,10 @@ function render() {
 // Rendering
 // ---------------------------------------------------------------------------
 
-// Stub — replaced in Task 3 when welcome screen HTML is wired up
-function renderWelcome() {}
+function renderWelcome() {
+  // Visibility is controlled by render(); this function handles
+  // any welcome-state-specific dynamic content updates.
+}
 
 function renderGroupList() {
   const list = document.getElementById('group-list')
@@ -1049,6 +1066,25 @@ function setupSettings() {
 }
 
 // ---------------------------------------------------------------------------
+// Welcome screen
+// ---------------------------------------------------------------------------
+
+function setupWelcome() {
+  document.getElementById('try-demo-btn').addEventListener('click', () => {
+    ensureDemoGroup()
+    render()
+    // Show demo banner now that we've left the welcome screen
+    if (!window.nostr && !state.identity) {
+      document.getElementById('demo-banner').hidden = false
+    }
+  })
+
+  document.getElementById('welcome-signin-btn').addEventListener('click', () => {
+    document.getElementById('auth-btn').click()
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 
@@ -1179,6 +1215,7 @@ function init() {
   setupSettings()
   setupInvite()
   setupAuth()
+  setupWelcome()
   setupThemeToggle()
   startTick()
 
@@ -1187,8 +1224,8 @@ function init() {
     if (state.identity) subscribeToInvitations()
   })
 
-  // Show demo banner if no NIP-07 extension and no saved identity
-  if (!window.nostr && !state.identity) {
+  // Show demo banner if no NIP-07 extension and no saved identity, but only when not on welcome screen
+  if (!window.nostr && !state.identity && getAppState() !== 'welcome') {
     document.getElementById('demo-banner').hidden = false
   }
 }
