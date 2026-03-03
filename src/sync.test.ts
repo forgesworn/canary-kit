@@ -6,6 +6,7 @@ import {
   type SyncMessage,
 } from './sync.js'
 import { createGroup } from './group.js'
+import { bytesToHex } from './crypto.js'
 
 describe('sync message serialisation', () => {
   it('round-trips a member-join message', () => {
@@ -119,7 +120,7 @@ describe('applySyncMessage', () => {
     const result = applySyncMessage(group, { type: 'reseed', seed: newSeed, counter: 0, timestamp: 0 })
     // seed is stored as hex string in GroupState
     expect(typeof result.seed).toBe('string')
-    expect(result.seed).toBe(Array.from(newSeed).map(b => b.toString(16).padStart(2, '0')).join(''))
+    expect(result.seed).toBe(bytesToHex(newSeed))
     expect(result.usageOffset).toBe(0)
   })
 
