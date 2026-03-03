@@ -36,6 +36,11 @@ describe('encodeAsWords', () => {
   it('throws on insufficient bytes', () => {
     expect(() => encodeAsWords(new Uint8Array(2), 2)).toThrow()
   })
+
+  it('rejects non-2048 wordlist', () => {
+    const shortList = Array.from({ length: 100 }, (_, i) => `word${i}`)
+    expect(() => encodeAsWords(new Uint8Array(32), 1, shortList)).toThrow(RangeError)
+  })
 })
 
 describe('encodeAsPin', () => {
@@ -60,6 +65,21 @@ describe('encodeAsPin', () => {
     const pin = encodeAsPin(bytes, 6)
     expect(pin).toHaveLength(6)
     expect(Number(pin)).toBeLessThan(1000000)
+  })
+
+  it('encodes 9-digit PIN correctly', () => {
+    const bytes = new Uint8Array([0xff, 0xff, 0xff, 0xff])
+    const pin = encodeAsPin(bytes, 9)
+    expect(pin).toHaveLength(9)
+    expect(pin).toMatch(/^\d{9}$/)
+  })
+
+  it('encodes 10-digit PIN with values above 2^32', () => {
+    // 5 bytes all 0xff = 1,099,511,627,775 — mod 10^10 = 9,511,627,775
+    const bytes = new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff])
+    const pin = encodeAsPin(bytes, 10)
+    expect(pin).toHaveLength(10)
+    expect(pin).toBe('9511627775')
   })
 
   it('throws on digits > 10', () => {

@@ -19,6 +19,7 @@ export function encodeAsWords(
   count: number = 1,
   wordlist: readonly string[] = WORDLIST,
 ): string[] {
+  if (wordlist.length !== 2048) throw new RangeError('Wordlist must contain exactly 2048 entries')
   if (count < 1 || count > 16) throw new RangeError('Word count must be 1–16')
   if (bytes.length < count * 2) throw new RangeError('Not enough bytes for requested word count')
   const words: string[] = []
@@ -37,11 +38,19 @@ export function encodeAsWords(
 export function encodeAsPin(bytes: Uint8Array, digits: number = 4): string {
   if (digits < 1 || digits > 10) throw new RangeError('PIN digits must be 1–10')
   const needed = Math.min(Math.ceil(digits * 0.415), bytes.length)
+  const mod = Math.pow(10, digits)
+
+  // Use BigInt accumulation for 9–10 digits to avoid 32-bit overflow in >>> 0
+  if (digits >= 9) {
+    let bigVal = 0n
+    for (let i = 0; i < needed; i++) bigVal = bigVal * 256n + BigInt(bytes[i])
+    return (Number(bigVal % BigInt(mod))).toString().padStart(digits, '0')
+  }
+
   let value = 0
   for (let i = 0; i < needed; i++) {
     value = (value * 256 + bytes[i]) >>> 0
   }
-  const mod = Math.pow(10, digits)
   return (value % mod).toString().padStart(digits, '0')
 }
 
