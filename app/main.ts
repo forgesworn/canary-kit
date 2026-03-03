@@ -17,7 +17,7 @@ import {
   disablePin,
 } from './storage.js'
 import { getState, subscribe, update } from './state.js'
-import { renderHeader } from './components/header.js'
+import { renderHeader, updateRelayStatus } from './components/header.js'
 import { renderSidebar } from './components/sidebar.js'
 import { showModal } from './components/modal.js'
 import { createNewGroup } from './actions/groups.js'
@@ -33,6 +33,9 @@ import { renderCallSimulation, destroyCallSimulation } from './views/call-simula
 import { acceptInvite } from './invite.js'
 import type { PresetName } from 'canary-kit'
 import { resolveSigner } from './nostr/signer.js'
+import { NostrSyncTransport } from './nostr/adapter.js'
+import { initSync, subscribeToAllGroups, teardownSync } from './sync.js'
+import { connectRelays, isConnected, getRelayCount } from './nostr/connect.js'
 import type { AppIdentity } from './types.js'
 
 // ── Storage bootstrap ──────────────────────────────────────────
@@ -137,6 +140,7 @@ function showLockScreen(): void {
       subscribe(render)
       startAutoLock()
       wireGlobalEvents()
+      void bootSync()
     } catch {
       pinError.textContent = 'Incorrect PIN. Try again.'
       pinError.hidden = false
@@ -492,6 +496,41 @@ async function ensureLocalIdentity(): Promise<void> {
   }
 }
 
+// ── Relay sync boot ────────────────────────────────────────────
+
+async function bootSync(): Promise<void> {
+  const { identity, groups } = getState()
+  if (!identity) return
+
+  // Collect unique relays from all groups
+  const allRelays = new Set<string>()
+  for (const group of Object.values(groups)) {
+    for (const relay of group.relays) {
+      allRelays.add(relay)
+    }
+  }
+  if (allRelays.size === 0) return
+
+  const relayUrls = Array.from(allRelays)
+
+  try {
+    await connectRelays(relayUrls)
+
+    const resolved = await resolveSigner({
+      pubkey: identity.pubkey,
+      privkey: identity.privkey,
+    })
+
+    const transport = new NostrSyncTransport(relayUrls, resolved.signer)
+    initSync(transport)
+    subscribeToAllGroups()
+    updateRelayStatus(true, getRelayCount())
+  } catch (err) {
+    console.warn('[canary:sync] Failed to boot sync:', err)
+    updateRelayStatus(false, 0)
+  }
+}
+
 // ── Bootstrap ──────────────────────────────────────────────────
 
 async function init(): Promise<void> {
@@ -517,6 +556,7 @@ async function init(): Promise<void> {
     render()
     subscribe(render)
     wireGlobalEvents()
+    void bootSync()
   }
 }
 
