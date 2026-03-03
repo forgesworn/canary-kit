@@ -1,41 +1,36 @@
 // app/panels/duress.ts — Duress panel: long-press to arm, press-and-hold to reveal duress word
 
-import { getCurrentDuressWord } from 'canary-kit'
-import { deriveDuressTokenBytes } from 'canary-kit/token'
-import { encodeAsPin, encodeAsHex } from 'canary-kit/encoding'
+import { deriveDuressToken } from 'canary-kit/token'
+import type { TokenEncoding } from 'canary-kit/encoding'
 import { getState } from '../state.js'
 import type { AppGroup } from '../types.js'
 
-// ── Display duress token derivation ────────────────────────────
+function toTokenEncoding(group: AppGroup): TokenEncoding {
+  switch (group.encodingFormat) {
+    case 'pin': return { format: 'pin', digits: 6 }
+    case 'hex': return { format: 'hex', length: 8 }
+    case 'words':
+    default: return { format: 'words', count: group.wordCount }
+  }
+}
+
+const GROUP_CONTEXT = 'canary:group'
 
 /**
- * Derive the duress display token for a member according to the group's encodingFormat.
- *
- * For 'words': delegates to getCurrentDuressWord() which handles multi-word phrase support.
- *
- * For 'pin' and 'hex': uses the universal CANARY duress token API with the same
- * effective counter (group.counter + group.usageOffset).
- *
- * Note: collision avoidance (re-derivation with suffix bytes) is not applied here
- * because we display the raw encoded bytes — the user sees the duress token, not
- * the verifier. Collision avoidance only matters at the verification step.
+ * Derive the duress display token using the universal CANARY token API.
+ * Uses deriveDuressToken with collision avoidance (maxTolerance must match
+ * the verifier's tolerance to prevent silent alarm suppression).
  */
 function getDuressDisplayToken(group: AppGroup, memberPubkey: string): string {
   const effectiveCounter = group.counter + group.usageOffset
-
-  switch (group.encodingFormat) {
-    case 'pin': {
-      const bytes = deriveDuressTokenBytes(group.seed, 'canary:verify', memberPubkey, effectiveCounter)
-      return encodeAsPin(bytes, 6)
-    }
-    case 'hex': {
-      const bytes = deriveDuressTokenBytes(group.seed, 'canary:verify', memberPubkey, effectiveCounter)
-      return encodeAsHex(bytes, 8)
-    }
-    case 'words':
-    default:
-      return getCurrentDuressWord(group, memberPubkey)
-  }
+  return deriveDuressToken(
+    group.seed,
+    GROUP_CONTEXT,
+    memberPubkey,
+    effectiveCounter,
+    toTokenEncoding(group),
+    group.tolerance,
+  )
 }
 
 // ── Render ─────────────────────────────────────────────────
