@@ -50,7 +50,7 @@ export function renderVerify(container: HTMLElement): void {
     return
   }
 
-  const placeholderNoun = group.encodingFormat === 'words' ? 'word' : group.encodingFormat === 'pin' ? 'PIN' : 'hex code'
+  const placeholder = group.encodingFormat === 'pin' ? 'Enter PIN' : group.encodingFormat === 'hex' ? 'Enter hex' : 'Enter word'
 
   container.innerHTML = `
     <section class="panel verify-panel">
@@ -61,7 +61,7 @@ export function renderVerify(container: HTMLElement): void {
           class="input"
           id="verify-input"
           type="text"
-          placeholder="Enter the ${placeholderNoun} you heard"
+          placeholder="${placeholder}"
           autocomplete="off"
           spellcheck="false"
         />

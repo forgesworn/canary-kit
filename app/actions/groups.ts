@@ -29,8 +29,8 @@ export function createNewGroup(name: string, preset: PresetName, memberPubkey?: 
   const appGroup: AppGroup = {
     ...sdkGroup,
     id,
-    nostrEnabled: false,
-    relays: [],
+    nostrEnabled: true,
+    relays: ['wss://relay.trotters.cc/'],
     encodingFormat: 'words',
     usedInvites: [],
     livenessInterval: sdkGroup.rotationInterval,

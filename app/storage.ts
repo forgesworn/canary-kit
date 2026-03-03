@@ -188,11 +188,12 @@ export async function unlockAndRestoreState(pin: string): Promise<void> {
   const validGroups: Record<string, AppGroup> = {}
   for (const [id, group] of Object.entries(groups)) {
     if (group && typeof group === 'object' && typeof group.name === 'string') {
-      validGroups[id] = group
+      validGroups[id] = { ...group, id, tolerance: group.tolerance ?? 1 }
     }
   }
 
   const restored: AppState = {
+    view: 'groups',
     groups: validGroups,
     activeGroupId: null,
     identity: identity && typeof identity.pubkey === 'string' ? identity : null,
@@ -221,11 +222,12 @@ export function restoreState(): void {
   const validGroups: Record<string, AppGroup> = {}
   for (const [id, group] of Object.entries(groups)) {
     if (group && typeof group === 'object' && typeof group.name === 'string') {
-      validGroups[id] = group
+      validGroups[id] = { ...group, id, tolerance: group.tolerance ?? 1 }
     }
   }
 
   const restored: AppState = {
+    view: 'groups',
     groups: validGroups,
     activeGroupId: null,
     identity: identity && typeof identity.pubkey === 'string' ? identity : null,

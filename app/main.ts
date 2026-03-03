@@ -125,6 +125,7 @@ function showLockScreen(): void {
     try {
       await unlockAndRestoreState(pin)
       // Success: build the full app shell and start auto-lock.
+      ensureLocalIdentity()
       buildShell()
       const header = document.getElementById('header')
       if (header) renderHeader(header)
@@ -330,7 +331,8 @@ function showCreateGroupModal(): void {
     const name = (formData.get('name') as string | null)?.trim() ?? ''
     const preset = (formData.get('preset') as PresetName | null) ?? 'family'
     if (!name) return
-    createNewGroup(name, preset)
+    const { identity } = getState()
+    createNewGroup(name, preset, identity?.pubkey)
   })
 
   // Wire Cancel button (after the dialog is in the DOM).
@@ -408,6 +410,7 @@ function wireGlobalEvents(): void {
           usedInvites: [data.nonce],
           livenessInterval: data.rotationInterval,
           livenessCheckins: {},
+          tolerance: 1,
           createdAt: Math.floor(Date.now() / 1000),
         }
         const groups = { ...getState().groups, [id]: appGroup }
@@ -452,6 +455,32 @@ function wireGlobalEvents(): void {
   })
 }
 
+// ── Local identity ────────────────────────────────────────────
+// Generate a random 64-hex pubkey so demo features (duress, beacons,
+// liveness) work without a NIP-07 extension.  Persisted via state.
+
+function ensureLocalIdentity(): void {
+  let { identity } = getState()
+  if (!identity?.pubkey) {
+    const bytes = new Uint8Array(32)
+    crypto.getRandomValues(bytes)
+    const pubkey = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+    identity = { pubkey, displayName: 'You' }
+    update({ identity })
+  }
+
+  // Ensure the local identity is a member of all existing groups
+  // (groups created before local identity was introduced).
+  const { groups } = getState()
+  for (const [id, group] of Object.entries(groups)) {
+    if (!group.members.includes(identity!.pubkey)) {
+      const members = [...group.members, identity!.pubkey]
+      const updated = { ...groups, [id]: { ...group, members } }
+      update({ groups: updated })
+    }
+  }
+}
+
 // ── Bootstrap ──────────────────────────────────────────────────
 
 function init(): void {
@@ -461,6 +490,7 @@ function init(): void {
   } else {
     // No PIN — restore state directly and boot the app.
     restoreState()
+    ensureLocalIdentity()
     buildShell()
 
     if (window.location.hash === '#call') {

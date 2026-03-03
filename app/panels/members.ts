@@ -1,17 +1,22 @@
 // app/panels/members.ts — Members panel: list members and generate invites
 
 import { getState } from '../state.js'
-import { removeGroupMember } from '../actions/groups.js'
+import { addGroupMember, removeGroupMember } from '../actions/groups.js'
 import { createInvite } from '../invite.js'
 import { generateQR } from '../components/qr.js'
 
 // ── Helpers ────────────────────────────────────────────────────
 
+const MEMBER_NAMES = ['Alice', 'Bob', 'Charlie', 'Dana', 'Eli', 'Faye', 'Gus', 'Hana']
+
 /**
- * Format a pubkey for display: first 8 chars + ellipsis + last 4 chars.
+ * Format a pubkey for display: "You" for local identity, friendly names for others.
  */
-function formatPubkey(pubkey: string): string {
-  return `${pubkey.slice(0, 8)}\u2026${pubkey.slice(-4)}`
+function formatPubkey(pubkey: string, members: string[]): string {
+  const { identity } = getState()
+  if (identity?.pubkey === pubkey) return 'You'
+  const otherIndex = members.filter(m => m !== identity?.pubkey).indexOf(pubkey)
+  return MEMBER_NAMES[otherIndex] ?? `${pubkey.slice(0, 8)}\u2026${pubkey.slice(-4)}`
 }
 
 // ── Invite modal ───────────────────────────────────────────────
@@ -22,7 +27,10 @@ function formatPubkey(pubkey: string): string {
  * we can manage two tabs without a form submit workflow.
  */
 function showInviteModal(payload: string, confirmCode: string): void {
-  const svgMarkup = generateQR(payload)
+  // QR encodes a URL so scanning opens the demo directly with the invite pre-filled.
+  const base = window.location.origin + window.location.pathname
+  const qrUrl = `${base}#join/${encodeURIComponent(payload)}`
+  const svgMarkup = generateQR(qrUrl)
 
   // Reuse or create an invite-specific dialog.
   let dialog = document.getElementById('invite-modal') as HTMLDialogElement | null
@@ -151,7 +159,7 @@ export function renderMembers(container: HTMLElement): void {
           .map(
             (pubkey) => `
           <li class="member-item" data-pubkey="${pubkey}">
-            <span class="member-item__pubkey">${formatPubkey(pubkey)}</span>
+            <span class="member-item__pubkey">${formatPubkey(pubkey, group.members)}</span>
             <button
               class="btn btn--sm member-item__remove"
               data-pubkey="${pubkey}"
@@ -170,6 +178,7 @@ export function renderMembers(container: HTMLElement): void {
         ${memberItems}
       </ul>
       <div class="members-actions">
+        <button class="btn btn--sm" id="add-member-btn" type="button">+ Add Member</button>
         <button class="btn btn--sm" id="invite-btn" type="button">+ Invite</button>
       </div>
     </section>
@@ -183,13 +192,26 @@ export function renderMembers(container: HTMLElement): void {
     const pubkey = btn.dataset.pubkey
     if (!pubkey) return
 
-    if (!confirm(`Remove member ${formatPubkey(pubkey)} from the group?\n\nThe group secret will be rotated automatically.`)) {
+    const { groups: g } = getState()
+    const currentMembers = g[activeGroupId]?.members ?? []
+    if (!confirm(`Remove ${formatPubkey(pubkey, currentMembers)} from the group?\n\nThe group secret will be rotated automatically.`)) {
       return
     }
 
     const { activeGroupId: currentGroupId } = getState()
     if (!currentGroupId) return
     removeGroupMember(currentGroupId, pubkey)
+  })
+
+  // ── Add simulated member ─────────────────────────────────
+
+  container.querySelector<HTMLButtonElement>('#add-member-btn')?.addEventListener('click', () => {
+    const { activeGroupId: currentGroupId } = getState()
+    if (!currentGroupId) return
+    const bytes = new Uint8Array(32)
+    crypto.getRandomValues(bytes)
+    const fakePubkey = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+    addGroupMember(currentGroupId, fakePubkey)
   })
 
   // ── Invite button ─────────────────────────────────────────

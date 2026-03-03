@@ -1,4 +1,4 @@
-// app/panels/duress.ts — Duress panel: long-press to arm, press-and-hold to reveal duress word
+// app/panels/duress.ts — Duress panel: hold to reveal duress word
 
 import { deriveDuressToken } from 'canary-kit/token'
 import { getState } from '../state.js'
@@ -46,103 +46,59 @@ export function renderDuress(container: HTMLElement): void {
 
   container.innerHTML = `
     <section class="duress-section">
-      <p class="duress-section__hint">Your personal distress signal — long-press to arm</p>
+      <p class="duress-section__hint">Your personal distress signal — hold to reveal</p>
 
       <button
         class="btn duress-btn"
-        id="duress-arm-btn"
+        id="duress-hold-btn"
         type="button"
         ${!isMember ? 'disabled' : ''}
-        aria-label="Long-press to arm duress signal"
+        aria-label="Hold to reveal duress word"
       >
         <span class="duress-btn__ring" id="duress-ring"></span>
-        Signal Duress
+        <span id="duress-label">Hold to Reveal</span>
       </button>
 
-      <div id="duress-reveal" hidden>
-        <span class="duress-word duress-word--masked" id="duress-word">••••••••</span>
-        <button
-          class="btn"
-          id="duress-word-reveal-btn"
-          type="button"
-          aria-label="Hold to reveal duress word"
-        >Hold to Reveal</button>
-      </div>
+      <div class="duress-word duress-word--masked" id="duress-word">••••••••</div>
     </section>
   `
 
-  const armBtn = container.querySelector<HTMLButtonElement>('#duress-arm-btn')!
+  const holdBtn = container.querySelector<HTMLButtonElement>('#duress-hold-btn')!
   const ring = container.querySelector<HTMLElement>('#duress-ring')!
-  const revealSection = container.querySelector<HTMLElement>('#duress-reveal')!
   const wordEl = container.querySelector<HTMLElement>('#duress-word')!
-  const wordRevealBtn = container.querySelector<HTMLButtonElement>('#duress-word-reveal-btn')!
+  const labelEl = container.querySelector<HTMLElement>('#duress-label')!
 
-  if (!armBtn || !ring || !revealSection || !wordEl || !wordRevealBtn) return
+  if (!holdBtn || !ring || !wordEl || !labelEl) return
   if (!isMember) return
 
-  // ── Long-press to arm ──────────────────────────────────
-
-  let armTimer: ReturnType<typeof setTimeout> | null = null
-  let duressWord = ''
-
-  function cancelArm(): void {
-    if (armTimer !== null) {
-      clearTimeout(armTimer)
-      armTimer = null
-    }
-    ring.classList.remove('duress-btn__ring--filling')
-  }
-
-  armBtn.addEventListener('pointerdown', (e) => {
-    e.preventDefault()
+  function showWord(): void {
     if (!identity?.pubkey) return
+    const { groups: currentGroups, activeGroupId: currentGroupId } = getState()
+    if (!currentGroupId) return
+    const currentGroup = currentGroups[currentGroupId]
+    if (!currentGroup) return
 
-    ring.classList.add('duress-btn__ring--filling')
-
-    armTimer = setTimeout(() => {
-      armTimer = null
-      ring.classList.remove('duress-btn__ring--filling')
-
-      // Derive duress word at arm time
-      const { groups: currentGroups, activeGroupId: currentGroupId } = getState()
-      if (!currentGroupId) return
-      const currentGroup = currentGroups[currentGroupId]
-      if (!currentGroup || !identity?.pubkey) return
-
-      duressWord = getDuressDisplayToken(currentGroup, identity.pubkey)
-
-      // Show masked word initially
-      wordEl.textContent = '••••••••'
-      wordEl.classList.remove('duress-word--revealed')
-      wordEl.classList.add('duress-word--masked')
-      revealSection.hidden = false
-    }, 1000)
-  })
-
-  armBtn.addEventListener('pointerup', cancelArm)
-  armBtn.addEventListener('pointerleave', cancelArm)
-  armBtn.addEventListener('pointercancel', cancelArm)
-
-  // ── Press-and-hold to reveal duress word ────────────────
-
-  function showDuressWord(): void {
-    if (!duressWord) return
+    const duressWord = getDuressDisplayToken(currentGroup, identity.pubkey)
     wordEl.textContent = duressWord
     wordEl.classList.remove('duress-word--masked')
     wordEl.classList.add('duress-word--revealed')
+    ring.classList.add('duress-btn__ring--filling')
+    labelEl.textContent = 'Release to hide'
   }
 
-  function hideDuressWord(): void {
+  function hideWord(): void {
     wordEl.textContent = '••••••••'
     wordEl.classList.remove('duress-word--revealed')
     wordEl.classList.add('duress-word--masked')
+    ring.classList.remove('duress-btn__ring--filling')
+    labelEl.textContent = 'Hold to Reveal'
   }
 
-  wordRevealBtn.addEventListener('pointerdown', (e) => {
+  holdBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault()
-    showDuressWord()
+    showWord()
   })
-  wordRevealBtn.addEventListener('pointerup', hideDuressWord)
-  wordRevealBtn.addEventListener('pointerleave', hideDuressWord)
-  wordRevealBtn.addEventListener('pointercancel', hideDuressWord)
+  holdBtn.addEventListener('pointerup', hideWord)
+  holdBtn.addEventListener('pointerleave', hideWord)
+  holdBtn.addEventListener('pointercancel', hideWord)
 }

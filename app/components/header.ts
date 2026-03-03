@@ -55,6 +55,7 @@ export function renderHeader(container: HTMLElement): void {
         <span class="relay-label"></span>
       </span>
       <button class="theme-toggle" id="theme-toggle" aria-label="Switch to light mode">&#9680;</button>
+      <button class="theme-toggle" id="reset-btn" aria-label="Reset demo" title="Clear all data and reset">&#8634;</button>
     </div>
   `
 
@@ -62,6 +63,16 @@ export function renderHeader(container: HTMLElement): void {
   if (btn) {
     updateToggleLabel(btn)
     btn.addEventListener('click', () => handleThemeToggle(btn))
+  }
+
+  const resetBtn = container.querySelector<HTMLButtonElement>('#reset-btn')
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (confirm('Clear all data and reset the demo?')) {
+        localStorage.clear()
+        window.location.reload()
+      }
+    })
   }
 
   const nav = container.querySelector<HTMLElement>('#header-nav')

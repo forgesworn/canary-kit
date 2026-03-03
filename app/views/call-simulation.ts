@@ -1,6 +1,7 @@
 // app/views/call-simulation.ts — Call verification demo: two-party simulation
 
 import { createSession, generateSeed, SESSION_PRESETS, type Session } from 'canary-kit/session'
+import { deriveDuressToken } from 'canary-kit/token'
 
 interface ScenarioConfig {
   label: string
@@ -17,16 +18,16 @@ const SCENARIOS: Record<string, ScenarioConfig> = {
     roles: ['caller', 'agent'],
     preset: 'call',
   },
-  banking: {
-    label: 'Banking',
-    namespace: 'barclays',
-    roles: ['customer', 'agent'],
-    preset: 'call',
+  pickup: {
+    label: 'Pickup',
+    namespace: 'family',
+    roles: ['child', 'adult'],
+    preset: 'handoff',
   },
   rideshare: {
     label: 'Rideshare',
     namespace: 'dispatch',
-    roles: ['requester', 'provider'],
+    roles: ['requester', 'driver'],
     preset: 'handoff',
     encoding: 'pin',
   },
@@ -54,11 +55,25 @@ function buildSessions(): void {
     ...(encoding ? { encoding } : {}),
   }
 
-  _callerSession = createSession({ ...base, myRole: _scenario.roles[0] })
-  _agentSession = createSession({ ...base, myRole: _scenario.roles[1] })
+  _callerSession = createSession({ ...base, myRole: _scenario.roles[0], theirIdentity: _scenario.roles[1] })
+  _agentSession = createSession({ ...base, myRole: _scenario.roles[1], theirIdentity: _scenario.roles[0] })
 }
 
 buildSessions()
+
+/** Derive the duress token for a role in the current scenario. */
+function getDuressToken(role: string, nowSec?: number): string {
+  const isHandoff = _scenario.preset === 'handoff'
+  const preset = SESSION_PRESETS[_scenario.preset]
+  const counter = isHandoff
+    ? _handoffCounter
+    : Math.floor((nowSec ?? Math.floor(Date.now() / 1000)) / preset.rotationSeconds)
+  const context = `${_scenario.namespace}:${role}`
+  const encoding = _scenario.encoding === 'pin'
+    ? { format: 'pin' as const, digits: 4 }
+    : { format: 'words' as const, count: 1 }
+  return deriveDuressToken(_seed, context, role, counter, encoding, preset.tolerance)
+}
 
 function clearTick(): void {
   if (_tickInterval !== null) {
@@ -112,12 +127,8 @@ export function renderCallSimulation(container: HTMLElement): void {
         <div class="call-sim__panel call-sim__panel--caller">
           <h3 class="call-sim__role">${roleA.toUpperCase()}</h3>
           <div class="call-sim__token-group">
-            <span class="call-sim__label">Your word:</span>
-            <div class="call-sim__token call-sim__token--mine" id="caller-my-token">${_callerSession.myToken(nowSec)}</div>
-          </div>
-          <div class="call-sim__token-group">
-            <span class="call-sim__label">Expect to hear:</span>
-            <div class="call-sim__token call-sim__token--theirs" id="caller-their-token">${_callerSession.theirToken(nowSec)}</div>
+            <span class="call-sim__label">Your code — tap to reveal:</span>
+            <div class="call-sim__token call-sim__token--reveal" id="caller-reveal" data-real="${_callerSession.myToken(nowSec)}" data-alt="${getDuressToken(roleA, nowSec)}">••••••••</div>
           </div>
           ${!isHandoff ? `
           <div class="call-sim__progress"><div class="call-sim__progress-bar" id="caller-progress" style="width: ${progressPct}%"></div></div>
@@ -135,12 +146,8 @@ export function renderCallSimulation(container: HTMLElement): void {
         <div class="call-sim__panel call-sim__panel--agent">
           <h3 class="call-sim__role">${roleB.toUpperCase()}</h3>
           <div class="call-sim__token-group">
-            <span class="call-sim__label">Your word:</span>
-            <div class="call-sim__token call-sim__token--mine" id="agent-my-token">${_agentSession.myToken(nowSec)}</div>
-          </div>
-          <div class="call-sim__token-group">
-            <span class="call-sim__label">Expect to hear:</span>
-            <div class="call-sim__token call-sim__token--theirs" id="agent-their-token">${_agentSession.theirToken(nowSec)}</div>
+            <span class="call-sim__label">Your code — tap to reveal:</span>
+            <div class="call-sim__token call-sim__token--reveal" id="agent-reveal" data-real="${_agentSession.myToken(nowSec)}" data-alt="${getDuressToken(roleB, nowSec)}">••••••••</div>
           </div>
           ${!isHandoff ? `
           <div class="call-sim__progress"><div class="call-sim__progress-bar" id="agent-progress" style="width: ${progressPct}%"></div></div>
@@ -153,6 +160,8 @@ export function renderCallSimulation(container: HTMLElement): void {
           <div class="call-sim__result" id="agent-result" hidden></div>
         </div>
       </div>
+
+      <div class="call-sim__banner call-sim__banner--valid" id="call-verified-banner" hidden></div>
 
       <div class="call-sim__footer">
         <span class="call-sim__meta">Namespace: <strong>${_scenario.namespace}</strong></span>
@@ -188,8 +197,28 @@ export function renderCallSimulation(container: HTMLElement): void {
     renderCallSimulation(container)
   })
 
-  // Wire verify buttons
-  function wireVerify(inputId: string, btnId: string, resultId: string, session: Session): void {
+  // Wire verify buttons with mutual verification tracking
+  let callerVerified = false
+  let agentVerified = false
+  let duressDetected = false
+
+  function checkMutualVerification(): void {
+    if (duressDetected) return
+    if (callerVerified && agentVerified) {
+      clearTick()
+      const banner = container.querySelector<HTMLElement>('#call-verified-banner')
+      if (banner) {
+        banner.hidden = false
+        banner.textContent = 'Call Verified — both parties authenticated'
+      }
+      // Hide countdowns and progress bars
+      container.querySelectorAll('.call-sim__progress, .call-sim__countdown').forEach(el => {
+        (el as HTMLElement).hidden = true
+      })
+    }
+  }
+
+  function wireVerify(inputId: string, btnId: string, resultId: string, session: Session, side: 'caller' | 'agent'): void {
     const input = container.querySelector<HTMLInputElement>(`#${inputId}`)
     const btn = container.querySelector<HTMLButtonElement>(`#${btnId}`)
     const resultEl = container.querySelector<HTMLElement>(`#${resultId}`)
@@ -204,22 +233,60 @@ export function renderCallSimulation(container: HTMLElement): void {
       if (result.status === 'valid') {
         resultEl!.classList.add('call-sim__result--valid')
         resultEl!.textContent = 'Verified ✓'
+        if (side === 'caller') callerVerified = true
+        else agentVerified = true
+        checkMutualVerification()
       } else if (result.status === 'duress') {
         resultEl!.classList.add('call-sim__result--duress')
-        resultEl!.textContent = 'DURESS DETECTED — silent alert triggered'
+        resultEl!.textContent = 'DURESS — silent alert triggered'
+        duressDetected = true
+        clearTick()
+        const banner = container.querySelector<HTMLElement>('#call-verified-banner')
+        if (banner) {
+          banner.hidden = false
+          banner.className = 'call-sim__banner call-sim__banner--duress'
+          banner.textContent = 'Duress Detected — silent alarm raised'
+        }
+        container.querySelectorAll('.call-sim__progress, .call-sim__countdown').forEach(el => {
+          (el as HTMLElement).hidden = true
+        })
       } else {
         resultEl!.classList.add('call-sim__result--invalid')
         resultEl!.textContent = 'Failed ✗'
       }
-      setTimeout(() => { resultEl!.hidden = true }, 3000)
     }
 
     btn.addEventListener('click', doVerify)
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doVerify() })
   }
 
-  wireVerify('caller-verify-input', 'caller-verify-btn', 'caller-result', _callerSession)
-  wireVerify('agent-verify-input', 'agent-verify-btn', 'agent-result', _agentSession)
+  wireVerify('caller-verify-input', 'caller-verify-btn', 'caller-result', _callerSession, 'caller')
+  wireVerify('agent-verify-input', 'agent-verify-btn', 'agent-result', _agentSession, 'agent')
+
+  // Wire tap-to-reveal: left half = real word, right half = duress word
+  function wireReveal(id: string): void {
+    const el = container.querySelector<HTMLElement>(`#${id}`)
+    if (!el) return
+
+    function reveal(e: PointerEvent): void {
+      e.preventDefault()
+      const rect = el!.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      el!.textContent = x < rect.width / 2 ? el!.dataset.real! : el!.dataset.alt!
+    }
+
+    function hide(): void {
+      el!.textContent = '••••••••'
+    }
+
+    el.addEventListener('pointerdown', reveal)
+    el.addEventListener('pointerup', hide)
+    el.addEventListener('pointerleave', hide)
+    el.addEventListener('pointercancel', hide)
+  }
+
+  wireReveal('caller-reveal')
+  wireReveal('agent-reveal')
 
   // Populate directional pair display
   const pairEl = container.querySelector<HTMLElement>('#pair-display')
@@ -240,10 +307,55 @@ export function renderCallSimulation(container: HTMLElement): void {
       const cc = container.querySelector<HTMLElement>('#caller-countdown')
       const ac = container.querySelector<HTMLElement>('#agent-countdown')
 
-      if (cp) cp.style.width = `${pct}%`
-      if (ap) ap.style.width = `${pct}%`
+      // Green (100%) → amber (50%) → red (0%) based on time remaining
+      const remainPct = Math.max(0, 100 - pct)
+      const barColour = remainPct > 50
+        ? `hsl(${Math.round(120 * (remainPct / 100))}, 70%, 45%)`
+        : `hsl(${Math.round(120 * (remainPct / 100))}, 80%, 45%)`
+
+      if (cp) { cp.style.width = `${pct}%`; cp.style.background = barColour }
+      if (ap) { ap.style.width = `${pct}%`; ap.style.background = barColour }
       if (cc) cc.textContent = formatCountdown(remaining)
       if (ac) ac.textContent = formatCountdown(remaining)
+
+      // Update tokens in the DOM each tick
+      const now = Math.floor(Date.now() / 1000)
+      const callerReveal = container.querySelector<HTMLElement>('#caller-reveal')
+      const agentReveal = container.querySelector<HTMLElement>('#agent-reveal')
+
+      const newCallerToken = _callerSession.myToken(now)
+      const rotated = callerReveal && callerReveal.dataset.real !== newCallerToken
+
+      // Update data attributes (the visible text stays masked unless held)
+      if (callerReveal) {
+        callerReveal.dataset.real = newCallerToken
+        callerReveal.dataset.alt = getDuressToken(roleA, now)
+      }
+      if (agentReveal) {
+        agentReveal.dataset.real = _agentSession.myToken(now)
+        agentReveal.dataset.alt = getDuressToken(roleB, now)
+      }
+
+      // Reset verification state when tokens rotate
+      if (rotated) {
+        callerVerified = false
+        agentVerified = false
+        duressDetected = false
+        const cr = container.querySelector<HTMLElement>('#caller-result')
+        const ar = container.querySelector<HTMLElement>('#agent-result')
+        if (cr) { cr.hidden = true; cr.className = 'call-sim__result' }
+        if (ar) { ar.hidden = true; ar.className = 'call-sim__result' }
+        const ci = container.querySelector<HTMLInputElement>('#caller-verify-input')
+        const ai = container.querySelector<HTMLInputElement>('#agent-verify-input')
+        if (ci) ci.value = ''
+        if (ai) ai.value = ''
+        const banner = container.querySelector<HTMLElement>('#call-verified-banner')
+        if (banner) banner.hidden = true
+        // Restore countdowns/progress if they were hidden by mutual verification
+        container.querySelectorAll('.call-sim__progress, .call-sim__countdown').forEach(el => {
+          (el as HTMLElement).hidden = false
+        })
+      }
 
       const pairDisplay = container.querySelector<HTMLElement>('#pair-display')
       if (pairDisplay) {
