@@ -8,6 +8,15 @@ import {
 } from './derive.js'
 import { PRESETS, type PresetName } from './presets.js'
 
+const HEX_64_RE = /^[0-9a-f]{64}$/
+
+/** Validate that a string is a 64-character lowercase hex pubkey. */
+function validatePubkey(pubkey: string): void {
+  if (!HEX_64_RE.test(pubkey)) {
+    throw new Error(`Invalid member pubkey: expected 64 hex characters, got "${pubkey}"`)
+  }
+}
+
 /** Configuration provided when creating a new group. */
 export interface GroupConfig {
   name: string
@@ -60,12 +69,36 @@ export function createGroup(config: GroupConfig): GroupState {
   const now = Math.floor(Date.now() / 1000)
   const base = config.preset !== undefined ? PRESETS[config.preset as keyof typeof PRESETS] : undefined
   const interval = config.rotationInterval ?? base?.rotationInterval ?? DEFAULT_ROTATION_INTERVAL
+  const wordCount = config.wordCount ?? base?.wordCount ?? 1
+
+  // Validate resolved config values
+  if (!Number.isInteger(interval) || interval <= 0) {
+    throw new Error(`rotationInterval must be a positive integer, got ${interval}`)
+  }
+  if (wordCount !== 1 && wordCount !== 2 && wordCount !== 3) {
+    throw new Error(`wordCount must be 1, 2, or 3, got ${wordCount}`)
+  }
+  if (config.beaconInterval !== undefined) {
+    if (!Number.isInteger(config.beaconInterval) || config.beaconInterval <= 0) {
+      throw new Error(`beaconInterval must be a positive integer, got ${config.beaconInterval}`)
+    }
+  }
+  if (config.beaconPrecision !== undefined) {
+    if (!Number.isInteger(config.beaconPrecision) || config.beaconPrecision < 1 || config.beaconPrecision > 11) {
+      throw new Error(`beaconPrecision must be an integer between 1 and 11, got ${config.beaconPrecision}`)
+    }
+  }
+
+  for (const pubkey of config.members) {
+    validatePubkey(pubkey)
+  }
+
   return {
     name: config.name,
     seed: randomSeed(),
     members: [...config.members],
     rotationInterval: interval,
-    wordCount: config.wordCount ?? base?.wordCount ?? 1,
+    wordCount,
     wordlist: config.wordlist ?? 'en-v1',
     counter: getCounter(now, interval),
     usageOffset: 0,
@@ -123,6 +156,7 @@ export function reseed(state: GroupState): GroupState {
  * Returns new state — does not mutate the input.
  */
 export function addMember(state: GroupState, pubkey: string): GroupState {
+  validatePubkey(pubkey)
   if (state.members.includes(pubkey)) return state
   return { ...state, members: [...state.members, pubkey] }
 }

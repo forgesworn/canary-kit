@@ -5,8 +5,8 @@ export type VerifyStatus = 'verified' | 'duress' | 'stale' | 'failed'
 export interface VerifyResult {
   /** The outcome of the verification check. */
   status: VerifyStatus
-  /** Pubkey of the member whose duress word was detected (only when status = 'duress'). */
-  member?: string
+  /** Pubkeys of members whose duress word matched (only when status = 'duress'). */
+  members?: string[]
 }
 
 /**
@@ -14,10 +14,13 @@ export interface VerifyResult {
  *
  * Checks in order:
  * 1. Current verification word → verified
- * 2. Each member's duress word at current counter → duress (with member identified)
- * 3. Each member's duress word at previous counter → duress (stale duress, out of sync)
+ * 2. ALL members' duress words at current counter → duress (with all matching members)
+ * 3. ALL members' duress words at previous counter → duress (stale duress, out of sync)
  * 4. Previous window's verification word → stale (out of sync)
  * 5. None matched → failed
+ *
+ * Per CANARY-DURESS: the verifier MUST check all identities and collect all matches.
+ * The verifier MUST NOT short-circuit after the first duress match.
  */
 export function verifyWord(
   spokenWord: string,
@@ -32,19 +35,27 @@ export function verifyWord(
     return { status: 'verified' }
   }
 
-  // 2. Check each member's duress word at current counter
+  // 2. Check ALL members' duress words at current counter — collect all matches
+  const currentMatches: string[] = []
   for (const pubkey of memberPubkeys) {
     if (normalised === deriveDuressWord(seedHex, pubkey, counter)) {
-      return { status: 'duress', member: pubkey }
+      currentMatches.push(pubkey)
     }
   }
+  if (currentMatches.length > 0) {
+    return { status: 'duress', members: currentMatches }
+  }
 
-  // 3. Check duress words at previous counter (stale duress — member slightly out of sync)
+  // 3. Check duress words at previous counter (stale duress) — collect all matches
   if (counter > 0) {
+    const staleMatches: string[] = []
     for (const pubkey of memberPubkeys) {
       if (normalised === deriveDuressWord(seedHex, pubkey, counter - 1)) {
-        return { status: 'duress', member: pubkey }
+        staleMatches.push(pubkey)
       }
+    }
+    if (staleMatches.length > 0) {
+      return { status: 'duress', members: staleMatches }
     }
   }
 

@@ -47,6 +47,81 @@ describe('createGroup', () => {
     })
     expect(group.wordCount).toBe(3)
   })
+
+  it('rejects rotationInterval of 0', () => {
+    expect(() => createGroup({ name: 'Bad', members: [ALICE], rotationInterval: 0 }))
+      .toThrow('rotationInterval must be a positive integer, got 0')
+  })
+
+  it('rejects negative rotationInterval', () => {
+    expect(() => createGroup({ name: 'Bad', members: [ALICE], rotationInterval: -1 }))
+      .toThrow('rotationInterval must be a positive integer, got -1')
+  })
+
+  it('rejects invalid wordCount', () => {
+    expect(() => createGroup({ name: 'Bad', members: [ALICE], wordCount: 99 as any }))
+      .toThrow('wordCount must be 1, 2, or 3, got 99')
+  })
+
+  it('rejects wordCount of 0', () => {
+    expect(() => createGroup({ name: 'Bad', members: [ALICE], wordCount: 0 as any }))
+      .toThrow('wordCount must be 1, 2, or 3, got 0')
+  })
+
+  it('rejects beaconPrecision out of range', () => {
+    expect(() => createGroup({ name: 'Bad', members: [ALICE], beaconPrecision: 99 }))
+      .toThrow('beaconPrecision must be an integer between 1 and 11, got 99')
+  })
+
+  it('rejects beaconPrecision of 0', () => {
+    expect(() => createGroup({ name: 'Bad', members: [ALICE], beaconPrecision: 0 }))
+      .toThrow('beaconPrecision must be an integer between 1 and 11, got 0')
+  })
+
+  it('rejects beaconInterval of 0', () => {
+    expect(() => createGroup({ name: 'Bad', members: [ALICE], beaconInterval: 0 }))
+      .toThrow('beaconInterval must be a positive integer, got 0')
+  })
+
+  it('rejects fractional rotationInterval', () => {
+    expect(() => createGroup({ name: 'Bad', members: [ALICE], rotationInterval: 86400.5 }))
+      .toThrow('rotationInterval must be a positive integer, got 86400.5')
+  })
+
+  it('rejects fractional beaconInterval', () => {
+    expect(() => createGroup({ name: 'Bad', members: [ALICE], beaconInterval: 300.7 }))
+      .toThrow('beaconInterval must be a positive integer, got 300.7')
+  })
+
+  it('accepts valid edge-case config', () => {
+    const group = createGroup({
+      name: 'Edge',
+      members: [ALICE],
+      rotationInterval: 1,
+      wordCount: 3,
+      beaconPrecision: 11,
+      beaconInterval: 1,
+    })
+    expect(group.rotationInterval).toBe(1)
+    expect(group.wordCount).toBe(3)
+    expect(group.beaconPrecision).toBe(11)
+    expect(group.beaconInterval).toBe(1)
+  })
+
+  it('rejects member pubkey that is too short', () => {
+    expect(() => createGroup({ name: 'Bad', members: ['abcd'] }))
+      .toThrow('Invalid member pubkey: expected 64 hex characters')
+  })
+
+  it('rejects member pubkey with uppercase hex', () => {
+    expect(() => createGroup({ name: 'Bad', members: ['A'.repeat(64)] }))
+      .toThrow('Invalid member pubkey: expected 64 hex characters')
+  })
+
+  it('rejects member pubkey with non-hex characters', () => {
+    expect(() => createGroup({ name: 'Bad', members: ['g'.repeat(64)] }))
+      .toThrow('Invalid member pubkey: expected 64 hex characters')
+  })
 })
 
 describe('getCurrentWord', () => {
@@ -132,6 +207,12 @@ describe('addMember', () => {
     const group = createGroup({ name: 'Test', members: [ALICE, BOB] })
     const updated = addMember(group, ALICE)
     expect(updated.members).toHaveLength(2)
+  })
+
+  it('rejects invalid pubkey', () => {
+    const group = createGroup({ name: 'Test', members: [ALICE, BOB] })
+    expect(() => addMember(group, 'not-a-pubkey'))
+      .toThrow('Invalid member pubkey: expected 64 hex characters')
   })
 })
 

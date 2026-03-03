@@ -87,7 +87,7 @@ describe('canonical test vectors', () => {
       const duress = deriveDuressWord(SEED_1, PUBKEY_A, 0)
       const result = verifyWord(duress, SEED_1, [PUBKEY_A, PUBKEY_B], 0)
       expect(result.status).toBe('duress')
-      expect(result.member).toBe(PUBKEY_A)
+      expect(result.members).toEqual([PUBKEY_A])
     })
   })
 })

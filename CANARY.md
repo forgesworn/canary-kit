@@ -133,6 +133,24 @@ Recommended tolerance values by use case:
 | High-security     | 0         | Strict; requires exact counter match         |
 | TOTP-equivalent   | ±1        | Standard TOTP practice (RFC 6238 §5.2)       |
 
+### Counter Acceptance
+
+Implementations that receive counter advancement signals (burn-after-use notifications,
+re-sync messages) MUST enforce the following rules:
+
+1. **Authorised source:** Counter advancement signals MUST originate from a party known
+   to hold the shared secret. The mechanism for verifying this is transport-defined
+   (e.g. cryptographic signature from a known group member).
+
+2. **Monotonic advancement:** Implementations MUST reject counter updates where
+   `new_counter <= local_counter`. This provides replay protection and prevents
+   counter rollback.
+
+3. **Bounded jumps:** Implementations SHOULD reject counter updates where
+   `new_counter > time_based_counter + max_offset`. The RECOMMENDED `max_offset` is
+   100. This bounds the damage from a compromised sender attempting to desynchronise
+   the group by jumping the counter far ahead.
+
 ### Output Encodings
 
 The encoding is a presentation layer, not part of the derivation. The same `token_bytes`
@@ -208,25 +226,38 @@ secret can check for both.
 ### Collision Avoidance
 
 If the duress token, after encoding, is identical to the verification token at the same
-counter, the implementation MUST re-derive by appending the byte `0x01` to the HMAC
-data:
+counter, the implementation MUST re-derive by appending incrementing suffix bytes to the
+HMAC data:
 
 ```
-duress_bytes = HMAC-SHA256(secret, utf8(context + ":duress") || 0x00 || utf8(identity) || counter_be32 || 0x01)
+duress_data = utf8(context + ":duress") || 0x00 || utf8(identity) || counter_be32
+duress_bytes = HMAC-SHA256(secret, duress_data)
+duress_token = encode(duress_bytes, encoding)
+
+suffix = 1
+while duress_token == normal_token and suffix <= 255:
+    duress_bytes = HMAC-SHA256(secret, duress_data || byte(suffix))
+    duress_token = encode(duress_bytes, encoding)
+    suffix += 1
+
+if duress_token == normal_token:
+    ERROR: duress collision unresolvable
 ```
 
 Collision avoidance operates at the encoding level, not the byte level, because different
 byte arrays can encode to the same output via modulo reduction. Implementations MUST
-apply this check whenever computing a duress token. A collision between the re-derived
-duress token and the verification token is considered astronomically unlikely and is not
-handled further.
+apply this check whenever computing a duress token. If all 255 suffix retries produce
+a collision (probability effectively zero for any practical encoding), the implementation
+MUST raise an error. Implementations MUST NOT return a duress token that matches the
+normal token — this would cause a duress signal to be classified as valid, suppressing the
+silent alarm.
 
 ### Verification Flow
 
 ```
 verify(secret, context, counter, input, identities[], tolerance?) ->
   { status: 'valid' } |
-  { status: 'duress', identity: string } |
+  { status: 'duress', identities: string[] } |
   { status: 'invalid' }
 ```
 
@@ -236,9 +267,33 @@ The verification algorithm checks in order:
    derive the verification token. If the input matches → `valid`.
 
 2. For each identity, for each counter in the tolerance window:
-   derive the duress token. If the input matches → `duress` with the matching identity.
+   derive the duress token. Collect all matching identities. If any match →
+   `duress` with all matching identities.
 
 3. No match → `invalid`.
+
+#### Multi-Match Attribution
+
+When checking duress tokens, the verifier MUST check all identities and collect all
+matches. If exactly one identity matches, the result is `duress` with that identity.
+If multiple identities match, the result is `duress` with all matching identities.
+The verifier MUST NOT short-circuit after the first duress match.
+
+#### Duress Collision Probability
+
+In finite output spaces, distinct identities may derive identical duress tokens at the
+same counter (birthday problem). This is a known limitation, not a protocol flaw.
+
+| Members | 1 word (~11 bits) | 2 words (~22 bits) | 3 words (~33 bits) |
+|---------|-------------------|--------------------|--------------------|
+| 5       | ~0.5%             | ~0.00012%          | negligible         |
+| 10      | ~2.2%             | ~0.00048%          | negligible         |
+| 20      | ~9.3%             | ~0.0019%           | negligible         |
+| 50      | ~45%              | ~0.012%            | negligible         |
+
+Groups of 10 or more members SHOULD use 2+ words for reliable attribution. PIN
+encoding with 4 digits (10,000 outputs) has similar collision properties to 1-word
+encoding (2,048 outputs).
 
 ### Deniability Properties
 
@@ -479,7 +534,7 @@ Liveness:
 | 6  | deriveDuressToken  | `canary:verify`  | `alice`    | 0       | 1 word      | `airport`                                                          |
 | 7  | deriveDuressToken  | `trott:handoff`  | `rider123` | 0       | 4-digit PIN | `0325`                                                             |
 | 8  | verifyToken        | `canary:verify`  | `alice`    | 0       | input: `net`   | `{ status: 'valid' }`                                           |
-| 9  | verifyToken        | `canary:verify`  | `alice`    | 0       | input: `airport`| `{ status: 'duress', identity: 'alice' }`                      |
+| 9  | verifyToken        | `canary:verify`  | `alice`    | 0       | input: `airport`| `{ status: 'duress', identities: ['alice'] }`                  |
 | 10 | deriveLivenessToken| `canary:verify`  | `alice`    | 0       | raw hex     | `b38a10676ea8d4e716ad606e0b2ae7d9678e47ff44b0920a68ed6cb02e9bb858` |
 
 Notes:

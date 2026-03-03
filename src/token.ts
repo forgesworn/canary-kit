@@ -76,7 +76,9 @@ export function deriveDuressTokenBytes(
  * CANARY-DURESS: Derive an encoded duress token with collision avoidance.
  *
  * If the duress token collides with the normal verification token (at the encoding level),
- * re-derives with a 0x01 suffix to guarantee they are always distinct.
+ * re-derives with incrementing suffix bytes (0x01, 0x02, ..., 0xFF) until distinct.
+ * If all 255 suffixes collide (astronomically unlikely), throws an error rather than
+ * failing open (returning a token that would be classified as 'valid' instead of 'duress').
  */
 export function deriveDuressToken(
   secret: Uint8Array | string,
@@ -92,10 +94,16 @@ export function deriveDuressToken(
   let bytes = hmacSha256(key, baseData)
   let token = encodeToken(bytes, encoding)
 
-  // Collision avoidance: if duress token matches normal token, re-derive with suffix
-  if (token === normalToken) {
-    bytes = hmacSha256(key, concatBytes(baseData, new Uint8Array([0x01])))
+  // Collision avoidance: deterministic multi-suffix retry
+  let suffix = 1
+  while (token === normalToken && suffix <= 255) {
+    bytes = hmacSha256(key, concatBytes(baseData, new Uint8Array([suffix])))
     token = encodeToken(bytes, encoding)
+    suffix++
+  }
+
+  if (token === normalToken) {
+    throw new Error('Duress token collision unresolvable after 255 retries')
   }
 
   return token
@@ -105,8 +113,8 @@ export function deriveDuressToken(
 export interface TokenVerifyResult {
   /** 'valid' = matches normal token, 'duress' = matches a duress token, 'invalid' = no match. */
   status: 'valid' | 'duress' | 'invalid'
-  /** Identity of the duress signaller (only when status = 'duress'). */
-  identity?: string
+  /** Identities of duress signallers (only when status = 'duress'). */
+  identities?: string[]
 }
 
 /** Options for token verification. */
@@ -122,8 +130,11 @@ export interface VerifyOptions {
  *
  * Checks in order:
  * 1. Normal verification token (within tolerance window) → 'valid'
- * 2. Each identity's duress token (within tolerance window) → 'duress'
+ * 2. ALL identities' duress tokens (within tolerance window) → 'duress' with all matches
  * 3. No match → 'invalid'
+ *
+ * Per CANARY-DURESS: the verifier MUST check all identities and collect all matches.
+ * The verifier MUST NOT short-circuit after the first duress match.
  */
 export function verifyToken(
   secret: Uint8Array | string,
@@ -149,13 +160,18 @@ export function verifyToken(
     }
   }
 
-  // 2. Check duress tokens for each identity
+  // 2. Check duress tokens for ALL identities — collect all matches
+  const matches: string[] = []
   for (const identity of identities) {
     for (let c = lo; c <= hi; c++) {
       if (normalised === deriveDuressToken(secret, context, identity, c, encoding)) {
-        return { status: 'duress', identity }
+        matches.push(identity)
+        break // found match for this identity, move to next
       }
     }
+  }
+  if (matches.length > 0) {
+    return { status: 'duress', identities: matches }
   }
 
   // 3. No match

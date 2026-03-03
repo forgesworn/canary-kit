@@ -1154,12 +1154,13 @@ function handleVerify(e) {
     case 'duress': {
       resultEl.classList.add('verify-result--duress')
       iconEl.textContent = '⚠'
-      const memberName = result.member
-        ? getMemberName(result.member, state.activeGroupId === 'demo')
+      const firstMember = result.members?.[0]
+      const memberName = firstMember
+        ? getMemberName(firstMember, state.activeGroupId === 'demo')
         : 'someone'
       textEl.textContent = `Duress — ${memberName} may be under coercion.`
-      if (result.member) {
-        showDuressAlert(result.member)
+      if (firstMember) {
+        showDuressAlert(firstMember)
       }
       break
     }

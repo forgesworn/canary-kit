@@ -58,17 +58,20 @@ Different 2-byte slices MAY produce the same index; this is a valid output, not 
 
 #### Duress Word
 
-Each member has a unique duress word, using their Nostr public key as the identity:
+Each member has a unique duress word derived per the CANARY-DURESS collision avoidance
+algorithm (see [CANARY.md](CANARY.md)). The member's Nostr public key (32-byte hex) is
+used as the identity parameter, and the group seed is used as the shared secret:
 
 ```
-key           = seed || member_pubkey   (64 bytes: 32-byte seed + 32-byte pubkey)
-mac           = HMAC-SHA256(key=key, data=uint64_be(counter))
-index         = uint16_be(mac[0..2]) mod 2048
-duress        = wordlist[index]
+key   = seed || member_pubkey   (64 bytes: 32-byte seed + 32-byte pubkey)
+mac   = HMAC-SHA256(key=key, data=uint64_be(counter))
+index = uint16_be(mac[0..2]) mod 2048
+word  = wordlist[index]
 ```
 
-If the duress word collides with the verification word for the same counter, re-derive
-with `0x01` appended to the key (65 bytes).
+If the duress word collides with the verification word for the same counter, the
+deterministic multi-suffix retry algorithm from CANARY-DURESS applies (append suffix
+bytes 0x01..0xFF to the key until distinct, error if exhausted).
 
 ### Counter Derivation
 
@@ -85,8 +88,9 @@ advance in step.
 When verifying a spoken response:
 
 1. If it matches the current verification word → identity confirmed.
-2. Derive the speaker's duress word. If it matches → **DURESS DETECTED**. Act normally,
-   broadcast silent duress event.
+2. Derive the duress word for every member. Collect all matches. If any match →
+   **DURESS DETECTED**. Act normally, broadcast silent duress event. Per CANARY-DURESS,
+   the verifier MUST check all members and collect all matches (see [CANARY.md](CANARY.md)).
 3. Check the verification word at `counter - 1` (one window lookback for stale counters).
    If it matches → identity confirmed, member out of sync.
 4. Otherwise → verification failed.
@@ -257,6 +261,18 @@ When `duress` is `true`, clients MUST handle this silently — they MUST NOT dis
 visible indication that could alert an attacker. Clients SHOULD initiate an automatic
 re-seed (kind 28801) with `reason=duress`.
 
+#### Counter Acceptance
+
+Per the CANARY protocol counter acceptance rules (see [CANARY.md](CANARY.md)):
+
+- Word Used events MUST be signed by a pubkey listed in the group's `p` tags
+  (kind 38800). Clients MUST reject events from non-members.
+- `new_counter` in the encrypted payload MUST be greater than the client's current
+  counter. Clients MUST reject `new_counter <= local_counter` (replay protection).
+- `new_counter` SHOULD NOT exceed `time_based_counter + 100`. Clients SHOULD reject
+  larger jumps to bound counter drift from compromised senders.
+- Clients SHOULD deduplicate events by event ID.
+
 ## Group Lifecycle
 
 ### Creation
@@ -384,10 +400,13 @@ duress:
   index = uint16_be(mac[0:2]) mod 2048
   word  = wordlist[index]
   if word == verification_word:
-    key   = seed || pubkey || 0x01  (65 bytes)
-    mac   = HMAC-SHA256(key=key, data=uint64_be(counter))
-    index = uint16_be(mac[0:2]) mod 2048
-    word  = wordlist[index]
+    # CANARY-DURESS multi-suffix retry (see CANARY.md)
+    for suffix in 0x01..0xFF:
+      key   = seed || pubkey || byte(suffix)
+      mac   = HMAC-SHA256(key=key, data=uint64_be(counter))
+      index = uint16_be(mac[0:2]) mod 2048
+      word  = wordlist[index]
+      if word != verification_word: break
 ```
 
 **Vector Table:**

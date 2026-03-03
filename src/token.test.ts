@@ -133,6 +133,16 @@ describe('deriveDuressToken', () => {
     expect(duress).toHaveLength(4)
     expect(duress).not.toBe(normal)
   })
+
+  it('retries beyond first suffix on repeated collision', () => {
+    // Run 1000 counter values across two encodings to exercise retry paths.
+    const encoding = { format: 'pin' as const, digits: 4 }
+    for (let c = 0; c < 1000; c++) {
+      const normal = deriveToken(SECRET_1, 'test', c, encoding)
+      const duress = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, c, encoding)
+      expect(duress).not.toBe(normal)
+    }
+  })
 })
 
 describe('verifyToken', () => {
@@ -146,7 +156,7 @@ describe('verifyToken', () => {
     const duress = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 0)
     const result = verifyToken(SECRET_1, 'test', 0, duress, [IDENTITY_A, IDENTITY_B])
     expect(result.status).toBe('duress')
-    expect(result.identity).toBe(IDENTITY_A)
+    expect(result.identities).toEqual([IDENTITY_A])
   })
 
   it('returns invalid for unknown token', () => {
@@ -183,7 +193,15 @@ describe('verifyToken', () => {
     const duress = deriveDuressToken(SECRET_1, 'test', IDENTITY_B, 10)
     const result = verifyToken(SECRET_1, 'test', 11, duress, [IDENTITY_A, IDENTITY_B], { tolerance: 1 })
     expect(result.status).toBe('duress')
-    expect(result.identity).toBe(IDENTITY_B)
+    expect(result.identities).toEqual([IDENTITY_B])
+  })
+
+  it('returns identities array (not singular identity) for duress', () => {
+    const duress = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 0)
+    const result = verifyToken(SECRET_1, 'test', 0, duress, [IDENTITY_A, IDENTITY_B])
+    expect(result.status).toBe('duress')
+    expect(result.identities).toEqual([IDENTITY_A])
+    expect(result).not.toHaveProperty('identity')
   })
 })
 

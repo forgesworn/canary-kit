@@ -49,9 +49,9 @@ export function deriveVerificationPhrase(
 /**
  * Derive a member's duress word for a given seed, pubkey, and counter.
  * Unique per member, derivable by all group members who know the seed.
- * If the result collides with the verification word, re-derives with an
- * incremented suffix (up to 3 attempts) to guarantee the duress word
- * never accidentally matches the verification word.
+ * If the result collides with the verification word, re-derives with
+ * incrementing suffix bytes (0x01..0xFF) to guarantee the duress word
+ * never matches the verification word. Throws if all 255 suffixes collide.
  */
 export function deriveDuressWord(
   seedHex: string,
@@ -63,16 +63,21 @@ export function deriveDuressWord(
   const counterBuf = counterToBytes(counter)
   const verificationWord = deriveVerificationWord(seedHex, counter)
 
-  let raw = hmacSha256(concatBytes(seedBuf, pubkeyBuf), counterBuf)
+  const baseKey = concatBytes(seedBuf, pubkeyBuf)
+  let raw = hmacSha256(baseKey, counterBuf)
   let word = getWord(readUint16BE(raw, 0) % WORDLIST_SIZE)
 
-  // Collision avoidance: loop up to 3 attempts with incrementing suffix
-  let suffix = 0
-  while (word === verificationWord && suffix < 3) {
-    suffix++
+  // Collision avoidance: deterministic multi-suffix retry
+  let suffix = 1
+  while (word === verificationWord && suffix <= 255) {
     const reKey = concatBytes(seedBuf, pubkeyBuf, new Uint8Array([suffix]))
     raw = hmacSha256(reKey, counterBuf)
     word = getWord(readUint16BE(raw, 0) % WORDLIST_SIZE)
+    suffix++
+  }
+
+  if (word === verificationWord) {
+    throw new Error('Duress word collision unresolvable after 255 retries')
   }
 
   return word
@@ -81,9 +86,9 @@ export function deriveDuressWord(
 /**
  * Derive a multi-word duress phrase for a given member.
  * Each word uses a consecutive 2-byte slice of the HMAC digest.
- * If the entire phrase coincidentally matches the verification phrase,
- * re-derives with an incrementing suffix (up to 3 attempts) to ensure
- * the phrases are always distinct.
+ * If the entire phrase matches the verification phrase, re-derives with
+ * incrementing suffix bytes (0x01..0xFF) until distinct. Throws if all
+ * 255 suffixes collide.
  */
 export function deriveDuressPhrase(
   seedHex: string,
@@ -96,7 +101,8 @@ export function deriveDuressPhrase(
   const counterBuf = counterToBytes(counter)
   const verifyPhrase = deriveVerificationPhrase(seedHex, counter, wordCount)
 
-  let raw = hmacSha256(concatBytes(seedBuf, pubkeyBuf), counterBuf)
+  const baseKey = concatBytes(seedBuf, pubkeyBuf)
+  let raw = hmacSha256(baseKey, counterBuf)
   const words: string[] = []
 
   for (let i = 0; i < wordCount; i++) {
@@ -104,14 +110,18 @@ export function deriveDuressPhrase(
     words.push(getWord(index))
   }
 
-  // Collision avoidance: loop up to 3 attempts with incrementing suffix
-  let suffix = 0
-  while (words.every((w, i) => w === verifyPhrase[i]) && suffix < 3) {
-    suffix++
+  // Collision avoidance: deterministic multi-suffix retry
+  let suffix = 1
+  while (words.every((w, i) => w === verifyPhrase[i]) && suffix <= 255) {
     raw = hmacSha256(concatBytes(seedBuf, pubkeyBuf, new Uint8Array([suffix])), counterBuf)
     for (let i = 0; i < wordCount; i++) {
       words[i] = getWord(readUint16BE(raw, i * 2) % WORDLIST_SIZE)
     }
+    suffix++
+  }
+
+  if (words.every((w, i) => w === verifyPhrase[i])) {
+    throw new Error('Duress phrase collision unresolvable after 255 retries')
   }
 
   return words

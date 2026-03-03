@@ -13,7 +13,6 @@ export const KINDS = {
   memberUpdate: 38_801,
   reseed: 28_801,
   wordUsed: 28_802,
-  duressAlert: 28_802, // alias — duress alerts are word-used events with duress: true in the encrypted payload
   beacon: 20_800,
 } as const
 
@@ -139,23 +138,4 @@ export function buildBeaconEvent(params: BeaconEventParams): UnsignedEvent {
     tags.push(['expiration', String(params.expiration)])
   }
   return { kind: KINDS.beacon, content: params.encryptedContent, tags, created_at: now() }
-}
-
-export interface DuressAlertEventParams {
-  groupId: string
-  memberPubkey: string
-  encryptedContent: string
-}
-
-export function buildDuressAlertEvent(params: DuressAlertEventParams): UnsignedEvent {
-  return {
-    kind: KINDS.wordUsed,
-    content: params.encryptedContent,
-    tags: [
-      ['h', params.groupId],
-      ['p', params.memberPubkey],
-      ['t', 'duress'],
-    ],
-    created_at: now(),
-  }
 }

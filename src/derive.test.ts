@@ -102,6 +102,14 @@ describe('deriveDuressWord', () => {
     const w2 = deriveDuressWord(TEST_SEED, ALICE_PUBKEY, 1)
     expect(w1).not.toBe(w2)
   })
+
+  it('never returns the verification word across 500 counters', () => {
+    for (let c = 0; c < 500; c++) {
+      const verify = deriveVerificationWord(TEST_SEED, c)
+      const duress = deriveDuressWord(TEST_SEED, ALICE_PUBKEY, c)
+      expect(duress).not.toBe(verify)
+    }
+  })
 })
 
 describe('deriveDuressPhrase', () => {
@@ -114,5 +122,13 @@ describe('deriveDuressPhrase', () => {
     const verify = deriveVerificationPhrase(TEST_SEED, 0, 3)
     const duress = deriveDuressPhrase(TEST_SEED, ALICE_PUBKEY, 0, 3)
     expect(duress).not.toEqual(verify)
+  })
+
+  it('never returns the verification phrase across 500 counters', () => {
+    for (let c = 0; c < 500; c++) {
+      const verify = deriveVerificationPhrase(TEST_SEED, c, 2)
+      const duress = deriveDuressPhrase(TEST_SEED, ALICE_PUBKEY, c, 2)
+      expect(duress).not.toEqual(verify)
+    }
   })
 })

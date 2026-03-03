@@ -74,7 +74,7 @@ describe('CANARY-DURESS protocol vectors', () => {
     const duress = deriveDuressToken(SECRET, CONTEXT, IDENTITY, 0)
     const result = verifyToken(SECRET, CONTEXT, 0, duress, [IDENTITY])
     expect(result.status).toBe('duress')
-    expect(result.identity).toBe(IDENTITY)
+    expect(result.identities).toEqual([IDENTITY])
   })
 
   it('vector 10: liveness token', () => {

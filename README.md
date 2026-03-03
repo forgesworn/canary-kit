@@ -109,7 +109,7 @@ import {
 |---|---|
 | `deriveToken(secret, context, counter, encoding?)` | Derive an encoded verification token |
 | `deriveDuressToken(secret, context, identity, counter, encoding?)` | Derive a duress token for a specific identity |
-| `verifyToken(secret, context, counter, input, identities, options?)` | Verify a token — returns `valid`, `duress` (with identity), or `invalid` |
+| `verifyToken(secret, context, counter, input, identities, options?)` | Verify a token — returns `valid`, `duress` (with matching identities), or `invalid` |
 | `deriveLivenessToken(secret, context, identity, counter)` | Derive a liveness heartbeat token for dead man's switch |
 
 ### Verification
@@ -127,7 +127,7 @@ type VerifyStatus = 'verified' | 'duress' | 'stale' | 'failed'
 
 interface VerifyResult {
   status: VerifyStatus
-  member?: string  // pubkey of coerced member (only when status === 'duress')
+  members?: string[]  // pubkeys of coerced members (only when status === 'duress')
 }
 ```
 
