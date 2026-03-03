@@ -18,13 +18,15 @@ const GROUP_D = 'family-2026'
 const GROUP_EVENT_ID = 'e'.repeat(64)
 
 describe('KINDS', () => {
-  it('defines 6 event kinds', () => {
-    expect(Object.keys(KINDS)).toHaveLength(6)
-    expect(KINDS.group).toBeDefined()
-    expect(KINDS.seedDistribution).toBeDefined()
-    expect(KINDS.memberUpdate).toBeDefined()
-    expect(KINDS.reseed).toBeDefined()
-    expect(KINDS.wordUsed).toBeDefined()
+  it('defines 7 event kinds', () => {
+    expect(Object.keys(KINDS)).toHaveLength(7)
+    expect(KINDS.group).toBe(38800)
+    expect(KINDS.seedDistribution).toBe(28800)
+    expect(KINDS.memberUpdate).toBe(38801)
+    expect(KINDS.reseed).toBe(28801)
+    expect(KINDS.wordUsed).toBe(28802)
+    expect(KINDS.duressAlert).toBe(28802)
+    expect(KINDS.beacon).toBe(20800)
   })
 })
 
@@ -141,7 +143,7 @@ describe('buildBeaconEvent', () => {
     })
     expect(event.kind).toBe(KINDS.beacon)
     expect(event.content).toBe('<encrypted-beacon>')
-    expect(event.tags).toContainEqual(['g', GROUP_D])
+    expect(event.tags).toContainEqual(['h', GROUP_D])
     expect(event.tags).toContainEqual(['expiration', '1800000300'])
   })
 
@@ -156,15 +158,15 @@ describe('buildBeaconEvent', () => {
 })
 
 describe('buildDuressAlertEvent', () => {
-  it('builds event with correct kind, g tag, p tag, and t tag', () => {
+  it('builds event with correct kind, h tag, p tag, and t tag', () => {
     const event = buildDuressAlertEvent({
       groupId: GROUP_D,
       memberPubkey: ALICE,
       encryptedContent: '<encrypted-alert>',
     })
-    expect(event.kind).toBe(KINDS.wordUsed)
+    expect(event.kind).toBe(KINDS.duressAlert)
     expect(event.content).toBe('<encrypted-alert>')
-    expect(event.tags).toContainEqual(['g', GROUP_D])
+    expect(event.tags).toContainEqual(['h', GROUP_D])
     expect(event.tags).toContainEqual(['p', ALICE])
     expect(event.tags).toContainEqual(['t', 'duress'])
   })
