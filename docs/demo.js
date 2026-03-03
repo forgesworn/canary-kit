@@ -228,6 +228,11 @@ let state = {
 // Track the last rendered hero word so we can re-trigger the animation
 let lastRenderedWord = null
 
+// Word reveal timer state
+let revealTimeout = null
+let revealCountdown = null
+const REVEAL_DURATION = 30 // seconds
+
 // Pending confirm callback
 let confirmCallback = null
 
@@ -494,6 +499,50 @@ function renderGroupList() {
   }
 }
 
+function showWord() {
+  const heroWord = document.getElementById('hero-word')
+  const mask = document.getElementById('hero-word-mask')
+  const timer = document.getElementById('reveal-timer')
+  const timerText = document.getElementById('reveal-timer-text')
+
+  heroWord.hidden = false
+  mask.hidden = true
+  timer.hidden = false
+
+  let remaining = REVEAL_DURATION
+  timerText.textContent = `hiding in ${remaining}s`
+
+  clearTimeout(revealTimeout)
+  clearInterval(revealCountdown)
+
+  revealCountdown = setInterval(() => {
+    remaining--
+    timerText.textContent = `hiding in ${remaining}s`
+    if (remaining <= 0) {
+      clearInterval(revealCountdown)
+    }
+  }, 1000)
+
+  revealTimeout = setTimeout(() => {
+    hideWord()
+  }, REVEAL_DURATION * 1000)
+}
+
+function hideWord() {
+  const heroWord = document.getElementById('hero-word')
+  const mask = document.getElementById('hero-word-mask')
+  const timer = document.getElementById('reveal-timer')
+
+  heroWord.hidden = true
+  mask.hidden = false
+  timer.hidden = true
+
+  clearTimeout(revealTimeout)
+  clearInterval(revealCountdown)
+  revealTimeout = null
+  revealCountdown = null
+}
+
 function renderHero() {
   const group = state.groups[state.activeGroupId]
   if (!group) return
@@ -508,6 +557,9 @@ function renderHero() {
   }
 
   const heroWordEl = document.getElementById('hero-word')
+  const mask = document.getElementById('hero-word-mask')
+  const appState = getAppState()
+
   if (word !== lastRenderedWord) {
     heroWordEl.classList.remove('word-appear')
     // Force reflow to restart the animation
@@ -516,6 +568,21 @@ function renderHero() {
     lastRenderedWord = word
   }
   heroWordEl.textContent = word
+
+  // In active state, word is masked unless currently revealed
+  if (appState === 'active') {
+    if (!revealTimeout) {
+      // Not currently revealed — show mask
+      heroWordEl.hidden = true
+      mask.hidden = false
+    }
+    // If revealed, leave both as they are (showWord manages visibility)
+  } else {
+    // Demo state — word always visible, no mask
+    heroWordEl.hidden = false
+    mask.hidden = true
+    document.getElementById('reveal-timer').hidden = true
+  }
 
   // Countdown bar
   const progress = getCountdownProgress(group)
@@ -1112,6 +1179,10 @@ function setupAuth() {
       state.activeGroupId = null
       state.isDemo = true
       lastRenderedWord = null
+      clearTimeout(revealTimeout)
+      clearInterval(revealCountdown)
+      revealTimeout = null
+      revealCountdown = null
       localStorage.removeItem(STORAGE_KEYS.groups)
       localStorage.removeItem(STORAGE_KEYS.identity)
       localStorage.removeItem(STORAGE_KEYS.settings)
@@ -1221,6 +1292,7 @@ function init() {
   render()
 
   // Event bindings
+  document.getElementById('reveal-word-btn').addEventListener('click', showWord)
   document.getElementById('verify-form').addEventListener('submit', handleVerify)
   setupDuressLongPress()
   setupCreateModal()

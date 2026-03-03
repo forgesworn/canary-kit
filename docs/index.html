@@ -84,7 +84,16 @@
           <div id="demo-hint-hero" class="demo-hint" hidden>
             This is your group's verification word. When someone calls, ask them to say it.
           </div>
-          <div id="hero-word" class="hero-word"></div>
+          <div class="hero-word-container">
+            <div id="hero-word" class="hero-word"></div>
+            <div id="hero-word-mask" class="hero-word-mask" hidden>
+              <span class="hero-word-mask__dots">● ● ● ● ● ●</span>
+              <button id="reveal-word-btn" class="reveal-word-btn">Reveal Word</button>
+            </div>
+            <div id="reveal-timer" class="reveal-timer" hidden>
+              <span id="reveal-timer-text" class="reveal-timer-text"></span>
+            </div>
+          </div>
           <div class="countdown-bar">
             <div id="countdown-fill" class="countdown-fill"></div>
           </div>

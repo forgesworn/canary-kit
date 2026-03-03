@@ -593,6 +593,64 @@ input::placeholder {
   animation: word-appear 0.6s var(--ease-out) both;
 }
 
+/* ── Word mask / reveal ──────────────────────────────────────── */
+
+.hero-word-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.hero-word-mask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.hero-word-mask[hidden] {
+  display: none;
+}
+
+.hero-word-mask__dots {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(2rem, 6vw, 4rem);
+  color: var(--text-muted);
+  letter-spacing: 0.3em;
+  user-select: none;
+}
+
+.reveal-word-btn {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--bg-deep);
+  background: var(--amber-500);
+  border: 1px solid var(--amber-500);
+  border-radius: 6px;
+  padding: 0.625rem 1.5rem;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.reveal-word-btn:hover {
+  background: var(--amber-400);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+}
+
+.reveal-timer {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.reveal-timer[hidden] {
+  display: none;
+}
+
 /* ── Countdown ───────────────────────────────────────────────── */
 
 .countdown-bar {
