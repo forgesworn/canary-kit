@@ -66,6 +66,32 @@ describe('buildGroupEvent', () => {
     })
     expect(event.tags).toContainEqual(['expiration', '1800000000'])
   })
+
+  it('encodes wordCount: 2 in the words tag', () => {
+    const event = buildGroupEvent({
+      groupId: GROUP_D,
+      name: 'Two Words',
+      members: [ALICE],
+      rotationInterval: 604_800,
+      wordCount: 2,
+      wordlist: 'en-v1',
+      encryptedContent: '',
+    })
+    expect(event.tags).toContainEqual(['words', '2'])
+  })
+
+  it('encodes wordCount: 3 in the words tag', () => {
+    const event = buildGroupEvent({
+      groupId: GROUP_D,
+      name: 'Three Words',
+      members: [ALICE],
+      rotationInterval: 604_800,
+      wordCount: 3,
+      wordlist: 'en-v1',
+      encryptedContent: '',
+    })
+    expect(event.tags).toContainEqual(['words', '3'])
+  })
 })
 
 describe('buildSeedDistributionEvent', () => {
@@ -120,6 +146,33 @@ describe('buildReseedEvent', () => {
     expect(event.kind).toBe(KINDS.reseed)
     expect(event.tags).toContainEqual(['e', GROUP_EVENT_ID])
     expect(event.tags).toContainEqual(['reason', 'duress'])
+  })
+
+  it('builds reseed event with reason: member_removed', () => {
+    const event = buildReseedEvent({
+      groupEventId: GROUP_EVENT_ID,
+      reason: 'member_removed',
+      encryptedContent: '<encrypted>',
+    })
+    expect(event.tags).toContainEqual(['reason', 'member_removed'])
+  })
+
+  it('builds reseed event with reason: compromise', () => {
+    const event = buildReseedEvent({
+      groupEventId: GROUP_EVENT_ID,
+      reason: 'compromise',
+      encryptedContent: '<encrypted>',
+    })
+    expect(event.tags).toContainEqual(['reason', 'compromise'])
+  })
+
+  it('builds reseed event with reason: scheduled', () => {
+    const event = buildReseedEvent({
+      groupEventId: GROUP_EVENT_ID,
+      reason: 'scheduled',
+      encryptedContent: '<encrypted>',
+    })
+    expect(event.tags).toContainEqual(['reason', 'scheduled'])
   })
 })
 

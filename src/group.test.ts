@@ -61,6 +61,23 @@ describe('getCurrentWord', () => {
     const group = createGroup({ name: 'Test', members: [ALICE, BOB] })
     expect(getCurrentWord(group)).toBe(getCurrentWord(group))
   })
+
+  it('returns 2 space-separated words when wordCount is 2', () => {
+    const group = createGroup({ name: 'Test', members: [ALICE, BOB], wordCount: 2 })
+    const phrase = getCurrentWord(group)
+    const parts = phrase.split(' ')
+    expect(parts).toHaveLength(2)
+    expect(parts[0].length).toBeGreaterThan(0)
+    expect(parts[1].length).toBeGreaterThan(0)
+  })
+
+  it('returns 3 space-separated words when wordCount is 3', () => {
+    const group = createGroup({ name: 'Test', members: [ALICE, BOB], wordCount: 3 })
+    const phrase = getCurrentWord(group)
+    const parts = phrase.split(' ')
+    expect(parts).toHaveLength(3)
+    expect(parts.every(p => p.length > 0)).toBe(true)
+  })
 })
 
 describe('getCurrentDuressWord', () => {

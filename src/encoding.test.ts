@@ -103,6 +103,23 @@ describe('encodeAsHex', () => {
   it('throws on length > 64', () => {
     expect(() => encodeAsHex(new Uint8Array(32), 65)).toThrow()
   })
+
+  it('encodes length = 1 (odd length — single hex nibble)', () => {
+    const bytes = new Uint8Array(32)
+    bytes[0] = 0xAB
+    const result = encodeAsHex(bytes, 1)
+    expect(result).toHaveLength(1)
+    expect(result).toBe('a')
+  })
+})
+
+describe('encodeAsWords with maximum count', () => {
+  it('encodes 16 words from 32 bytes (maximum allowed)', () => {
+    const bytes = new Uint8Array(32)
+    const words = encodeAsWords(bytes, 16)
+    expect(words).toHaveLength(16)
+    expect(words.every(w => typeof w === 'string' && w.length > 0)).toBe(true)
+  })
 })
 
 describe('encodeToken', () => {

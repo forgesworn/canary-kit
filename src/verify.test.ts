@@ -58,4 +58,16 @@ describe('verifyWord', () => {
     expect(result.status).toBe('duress')
     expect(result.member).toBe(ALICE)
   })
+
+  it('empty memberPubkeys still verifies the verification word correctly', () => {
+    const word = deriveVerificationWord(TEST_SEED, COUNTER)
+    const result = verifyWord(word, TEST_SEED, [], COUNTER)
+    expect(result.status).toBe('verified')
+  })
+
+  it('future counter word returns failed', () => {
+    const futureWord = deriveVerificationWord(TEST_SEED, COUNTER + 10)
+    const result = verifyWord(futureWord, TEST_SEED, MEMBERS, COUNTER)
+    expect(result.status).toBe('failed')
+  })
 })

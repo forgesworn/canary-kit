@@ -66,6 +66,23 @@ describe('encryptBeacon / decryptBeacon', () => {
     expect(payload.geohash).toBe('gcpuuzwjzpb')
     expect(payload.precision).toBe(11)
   })
+
+  it('tampered ciphertext (byte flip after IV) causes decryptBeacon to throw', async () => {
+    const key = deriveBeaconKey(SEED_1)
+    const encrypted = await encryptBeacon(key, 'gcpuuz', 6)
+    // Decode base64, flip a byte after the 12-byte IV, re-encode
+    const bytes = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0))
+    bytes[12] ^= 0xff
+    const tampered = btoa(String.fromCharCode(...bytes))
+    await expect(decryptBeacon(key, tampered)).rejects.toThrow()
+  })
+
+  it('truncated base64 causes decryptBeacon to throw', async () => {
+    const key = deriveBeaconKey(SEED_1)
+    const encrypted = await encryptBeacon(key, 'gcpuuz', 6)
+    const truncated = encrypted.slice(0, 8)
+    await expect(decryptBeacon(key, truncated)).rejects.toThrow()
+  })
 })
 
 const PUBKEY_A = '0000000000000000000000000000000000000000000000000000000000000002'

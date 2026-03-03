@@ -47,4 +47,17 @@ describe('counterToBytes', () => {
     const bytes = counterToBytes(256)
     expect(Array.from(bytes)).toEqual([0, 0, 0, 0, 0, 0, 1, 0])
   })
+
+  it('throws on non-integer counter', () => {
+    expect(() => counterToBytes(1.5)).toThrow()
+  })
+})
+
+describe('getCounter with negative timestamp', () => {
+  it('negative timestamp still returns a number (floor division)', () => {
+    // Math.floor(-1 / 604800) = -1, so getCounter returns a number
+    const result = getCounter(-1, 604_800)
+    expect(typeof result).toBe('number')
+    expect(result).toBe(-1)
+  })
 })

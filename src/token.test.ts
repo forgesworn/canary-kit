@@ -221,6 +221,28 @@ describe('concatenation ambiguity', () => {
   })
 })
 
+describe('verifyToken with empty identities', () => {
+  it('still returns valid for correct token when identities is empty', () => {
+    const token = deriveToken(SECRET_1, 'test', 0)
+    const result = verifyToken(SECRET_1, 'test', 0, token, [])
+    expect(result.status).toBe('valid')
+  })
+
+  it('never returns duress when identities is empty', () => {
+    // Any token that does not match the normal token should be invalid, not duress
+    const result = verifyToken(SECRET_1, 'test', 0, 'nosuchword', [])
+    expect(result.status).toBe('invalid')
+  })
+})
+
+describe('liveness token context isolation', () => {
+  it('different contexts produce different liveness tokens', () => {
+    const a = deriveLivenessToken(SECRET_1, 'context-a', IDENTITY_A, 0)
+    const b = deriveLivenessToken(SECRET_1, 'context-b', IDENTITY_A, 0)
+    expect(bytesToHex(a)).not.toBe(bytesToHex(b))
+  })
+})
+
 describe('deriveLivenessToken', () => {
   it('returns 32 bytes', () => {
     const bytes = deriveLivenessToken(SECRET_1, 'test', IDENTITY_A, 0)
