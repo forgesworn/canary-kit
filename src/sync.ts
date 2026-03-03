@@ -1,6 +1,8 @@
 // Transport-agnostic sync message protocol
 
 import { bytesToHex, hexToBytes } from './crypto.js'
+import type { GroupState } from './group.js'
+import { addMember, removeMember } from './group.js'
 
 // ── Message types ─────────────────────────────────────────────
 
@@ -56,6 +58,42 @@ export function decodeSyncMessage(payload: string): SyncMessage {
   }
 
   return parsed as SyncMessage
+}
+
+// ── State application ─────────────────────────────────────────
+
+/**
+ * Apply a sync message to group state.
+ * Pure function — returns a new GroupState with the change applied.
+ * Beacons and duress alerts don't modify group state (fire-and-forget).
+ */
+export function applySyncMessage(group: GroupState, msg: SyncMessage): GroupState {
+  switch (msg.type) {
+    case 'member-join':
+      return addMember(group, msg.pubkey)
+
+    case 'member-leave':
+      return removeMember(group, msg.pubkey)
+
+    case 'counter-advance': {
+      // Monotonic: only advance, never retreat
+      const currentEffective = group.counter + group.usageOffset
+      const incomingEffective = msg.counter + msg.usageOffset
+      if (incomingEffective <= currentEffective) return group
+      return { ...group, counter: msg.counter, usageOffset: msg.usageOffset }
+    }
+
+    case 'reseed':
+      // GroupState.seed is a hex string; SyncMessage.reseed.seed is Uint8Array
+      return { ...group, seed: bytesToHex(msg.seed), counter: msg.counter, usageOffset: 0 }
+
+    case 'beacon':
+    case 'duress-alert':
+      return group
+
+    default:
+      return group
+  }
 }
 
 // ── Transport interface ───────────────────────────────────────
