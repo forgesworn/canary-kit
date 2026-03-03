@@ -382,8 +382,53 @@ function getMemberName(pubkey, isDemo) {
 }
 
 // ---------------------------------------------------------------------------
+// State machine
+// ---------------------------------------------------------------------------
+
+function getAppState() {
+  if (!state.identity && Object.keys(state.groups).length === 0) return 'welcome'
+  if (state.activeGroupId === 'demo') return 'demo'
+  return 'active'
+}
+
+// ---------------------------------------------------------------------------
+// Master render
+// ---------------------------------------------------------------------------
+
+function render() {
+  const appState = getAppState()
+
+  // Sidebar — hidden in welcome state
+  const sidebar = document.querySelector('.sidebar')
+  if (sidebar) sidebar.hidden = appState === 'welcome'
+
+  // Layout class for welcome centering
+  const layout = document.querySelector('.layout')
+  if (layout) layout.classList.toggle('layout--welcome', appState === 'welcome')
+
+  // Relay status — hidden in welcome
+  const relayStatus = document.querySelector('.relay-status')
+  if (relayStatus) relayStatus.hidden = appState === 'welcome'
+
+  if (appState === 'welcome') {
+    renderWelcome()
+  } else {
+    renderGroupList()
+    renderHero()
+    renderMembers()
+    renderSettings()
+    renderIdentityBadge()
+  }
+
+  renderAuthButton()
+}
+
+// ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
+
+// Stub — replaced in Task 3 when welcome screen HTML is wired up
+function renderWelcome() {}
 
 function renderGroupList() {
   const list = document.getElementById('group-list')
@@ -418,10 +463,7 @@ function renderGroupList() {
 
     item.addEventListener('click', () => {
       state.activeGroupId = id
-      renderGroupList()
-      renderHero()
-      renderMembers()
-      renderSettings()
+      render()
     })
 
     list.appendChild(item)
@@ -804,10 +846,7 @@ function handleCreateGroup(e) {
 
   document.getElementById('create-modal').close()
 
-  renderGroupList()
-  renderHero()
-  renderMembers()
-  renderSettings()
+  render()
 }
 
 function setupCreateModal() {
@@ -844,9 +883,7 @@ function handleRemoveMember(pubkey) {
     () => {
       state.groups[state.activeGroupId] = removeMember(group, pubkey)
       saveGroups()
-      renderHero()
-      renderMembers()
-      renderSettings()
+      render()
     },
   )
 }
@@ -912,7 +949,7 @@ function setupSettings() {
     if (!group || state.activeGroupId === 'demo') return
     state.groups[state.activeGroupId] = { ...group, name: nameInput.value.trim() }
     saveGroups()
-    renderGroupList()
+    render()
   })
 
   // Rotation interval buttons
@@ -931,8 +968,7 @@ function setupSettings() {
       counter: getCounter(now, interval),
     }
     saveGroups()
-    renderSettings()
-    renderHero()
+    render()
   })
 
   // Word count buttons
@@ -946,8 +982,7 @@ function setupSettings() {
     const wordCount = parseInt(btn.dataset.value, 10)
     state.groups[state.activeGroupId] = { ...group, wordCount }
     saveGroups()
-    renderSettings()
-    renderHero()
+    render()
   })
 
   // Relay list — delegated remove
@@ -989,8 +1024,7 @@ function setupSettings() {
       () => {
         state.groups[state.activeGroupId] = reseed(group)
         saveGroups()
-        renderHero()
-        renderMembers()
+        render()
       },
     )
   })
@@ -1008,10 +1042,7 @@ function setupSettings() {
         const remaining = Object.keys(state.groups)
         state.activeGroupId = remaining.length > 0 ? remaining[0] : null
         saveGroups()
-        renderGroupList()
-        renderHero()
-        renderMembers()
-        renderSettings()
+        render()
       },
     )
   })
@@ -1026,12 +1057,27 @@ function setupAuth() {
 
   btn.addEventListener('click', async () => {
     if (state.identity) {
-      // Sign out
+      // Sign out — complete wipe of identity and groups
       state.identity = null
+      state.groups = {}
+      state.activeGroupId = null
       state.isDemo = true
-      saveIdentity()
-      renderIdentityBadge()
-      renderAuthButton()
+      lastRenderedWord = null
+      localStorage.removeItem(STORAGE_KEYS.groups)
+      localStorage.removeItem(STORAGE_KEYS.identity)
+      localStorage.removeItem(STORAGE_KEYS.settings)
+      // Clear sensitive DOM
+      const heroWordEl = document.getElementById('hero-word')
+      if (heroWordEl) heroWordEl.textContent = ''
+      const duressWordEl = document.getElementById('duress-word')
+      if (duressWordEl) duressWordEl.textContent = ''
+      const duressReveal = document.getElementById('duress-reveal')
+      if (duressReveal) duressReveal.hidden = true
+      const membersList = document.getElementById('members-list')
+      if (membersList) membersList.innerHTML = ''
+      const verifyResult = document.getElementById('verify-result')
+      if (verifyResult) verifyResult.hidden = true
+      render()
       return
     }
 
@@ -1042,10 +1088,9 @@ function setupAuth() {
         state.identity = { pubkey }
         state.isDemo = false
         saveIdentity()
-        renderIdentityBadge()
-        renderAuthButton()
         subscribeToInvitations()
         document.getElementById('demo-banner').hidden = true
+        render()
         return
       } catch {
         // User rejected or extension failed — fall through to ephemeral
@@ -1081,10 +1126,9 @@ function setupAuth() {
 
       state.isDemo = false
       saveIdentity()
-      renderIdentityBadge()
-      renderAuthButton()
       subscribeToInvitations()
       document.getElementById('demo-banner').hidden = true
+      render()
     } catch {
       alert('Could not generate an ephemeral identity. Your browser may not support Web Crypto.')
     }
@@ -1113,7 +1157,9 @@ function startTick() {
       // Reset the last word so animation re-triggers
       lastRenderedWord = null
     }
-    renderHero()
+    if (getAppState() !== 'welcome') {
+      renderHero()
+    }
   }, 1000)
 }
 
@@ -1123,13 +1169,7 @@ function startTick() {
 
 function init() {
   loadState()
-  ensureDemoGroup()
-  renderGroupList()
-  renderHero()
-  renderMembers()
-  renderSettings()
-  renderIdentityBadge()
-  renderAuthButton()
+  render()
 
   // Event bindings
   document.getElementById('verify-form').addEventListener('submit', handleVerify)
