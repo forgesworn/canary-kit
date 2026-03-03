@@ -33,6 +33,7 @@ export {
   reseed,
   addMember,
   removeMember,
+  syncCounter,
   type GroupConfig,
   type GroupState,
 } from './group.js'

@@ -7,6 +7,7 @@ import {
   reseed,
   addMember,
   removeMember,
+  syncCounter,
   type GroupConfig,
   type GroupState,
 } from './group.js'
@@ -124,5 +125,31 @@ describe('removeMember', () => {
     expect(updated.members).not.toContain(CHARLIE)
     expect(updated.members).toHaveLength(2)
     expect(updated.seed).not.toBe(group.seed)
+  })
+
+  it('removeMember on non-existent member still reseeds', () => {
+    const state = createGroup({ name: 'test', members: ['a'.repeat(64)] })
+    const result = removeMember(state, 'b'.repeat(64))
+    expect(result.seed).not.toBe(state.seed) // reseeded
+    expect(result.members).toEqual(state.members) // unchanged
+  })
+})
+
+describe('syncCounter', () => {
+  it('syncCounter advances counter and resets usageOffset', () => {
+    const state = createGroup({ name: 'test', members: ['a'.repeat(64)] })
+    const advanced = advanceCounter(state)
+    expect(advanced.usageOffset).toBe(1)
+    // Sync to a future time
+    const futureTime = Math.floor(Date.now() / 1000) + state.rotationInterval * 2
+    const synced = syncCounter(advanced, futureTime)
+    expect(synced.counter).toBeGreaterThan(state.counter)
+    expect(synced.usageOffset).toBe(0)
+  })
+
+  it('syncCounter returns same state when counter unchanged', () => {
+    const state = createGroup({ name: 'test', members: ['a'.repeat(64)] })
+    const synced = syncCounter(state, Math.floor(Date.now() / 1000))
+    expect(synced).toBe(state) // reference equality — no unnecessary copy
   })
 })

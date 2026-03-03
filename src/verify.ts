@@ -14,9 +14,10 @@ export interface VerifyResult {
  *
  * Checks in order:
  * 1. Current verification word → verified
- * 2. Each member's duress word → duress (with member identified)
- * 3. Previous window's verification word → stale (out of sync)
- * 4. None matched → failed
+ * 2. Each member's duress word at current counter → duress (with member identified)
+ * 3. Each member's duress word at previous counter → duress (stale duress, out of sync)
+ * 4. Previous window's verification word → stale (out of sync)
+ * 5. None matched → failed
  */
 export function verifyWord(
   spokenWord: string,
@@ -31,18 +32,27 @@ export function verifyWord(
     return { status: 'verified' }
   }
 
-  // 2. Check each member's duress word
+  // 2. Check each member's duress word at current counter
   for (const pubkey of memberPubkeys) {
     if (normalised === deriveDuressWord(seedHex, pubkey, counter)) {
       return { status: 'duress', member: pubkey }
     }
   }
 
-  // 3. Check previous window (1-window lookback for sync issues)
+  // 3. Check duress words at previous counter (stale duress — member slightly out of sync)
+  if (counter > 0) {
+    for (const pubkey of memberPubkeys) {
+      if (normalised === deriveDuressWord(seedHex, pubkey, counter - 1)) {
+        return { status: 'duress', member: pubkey }
+      }
+    }
+  }
+
+  // 4. Check previous window's verification word (1-window lookback for sync issues)
   if (counter > 0 && normalised === deriveVerificationWord(seedHex, counter - 1)) {
     return { status: 'stale' }
   }
 
-  // 4. Nothing matched
+  // 5. Nothing matched
   return { status: 'failed' }
 }

@@ -50,4 +50,12 @@ describe('verifyWord', () => {
     const result = verifyWord('xyznotaword', TEST_SEED, MEMBERS, 0)
     expect(result.status).toBe('failed')
   })
+
+  it('detects stale duress word from previous counter', () => {
+    // Derive duress word at counter 0, then verify against counter 1
+    const duressAtZero = deriveDuressWord(TEST_SEED, ALICE, 0)
+    const result = verifyWord(duressAtZero, TEST_SEED, MEMBERS, 1)
+    expect(result.status).toBe('duress')
+    expect(result.member).toBe(ALICE)
+  })
 })

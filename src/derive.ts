@@ -2,13 +2,6 @@ import { hmacSha256, hexToBytes, concatBytes, readUint16BE } from './crypto.js'
 import { counterToBytes } from './counter.js'
 import { getWord, WORDLIST_SIZE } from './wordlist.js'
 
-/**
- * Compute HMAC-SHA256(key, data) and return the raw 32-byte digest.
- */
-function hmac(key: Uint8Array, data: Uint8Array): Uint8Array {
-  return hmacSha256(key, data)
-}
-
 /** Parse a hex-encoded seed string to a Uint8Array. */
 function seedToBytes(seedHex: string): Uint8Array {
   if (seedHex.length !== 64) {
@@ -27,7 +20,7 @@ function seedToBytes(seedHex: string): Uint8Array {
  * to yield the wordlist index.
  */
 export function deriveVerificationWord(seedHex: string, counter: number): string {
-  const raw = hmac(seedToBytes(seedHex), counterToBytes(counter))
+  const raw = hmacSha256(seedToBytes(seedHex), counterToBytes(counter))
   const index = readUint16BE(raw, 0) % WORDLIST_SIZE
   return getWord(index)
 }
@@ -44,7 +37,7 @@ export function deriveVerificationPhrase(
   counter: number,
   wordCount: 1 | 2 | 3,
 ): string[] {
-  const raw = hmac(seedToBytes(seedHex), counterToBytes(counter))
+  const raw = hmacSha256(seedToBytes(seedHex), counterToBytes(counter))
   const words: string[] = []
   for (let i = 0; i < wordCount; i++) {
     const index = readUint16BE(raw, i * 2) % WORDLIST_SIZE
@@ -56,8 +49,9 @@ export function deriveVerificationPhrase(
 /**
  * Derive a member's duress word for a given seed, pubkey, and counter.
  * Unique per member, derivable by all group members who know the seed.
- * If it collides with the verification word, re-derives with a 0x01 suffix
- * to guarantee the duress word never accidentally matches the verification word.
+ * If the result collides with the verification word, re-derives with an
+ * incremented suffix (up to 3 attempts) to guarantee the duress word
+ * never accidentally matches the verification word.
  */
 export function deriveDuressWord(
   seedHex: string,
@@ -69,17 +63,16 @@ export function deriveDuressWord(
   const counterBuf = counterToBytes(counter)
   const verificationWord = deriveVerificationWord(seedHex, counter)
 
-  let key = concatBytes(seedBuf, pubkeyBuf)
-  let raw = hmac(key, counterBuf)
-  let index = readUint16BE(raw, 0) % WORDLIST_SIZE
-  let word = getWord(index)
+  let raw = hmacSha256(concatBytes(seedBuf, pubkeyBuf), counterBuf)
+  let word = getWord(readUint16BE(raw, 0) % WORDLIST_SIZE)
 
-  // Collision avoidance: if duress word matches verification word, re-derive
-  if (word === verificationWord) {
-    key = concatBytes(seedBuf, pubkeyBuf, new Uint8Array([0x01]))
-    raw = hmac(key, counterBuf)
-    index = readUint16BE(raw, 0) % WORDLIST_SIZE
-    word = getWord(index)
+  // Collision avoidance: loop up to 3 attempts with incrementing suffix
+  let suffix = 0
+  while (word === verificationWord && suffix < 3) {
+    suffix++
+    const reKey = concatBytes(seedBuf, pubkeyBuf, new Uint8Array([suffix]))
+    raw = hmacSha256(reKey, counterBuf)
+    word = getWord(readUint16BE(raw, 0) % WORDLIST_SIZE)
   }
 
   return word
@@ -89,7 +82,8 @@ export function deriveDuressWord(
  * Derive a multi-word duress phrase for a given member.
  * Each word uses a consecutive 2-byte slice of the HMAC digest.
  * If the entire phrase coincidentally matches the verification phrase,
- * re-derives with a 0x01 suffix to ensure the phrases are always distinct.
+ * re-derives with an incrementing suffix (up to 3 attempts) to ensure
+ * the phrases are always distinct.
  */
 export function deriveDuressPhrase(
   seedHex: string,
@@ -102,8 +96,7 @@ export function deriveDuressPhrase(
   const counterBuf = counterToBytes(counter)
   const verifyPhrase = deriveVerificationPhrase(seedHex, counter, wordCount)
 
-  let key = concatBytes(seedBuf, pubkeyBuf)
-  let raw = hmac(key, counterBuf)
+  let raw = hmacSha256(concatBytes(seedBuf, pubkeyBuf), counterBuf)
   const words: string[] = []
 
   for (let i = 0; i < wordCount; i++) {
@@ -111,10 +104,11 @@ export function deriveDuressPhrase(
     words.push(getWord(index))
   }
 
-  // If entire phrase matches verification phrase, re-derive with disambiguation suffix
-  if (words.every((w, i) => w === verifyPhrase[i])) {
-    key = concatBytes(seedBuf, pubkeyBuf, new Uint8Array([0x01]))
-    raw = hmac(key, counterBuf)
+  // Collision avoidance: loop up to 3 attempts with incrementing suffix
+  let suffix = 0
+  while (words.every((w, i) => w === verifyPhrase[i]) && suffix < 3) {
+    suffix++
+    raw = hmacSha256(concatBytes(seedBuf, pubkeyBuf, new Uint8Array([suffix])), counterBuf)
     for (let i = 0; i < wordCount; i++) {
       words[i] = getWord(readUint16BE(raw, i * 2) % WORDLIST_SIZE)
     }

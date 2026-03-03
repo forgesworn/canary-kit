@@ -39,11 +39,6 @@ export interface GroupState {
   beaconPrecision: number
 }
 
-/** Generate a cryptographically secure 32-byte seed as a hex string. */
-function generateSeed(): string {
-  return randomSeed()
-}
-
 /**
  * Combine the time-based counter with the usage offset to produce the
  * effective counter used for word derivation.
@@ -58,7 +53,7 @@ export function createGroup(config: GroupConfig): GroupState {
   const interval = config.rotationInterval ?? DEFAULT_ROTATION_INTERVAL
   return {
     name: config.name,
-    seed: generateSeed(),
+    seed: randomSeed(),
     members: [...config.members],
     rotationInterval: interval,
     wordCount: config.wordCount ?? 1,
@@ -110,7 +105,7 @@ export function advanceCounter(state: GroupState): GroupState {
  * Returns new state — does not mutate the input.
  */
 export function reseed(state: GroupState): GroupState {
-  return { ...state, seed: generateSeed(), usageOffset: 0 }
+  return { ...state, seed: randomSeed(), usageOffset: 0 }
 }
 
 /**
@@ -129,6 +124,15 @@ export function addMember(state: GroupState, pubkey: string): GroupState {
  * Returns new state — does not mutate the input.
  */
 export function removeMember(state: GroupState, pubkey: string): GroupState {
-  const members = state.members.filter((m) => m !== pubkey)
-  return { ...reseed({ ...state, members }), members }
+  return reseed({ ...state, members: state.members.filter((m) => m !== pubkey) })
+}
+
+/** Refresh the counter to the current time window. Call after loading persisted state. */
+export function syncCounter(
+  state: GroupState,
+  nowSec: number = Math.floor(Date.now() / 1000),
+): GroupState {
+  const counter = getCounter(nowSec, state.rotationInterval)
+  if (counter === state.counter) return state
+  return { ...state, counter, usageOffset: 0 }
 }
