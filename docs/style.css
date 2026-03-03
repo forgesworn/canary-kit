@@ -1324,6 +1324,31 @@ input::placeholder {
   box-shadow: 0 0 10px rgba(248, 113, 113, 0.15);
 }
 
+/* ── Share modal ──────────────────────────────────────────── */
+
+.share-qr {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 0;
+}
+
+.share-qr canvas {
+  border-radius: 8px;
+  border: 4px solid var(--text-bright);
+}
+
+.share-link-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.share-link-input {
+  flex: 1;
+  font-size: 0.875rem;
+  min-width: 0;
+}
+
 /* ============================================================
    18. ANIMATIONS
    ============================================================ */

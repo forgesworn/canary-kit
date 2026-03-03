@@ -193,6 +193,7 @@
             </div>
 
             <div class="setting-row setting-row--actions">
+              <button id="share-btn" class="danger-btn">Share Group</button>
               <button id="reseed-btn" class="danger-btn">Reseed Group</button>
               <button id="dissolve-btn" class="danger-btn danger-btn--destructive">Dissolve Group</button>
             </div>
@@ -237,6 +238,19 @@
         <button type="submit" class="modal-btn modal-btn--primary">Create</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="share-modal" class="modal">
+    <h2 class="modal-title">Share Group</h2>
+    <p class="modal-message">Scan this QR code or share the invite link to add members.</p>
+    <div id="share-qr" class="share-qr"></div>
+    <div class="share-link-row">
+      <input id="share-link-input" class="modal-input share-link-input" type="text" readonly />
+      <button id="share-copy-btn" class="modal-btn modal-btn--primary">Copy</button>
+    </div>
+    <div class="modal-actions">
+      <button id="share-close-btn" class="modal-btn modal-btn--cancel">Done</button>
+    </div>
   </dialog>
 
   <dialog id="confirm-modal" class="modal">

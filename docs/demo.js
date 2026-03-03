@@ -62,6 +62,22 @@ applyTheme(getInitialTheme())
 // Nostr tools — loaded dynamically so offline mode still works
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// QR code library — lazy-loaded
+// ---------------------------------------------------------------------------
+
+let QRC = null
+async function loadQR() {
+  if (QRC) return QRC
+  try {
+    const mod = await import('https://esm.sh/qr-creator@1.0.6')
+    QRC = mod.default || mod
+    return QRC
+  } catch {
+    return null
+  }
+}
+
 let nostrTools = null
 let pool = null
 
@@ -704,7 +720,8 @@ function renderSettings() {
   // Relay list
   renderRelayList()
 
-  // Danger buttons — hide for demo group
+  // Action buttons — hide for demo group
+  document.getElementById('share-btn').hidden = isDemoGroup
   const reseedBtn = document.getElementById('reseed-btn')
   const dissolveBtn = document.getElementById('dissolve-btn')
   reseedBtn.hidden = isDemoGroup
@@ -938,6 +955,9 @@ function handleCreateGroup(e) {
   document.getElementById('create-modal').close()
 
   render()
+
+  // Show share modal so user can invite members
+  showShareModal(id)
 }
 
 function setupCreateModal() {
@@ -1029,6 +1049,75 @@ function setupInvite() {
 }
 
 // ---------------------------------------------------------------------------
+// Group sharing (QR code + invite link)
+// ---------------------------------------------------------------------------
+
+function buildInvitePayload(groupId) {
+  const group = state.groups[groupId]
+  if (!group) return null
+  return {
+    name: group.name,
+    seed: group.seed,
+    members: group.members,
+    rotationInterval: group.rotationInterval,
+    wordCount: group.wordCount,
+  }
+}
+
+function buildInviteLink(groupId) {
+  const payload = buildInvitePayload(groupId)
+  if (!payload) return null
+  const encoded = btoa(JSON.stringify(payload))
+  return `${location.origin}${location.pathname}#join/${encoded}`
+}
+
+async function showShareModal(groupId) {
+  const link = buildInviteLink(groupId)
+  if (!link) return
+
+  const linkInput = document.getElementById('share-link-input')
+  linkInput.value = link
+
+  const qrContainer = document.getElementById('share-qr')
+  qrContainer.innerHTML = ''
+
+  const qr = await loadQR()
+  if (qr) {
+    const canvas = document.createElement('canvas')
+    qr.render({
+      text: link,
+      radius: 0.5,
+      ecLevel: 'M',
+      fill: '#f8fafc',
+      background: '#0a0e17',
+      size: 200,
+    }, canvas)
+    qrContainer.appendChild(canvas)
+  }
+
+  document.getElementById('share-modal').showModal()
+}
+
+function setupShareModal() {
+  document.getElementById('share-close-btn').addEventListener('click', () => {
+    document.getElementById('share-modal').close()
+  })
+
+  document.getElementById('share-copy-btn').addEventListener('click', async () => {
+    const input = document.getElementById('share-link-input')
+    try {
+      await navigator.clipboard.writeText(input.value)
+      document.getElementById('share-copy-btn').textContent = 'Copied!'
+      setTimeout(() => {
+        document.getElementById('share-copy-btn').textContent = 'Copy'
+      }, 2000)
+    } catch {
+      input.select()
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Settings panel
 // ---------------------------------------------------------------------------
 
@@ -1102,6 +1191,14 @@ function setupSettings() {
       renderRelayList()
     }
     addInput.value = ''
+  })
+
+  // Share
+  const shareBtn = document.getElementById('share-btn')
+  shareBtn.addEventListener('click', () => {
+    if (state.activeGroupId && state.activeGroupId !== 'demo') {
+      showShareModal(state.activeGroupId)
+    }
   })
 
   // Reseed
@@ -1302,6 +1399,7 @@ function init() {
   setupAuth()
   setupWelcome()
   setupDemoCta()
+  setupShareModal()
   setupThemeToggle()
   startTick()
 
