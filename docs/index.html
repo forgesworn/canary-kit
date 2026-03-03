@@ -81,11 +81,17 @@
         </section>
 
         <section id="hero" class="hero">
+          <div id="demo-hint-hero" class="demo-hint" hidden>
+            This is your group's verification word. When someone calls, ask them to say it.
+          </div>
           <div id="hero-word" class="hero-word"></div>
           <div class="countdown-bar">
             <div id="countdown-fill" class="countdown-fill"></div>
           </div>
           <span id="countdown-label" class="countdown-label"></span>
+          <div id="demo-hint-duress" class="demo-hint" hidden>
+            Each member has a secret panic word. Long-press "Signal Duress" to reveal yours.
+          </div>
           <button id="duress-trigger" class="duress-trigger">Signal Duress</button>
           <div id="duress-reveal" class="duress-reveal" hidden>
             <span class="duress-label">Duress word:</span>
@@ -97,6 +103,9 @@
 
           <section class="panel verify-panel">
             <h2 class="panel-title">Verify Someone</h2>
+            <div id="demo-hint-verify" class="demo-hint" hidden>
+              Type a word to check if it's correct. Try typing "garnet".
+            </div>
             <form id="verify-form" class="verify-form">
               <input
                 id="verify-input"
@@ -181,6 +190,11 @@
 
           </div>
         </details>
+
+        <div id="demo-cta" class="demo-cta" hidden>
+          <p class="demo-cta__text">Ready to create your own group?</p>
+          <button id="demo-cta-btn" class="welcome-btn welcome-btn--primary">Create Your Own Group</button>
+        </div>
 
       </main>
     </div>

@@ -435,6 +435,13 @@ function render() {
     renderIdentityBadge()
   }
 
+  // Show/hide demo hints and CTA based on state
+  const isDemoState = appState === 'demo'
+  document.getElementById('demo-hint-hero').hidden = !isDemoState
+  document.getElementById('demo-hint-verify').hidden = !isDemoState
+  document.getElementById('demo-hint-duress').hidden = !isDemoState
+  document.getElementById('demo-cta').hidden = !isDemoState
+
   renderAuthButton()
 }
 
@@ -1069,6 +1076,12 @@ function setupSettings() {
 // Welcome screen
 // ---------------------------------------------------------------------------
 
+function setupDemoCta() {
+  document.getElementById('demo-cta-btn').addEventListener('click', () => {
+    document.getElementById('create-modal').showModal()
+  })
+}
+
 function setupWelcome() {
   document.getElementById('try-demo-btn').addEventListener('click', () => {
     ensureDemoGroup()
@@ -1216,6 +1229,7 @@ function init() {
   setupInvite()
   setupAuth()
   setupWelcome()
+  setupDemoCta()
   setupThemeToggle()
   startTick()
 

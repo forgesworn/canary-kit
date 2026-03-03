@@ -1486,6 +1486,45 @@ input::placeholder {
 }
 
 /* ============================================================
+   DEMO HINTS & CTA
+   ============================================================ */
+
+.demo-hint {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--amber-500);
+  background: var(--duress-bg);
+  border: 1px solid var(--border-amber);
+  border-radius: 6px;
+  padding: 0.65rem 1rem;
+  line-height: 1.5;
+  text-align: center;
+  animation: fade-in 0.5s var(--ease-out) both;
+}
+
+.demo-hint[hidden] {
+  display: none;
+}
+
+.demo-cta {
+  text-align: center;
+  padding: 2rem;
+  border-top: 1px solid var(--border);
+  animation: fade-in 0.8s var(--ease-out) 0.6s both;
+}
+
+.demo-cta[hidden] {
+  display: none;
+}
+
+.demo-cta__text {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+/* ============================================================
    20. RESPONSIVE
    ============================================================ */
 
