@@ -95,3 +95,77 @@ export async function decryptBeacon(
   const plaintext = await aesGcmDecrypt(key, content)
   return JSON.parse(new TextDecoder().decode(plaintext))
 }
+
+// ---------------------------------------------------------------------------
+// Duress Alert
+// ---------------------------------------------------------------------------
+
+/** Decrypted content of an enhanced kind 28802 duress alert event. */
+export interface DuressAlert {
+  type: 'duress'
+  member: string
+  geohash: string
+  precision: number
+  locationSource: 'beacon' | 'verifier' | 'none'
+  timestamp: number
+}
+
+/** Location info for a duress alert. Null means no location available. */
+export interface DuressLocation {
+  geohash: string
+  precision: number
+  locationSource: 'beacon' | 'verifier'
+}
+
+/**
+ * Construct a duress alert payload.
+ *
+ * The caller is responsible for geohash encoding and precision upgrade
+ * (e.g. using geohash-kit to re-encode at precision 11 for duress).
+ * This function just assembles the payload.
+ */
+export function buildDuressAlert(
+  memberPubkey: string,
+  location: DuressLocation | null,
+): DuressAlert {
+  if (location) {
+    return {
+      type: 'duress',
+      member: memberPubkey,
+      geohash: location.geohash,
+      precision: location.precision,
+      locationSource: location.locationSource,
+      timestamp: Math.floor(Date.now() / 1000),
+    }
+  }
+  return {
+    type: 'duress',
+    member: memberPubkey,
+    geohash: '',
+    precision: 0,
+    locationSource: 'none',
+    timestamp: Math.floor(Date.now() / 1000),
+  }
+}
+
+/**
+ * Encrypt a duress alert with the group's beacon key.
+ * Returns a base64 string for the Nostr event's `content` field.
+ */
+export async function encryptDuressAlert(
+  key: Uint8Array,
+  alert: DuressAlert,
+): Promise<string> {
+  return aesGcmEncrypt(key, new TextEncoder().encode(JSON.stringify(alert)))
+}
+
+/**
+ * Decrypt a duress alert event's content.
+ */
+export async function decryptDuressAlert(
+  key: Uint8Array,
+  content: string,
+): Promise<DuressAlert> {
+  const plaintext = await aesGcmDecrypt(key, content)
+  return JSON.parse(new TextDecoder().decode(plaintext))
+}

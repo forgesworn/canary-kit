@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { deriveBeaconKey, encryptBeacon, decryptBeacon } from './beacon.js'
+import {
+  deriveBeaconKey,
+  encryptBeacon,
+  decryptBeacon,
+  buildDuressAlert,
+  encryptDuressAlert,
+  decryptDuressAlert,
+} from './beacon.js'
 import { bytesToHex } from './crypto.js'
 
 const SEED_1 = '0000000000000000000000000000000000000000000000000000000000000001'
@@ -58,5 +65,79 @@ describe('encryptBeacon / decryptBeacon', () => {
     const payload = await decryptBeacon(key, encrypted)
     expect(payload.geohash).toBe('gcpuuzwjzpb')
     expect(payload.precision).toBe(11)
+  })
+})
+
+const PUBKEY_A = '0000000000000000000000000000000000000000000000000000000000000002'
+
+describe('buildDuressAlert', () => {
+  it('builds alert with beacon location', () => {
+    const alert = buildDuressAlert(PUBKEY_A, {
+      geohash: 'gcpuuzwjzpb',
+      precision: 11,
+      locationSource: 'beacon',
+    })
+    expect(alert.type).toBe('duress')
+    expect(alert.member).toBe(PUBKEY_A)
+    expect(alert.geohash).toBe('gcpuuzwjzpb')
+    expect(alert.precision).toBe(11)
+    expect(alert.locationSource).toBe('beacon')
+    expect(alert.timestamp).toBeGreaterThan(0)
+  })
+
+  it('builds alert with verifier location', () => {
+    const alert = buildDuressAlert(PUBKEY_A, {
+      geohash: 'u4pruydqqvj',
+      precision: 11,
+      locationSource: 'verifier',
+    })
+    expect(alert.locationSource).toBe('verifier')
+    expect(alert.geohash).toBe('u4pruydqqvj')
+  })
+
+  it('builds alert with no location', () => {
+    const alert = buildDuressAlert(PUBKEY_A, null)
+    expect(alert.locationSource).toBe('none')
+    expect(alert.geohash).toBe('')
+    expect(alert.precision).toBe(0)
+  })
+})
+
+describe('encryptDuressAlert / decryptDuressAlert', () => {
+  it('round-trips a duress alert with location', async () => {
+    const key = deriveBeaconKey(SEED_1)
+    const alert = buildDuressAlert(PUBKEY_A, {
+      geohash: 'gcpuuzwjzpb',
+      precision: 11,
+      locationSource: 'beacon',
+    })
+    const encrypted = await encryptDuressAlert(key, alert)
+    const decrypted = await decryptDuressAlert(key, encrypted)
+    expect(decrypted.type).toBe('duress')
+    expect(decrypted.member).toBe(PUBKEY_A)
+    expect(decrypted.geohash).toBe('gcpuuzwjzpb')
+    expect(decrypted.precision).toBe(11)
+    expect(decrypted.locationSource).toBe('beacon')
+  })
+
+  it('round-trips a duress alert with no location', async () => {
+    const key = deriveBeaconKey(SEED_1)
+    const alert = buildDuressAlert(PUBKEY_A, null)
+    const encrypted = await encryptDuressAlert(key, alert)
+    const decrypted = await decryptDuressAlert(key, encrypted)
+    expect(decrypted.locationSource).toBe('none')
+    expect(decrypted.geohash).toBe('')
+  })
+
+  it('wrong key fails to decrypt', async () => {
+    const key1 = deriveBeaconKey(SEED_1)
+    const key2 = deriveBeaconKey(SEED_2)
+    const alert = buildDuressAlert(PUBKEY_A, {
+      geohash: 'gcpuuzwjzpb',
+      precision: 11,
+      locationSource: 'beacon',
+    })
+    const encrypted = await encryptDuressAlert(key1, alert)
+    await expect(decryptDuressAlert(key2, encrypted)).rejects.toThrow()
   })
 })
