@@ -2,9 +2,9 @@
 
 import { advanceCounter, syncCounter, getCounter } from 'canary-kit'
 import { deriveToken } from 'canary-kit/token'
-import type { TokenEncoding } from 'canary-kit/encoding'
 import { getState, updateGroup } from '../state.js'
 import type { AppGroup } from '../types.js'
+import { toTokenEncoding, GROUP_CONTEXT } from '../utils/encoding.js'
 
 // ── Tick interval management ───────────────────────────────────
 
@@ -75,19 +75,6 @@ const ENCODING_LABELS: Record<AppGroup['encodingFormat'], string> = {
 const ENCODING_VALUES: AppGroup['encodingFormat'][] = ['words', 'pin', 'hex']
 
 // ── Display token derivation ────────────────────────────────────
-
-/** Map the app's simple encoding name to a TokenEncoding object. */
-function toTokenEncoding(group: AppGroup): TokenEncoding {
-  switch (group.encodingFormat) {
-    case 'pin': return { format: 'pin', digits: 6 }
-    case 'hex': return { format: 'hex', length: 8 }
-    case 'words':
-    default: return { format: 'words', count: group.wordCount }
-  }
-}
-
-/** Context string for group-mode token derivation. */
-const GROUP_CONTEXT = 'canary:group'
 
 /**
  * Derive the current display token using the universal CANARY token API.

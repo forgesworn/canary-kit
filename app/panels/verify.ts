@@ -1,23 +1,9 @@
 // app/panels/verify.ts — Verify panel: spoken-token verification input
 
 import { getCounter, deriveBeaconKey, buildDuressAlert, encryptDuressAlert } from 'canary-kit'
-import { verifyToken, type TokenVerifyResult } from 'canary-kit/token'
-import type { TokenEncoding } from 'canary-kit/encoding'
+import { verifyToken } from 'canary-kit/token'
 import { getState } from '../state.js'
-import type { AppGroup } from '../types.js'
-
-// ── Encoding helper ───────────────────────────────────────────
-
-function toTokenEncoding(group: AppGroup): TokenEncoding {
-  switch (group.encodingFormat) {
-    case 'pin': return { format: 'pin', digits: 6 }
-    case 'hex': return { format: 'hex', length: 8 }
-    case 'words':
-    default: return { format: 'words', count: group.wordCount }
-  }
-}
-
-const GROUP_CONTEXT = 'canary:group'
+import { toTokenEncoding, GROUP_CONTEXT } from '../utils/encoding.js'
 
 // ── Status display config ──────────────────────────────────
 

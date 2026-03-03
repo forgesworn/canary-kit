@@ -95,6 +95,7 @@ function startBeaconWatch(): void {
     async (pos) => {
       const lat = pos.coords.latitude
       const lon = pos.coords.longitude
+      // Placeholder: lat,lon string. In production, use geohash-kit to encode a proper geohash.
       const geohash = `${lat.toFixed(4)},${lon.toFixed(4)}`
       const precision = 6
 
@@ -184,5 +185,6 @@ export function cleanupBeacons(): void {
   geoWatchId = null
   if (map) { map.remove(); map = null }
   markers = {}
+  positions = {}
   encryptedPayloads = {}
 }
