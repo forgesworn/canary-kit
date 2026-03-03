@@ -39,7 +39,7 @@ describe('deriveVerificationWord', () => {
 
   it('rejects seed that is not 64 hex chars', () => {
     expect(() => deriveVerificationWord('tooshort', 0)).toThrow()
-    expect(() => deriveVerificationWord('z'.repeat(64), 0)).not.toThrow() // hex chars don't need to be validated beyond length for now
+    expect(() => deriveVerificationWord('z'.repeat(64), 0)).toThrow(TypeError) // invalid hex characters are now rejected
   })
 })
 

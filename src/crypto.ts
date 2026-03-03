@@ -193,7 +193,9 @@ export function hexToBytes(hex: string): Uint8Array {
   }
   const bytes = new Uint8Array(hex.length / 2)
   for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
+    const pair = hex.slice(i * 2, i * 2 + 2)
+    if (!/^[0-9a-fA-F]{2}$/.test(pair)) throw new TypeError(`Invalid hex character at position ${i * 2}`)
+    bytes[i] = parseInt(pair, 16)
   }
   return bytes
 }
@@ -212,6 +214,7 @@ export function bytesToHex(bytes: Uint8Array): string {
  * Replaces `buffer.readUInt16BE(offset)`.
  */
 export function readUint16BE(bytes: Uint8Array, offset: number): number {
+  if (offset + 1 >= bytes.length) throw new RangeError(`readUint16BE: offset ${offset} out of bounds for length ${bytes.length}`)
   return ((bytes[offset] << 8) | bytes[offset + 1]) >>> 0
 }
 
@@ -243,4 +246,12 @@ export function base64ToBytes(base64: string): Uint8Array {
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return bytes
+}
+
+/** Constant-time comparison of two byte arrays. */
+export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i]
+  return diff === 0
 }
