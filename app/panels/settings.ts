@@ -3,8 +3,8 @@
 import { getState, updateGroup, update } from '../state.js'
 import { deleteGroup, reseedGroup } from '../actions/groups.js'
 import { connectRelays, disconnectRelays, isConnected, getRelayCount } from '../nostr/connect.js'
-import { subscribeToGroupEvents, unsubscribeFromGroup } from '../nostr/sync.js'
-import { hasNip07, getNip07Pubkey } from '../nostr/events.js'
+import { subscribeToGroup, teardownSync } from '../sync.js'
+import { hasNip07 } from '../nostr/signer.js'
 import { updateRelayStatus } from '../components/header.js'
 
 // ── Drawer state persistence across re-renders ─────────────────
@@ -193,11 +193,11 @@ export function renderSettings(container: HTMLElement): void {
       void connectRelays(relays).then(() => {
         updateRelayStatus(isConnected(), getRelayCount())
         updateNostrConnectionStatus()
-        if (activeGroupId) subscribeToGroupEvents(activeGroupId, relays)
+        if (activeGroupId) subscribeToGroup(activeGroupId)
       })
       void populateNostrIdentity()
     } else {
-      if (activeGroupId) unsubscribeFromGroup(activeGroupId)
+      teardownSync()
       void disconnectRelays().then(() => {
         updateRelayStatus(false, 0)
         updateNostrConnectionStatus()
@@ -218,7 +218,7 @@ export function renderSettings(container: HTMLElement): void {
       if (getState().groups[activeGroupId!]?.nostrEnabled) {
         void connectRelays(relays).then(() => {
           updateRelayStatus(isConnected(), getRelayCount())
-          if (activeGroupId) subscribeToGroupEvents(activeGroupId, relays)
+          if (activeGroupId) subscribeToGroup(activeGroupId)
         })
       }
     })
@@ -240,7 +240,7 @@ export function renderSettings(container: HTMLElement): void {
       if (getState().groups[activeGroupId!]?.nostrEnabled) {
         void connectRelays(relays).then(() => {
           updateRelayStatus(isConnected(), getRelayCount())
-          if (activeGroupId) subscribeToGroupEvents(activeGroupId, relays)
+          if (activeGroupId) subscribeToGroup(activeGroupId)
         })
       }
     } else {
@@ -328,27 +328,23 @@ export function renderSettings(container: HTMLElement): void {
 
 // ── Nostr helpers ───────────────────────────────────────────────
 
-/** Populate the identity block with pubkey from NIP-07 or a "not available" hint. */
-async function populateNostrIdentity(): Promise<void> {
+/** Populate the identity block with pubkey from state. */
+function populateNostrIdentity(): void {
   const el = document.getElementById('nostr-identity')
   if (!el) return
 
-  if (!hasNip07()) {
-    el.innerHTML = `<span class="settings-hint">No NIP-07 extension detected. Install <a href="https://getalby.com" target="_blank" rel="noopener">Alby</a> or <a href="https://github.com/fiatjaf/nos2x" target="_blank" rel="noopener">nos2x</a> to sign events.</span>`
+  const { identity } = getState()
+  if (!identity?.pubkey) {
+    el.innerHTML = `<span class="settings-hint">No identity available.</span>`
     return
   }
 
-  const pubkey = await getNip07Pubkey()
-  if (!pubkey) {
-    el.innerHTML = `<span class="settings-hint">Extension found but could not retrieve public key. Unlock your extension and try again.</span>`
-    return
-  }
-
-  const shortened = `${pubkey.slice(0, 8)}…${pubkey.slice(-8)}`
+  const signerLabel = hasNip07() ? 'NIP-07' : 'Local key'
+  const shortened = `${identity.pubkey.slice(0, 8)}…${identity.pubkey.slice(-8)}`
   el.innerHTML = `
     <div class="nostr-identity-row">
-      <span class="input-label">Identity</span>
-      <span class="relay-url nostr-pubkey" title="${pubkey}">${shortened}</span>
+      <span class="input-label">Identity (${signerLabel})</span>
+      <span class="relay-url nostr-pubkey" title="${identity.pubkey}">${shortened}</span>
     </div>
   `
 }
