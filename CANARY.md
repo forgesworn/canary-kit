@@ -619,7 +619,7 @@ Notes:
 - Vector 5 uses a different context string, demonstrating that the same secret derives
   independent tokens per context.
 - Vector 6: `airport` is distinct from `net` — no collision re-derivation needed.
-- Vector 7: `0325` is distinct from `2796` — no collision re-derivation needed.
+- Vector 7: `0973` is distinct from `2818` — no collision re-derivation needed.
 - Vectors 8–9: Round-trip verification confirms correct classification of normal tokens
   as `valid` and duress tokens as `duress` with the correct identity.
 - Vectors 11–12: Directional pair — same secret, different context strings produce
