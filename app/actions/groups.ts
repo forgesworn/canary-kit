@@ -10,7 +10,7 @@ import {
 } from 'canary-kit'
 
 import { getState, update, updateGroup } from '../state.js'
-import { broadcastAction } from '../sync.js'
+import { broadcastAction, reRegisterGroup } from '../sync.js'
 import type { AppGroup } from '../types.js'
 
 function hexToBytes(hex: string): Uint8Array {
@@ -29,7 +29,7 @@ function hexToBytes(hex: string): Uint8Array {
  * @param preset       Named threat-profile preset ('family' | 'field-ops' | 'enterprise').
  * @param memberPubkey Optional 64-char hex pubkey to add as the first member.
  */
-export function createNewGroup(name: string, preset: PresetName, memberPubkey?: string): string {
+export function createNewGroup(name: string, preset: PresetName, memberPubkey?: string, mode: 'offline' | 'online' = 'offline'): string {
   const id = crypto.randomUUID()
 
   const members: string[] = memberPubkey ? [memberPubkey] : []
@@ -38,8 +38,9 @@ export function createNewGroup(name: string, preset: PresetName, memberPubkey?: 
   const appGroup: AppGroup = {
     ...sdkGroup,
     id,
-    nostrEnabled: true,
-    relays: ['wss://relay.trotters.cc/'],
+    mode,
+    nostrEnabled: mode === 'online',
+    relays: mode === 'online' ? [...getState().settings.defaultRelays] : [],
     encodingFormat: 'words',
     usedInvites: [],
     livenessInterval: sdkGroup.rotationInterval,
@@ -92,6 +93,12 @@ export function reseedGroup(id: string): void {
 
   const reseeded = reseed(group)
   updateGroup(id, reseeded)
+
+  // Re-register transport with new seed BEFORE broadcasting,
+  // so the reseed message is encrypted under the new key.
+  // The removed member (who has the old key) cannot decrypt it.
+  reRegisterGroup(id)
+
   broadcastAction(id, { type: 'reseed', seed: hexToBytes(reseeded.seed), counter: reseeded.counter, timestamp: Math.floor(Date.now() / 1000) })
 }
 

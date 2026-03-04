@@ -68,6 +68,22 @@ export function broadcastAction(groupId: string, message: SyncMessage): void {
 }
 
 /**
+ * Re-register a group's encryption key with the transport after a reseed.
+ * Unregisters the old key, then registers with the new seed so subsequent
+ * broadcasts are encrypted under the new group key.
+ */
+export function reRegisterGroup(groupId: string): void {
+  if (!(_transport instanceof NostrSyncTransport)) return
+  const { identity, groups } = getState()
+  const group = groups[groupId]
+  if (!identity?.privkey || !group?.seed) return
+
+  _transport.unregisterGroup(groupId)
+  const signer = new GroupSigner(group.seed, identity.privkey)
+  _transport.registerGroup(groupId, group.seed, signer)
+}
+
+/**
  * Subscribe to incoming sync messages for a group.
  * Applies received messages to group state via the pure applySyncMessage function.
  */
