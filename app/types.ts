@@ -16,6 +16,8 @@ export interface AppGroup extends GroupState {
   encodingFormat: 'words' | 'pin' | 'hex'
   /** Nonces of invites that have already been consumed. */
   usedInvites: string[]
+  /** Most recent accepted invite issue time (unix seconds). Used to reject stale invite rollbacks. */
+  latestInviteIssuedAt: number
   /** Dead man's switch check-in interval in seconds. */
   livenessInterval: number
   /** Last check-in unix timestamp per member pubkey. */
