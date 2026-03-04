@@ -298,6 +298,9 @@ function render(): void {
 // ── Modal: create group ────────────────────────────────────────
 
 function showCreateGroupModal(): void {
+  const { identity } = getState()
+  const knownName = identity?.displayName && identity.displayName !== 'You' ? identity.displayName : ''
+
   const content = `
     <h2 class="modal__title">New Group</h2>
     <label class="input-label">
@@ -311,6 +314,7 @@ function showCreateGroupModal(): void {
         autofocus
       />
     </label>
+    ${!knownName ? `
     <label class="input-label">
       <span>Your name</span>
       <input
@@ -320,6 +324,7 @@ function showCreateGroupModal(): void {
         placeholder="e.g. Alice"
       />
     </label>
+    ` : ''}
     <fieldset class="segmented" style="margin-top: 0.5rem;">
       <legend class="input-label__text" style="margin-bottom: 0.25rem;">Preset</legend>
       <button type="button" class="segmented__btn segmented__btn--active" data-preset="family">Family</button>
@@ -336,10 +341,9 @@ function showCreateGroupModal(): void {
   showModal(content, (formData) => {
     const name = (formData.get('name') as string | null)?.trim() ?? ''
     if (!name) return
-    const myName = (formData.get('myname') as string | null)?.trim() ?? ''
+    const myName = knownName || (formData.get('myname') as string | null)?.trim() || ''
     const activeBtn = document.querySelector<HTMLButtonElement>('.segmented__btn.segmented__btn--active[data-preset]')
     const preset = (activeBtn?.dataset.preset ?? 'family') as 'family' | 'field-ops' | 'enterprise' | 'event'
-    const { identity } = getState()
     const groupId = createNewGroup(name, preset, identity?.pubkey)
     if (myName && identity?.pubkey) {
       const group = getState().groups[groupId]
@@ -394,15 +398,19 @@ function wireGlobalEvents(): void {
 
   document.addEventListener('canary:join-group', (evt) => {
     const prefill = (evt as CustomEvent<{ payload?: string }>).detail?.payload ?? ''
+    const { identity: joinIdentity } = getState()
+    const joinKnownName = joinIdentity?.displayName && joinIdentity.displayName !== 'You' ? joinIdentity.displayName : ''
 
     showModal(`
       <h2 class="modal__title">Join Group</h2>
       <label class="input-label">Invite String
         <textarea name="payload" class="input" rows="3" placeholder="Paste the invite string here" required>${prefill}</textarea>
       </label>
+      ${!joinKnownName ? `
       <label class="input-label">Your name
         <input name="myname" class="input" placeholder="e.g. Alice">
       </label>
+      ` : ''}
       <label class="input-label">Confirmation Code
         <input name="code" class="input" placeholder="6-character code" maxlength="6" required>
       </label>
@@ -414,7 +422,7 @@ function wireGlobalEvents(): void {
       try {
         const payload = form.get('payload') as string
         const code = form.get('code') as string
-        const myName = (form.get('myname') as string | null)?.trim() ?? ''
+        const myName = joinKnownName || (form.get('myname') as string | null)?.trim() || ''
         const data = acceptInvite(payload.trim(), code.trim() || undefined)
 
         // Use the shared group ID from the invite so relay sync events match
