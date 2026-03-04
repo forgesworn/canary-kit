@@ -253,9 +253,20 @@ function showIdentityPopover(anchor: HTMLElement): void {
         ${demoAccountsHtml}
       </div>
     </div>
+
+    <div class="identity-popover__divider"></div>
+    <button class="btn btn--sm" id="identity-logout-btn" type="button" style="width: 100%; color: var(--failed);">Logout</button>
   `
 
   anchor.parentElement?.appendChild(popover)
+
+  // Logout
+  popover.querySelector('#identity-logout-btn')?.addEventListener('click', () => {
+    teardownSync()
+    update({ identity: null, groups: {}, activeGroupId: null })
+    popover.remove()
+    window.location.reload()
+  })
 
   // nsec login via form submit (avoids "password not in form" warning)
   popover.querySelector<HTMLFormElement>('#nsec-login-form')?.addEventListener('submit', (e) => {
