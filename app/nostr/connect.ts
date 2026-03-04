@@ -1,17 +1,11 @@
-// app/nostr/connect.ts — Lazy-loads nostr-tools from CDN and manages relay pool
+// app/nostr/connect.ts — Manages relay pool using nostr-tools
 
-const NOSTR_TOOLS_URL = 'https://esm.sh/nostr-tools@latest'
+import { SimplePool } from 'nostr-tools/pool'
 
-let _pool: any = null
+let _pool: SimplePool | null = null
 let _connected = false
 let _relayCount = 0
-
-// ── CDN loader ─────────────────────────────────────────────────
-
-/** Lazily import nostr-tools from CDN. Cached after first call. */
-export async function loadNostrTools(): Promise<any> {
-  return import(/* @vite-ignore */ NOSTR_TOOLS_URL)
-}
+let _relayUrls: string[] = []
 
 // ── Pool management ────────────────────────────────────────────
 
@@ -19,32 +13,36 @@ export async function loadNostrTools(): Promise<any> {
  * Connect to the given relay URLs using a SimplePool.
  * Idempotent: if already connected, closes the old pool first.
  */
-export async function connectRelays(relayUrls: string[]): Promise<void> {
+export function connectRelays(relayUrls: string[]): void {
   if (_pool) {
-    _pool.close?.()
+    _pool.close(_relayUrls)
     _pool = null
     _connected = false
     _relayCount = 0
+    _relayUrls = []
   }
 
   if (relayUrls.length === 0) return
 
-  const nostrTools = await loadNostrTools()
-  _pool = new nostrTools.SimplePool()
+  _pool = new SimplePool()
   _connected = true
   _relayCount = relayUrls.length
+  _relayUrls = [...relayUrls]
 }
 
 /** Disconnect and destroy the relay pool. */
-export async function disconnectRelays(): Promise<void> {
-  _pool?.close?.()
+export function disconnectRelays(): void {
+  if (_pool) {
+    _pool.close(_relayUrls)
+  }
   _pool = null
   _connected = false
   _relayCount = 0
+  _relayUrls = []
 }
 
 // ── Accessors ──────────────────────────────────────────────────
 
-export function getPool(): any { return _pool }
+export function getPool(): SimplePool | null { return _pool }
 export function isConnected(): boolean { return _connected }
 export function getRelayCount(): number { return _relayCount }

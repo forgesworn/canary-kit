@@ -4,6 +4,7 @@ import type { SyncTransport, SyncMessage, EventSigner } from 'canary-kit/sync'
 import { encodeSyncMessage, decodeSyncMessage } from 'canary-kit/sync'
 import { KINDS } from 'canary-kit/nostr'
 import { getPool, isConnected, connectRelays } from './connect.js'
+import type { SimplePool } from 'nostr-tools/pool'
 
 /** Map sync message types to Nostr event kinds. */
 function messageToKind(type: SyncMessage['type']): number {
@@ -38,7 +39,7 @@ export class NostrSyncTransport implements SyncTransport {
   ) {}
 
   async send(groupId: string, message: SyncMessage, recipients: string[]): Promise<void> {
-    if (!isConnected()) await connectRelays(this.relays)
+    if (!isConnected()) connectRelays(this.relays)
     const pool = getPool()
     if (!pool) return
 
@@ -50,16 +51,22 @@ export class NostrSyncTransport implements SyncTransport {
     for (const recipientPubkey of recipients) {
       if (recipientPubkey === this.signer.pubkey) continue // don't send to self
 
-      const encrypted = await this.signer.encrypt(payload, recipientPubkey)
+      try {
+        const encrypted = await this.signer.encrypt(payload, recipientPubkey)
 
-      const tags: string[][] = [
-        ['p', recipientPubkey],
-        ['e', groupId],
-      ]
+        const tags: string[][] = [
+          ['p', recipientPubkey],
+          ['e', groupId],
+        ]
 
-      const unsigned = { kind, content: encrypted, tags, created_at }
-      const signed = await this.signer.sign(unsigned)
-      await pool.publish(this.relays, signed)
+        const unsigned = { kind, content: encrypted, tags, created_at }
+        const signed = await this.signer.sign(unsigned)
+        console.info('[canary:sync] Publishing event:', { kind, tags, recipientPubkey: recipientPubkey.slice(0, 8) })
+        await pool.publish(this.relays, signed)
+        console.info('[canary:sync] Published OK')
+      } catch (err) {
+        console.error('[canary:sync] Publish failed for', recipientPubkey.slice(0, 8), err)
+      }
     }
   }
 
@@ -67,15 +74,16 @@ export class NostrSyncTransport implements SyncTransport {
     const pool = getPool()
     if (!pool) return () => {}
 
+    const filter = {
+      kinds: SUBSCRIBE_KINDS,
+      '#e': [groupId],
+      since: Math.floor(Date.now() / 1000) - 3600, // last hour on connect
+    }
+    console.info('[canary:sync] Subscribing with filter:', filter)
+
     const sub = pool.subscribeMany(
       this.relays,
-      [
-        {
-          kinds: SUBSCRIBE_KINDS,
-          '#e': [groupId],
-          since: Math.floor(Date.now() / 1000) - 3600, // last hour on connect
-        },
-      ],
+      filter,
       {
         onevent: async (event: any) => {
           try {

@@ -33,9 +33,7 @@ import { renderCallSimulation, destroyCallSimulation } from './views/call-simula
 import { acceptInvite } from './invite.js'
 import type { PresetName } from 'canary-kit'
 import { resolveSigner } from './nostr/signer.js'
-import { NostrSyncTransport } from './nostr/adapter.js'
-import { initSync, subscribeToAllGroups, teardownSync } from './sync.js'
-import { connectRelays, isConnected, getRelayCount } from './nostr/connect.js'
+import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
 import type { AppIdentity } from './types.js'
 
 // ── Storage bootstrap ──────────────────────────────────────────
@@ -338,7 +336,12 @@ function showCreateGroupModal(): void {
     const preset = (formData.get('preset') as PresetName | null) ?? 'family'
     if (!name) return
     const { identity } = getState()
-    createNewGroup(name, preset, identity?.pubkey)
+    const groupId = createNewGroup(name, preset, identity?.pubkey)
+    // Boot sync for the new group (relay is pre-configured)
+    const newGroup = getState().groups[groupId]
+    if (newGroup?.relays?.length) {
+      void ensureTransport(newGroup.relays, groupId)
+    }
   })
 
   // Wire Cancel button (after the dialog is in the DOM).
@@ -405,22 +408,44 @@ function wireGlobalEvents(): void {
         const code = form.get('code') as string
         const data = acceptInvite(payload.trim(), code.trim() || undefined)
 
-        const id = crypto.randomUUID()
+        // Use the shared group ID from the invite so relay sync events match
+        const id = data.groupId ?? crypto.randomUUID()
+        const hasRelays = (data.relays?.length ?? 0) > 0
+
+        // Add our own pubkey to the members list
+        const { identity } = getState()
+        const members = [...(data.members ?? [])]
+        if (identity?.pubkey && !members.includes(identity.pubkey)) {
+          members.push(identity.pubkey)
+        }
+
         const appGroup = {
           ...data,
           id,
           name: data.groupName,
-          nostrEnabled: false,
-          relays: [],
-          encodingFormat: 'words' as const,
+          members,
+          nostrEnabled: hasRelays,
+          relays: data.relays ?? [],
+          encodingFormat: (data.encodingFormat ?? 'words') as 'words' | 'pin' | 'hex',
           usedInvites: [data.nonce],
           livenessInterval: data.rotationInterval,
           livenessCheckins: {},
-          tolerance: 1,
+          tolerance: data.tolerance ?? 1,
           createdAt: Math.floor(Date.now() / 1000),
         }
         const groups = { ...getState().groups, [id]: appGroup }
         update({ groups, activeGroupId: id })
+
+        // Boot relay sync for this group and announce ourselves
+        if (hasRelays && identity) {
+          void ensureTransport(data.relays!, id).then(() => {
+            broadcastAction(id, {
+              type: 'member-join',
+              pubkey: identity.pubkey,
+              timestamp: Math.floor(Date.now() / 1000),
+            })
+          })
+        }
 
         const dialog = document.getElementById('app-modal') as HTMLDialogElement | null
         dialog?.close()
@@ -514,8 +539,7 @@ async function ensureLocalIdentity(): Promise<void> {
 // ── Relay sync boot ────────────────────────────────────────────
 
 async function bootSync(): Promise<void> {
-  const { identity, groups } = getState()
-  if (!identity) return
+  const { groups } = getState()
 
   // Collect unique relays from all groups
   const allRelays = new Set<string>()
@@ -526,24 +550,8 @@ async function bootSync(): Promise<void> {
   }
   if (allRelays.size === 0) return
 
-  const relayUrls = Array.from(allRelays)
-
-  try {
-    await connectRelays(relayUrls)
-
-    const resolved = await resolveSigner({
-      pubkey: identity.pubkey,
-      privkey: identity.privkey,
-    })
-
-    const transport = new NostrSyncTransport(relayUrls, resolved.signer)
-    initSync(transport)
-    subscribeToAllGroups()
-    updateRelayStatus(true, getRelayCount())
-  } catch (err) {
-    console.warn('[canary:sync] Failed to boot sync:', err)
-    updateRelayStatus(false, 0)
-  }
+  await ensureTransport(Array.from(allRelays))
+  subscribeToAllGroups()
 }
 
 // ── Bootstrap ──────────────────────────────────────────────────

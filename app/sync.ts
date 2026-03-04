@@ -3,6 +3,10 @@
 import type { SyncTransport, SyncMessage } from 'canary-kit/sync'
 import { applySyncMessage } from 'canary-kit/sync'
 import { getState, updateGroup } from './state.js'
+import { connectRelays, isConnected, getRelayCount } from './nostr/connect.js'
+import { resolveSigner } from './nostr/signer.js'
+import { NostrSyncTransport } from './nostr/adapter.js'
+import { updateRelayStatus } from './components/header.js'
 
 let _transport: SyncTransport | null = null
 const _unsubscribers = new Map<string, () => void>()
@@ -15,6 +19,38 @@ export function initSync(transport: SyncTransport): void {
 /** Get the current transport (or null if not initialised). */
 export function getTransport(): SyncTransport | null {
   return _transport
+}
+
+/**
+ * Ensure a sync transport is active for the given relays.
+ * Creates one if none exists, then subscribes to the specified group.
+ * Used by settings panel, invite acceptance, and startup.
+ */
+export async function ensureTransport(relays: string[], groupId?: string): Promise<void> {
+  const { identity } = getState()
+  if (!identity || relays.length === 0) return
+
+  try {
+    connectRelays(relays)
+
+    if (!_transport) {
+      const resolved = await resolveSigner({
+        pubkey: identity.pubkey,
+        privkey: identity.privkey,
+      })
+      const transport = new NostrSyncTransport(relays, resolved.signer)
+      initSync(transport)
+    }
+
+    if (groupId) {
+      subscribeToGroup(groupId)
+    }
+
+    updateRelayStatus(isConnected(), getRelayCount())
+  } catch (err) {
+    console.warn('[canary:sync] ensureTransport failed:', err)
+    updateRelayStatus(false, 0)
+  }
 }
 
 /**

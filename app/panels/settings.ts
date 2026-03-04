@@ -2,8 +2,8 @@
 
 import { getState, updateGroup, update } from '../state.js'
 import { deleteGroup, reseedGroup } from '../actions/groups.js'
-import { connectRelays, disconnectRelays, isConnected, getRelayCount } from '../nostr/connect.js'
-import { subscribeToGroup, teardownSync } from '../sync.js'
+import { disconnectRelays, isConnected, getRelayCount } from '../nostr/connect.js'
+import { ensureTransport, teardownSync } from '../sync.js'
 import { hasNip07 } from '../nostr/signer.js'
 import { updateRelayStatus } from '../components/header.js'
 
@@ -190,18 +190,15 @@ export function renderSettings(container: HTMLElement): void {
 
     if (enabled) {
       const relays = getState().groups[activeGroupId!]?.relays ?? []
-      void connectRelays(relays).then(() => {
-        updateRelayStatus(isConnected(), getRelayCount())
+      void ensureTransport(relays, activeGroupId!).then(() => {
         updateNostrConnectionStatus()
-        if (activeGroupId) subscribeToGroup(activeGroupId)
       })
       void populateNostrIdentity()
     } else {
       teardownSync()
-      void disconnectRelays().then(() => {
-        updateRelayStatus(false, 0)
-        updateNostrConnectionStatus()
-      })
+      disconnectRelays()
+      updateRelayStatus(false, 0)
+      updateNostrConnectionStatus()
     }
   })
 
@@ -216,10 +213,7 @@ export function renderSettings(container: HTMLElement): void {
       updateGroup(activeGroupId!, { relays })
       // Reconnect with updated relay list if Nostr is enabled.
       if (getState().groups[activeGroupId!]?.nostrEnabled) {
-        void connectRelays(relays).then(() => {
-          updateRelayStatus(isConnected(), getRelayCount())
-          if (activeGroupId) subscribeToGroup(activeGroupId)
-        })
+        void ensureTransport(relays, activeGroupId!)
       }
     })
   })
@@ -238,10 +232,7 @@ export function renderSettings(container: HTMLElement): void {
       updateGroup(activeGroupId!, { relays })
       input.value = ''
       if (getState().groups[activeGroupId!]?.nostrEnabled) {
-        void connectRelays(relays).then(() => {
-          updateRelayStatus(isConnected(), getRelayCount())
-          if (activeGroupId) subscribeToGroup(activeGroupId)
-        })
+        void ensureTransport(relays, activeGroupId!)
       }
     } else {
       input.value = ''

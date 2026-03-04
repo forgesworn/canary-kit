@@ -7,6 +7,8 @@ import type { AppGroup } from './types.js'
 
 /** Serialisable invite payload passed between devices. */
 export interface InvitePayload {
+  /** Shared group identifier — both inviter and receiver use this so relay sync works. */
+  groupId: string
   seed: string
   groupName: string
   rotationInterval: number
@@ -19,6 +21,12 @@ export interface InvitePayload {
   beaconInterval: number
   beaconPrecision: number
   members: string[]
+  /** Relay URLs so the receiver can sync immediately. */
+  relays: string[]
+  /** Encoding format preference. */
+  encodingFormat: 'words' | 'pin' | 'hex'
+  /** Tolerance window. */
+  tolerance: number
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -58,6 +66,7 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
   const nonce = randomNonce()
 
   const invitePayload: InvitePayload = {
+    groupId: group.id,
     seed: group.seed,
     groupName: group.name,
     rotationInterval: group.rotationInterval,
@@ -69,6 +78,9 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
     beaconInterval: group.beaconInterval,
     beaconPrecision: group.beaconPrecision,
     members: [...group.members],
+    relays: [...(group.relays ?? [])],
+    encodingFormat: group.encodingFormat ?? 'words',
+    tolerance: group.tolerance ?? 1,
   }
 
   const payload = btoa(JSON.stringify(invitePayload))

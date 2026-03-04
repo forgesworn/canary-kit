@@ -1,7 +1,22 @@
 // app/nostr/signer.ts — EventSigner implementations: NIP-07 and local keypair
 
 import type { EventSigner } from 'canary-kit/sync'
-import { loadNostrTools } from './connect.js'
+import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure'
+import { encrypt as nip44encrypt, decrypt as nip44decrypt, getConversationKey } from 'nostr-tools/nip44'
+
+// ── Helpers ───────────────────────────────────────────────────
+
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16)
+  }
+  return bytes
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
 
 // ── NIP-07 Signer ──────────────────────────────────────────────
 
@@ -32,32 +47,21 @@ export class LocalKeySigner implements EventSigner {
   ) {}
 
   async sign(event: unknown): Promise<unknown> {
-    const nt = await loadNostrTools()
-    const privkeyBytes = hexToBytes(this.privkeyHex)
-    return nt.finalizeEvent(event, privkeyBytes)
+    const sk = hexToBytes(this.privkeyHex)
+    return finalizeEvent(event as any, sk)
   }
 
   async encrypt(plaintext: string, recipientPubkey: string): Promise<string> {
-    const nt = await loadNostrTools()
-    const privkeyBytes = hexToBytes(this.privkeyHex)
-    const conversationKey = nt.nip44.v2.utils.getConversationKey(privkeyBytes, recipientPubkey)
-    return nt.nip44.v2.encrypt(plaintext, conversationKey)
+    const sk = hexToBytes(this.privkeyHex)
+    const ck = getConversationKey(sk, recipientPubkey)
+    return nip44encrypt(plaintext, ck)
   }
 
   async decrypt(ciphertext: string, senderPubkey: string): Promise<string> {
-    const nt = await loadNostrTools()
-    const privkeyBytes = hexToBytes(this.privkeyHex)
-    const conversationKey = nt.nip44.v2.utils.getConversationKey(privkeyBytes, senderPubkey)
-    return nt.nip44.v2.decrypt(ciphertext, conversationKey)
+    const sk = hexToBytes(this.privkeyHex)
+    const ck = getConversationKey(sk, senderPubkey)
+    return nip44decrypt(ciphertext, ck)
   }
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2)
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16)
-  }
-  return bytes
 }
 
 // ── Signer resolution ──────────────────────────────────────────
@@ -96,10 +100,9 @@ export async function resolveSigner(
   }
 
   // Generate new keypair
-  const nt = await loadNostrTools()
-  const privkeyBytes = nt.generateSecretKey()
-  const pubkey = nt.getPublicKey(privkeyBytes)
-  const privkey = Array.from(privkeyBytes as Uint8Array, (b: number) => b.toString(16).padStart(2, '0')).join('')
+  const sk = generateSecretKey()
+  const pubkey = getPublicKey(sk)
+  const privkey = bytesToHex(sk)
   return {
     signer: new LocalKeySigner(pubkey, privkey),
     signerType: 'local',
