@@ -1,9 +1,9 @@
-// app/panels/beacons.ts — Beacons panel: MapLibre map with member location markers
+// app/panels/beacons.ts — Beacons panel: MapLibre map with geohash area circles
 
 import { getState } from '../state.js'
 import { broadcastAction } from '../sync.js'
 import { deriveBeaconKey, encryptBeacon } from 'canary-kit'
-import { encode, decode } from 'geohash-kit'
+import { encode, decode, precisionToRadius } from 'geohash-kit'
 
 let map: any = null
 let maplibreLoaded = false
@@ -11,20 +11,53 @@ let markers: Record<string, any> = {}
 let positions: Record<string, { lat: number; lon: number; geohash: string; precision: number; timestamp: number }> = {}
 let encryptedPayloads: Record<string, string> = {}
 let geoWatchId: number | null = null
+let duressMembers = new Set<string>()
+let mapReady = false
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js'
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css'
 
+// ── Circle geometry helper ────────────────────────────────────
+
+const EARTH_RADIUS = 6_371_000 // metres
+
+/** Generate a GeoJSON polygon approximating a circle on the map. */
+function circlePolygon(lat: number, lon: number, radiusM: number, segments = 48): [number, number][] {
+  const coords: [number, number][] = []
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * 2 * Math.PI
+    const dLat = (radiusM / EARTH_RADIUS) * Math.cos(angle) * (180 / Math.PI)
+    const dLon = (radiusM / (EARTH_RADIUS * Math.cos(lat * Math.PI / 180))) * Math.sin(angle) * (180 / Math.PI)
+    coords.push([lon + dLon, lat + dLat])
+  }
+  return coords
+}
+
+/** Build GeoJSON FeatureCollection for all member circles. */
+function buildCircleFeatures(): any {
+  return {
+    type: 'FeatureCollection',
+    features: Object.entries(positions).map(([pubkey, pos]) => ({
+      type: 'Feature',
+      properties: { pubkey, duress: duressMembers.has(pubkey) },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [circlePolygon(pos.lat, pos.lon, precisionToRadius(pos.precision))],
+      },
+    })),
+  }
+}
+
+// ── MapLibre loading ──────────────────────────────────────────
+
 async function loadMapLibre(): Promise<void> {
   if (maplibreLoaded) return
 
-  // Load CSS
   const link = document.createElement('link')
   link.rel = 'stylesheet'
   link.href = MAPLIBRE_CSS
   document.head.appendChild(link)
 
-  // Load JS
   await new Promise<void>((resolve, reject) => {
     const script = document.createElement('script')
     script.src = MAPLIBRE_JS
@@ -36,10 +69,12 @@ async function loadMapLibre(): Promise<void> {
   maplibreLoaded = true
 }
 
+// ── Render ────────────────────────────────────────────────────
+
 export async function renderBeacons(container: HTMLElement): Promise<void> {
   const { groups, activeGroupId } = getState()
   if (!activeGroupId || !groups[activeGroupId]) {
-    if (map) { map.remove(); map = null }
+    if (map) { map.remove(); map = null; mapReady = false }
     container.innerHTML = ''
     return
   }
@@ -51,8 +86,9 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
   container.innerHTML = `
     <section class="panel beacon-panel">
       <h3 class="panel__title">Location</h3>
+      <p class="settings-hint" style="margin-bottom: 0.5rem;">Approximate location of group members. Circles show the geohash area — your exact position is never shared, only which neighbourhood you're in. Circles turn <span style="color: #f87171; font-weight: 500;">red</span> when a duress signal is active.</p>
       <div class="beacon-map" id="beacon-map" style="height: 500px; border-radius: 8px;"></div>
-      ${geoWatchId === null ? '<button class="btn btn--primary" id="beacon-share-btn" type="button">Share Location</button>' : ''}
+      ${geoWatchId === null ? '<button class="btn btn--primary" id="beacon-share-btn" type="button" style="margin-top: 0.5rem;">Share Location</button>' : ''}
       <div class="beacon-list" id="beacon-list"></div>
     </section>
   `
@@ -88,7 +124,49 @@ function initMap(): void {
     center: [-0.1278, 51.5074], // London default
     zoom: 12,
   })
+
+  map.on('load', () => {
+    mapReady = true
+
+    // Add GeoJSON source for geohash area circles
+    map.addSource('geohash-circles', {
+      type: 'geojson',
+      data: buildCircleFeatures(),
+    })
+
+    // Fill layer — amber for normal, red for duress
+    map.addLayer({
+      id: 'geohash-fill',
+      type: 'fill',
+      source: 'geohash-circles',
+      paint: {
+        'fill-color': ['case', ['get', 'duress'], '#f87171', '#f59e0b'],
+        'fill-opacity': ['case', ['get', 'duress'], 0.25, 0.12],
+      },
+    })
+
+    // Stroke layer
+    map.addLayer({
+      id: 'geohash-stroke',
+      type: 'line',
+      source: 'geohash-circles',
+      paint: {
+        'line-color': ['case', ['get', 'duress'], '#f87171', '#f59e0b'],
+        'line-width': 2,
+        'line-opacity': ['case', ['get', 'duress'], 0.8, 0.5],
+      },
+    })
+  })
 }
+
+/** Update the GeoJSON source with current positions and duress state. */
+function refreshCircles(): void {
+  if (!map || !mapReady) return
+  const source = map.getSource('geohash-circles')
+  if (source) source.setData(buildCircleFeatures())
+}
+
+// ── Beacon watch ──────────────────────────────────────────────
 
 function startBeaconWatch(): void {
   if (geoWatchId !== null) return
@@ -117,6 +195,7 @@ function startBeaconWatch(): void {
         encryptedPayloads[identity.pubkey] = encrypted
         positions[identity.pubkey] = { lat, lon, geohash, precision: geohashPrecision, timestamp: Math.floor(Date.now() / 1000) }
         updateMapMarker(identity.pubkey, lat, lon)
+        refreshCircles()
         fitMapToMarkers()
         updateBeaconList()
 
@@ -137,19 +216,23 @@ function startBeaconWatch(): void {
   )
 }
 
+// ── Markers (small center dots) ───────────────────────────────
+
 function updateMapMarker(pubkey: string, lat: number, lon: number): void {
   if (!map) return
   const maplibregl = (window as any).maplibregl
+  const isDuress = duressMembers.has(pubkey)
 
   if (markers[pubkey]) {
     markers[pubkey].setLngLat([lon, lat])
   } else {
     const el = document.createElement('div')
-    el.style.width = '12px'
-    el.style.height = '12px'
+    el.style.width = '10px'
+    el.style.height = '10px'
     el.style.borderRadius = '50%'
-    el.style.background = '#f59e0b'
+    el.style.background = isDuress ? '#f87171' : '#f59e0b'
     el.style.border = '2px solid #0a0e17'
+    el.style.zIndex = '2'
     markers[pubkey] = new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map)
   }
 }
@@ -177,17 +260,17 @@ function updateBeaconList(): void {
 
   const entries = Object.entries(positions).map(([pk, pos]) => {
     const encrypted = encryptedPayloads[pk]
-    const truncated = encrypted ? encrypted.slice(0, 24) + '…' : 'n/a'
+    const truncated = encrypted ? encrypted.slice(0, 24) + '\u2026' : 'n/a'
     return `
       <div class="beacon-entry">
-        <span class="beacon-member">${pk.slice(0, 8)}…</span>
+        <span class="beacon-member">${pk.slice(0, 8)}\u2026</span>
         <span class="beacon-geohash">${pos.geohash}</span>
         <span class="beacon-encrypted" title="${encrypted ?? ''}">${truncated}</span>
       </div>
     `
   }).join('')
 
-  listEl.innerHTML = entries || '<p class="settings-hint">No beacons yet — enable location to start</p>'
+  listEl.innerHTML = entries || '<p class="settings-hint">No beacons yet \u2014 enable location to start</p>'
 }
 
 // ── Duress event listener ───────────────────────────────────────
@@ -195,13 +278,19 @@ function updateBeaconList(): void {
 document.addEventListener('canary:duress', ((e: CustomEvent) => {
   const { members } = e.detail
   if (!members?.length) return
+
   for (const pk of members) {
+    duressMembers.add(pk)
     setMarkerDuress(pk)
   }
+
+  // Refresh circle colours to red for duress members
+  refreshCircles()
+
   // Fit map to duress members' positions
   const duressPositions = members.map((pk: string) => positions[pk]).filter(Boolean)
   if (map && duressPositions.length === 1) {
-    map.flyTo({ center: [duressPositions[0].lon, duressPositions[0].lat], zoom: 16 })
+    map.flyTo({ center: [duressPositions[0].lon, duressPositions[0].lat], zoom: 14 })
   } else if (map && duressPositions.length > 1) {
     const lngs = duressPositions.map((p: any) => p.lon)
     const lats = duressPositions.map((p: any) => p.lat)
@@ -217,16 +306,18 @@ function setMarkerDuress(pubkey: string): void {
   if (!m) return
   const el = m.getElement()
   el.style.background = '#f87171'
-  el.style.width = '18px'
-  el.style.height = '18px'
+  el.style.width = '14px'
+  el.style.height = '14px'
   el.style.boxShadow = '0 0 12px rgba(248, 113, 113, 0.6)'
 }
 
 export function cleanupBeacons(): void {
   if (geoWatchId !== null) navigator.geolocation.clearWatch(geoWatchId)
   geoWatchId = null
+  mapReady = false
   if (map) { map.remove(); map = null }
   markers = {}
   positions = {}
   encryptedPayloads = {}
+  duressMembers.clear()
 }

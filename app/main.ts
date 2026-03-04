@@ -182,8 +182,8 @@ function buildShell(): void {
         <div class="panels-grid">
           <div id="verify-container"></div>
           <div id="members-container"></div>
-          <div id="beacon-container"></div>
         </div>
+        <div id="beacon-container"></div>
         <div id="liveness-container"></div>
         <div id="settings-container"></div>
       </main>

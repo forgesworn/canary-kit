@@ -1,6 +1,8 @@
-// app/components/header.ts — Header component: brand, theme toggle, relay status
+// app/components/header.ts — Header component: brand, theme toggle, relay status, identity
 
 import { getState, update } from '../state.js'
+import { hasNip07, resolveSigner, Nip07Signer } from '../nostr/signer.js'
+import type { AppIdentity } from '../types.js'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -50,6 +52,10 @@ export function renderHeader(container: HTMLElement): void {
       <button class="header__nav-tab${view === 'call-demo' ? ' header__nav-tab--active' : ''}" data-view="call-demo">Call Demo</button>
     </nav>
     <div class="header__actions">
+      <button class="header__identity-btn" id="identity-btn" title="Identity">
+        <span class="header__identity-dot" id="identity-dot"></span>
+        <span class="header__identity-label" id="identity-label">...</span>
+      </button>
       <span id="relay-status" hidden>
         <span class="relay-dot"></span>
         <span class="relay-label"></span>
@@ -74,6 +80,11 @@ export function renderHeader(container: HTMLElement): void {
       }
     })
   }
+
+  // ── Identity button ────────────────────────────────────────
+  updateIdentityDisplay()
+  const identityBtn = container.querySelector<HTMLButtonElement>('#identity-btn')
+  identityBtn?.addEventListener('click', () => showIdentityPopover(identityBtn))
 
   const nav = container.querySelector<HTMLElement>('#header-nav')
   nav?.addEventListener('click', (e) => {
@@ -122,4 +133,106 @@ export function flashSyncing(): void {
   indicator.removeAttribute('hidden')
   dot?.setAttribute('class', 'relay-dot relay-dot--syncing')
   if (label) label.textContent = 'Syncing...'
+}
+
+// ── Identity management ─────────────────────────────────────
+
+/** Update the identity indicator in the header. */
+export function updateIdentityDisplay(): void {
+  const dot = document.getElementById('identity-dot')
+  const label = document.getElementById('identity-label')
+  if (!dot || !label) return
+
+  const { identity } = getState()
+  if (!identity?.pubkey) {
+    label.textContent = 'No identity'
+    dot.className = 'header__identity-dot header__identity-dot--none'
+    return
+  }
+
+  const shortPk = `${identity.pubkey.slice(0, 6)}\u2026${identity.pubkey.slice(-4)}`
+  const name = identity.displayName && identity.displayName !== 'You'
+    ? identity.displayName
+    : shortPk
+
+  label.textContent = name
+  dot.className = identity.signerType === 'nip07'
+    ? 'header__identity-dot header__identity-dot--extension'
+    : 'header__identity-dot header__identity-dot--local'
+}
+
+function showIdentityPopover(anchor: HTMLElement): void {
+  // Remove existing popover
+  document.getElementById('identity-popover')?.remove()
+
+  const { identity } = getState()
+  const pk = identity?.pubkey ?? ''
+  const shortPk = pk ? `${pk.slice(0, 8)}\u2026${pk.slice(-8)}` : 'None'
+  const signerLabel = identity?.signerType === 'nip07' ? 'Extension (NIP-07)' : 'Local key'
+  const extensionAvailable = hasNip07()
+
+  const popover = document.createElement('div')
+  popover.id = 'identity-popover'
+  popover.className = 'identity-popover'
+  popover.innerHTML = `
+    <div class="identity-popover__row">
+      <span class="identity-popover__label">Pubkey</span>
+      <span class="identity-popover__value" title="${pk}">${shortPk}</span>
+    </div>
+    <div class="identity-popover__row">
+      <span class="identity-popover__label">Signer</span>
+      <span class="identity-popover__value">${signerLabel}</span>
+    </div>
+    ${identity?.signerType !== 'nip07' && extensionAvailable ? `
+      <button class="btn btn--sm btn--primary" id="nip07-connect-btn" type="button">Use Extension</button>
+    ` : ''}
+    ${identity?.signerType !== 'nip07' && !extensionAvailable ? `
+      <p class="settings-hint" style="margin: 0.5rem 0 0;">No NIP-07 extension detected. Install <a href="https://getalby.com" target="_blank" style="color: var(--amber);">Alby</a> or nos2x to sign with your Nostr identity.</p>
+    ` : ''}
+    ${identity?.signerType === 'nip07' ? `
+      <button class="btn btn--sm" id="nip07-disconnect-btn" type="button">Use Local Key</button>
+    ` : ''}
+  `
+
+  anchor.parentElement?.appendChild(popover)
+
+  // Connect NIP-07
+  popover.querySelector('#nip07-connect-btn')?.addEventListener('click', async () => {
+    try {
+      const pubkey = await (window as any).nostr.getPublicKey()
+      const newIdentity: AppIdentity = {
+        pubkey,
+        signerType: 'nip07',
+        displayName: identity?.displayName ?? 'You',
+      }
+      update({ identity: newIdentity })
+      updateIdentityDisplay()
+      popover.remove()
+    } catch {
+      alert('Extension rejected the request.')
+    }
+  })
+
+  // Disconnect NIP-07
+  popover.querySelector('#nip07-disconnect-btn')?.addEventListener('click', async () => {
+    const resolved = await resolveSigner({ pubkey: '', privkey: identity?.privkey })
+    const newIdentity: AppIdentity = {
+      pubkey: resolved.pubkey,
+      privkey: resolved.privkey,
+      signerType: 'local',
+      displayName: identity?.displayName ?? 'You',
+    }
+    update({ identity: newIdentity })
+    updateIdentityDisplay()
+    popover.remove()
+  })
+
+  // Close on outside click
+  const closeHandler = (e: MouseEvent) => {
+    if (!popover.contains(e.target as Node) && e.target !== anchor) {
+      popover.remove()
+      document.removeEventListener('click', closeHandler)
+    }
+  }
+  requestAnimationFrame(() => document.addEventListener('click', closeHandler))
 }

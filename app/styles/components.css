@@ -131,6 +131,93 @@ button {
   gap: 1rem;
 }
 
+/* ── Identity button ─────────────────────────────────────── */
+
+.header__identity-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease-out);
+  position: relative;
+}
+
+.header__identity-btn:hover {
+  border-color: var(--border-amber);
+}
+
+.header__identity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.header__identity-dot--local {
+  background: var(--duress);
+}
+
+.header__identity-dot--extension {
+  background: var(--verified);
+}
+
+.header__identity-dot--none {
+  background: var(--text-muted);
+}
+
+.header__identity-label {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Identity popover ────────────────────────────────────── */
+
+.identity-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  min-width: 260px;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.identity-popover__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+}
+
+.identity-popover__label {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.identity-popover__value {
+  color: var(--text-primary);
+}
+
+.identity-popover .btn {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
 /* ── Hamburger menu button (mobile only) ─────────────────── */
 
 .header__hamburger {
