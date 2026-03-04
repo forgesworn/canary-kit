@@ -232,7 +232,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
     <div class="identity-popover__section">
       <span class="identity-popover__label">Login with nsec</span>
       <form id="nsec-login-form" autocomplete="off" style="display: flex; flex-direction: column; gap: 0.375rem; margin-top: 0.375rem;">
-        <input class="input" type="password" id="nsec-input" placeholder="nsec1..." style="width: 100%; font-size: 0.8125rem; padding: 0.5rem;" />
+        <input class="input" type="password" id="nsec-input" placeholder="nsec1..." autocomplete="off" style="width: 100%; font-size: 0.8125rem; padding: 0.5rem;" />
         <button class="btn btn--sm btn--primary" type="submit" style="width: 100%;">Login</button>
       </form>
     </div>

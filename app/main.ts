@@ -105,6 +105,7 @@ function showLockScreen(): void {
         inputmode="numeric"
         maxlength="8"
         autofocus
+        autocomplete="off"
         placeholder="••••"
       >
       <p class="lock-screen__error" id="pin-error" hidden>Incorrect PIN. Try again.</p>
@@ -612,7 +613,7 @@ function showLoginScreen(): void {
           <p class="settings-hint" style="margin-bottom: 0.5rem;">Sync groups across devices via relays.</p>
 
           <form id="nsec-login-form" autocomplete="off" style="display: flex; flex-direction: column; gap: 0.375rem;">
-            <input class="input" type="password" id="login-nsec" placeholder="nsec1..." style="width: 100%; font-size: 0.875rem; padding: 0.5rem;" />
+            <input class="input" type="password" id="login-nsec" placeholder="nsec1..." autocomplete="off" style="width: 100%; font-size: 0.875rem; padding: 0.5rem;" />
             <button class="btn btn--primary" type="submit">Login with nsec</button>
           </form>
 
