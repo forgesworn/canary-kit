@@ -230,6 +230,7 @@ describe('integration: encrypt sync message → decrypt → apply', () => {
       lat: 51.5074,
       lon: -0.1278,
       timestamp: Math.floor(Date.now() / 1000),
+      opId: 'test-duress-1',
       protocolVersion: 1,
     }
 

@@ -7,6 +7,7 @@ import {
   canonicaliseSyncMessage,
   PROTOCOL_VERSION,
   FIRE_AND_FORGET_FRESHNESS_SEC,
+  MAX_FUTURE_SKEW_SEC,
   type SyncMessage,
 } from './sync.js'
 import { createGroup } from './group.js'
@@ -54,12 +55,12 @@ describe('sync message serialisation', () => {
   })
 
   it('round-trips a beacon message', () => {
-    const msg: SyncMessage = { type: 'beacon', lat: 51.5074, lon: -0.1278, accuracy: 10, timestamp: 1700000000, protocolVersion: 1 }
+    const msg: SyncMessage = { type: 'beacon', lat: 51.5074, lon: -0.1278, accuracy: 10, timestamp: 1700000000, opId: 'beacon-1', protocolVersion: 1 }
     expect(decodeSyncMessage(encodeSyncMessage(msg))).toEqual(msg)
   })
 
   it('round-trips a duress-alert message', () => {
-    const msg: SyncMessage = { type: 'duress-alert', lat: 51.5074, lon: -0.1278, timestamp: 1700000000, protocolVersion: 1 }
+    const msg: SyncMessage = { type: 'duress-alert', lat: 51.5074, lon: -0.1278, timestamp: 1700000000, opId: 'duress-1', protocolVersion: 1 }
     expect(decodeSyncMessage(encodeSyncMessage(msg))).toEqual(msg)
   })
 
@@ -157,9 +158,10 @@ describe('applySyncMessage', () => {
 
   it('beacon and duress-alert return group unchanged', () => {
     const group = makeGroup()
-    const afterBeacon = applySyncMessage(group, { type: 'beacon', lat: 0, lon: 0, accuracy: 10, timestamp: 0 })
+    const nowSec = Math.floor(Date.now() / 1000)
+    const afterBeacon = applySyncMessage(group, { type: 'beacon', lat: 0, lon: 0, accuracy: 10, timestamp: nowSec, opId: 'b1' }, nowSec)
     expect(afterBeacon).toEqual(group)
-    const afterDuress = applySyncMessage(group, { type: 'duress-alert', lat: 0, lon: 0, timestamp: 0 })
+    const afterDuress = applySyncMessage(group, { type: 'duress-alert', lat: 0, lon: 0, timestamp: nowSec, opId: 'd1' }, nowSec)
     expect(afterDuress).toEqual(group)
   })
 })
@@ -220,6 +222,7 @@ describe('liveness-checkin', () => {
       type: 'liveness-checkin',
       pubkey: 'a'.repeat(64),
       timestamp: 1700000000,
+      opId: 'liveness-1',
       protocolVersion: 1,
     }
     const encoded = encodeSyncMessage(msg)
@@ -245,13 +248,15 @@ describe('liveness-checkin', () => {
       consumedOps: [],
     }
 
+    const nowSec = 1700001000
     const msg: SyncMessage = {
       type: 'liveness-checkin',
       pubkey: 'b'.repeat(64),
-      timestamp: 1700001000,
+      timestamp: nowSec,
+      opId: 'liveness-2',
     }
 
-    const updated = applySyncMessage(group, msg)
+    const updated = applySyncMessage(group, msg, nowSec)
     expect(updated).toEqual(group)
   })
 })
@@ -703,11 +708,19 @@ describe('fire-and-forget freshness gating', () => {
     expect(result).toBe(group)
   })
 
-  it('drops a duress-alert with a future timestamp beyond the freshness window', () => {
+  it('drops a duress-alert with a future timestamp beyond MAX_FUTURE_SKEW_SEC', () => {
     const group = makeGroup()
-    const futureTimestamp = nowSec + FIRE_AND_FORGET_FRESHNESS_SEC + 1
+    const futureTimestamp = nowSec + MAX_FUTURE_SKEW_SEC + 1
     const msg: SyncMessage = { type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: futureTimestamp, opId: 'future-1', protocolVersion: PROTOCOL_VERSION }
     const result = applySyncMessage(group, msg, nowSec, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('accepts a duress-alert with slight future skew within MAX_FUTURE_SKEW_SEC', () => {
+    const group = makeGroup()
+    const msg: SyncMessage = { type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: nowSec + 30, opId: 'future-ok', protocolVersion: PROTOCOL_VERSION }
+    const result = applySyncMessage(group, msg, nowSec, PUBKEY_AAA)
+    // fire-and-forget returns group unchanged (no state mutation) — but accepted means not dropped
     expect(result).toBe(group)
   })
 
@@ -727,7 +740,7 @@ describe('fire-and-forget freshness gating', () => {
 
   it('drops a stale liveness-checkin', () => {
     const group = makeGroup()
-    const msg: SyncMessage = { type: 'liveness-checkin', pubkey: PUBKEY_AAA, timestamp: nowSec - 600, protocolVersion: PROTOCOL_VERSION }
+    const msg: SyncMessage = { type: 'liveness-checkin', pubkey: PUBKEY_AAA, timestamp: nowSec - 600, opId: 'liveness-stale', protocolVersion: PROTOCOL_VERSION }
     const result = applySyncMessage(group, msg, nowSec, PUBKEY_AAA)
     expect(result).toBe(group)
   })
@@ -754,10 +767,19 @@ describe('fire-and-forget opId serialisation', () => {
     expect(decoded).toEqual(msg)
   })
 
-  it('accepts a duress-alert without opId (backward compat)', () => {
-    const msg: SyncMessage = { type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: 1700000000, protocolVersion: PROTOCOL_VERSION }
-    const decoded = decodeSyncMessage(encodeSyncMessage(msg))
-    expect(decoded.type).toBe('duress-alert')
+  it('rejects a duress-alert without opId', () => {
+    const raw = JSON.stringify({ type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: 1700000000, protocolVersion: PROTOCOL_VERSION })
+    expect(() => decodeSyncMessage(raw)).toThrow(/opId/)
+  })
+
+  it('rejects a liveness-checkin without opId', () => {
+    const raw = JSON.stringify({ type: 'liveness-checkin', pubkey: 'a'.repeat(64), timestamp: 1700000000, protocolVersion: PROTOCOL_VERSION })
+    expect(() => decodeSyncMessage(raw)).toThrow(/opId/)
+  })
+
+  it('rejects a beacon without opId', () => {
+    const raw = JSON.stringify({ type: 'beacon', lat: 51.5, lon: -0.1, accuracy: 100, timestamp: 1700000000, protocolVersion: PROTOCOL_VERSION })
+    expect(() => decodeSyncMessage(raw)).toThrow(/opId/)
   })
 
   it('rejects a duress-alert with invalid opId', () => {

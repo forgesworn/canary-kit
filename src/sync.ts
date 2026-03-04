@@ -14,9 +14,9 @@ export type SyncMessage =
   | { type: 'member-leave'; pubkey: string; timestamp: number; epoch?: number; opId?: string; protocolVersion?: number }
   | { type: 'counter-advance'; counter: number; usageOffset: number; timestamp: number; protocolVersion?: number }
   | { type: 'reseed'; seed: Uint8Array; counter: number; timestamp: number; epoch: number; opId: string; admins: string[]; members: string[]; protocolVersion?: number }
-  | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number; opId?: string; protocolVersion?: number }
-  | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId?: string; protocolVersion?: number }
-  | { type: 'liveness-checkin'; pubkey: string; timestamp: number; protocolVersion?: number }
+  | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number; opId: string; protocolVersion?: number }
+  | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId: string; protocolVersion?: number }
+  | { type: 'liveness-checkin'; pubkey: string; timestamp: number; opId: string; protocolVersion?: number }
   | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; timestamp: number; protocolVersion?: number }
 
 const VALID_TYPES = new Set<string>([
@@ -31,6 +31,9 @@ const MAX_BEACON_ACCURACY_METERS = 20_000_000
 
 /** Maximum age (in seconds) for fire-and-forget messages before they are dropped. */
 export const FIRE_AND_FORGET_FRESHNESS_SEC = 300
+
+/** Maximum allowed future skew (in seconds) for fire-and-forget timestamps. */
+export const MAX_FUTURE_SKEW_SEC = 60
 
 /** Current protocol version. Bump on any breaking wire format change. */
 export const PROTOCOL_VERSION = 1
@@ -163,6 +166,9 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (typeof parsed.pubkey !== 'string' || !HEX_64_RE.test(parsed.pubkey)) {
         throw new Error('Invalid sync message: liveness-checkin requires a 64-char hex pubkey')
       }
+      if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
+        throw new Error('Invalid sync message: liveness-checkin requires a non-empty opId (max 128 chars)')
+      }
       break
 
     case 'counter-advance':
@@ -209,9 +215,8 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (!isFiniteNumber(parsed.accuracy) || parsed.accuracy < 0 || parsed.accuracy > MAX_BEACON_ACCURACY_METERS) {
         throw new Error('Invalid sync message: beacon requires a non-negative accuracy')
       }
-      // opId is optional for backward compat with older clients
-      if (parsed.opId !== undefined && (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128)) {
-        throw new Error('Invalid sync message: beacon.opId must be a non-empty string (max 128 chars)')
+      if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
+        throw new Error('Invalid sync message: beacon requires a non-empty opId (max 128 chars)')
       }
       break
 
@@ -222,9 +227,8 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (parsed.lat < -90 || parsed.lat > 90 || parsed.lon < -180 || parsed.lon > 180) {
         throw new Error('Invalid sync message: duress-alert lat/lon out of range')
       }
-      // opId is optional for backward compat with older clients
-      if (parsed.opId !== undefined && (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128)) {
-        throw new Error('Invalid sync message: duress-alert.opId must be a non-empty string (max 128 chars)')
+      if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
+        throw new Error('Invalid sync message: duress-alert requires a non-empty opId (max 128 chars)')
       }
       break
 
@@ -316,8 +320,9 @@ export function applySyncMessage(
   // ── Freshness gate for fire-and-forget messages ────────────
   // Drop stale duress-alert/beacon/liveness-checkin messages to prevent replay.
   if (msg.type === 'duress-alert' || msg.type === 'beacon' || msg.type === 'liveness-checkin') {
-    const age = Math.abs(nowSec - msg.timestamp)
-    if (age > FIRE_AND_FORGET_FRESHNESS_SEC) return group
+    const elapsed = nowSec - msg.timestamp
+    if (elapsed > FIRE_AND_FORGET_FRESHNESS_SEC) return group   // stale
+    if (elapsed < -MAX_FUTURE_SKEW_SEC) return group             // too far in the future
   }
 
   switch (msg.type) {

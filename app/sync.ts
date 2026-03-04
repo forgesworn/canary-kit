@@ -147,11 +147,14 @@ export function subscribeToGroup(groupId: string): void {
       showToast('Group secret was rotated', 'warning')
     }
 
-    // Record incoming liveness check-ins (freshness-gated to prevent stale replay)
+    // Record incoming liveness check-ins (freshness-gated + opId dedup)
     if (msg.type === 'liveness-checkin') {
-      const age = Math.abs(Math.floor(Date.now() / 1000) - msg.timestamp)
-      if (age <= FIRE_AND_FORGET_FRESHNESS_SEC) {
-        recordCheckin(groupId, sender, msg.timestamp)
+      const elapsed = Math.floor(Date.now() / 1000) - msg.timestamp
+      if (elapsed <= FIRE_AND_FORGET_FRESHNESS_SEC && elapsed >= -60) {
+        if (!isSeenOpId(groupId, msg.opId)) {
+          recordOpId(groupId, msg.opId)
+          recordCheckin(groupId, sender, msg.timestamp)
+        }
       }
     }
 
@@ -164,14 +167,11 @@ export function subscribeToGroup(groupId: string): void {
     // the same group reference for all fire-and-forget types, so we must also
     // check freshness here before dispatching UI effects.
     if (msg.type === 'beacon' || msg.type === 'duress-alert') {
-      const age = Math.abs(Math.floor(Date.now() / 1000) - msg.timestamp)
-      if (age > FIRE_AND_FORGET_FRESHNESS_SEC) return // stale — suppress
+      const elapsed = Math.floor(Date.now() / 1000) - msg.timestamp
+      if (elapsed > FIRE_AND_FORGET_FRESHNESS_SEC || elapsed < -60) return // stale or future — suppress
 
-      const opId = (msg as { opId?: string }).opId
-      if (opId) {
-        if (isSeenOpId(groupId, opId)) return // replay — suppress
-        recordOpId(groupId, opId)
-      }
+      if (isSeenOpId(groupId, msg.opId)) return // replay — suppress
+      recordOpId(groupId, msg.opId)
       document.dispatchEvent(
         new CustomEvent('canary:sync-message', { detail: { groupId, message: msg, sender } }),
       )

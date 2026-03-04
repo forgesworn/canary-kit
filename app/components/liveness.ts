@@ -34,6 +34,7 @@ function broadcastCheckins(): void {
       type: 'liveness-checkin',
       pubkey: identity.pubkey,
       timestamp: now,
+      opId: crypto.randomUUID(),
     })
 
     // Record own check-in locally
@@ -42,7 +43,7 @@ function broadcastCheckins(): void {
   }
 }
 
-const MAX_FUTURE_SKEW_SEC = 300
+const MAX_FUTURE_SKEW_SEC = 60
 
 /**
  * Record a liveness check-in from another member (received via sync).

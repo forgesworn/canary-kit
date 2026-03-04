@@ -120,6 +120,7 @@ export function renderLiveness(container: HTMLElement): void {
       type: 'liveness-checkin',
       pubkey: identity.pubkey,
       timestamp: now,
+      opId: crypto.randomUUID(),
     })
   })
 }
