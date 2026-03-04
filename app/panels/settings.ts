@@ -1,7 +1,7 @@
 // app/panels/settings.ts — Group settings drawer
 
 import { getState, updateGroup, update } from '../state.js'
-import { deleteGroup, reseedGroup } from '../actions/groups.js'
+import { deleteGroup, reseedGroup, compromiseReseed } from '../actions/groups.js'
 import { showToast } from '../components/toast.js'
 import { disconnectRelays, isConnected, getRelayCount } from '../nostr/connect.js'
 import { ensureTransport, teardownSync } from '../sync.js'
@@ -155,7 +155,8 @@ export function renderSettings(container: HTMLElement): void {
         <div class="settings-actions">
           <button class="btn btn--ghost" id="export-btn">Export Group</button>
           <button class="btn btn--ghost" id="import-btn">Import Group</button>
-          <button class="btn btn--warning" id="reseed-btn">Emergency Reseed</button>
+          <button class="btn btn--warning" id="reseed-btn">Rotate Key</button>
+          <button class="btn btn--danger" id="compromise-reseed-btn">Compromise Reseed</button>
           <button class="btn btn--danger" id="dissolve-btn">Dissolve Group</button>
         </div>
       </div>
@@ -294,9 +295,16 @@ export function renderSettings(container: HTMLElement): void {
   // ── Emergency reseed ─────────────────────────────────────────
 
   document.getElementById('reseed-btn')!.addEventListener('click', () => {
-    if (confirm('Emergency reseed? This generates a new seed. All members will need new invites.')) {
+    if (confirm('Rotate the group key? This broadcasts the new key to all members via the relay.')) {
       reseedGroup(activeGroupId!)
-      showToast('Emergency reseed complete. All verification words have changed. Share new invites.', 'warning', 6000)
+      showToast('Key rotated. New verification words are active.', 'warning', 6000)
+    }
+  })
+
+  document.getElementById('compromise-reseed-btn')!.addEventListener('click', () => {
+    if (confirm('Compromise reseed? This generates a new key WITHOUT broadcasting. All members will need new invites.')) {
+      compromiseReseed(activeGroupId!)
+      showToast('Emergency reseed complete. No broadcast sent — share new invites with all members.', 'warning', 8000)
     }
   })
 
