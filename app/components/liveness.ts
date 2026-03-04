@@ -42,12 +42,16 @@ function broadcastCheckins(): void {
   }
 }
 
+const MAX_FUTURE_SKEW_SEC = 300
+
 /**
  * Record a liveness check-in from another member (received via sync).
  */
 export function recordCheckin(groupId: string, pubkey: string, timestamp: number): void {
   const group = getState().groups[groupId]
   if (!group) return
+  const now = Math.floor(Date.now() / 1000)
+  if (timestamp > now + MAX_FUTURE_SKEW_SEC) return // reject far-future check-ins
   const existing = group.livenessCheckins[pubkey] ?? 0
   if (timestamp <= existing) return // don't go backwards
   const checkins = { ...group.livenessCheckins, [pubkey]: timestamp }
