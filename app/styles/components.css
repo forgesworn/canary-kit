@@ -192,7 +192,7 @@ button {
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   z-index: 100;
-  min-width: 260px;
+  min-width: 320px;
   font-family: var(--font-mono);
   font-size: 0.8125rem;
 }

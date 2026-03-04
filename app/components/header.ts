@@ -229,9 +229,9 @@ function showIdentityPopover(anchor: HTMLElement): void {
 
     <div class="identity-popover__section">
       <span class="identity-popover__label">Login with nsec</span>
-      <div style="display: flex; gap: 0.25rem; margin-top: 0.25rem;">
-        <input class="input" type="password" id="nsec-input" placeholder="nsec1..." style="flex: 1; font-size: 0.75rem;" />
-        <button class="btn btn--sm btn--primary" id="nsec-login-btn" type="button">Login</button>
+      <div style="display: flex; flex-direction: column; gap: 0.375rem; margin-top: 0.375rem;">
+        <input class="input" type="password" id="nsec-input" placeholder="nsec1..." style="width: 100%; font-size: 0.8125rem; padding: 0.5rem;" />
+        <button class="btn btn--sm btn--primary" id="nsec-login-btn" type="button" style="width: 100%;">Login</button>
       </div>
     </div>
 
