@@ -117,10 +117,6 @@ export class NostrSyncTransport implements SyncTransport {
             if (!event || typeof event !== 'object') return
             if (typeof event.pubkey !== 'string' || typeof event.content !== 'string') return
 
-            // Dedup: skip events we've already processed (e.g. on reconnect within the since window)
-            if (typeof event.id === 'string' && this.seenEventIds.has(event.id)) return
-            if (typeof event.id === 'string') this.seenEventIds.add(event.id)
-
             // Skip our own events
             if (event.pubkey === groupInfo.signer.pubkey) return
 
@@ -129,6 +125,12 @@ export class NostrSyncTransport implements SyncTransport {
               console.warn('[canary:sync] Rejected event with invalid signature')
               return
             }
+
+            // Dedup: skip events we've already processed (e.g. on reconnect within the since window).
+            // IMPORTANT: this check is placed AFTER signature verification to prevent a
+            // malicious relay from poisoning the cache with forged event IDs.
+            if (typeof event.id === 'string' && this.seenEventIds.has(event.id)) return
+            if (typeof event.id === 'string') this.seenEventIds.add(event.id)
 
             // Decrypt and verify authenticated inner envelope.
             // Format: { s: personalPubkey, sig: schnorr(sig over payload), p: syncPayload }
