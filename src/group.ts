@@ -152,10 +152,15 @@ export function reseed(state: GroupState): GroupState {
 
 /**
  * Derive a new seed deterministically from the current seed and a context string.
- * Used by removeMember() so all devices converge on the same seed after a
- * member-leave event, without needing a separate reseed broadcast.
+ *
+ * **SECURITY WARNING:** Do NOT use this for member removal. A removed member
+ * knows the old seed and can compute the result, defeating forward secrecy.
+ * For member removal, use `removeMember()` (which only filters the member list)
+ * followed by creating a new group with a fresh random seed.
  *
  * newSeed = HMAC-SHA256(currentSeed, "canary:reseed:" + context)
+ *
+ * @deprecated Prefer `reseed()` (random) for security-critical key rotation.
  */
 export function deterministicReseed(state: GroupState, context: string): GroupState {
   const key = hexToBytes(state.seed)
@@ -176,15 +181,17 @@ export function addMember(state: GroupState, pubkey: string): GroupState {
 }
 
 /**
- * Remove a member from the group and immediately reseed to invalidate the old
- * shared secret. The departing member can no longer derive valid words.
+ * Remove a member from the group's member list.
+ *
+ * **Important:** This does NOT reseed. In a symmetric-key group, the removed
+ * member still possesses the old seed and can derive valid words. Callers
+ * should create a replacement group with a fresh seed if forward secrecy is
+ * required. See `reseed()` for manual key rotation.
+ *
  * Returns new state — does not mutate the input.
  */
 export function removeMember(state: GroupState, pubkey: string): GroupState {
-  return deterministicReseed(
-    { ...state, members: state.members.filter((m) => m !== pubkey) },
-    pubkey,
-  )
+  return { ...state, members: state.members.filter((m) => m !== pubkey) }
 }
 
 /** Refresh the counter to the current time window. Call after loading persisted state. */

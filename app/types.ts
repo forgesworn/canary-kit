@@ -26,8 +26,9 @@ export interface AppGroup extends GroupState {
   memberNames?: Record<string, string>
   /** Silent duress response mode: immediate alert, dead-drop, or both. */
   duressMode?: 'immediate' | 'dead-drop' | 'both'
-  /** Geohash precision for location beacons (1–12, default 4 ≈ 20km). Higher = more precise. */
-  beaconPrecision?: number
+  /** Geohash precision for location beacons (1–11, default 6 ≈ 1.2km). Higher = more precise.
+   * Inherited from GroupState where it's required; optional here for backwards compat with persisted state. */
+  beaconPrecision: number
 }
 
 /** The local identity (Nostr keypair) for this device. */

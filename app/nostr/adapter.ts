@@ -11,10 +11,17 @@ const SYNC_EVENT_KIND = 29_111
 export class NostrSyncTransport implements SyncTransport {
   private subs = new Map<string, { close(): void }>()
   private groupKeys = new Map<string, { key: Uint8Array; signer: GroupSigner; tagHash: string }>()
+  /** Personal pubkey used for sender identity binding inside encrypted envelopes. */
+  private personalPubkey: string | null = null
 
   constructor(
     private relays: string[],
   ) {}
+
+  /** Set the personal identity pubkey used for sender binding. */
+  setPersonalPubkey(pubkey: string): void {
+    this.personalPubkey = pubkey
+  }
 
   /** Register a group's seed so we can encrypt/decrypt and sign for it. */
   registerGroup(groupId: string, seedHex: string, signer: GroupSigner): void {
@@ -41,8 +48,14 @@ export class NostrSyncTransport implements SyncTransport {
       return
     }
 
-    const payload = encodeSyncMessage(message)
-    const encrypted = await encryptEnvelope(groupInfo.key, payload)
+    const innerPayload = encodeSyncMessage(message)
+    // Bind sender identity inside the encrypted envelope so receivers know
+    // which personal pubkey sent this message. The "s" field is the sender's
+    // personal pubkey; "p" is the original sync payload.
+    const envelope = this.personalPubkey
+      ? JSON.stringify({ s: this.personalPubkey, p: innerPayload })
+      : innerPayload
+    const encrypted = await encryptEnvelope(groupInfo.key, envelope)
 
     const unsigned = {
       kind: SYNC_EVENT_KIND,
@@ -84,16 +97,28 @@ export class NostrSyncTransport implements SyncTransport {
             // Skip our own events
             if (event.pubkey === groupInfo.signer.pubkey) return
 
-            // Membership proof: the message is encrypted with AES-256-GCM under
-            // the group key (derived from the seed). Only members who possess the
-            // seed can encrypt or decrypt. We cannot compare event.pubkey against
-            // the personal member list because each member signs with a per-group
-            // derived identity (GroupSigner), producing a pubkey that differs from
-            // their personal one. Envelope decryption below is the auth gate.
-
+            // Decrypt and extract sender identity binding.
+            // The envelope is AES-256-GCM under the group key — only seed holders
+            // can encrypt or decrypt. Inside the envelope, the sender's personal
+            // pubkey is bound via the "s" field, allowing membership verification.
             const decrypted = await decryptEnvelope(groupInfo.key, event.content)
-            const msg = decodeSyncMessage(decrypted)
-            onMessage(msg, event.pubkey)
+
+            let senderPubkey = event.pubkey // fallback to Nostr event pubkey
+            let innerPayload = decrypted
+
+            // Parse sender-bound envelope: { s: personalPubkey, p: syncPayload }
+            try {
+              const parsed = JSON.parse(decrypted)
+              if (parsed && typeof parsed.s === 'string' && typeof parsed.p === 'string') {
+                senderPubkey = parsed.s
+                innerPayload = parsed.p
+              }
+            } catch {
+              // Legacy format (no sender binding) — use as-is
+            }
+
+            const msg = decodeSyncMessage(innerPayload)
+            onMessage(msg, senderPubkey)
           } catch (err) {
             console.warn('[canary:sync] Failed to process event:', err)
           }

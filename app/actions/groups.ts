@@ -121,7 +121,10 @@ export function addGroupMember(id: string, pubkey: string): void {
 
 /**
  * Remove a member pubkey from the group.
- * The SDK automatically reseeds after removal to invalidate the old secret.
+ *
+ * **Security note:** The removed member still possesses the old seed and can
+ * derive valid words. This function only removes them from the member list.
+ * For forward secrecy, create a replacement group with a fresh seed.
  */
 export function removeGroupMember(id: string, pubkey: string): void {
   const { groups } = getState()

@@ -218,21 +218,19 @@ describe('addMember', () => {
 })
 
 describe('removeMember', () => {
-  it('removes a member and reseeds deterministically', () => {
+  it('removes a member without reseeding', () => {
     const group = createGroup({ name: 'Test', members: [ALICE, BOB, CHARLIE] })
-    const a = removeMember(group, CHARLIE)
-    const b = removeMember(group, CHARLIE)
-    expect(a.members).not.toContain(CHARLIE)
-    expect(a.members).toHaveLength(2)
-    expect(a.seed).not.toBe(group.seed)
-    // Deterministic: both calls produce the same new seed
-    expect(a.seed).toBe(b.seed)
+    const updated = removeMember(group, CHARLIE)
+    expect(updated.members).not.toContain(CHARLIE)
+    expect(updated.members).toHaveLength(2)
+    // Seed unchanged — callers must create a new group for forward secrecy
+    expect(updated.seed).toBe(group.seed)
   })
 
-  it('removeMember on non-existent member still reseeds deterministically', () => {
+  it('is idempotent for absent members', () => {
     const state = createGroup({ name: 'test', members: ['a'.repeat(64)] })
     const result = removeMember(state, 'b'.repeat(64))
-    expect(result.seed).not.toBe(state.seed)
+    expect(result.seed).toBe(state.seed)
     expect(result.members).toEqual(state.members)
   })
 })

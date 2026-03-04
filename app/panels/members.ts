@@ -165,7 +165,7 @@ export function renderMembers(container: HTMLElement): void {
 
     const { groups: g } = getState()
     const currentMembers = g[activeGroupId]?.members ?? []
-    if (!confirm(`Remove ${formatPubkey(pubkey, currentMembers, activeGroupId)} from the group?\n\nThe group secret will be rotated automatically.`)) {
+    if (!confirm(`Remove ${formatPubkey(pubkey, currentMembers, activeGroupId)} from the group?\n\nWarning: The removed member still has the old group secret. For full security, create a new group without them after removal.`)) {
       return
     }
 

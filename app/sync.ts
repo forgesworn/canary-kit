@@ -37,6 +37,7 @@ export async function ensureTransport(relays: string[], groupId?: string): Promi
 
     if (!_transport) {
       const transport = new NostrSyncTransport(relays)
+      if (identity.pubkey) transport.setPersonalPubkey(identity.pubkey)
       initSync(transport)
     }
 
