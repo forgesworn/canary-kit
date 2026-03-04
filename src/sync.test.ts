@@ -10,7 +10,7 @@ import { bytesToHex } from './crypto.js'
 
 describe('sync message serialisation', () => {
   it('round-trips a member-join message', () => {
-    const msg: SyncMessage = { type: 'member-join', pubkey: 'abc123', timestamp: 1700000000 }
+    const msg: SyncMessage = { type: 'member-join', pubkey: 'a'.repeat(64), timestamp: 1700000000 }
     const encoded = encodeSyncMessage(msg)
     expect(typeof encoded).toBe('string')
     const decoded = decodeSyncMessage(encoded)
@@ -18,7 +18,7 @@ describe('sync message serialisation', () => {
   })
 
   it('round-trips a member-leave message', () => {
-    const msg: SyncMessage = { type: 'member-leave', pubkey: 'abc123', timestamp: 1700000000 }
+    const msg: SyncMessage = { type: 'member-leave', pubkey: 'a'.repeat(64), timestamp: 1700000000 }
     expect(decodeSyncMessage(encodeSyncMessage(msg))).toEqual(msg)
   })
 
@@ -28,7 +28,7 @@ describe('sync message serialisation', () => {
   })
 
   it('round-trips a reseed message with binary seed', () => {
-    const seed = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+    const seed = new Uint8Array(32).fill(42)
     const msg: SyncMessage = { type: 'reseed', seed, counter: 0, timestamp: 1700000000 }
     const decoded = decodeSyncMessage(encodeSyncMessage(msg))
     expect(decoded.type).toBe('reseed')

@@ -1,6 +1,6 @@
 // app/panels/beacons.ts — Beacons panel: MapLibre map with geohash area circles
 
-import { getState } from '../state.js'
+import { getState, updateGroup } from '../state.js'
 import { broadcastAction } from '../sync.js'
 import { deriveBeaconKey, encryptBeacon } from 'canary-kit'
 import { encode, decode, precisionToRadius } from 'geohash-kit'
@@ -13,6 +13,18 @@ let encryptedPayloads: Record<string, string> = {}
 let geoWatchId: number | null = null
 let duressMembers = new Set<string>()
 let mapReady = false
+
+const PRECISION_LABELS: Record<number, string> = {
+  1: '2,500 km — continental',
+  2: '630 km — country',
+  3: '78 km — region',
+  4: '20 km — city',
+  5: '2.4 km — neighbourhood',
+  6: '610 m — street',
+  7: '76 m — building',
+  8: '19 m — door',
+  9: '2.4 m — exact',
+}
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js'
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css'
@@ -79,6 +91,9 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
     return
   }
 
+  const group = groups[activeGroupId]
+  const precision = group.beaconPrecision ?? 4
+
   // If map is already initialised, skip re-rendering to preserve the live
   // MapLibre instance (replacing innerHTML would orphan the GL context).
   if (map && document.getElementById('beacon-map')) return
@@ -86,7 +101,7 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
   container.innerHTML = `
     <section class="panel beacon-panel">
       <h3 class="panel__title">Location</h3>
-      <p class="settings-hint" style="margin-bottom: 0.5rem;">Approximate location of group members. Circles show the geohash area — your exact position is never shared, only which neighbourhood you're in. Circles turn <span style="color: #f87171; font-weight: 500;">red</span> when a duress signal is active.</p>
+      <p class="settings-hint" style="margin-bottom: 0.5rem;">Approximate location of group members. Circles show the geohash area — your exact position is never shared. Under duress, full GPS precision is used so your group can help. Circles turn <span style="color: #f87171; font-weight: 500;">red</span> when a duress signal is active.</p>
       <div class="beacon-map" id="beacon-map" style="height: 500px; border-radius: 8px;"></div>
       <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem;">
         <button class="btn ${geoWatchId !== null ? 'btn--primary' : ''}" id="beacon-toggle-btn" type="button">
@@ -94,9 +109,39 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
         </button>
         ${geoWatchId !== null ? '<span class="settings-hint" style="margin: 0;">Your approximate area is visible to group members</span>' : ''}
       </div>
+      <div style="margin-top: 0.75rem;">
+        <label class="input-label" style="margin-bottom: 0.25rem;">
+          <span>Location Precision</span>
+        </label>
+        <input type="range" id="precision-slider" min="1" max="9" value="${precision}" style="width: 100%; accent-color: #f59e0b;" />
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.25rem;">
+          <span class="settings-hint" id="precision-label">${PRECISION_LABELS[precision]}</span>
+          <span class="settings-hint" style="opacity: 0.5; font-size: 0.7rem;">Duress: full GPS</span>
+        </div>
+      </div>
       <div class="beacon-list" id="beacon-list"></div>
     </section>
   `
+
+  // ── Precision slider ────────────────────────────────────────
+  const slider = container.querySelector<HTMLInputElement>('#precision-slider')
+  const precisionLabel = container.querySelector<HTMLElement>('#precision-label')
+  slider?.addEventListener('input', () => {
+    const val = Number(slider.value)
+    if (precisionLabel) precisionLabel.textContent = PRECISION_LABELS[val] ?? ''
+  })
+  slider?.addEventListener('change', () => {
+    const val = Number(slider.value)
+    const { activeGroupId: gid } = getState()
+    if (gid) {
+      updateGroup(gid, { beaconPrecision: val })
+      // Restart watch with new precision if active
+      if (geoWatchId !== null) {
+        stopBeaconWatch()
+        startBeaconWatch()
+      }
+    }
+  })
 
   container.querySelector<HTMLButtonElement>('#beacon-toggle-btn')?.addEventListener('click', () => {
     if (geoWatchId !== null) {
@@ -232,7 +277,7 @@ function startBeaconWatch(): void {
             type: 'beacon',
             lat,
             lon,
-            geohash,
+            accuracy: precisionToRadius(geohashPrecision),
             timestamp: Math.floor(Date.now() / 1000),
           })
         }

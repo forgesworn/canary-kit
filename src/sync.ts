@@ -24,6 +24,9 @@ const VALID_TYPES = new Set<string>([
   'reseed', 'beacon', 'duress-alert', 'liveness-checkin', 'state-snapshot',
 ])
 
+/** 64-character lowercase hex string (32 bytes — Nostr pubkey or CANARY seed). */
+const HEX_64_RE = /^[0-9a-f]{64}$/
+
 // ── Serialisation ─────────────────────────────────────────────
 
 /**
@@ -64,8 +67,8 @@ export function decodeSyncMessage(payload: string): SyncMessage {
     case 'member-join':
     case 'member-leave':
     case 'liveness-checkin':
-      if (typeof parsed.pubkey !== 'string' || parsed.pubkey.length === 0) {
-        throw new Error(`Invalid sync message: ${type} requires a non-empty pubkey string`)
+      if (typeof parsed.pubkey !== 'string' || !HEX_64_RE.test(parsed.pubkey)) {
+        throw new Error(`Invalid sync message: ${type} requires a 64-char hex pubkey`)
       }
       break
 
@@ -79,8 +82,8 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       break
 
     case 'reseed':
-      if (typeof parsed.seed !== 'string') {
-        throw new Error('Invalid sync message: reseed.seed must be a hex string')
+      if (typeof parsed.seed !== 'string' || !HEX_64_RE.test(parsed.seed)) {
+        throw new Error('Invalid sync message: reseed.seed must be a 64-char hex string')
       }
       if (typeof parsed.counter !== 'number' || parsed.counter < 0) {
         throw new Error('Invalid sync message: reseed requires a non-negative counter')
@@ -103,8 +106,8 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       break
 
     case 'state-snapshot':
-      if (typeof parsed.seed !== 'string' || parsed.seed.length === 0) {
-        throw new Error('Invalid sync message: state-snapshot requires a non-empty seed string')
+      if (typeof parsed.seed !== 'string' || !HEX_64_RE.test(parsed.seed)) {
+        throw new Error('Invalid sync message: state-snapshot requires a 64-char hex seed')
       }
       if (typeof parsed.counter !== 'number' || parsed.counter < 0) {
         throw new Error('Invalid sync message: state-snapshot requires a non-negative counter')
@@ -112,8 +115,8 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (typeof parsed.usageOffset !== 'number' || parsed.usageOffset < 0) {
         throw new Error('Invalid sync message: state-snapshot requires a non-negative usageOffset')
       }
-      if (!Array.isArray(parsed.members) || !parsed.members.every((m: unknown) => typeof m === 'string')) {
-        throw new Error('Invalid sync message: state-snapshot requires a string array of members')
+      if (!Array.isArray(parsed.members) || !parsed.members.every((m: unknown) => typeof m === 'string' && HEX_64_RE.test(m))) {
+        throw new Error('Invalid sync message: state-snapshot members must be 64-char hex pubkeys')
       }
       break
   }

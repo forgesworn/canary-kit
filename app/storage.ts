@@ -205,12 +205,10 @@ export async function unlockAndRestoreState(pin: string): Promise<void> {
   if (rawIdentity && typeof rawIdentity.pubkey === 'string') {
     let privkey = rawIdentity.privkey
     if (rawIdentity._privkeyEncrypted && privkey) {
-      try {
-        privkey = await decrypt(privkey, key)
-      } catch {
-        // If decryption fails, the privkey is lost — user will need to re-login
-        privkey = undefined
-      }
+      // Fail closed: if the encrypted privkey can't be decrypted, the PIN is
+      // wrong (or ciphertext is corrupt). Without this throw, an empty groups
+      // object lets decryptSeeds() succeed trivially, bypassing the lock screen.
+      privkey = await decrypt(privkey, key)
     }
     identity = {
       pubkey: rawIdentity.pubkey,

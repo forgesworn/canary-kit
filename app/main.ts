@@ -31,7 +31,7 @@ import { renderLiveness } from './panels/liveness.js'
 import { renderSettings } from './panels/settings.js'
 import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
 import { showCallVerify } from './components/call-verify.js'
-import { acceptInvite, createInvite } from './invite.js'
+import { acceptInvite, createInvite, isInviteConsumed } from './invite.js'
 import { resolveSigner, hasNip07 } from './nostr/signer.js'
 import { DEMO_ACCOUNTS } from './demo-accounts.js'
 import { decode as nip19decode } from 'nostr-tools/nip19'
@@ -468,6 +468,12 @@ function wireGlobalEvents(): void {
 
         // Use the shared group ID from the invite so relay sync events match
         const id = data.groupId ?? crypto.randomUUID()
+
+        // Reject replayed invites — same nonce for the same group means replay
+        if (isInviteConsumed(id, data.nonce)) {
+          throw new Error('This invite has already been used.')
+        }
+
         const hasRelays = (data.relays?.length ?? 0) > 0
 
         // Add our own pubkey to the members list
@@ -498,7 +504,7 @@ function wireGlobalEvents(): void {
           usageOffset: data.usageOffset ?? 0,
           rotationInterval: data.rotationInterval ?? 86400,
           encodingFormat: (data.encodingFormat ?? 'words') as 'words' | 'pin' | 'hex',
-          usedInvites: [data.nonce],
+          usedInvites: [...(getState().groups[id]?.usedInvites ?? []), data.nonce],
           beaconInterval: data.beaconInterval ?? 60,
           beaconPrecision: data.beaconPrecision ?? 6,
           duressMode: 'immediate' as const,

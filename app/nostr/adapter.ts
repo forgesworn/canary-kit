@@ -59,14 +59,6 @@ export class NostrSyncTransport implements SyncTransport {
     }
   }
 
-  /** Set of pubkeys authorised to send sync messages for a group. */
-  private groupMembers = new Map<string, Set<string>>()
-
-  /** Update the authorised member set for a group. */
-  updateMembers(groupId: string, members: string[]): void {
-    this.groupMembers.set(groupId, new Set(members))
-  }
-
   subscribe(groupId: string, onMessage: (msg: SyncMessage, sender: string) => void): () => void {
     const pool = getPool()
     if (!pool) return () => {}
@@ -92,12 +84,12 @@ export class NostrSyncTransport implements SyncTransport {
             // Skip our own events
             if (event.pubkey === groupInfo.signer.pubkey) return
 
-            // Verify the sender is an authorised group member
-            const allowedMembers = this.groupMembers.get(groupId)
-            if (allowedMembers && !allowedMembers.has(event.pubkey)) {
-              console.warn(`[canary:sync] Rejected message from non-member ${event.pubkey.slice(0, 8)}…`)
-              return
-            }
+            // Membership proof: the message is encrypted with AES-256-GCM under
+            // the group key (derived from the seed). Only members who possess the
+            // seed can encrypt or decrypt. We cannot compare event.pubkey against
+            // the personal member list because each member signs with a per-group
+            // derived identity (GroupSigner), producing a pubkey that differs from
+            // their personal one. Envelope decryption below is the auth gate.
 
             const decrypted = await decryptEnvelope(groupInfo.key, event.content)
             const msg = decodeSyncMessage(decrypted)

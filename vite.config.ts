@@ -19,6 +19,7 @@ export default defineConfig({
       'canary-kit/encoding':  resolve(__dirname, 'src/encoding.ts'),
       'canary-kit/session':   resolve(__dirname, 'src/session.ts'),
       'canary-kit/sync':      resolve(__dirname, 'src/sync.ts'),
+      'canary-kit/crypto':    resolve(__dirname, 'src/crypto.ts'),
       // Root export must come last (longest-match-first is not guaranteed)
       'canary-kit':           resolve(__dirname, 'src/index.ts'),
     },
