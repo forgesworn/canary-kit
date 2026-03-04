@@ -32,7 +32,10 @@ import { renderSettings } from './panels/settings.js'
 import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
 import { showCallVerify } from './components/call-verify.js'
 import { acceptInvite, createInvite } from './invite.js'
-import { resolveSigner } from './nostr/signer.js'
+import { resolveSigner, hasNip07 } from './nostr/signer.js'
+import { DEMO_ACCOUNTS } from './demo-accounts.js'
+import { decode as nip19decode } from 'nostr-tools/nip19'
+import { getPublicKey } from 'nostr-tools/pure'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
 import { showDuressAlert } from './components/duress-alert.js'
 import type { AppIdentity } from './types.js'
@@ -573,6 +576,116 @@ async function bootSync(): Promise<void> {
   subscribeToAllGroups()
 }
 
+// ── Login screen ──────────────────────────────────────────────
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function showLoginScreen(): void {
+  const app = document.getElementById('app')!
+
+  const demoButtons = DEMO_ACCOUNTS.map(a => `
+    <button class="btn login-screen__demo" data-nsec="${a.nsec}" data-name="${a.name}" type="button">
+      <strong>${a.name}</strong> <span style="color: var(--text-muted); font-weight: 400;">${a.bio}</span>
+    </button>
+  `).join('')
+
+  app.innerHTML = `
+    <div class="lock-screen">
+      <h1 class="lock-screen__brand">CANARY</h1>
+      <p class="lock-screen__hint">Deepfake-proof identity verification</p>
+
+      <div style="width: 100%; max-width: 320px; margin-top: 1.5rem;">
+        <p class="input-label__text" style="margin-bottom: 0.375rem;">Login with nsec</p>
+        <form id="nsec-login-form" autocomplete="off" style="display: flex; flex-direction: column; gap: 0.375rem;">
+          <input class="input" type="password" id="login-nsec" placeholder="nsec1..." style="width: 100%; font-size: 0.875rem; padding: 0.5rem;" />
+          <button class="btn btn--primary" type="submit">Login</button>
+        </form>
+
+        ${hasNip07() ? `
+          <button class="btn" id="login-nip07" type="button" style="width: 100%; margin-top: 0.5rem;">Use Browser Extension</button>
+        ` : ''}
+
+        <div style="border-top: 1px solid var(--border); margin: 1rem 0; padding-top: 0.75rem;">
+          <p class="input-label__text" style="margin-bottom: 0.375rem;">Demo accounts</p>
+          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            ${demoButtons}
+          </div>
+        </div>
+
+        <button class="btn" id="login-generate" type="button" style="width: 100%; margin-top: 0.25rem;">Generate New Key</button>
+      </div>
+    </div>
+  `
+
+  // nsec form submit
+  app.querySelector<HTMLFormElement>('#nsec-login-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const input = app.querySelector<HTMLInputElement>('#login-nsec')
+    const nsec = input?.value.trim()
+    if (!nsec) return
+    try {
+      const decoded = nip19decode(nsec)
+      if (decoded.type !== 'nsec') { alert('Not a valid nsec.'); return }
+      const privkeyBytes = decoded.data as Uint8Array
+      const privkey = bytesToHex(privkeyBytes)
+      const pubkey = getPublicKey(privkeyBytes)
+      update({ identity: { pubkey, privkey, signerType: 'local', displayName: 'You' } })
+      await bootApp()
+    } catch { alert('Invalid nsec format.') }
+  })
+
+  // Demo account buttons
+  app.querySelectorAll<HTMLButtonElement>('.login-screen__demo').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const nsec = btn.dataset.nsec!
+      const name = btn.dataset.name!
+      const decoded = nip19decode(nsec)
+      const privkeyBytes = (decoded.data as Uint8Array)
+      const privkey = bytesToHex(privkeyBytes)
+      const pubkey = getPublicKey(privkeyBytes)
+      update({ identity: { pubkey, privkey, signerType: 'local', displayName: name } })
+      await bootApp()
+    })
+  })
+
+  // NIP-07 extension
+  app.querySelector('#login-nip07')?.addEventListener('click', async () => {
+    try {
+      const pubkey = await (window as any).nostr.getPublicKey()
+      update({ identity: { pubkey, signerType: 'nip07', displayName: 'You' } })
+      await bootApp()
+    } catch { alert('Extension rejected the request.') }
+  })
+
+  // Generate new key
+  app.querySelector('#login-generate')?.addEventListener('click', async () => {
+    await ensureLocalIdentity()
+    await bootApp()
+  })
+}
+
+async function bootApp(): Promise<void> {
+  buildShell()
+
+  if (window.location.hash === '#call') {
+    update({ view: 'call-demo' })
+  }
+
+  checkInviteFragment()
+  window.addEventListener('hashchange', () => checkInviteFragment())
+
+  const header = document.getElementById('header')
+  if (header) renderHeader(header)
+
+  wireSidebarToggle()
+  render()
+  subscribe(render)
+  wireGlobalEvents()
+  void bootSync()
+}
+
 // ── Bootstrap ──────────────────────────────────────────────────
 
 async function init(): Promise<void> {
@@ -580,26 +693,17 @@ async function init(): Promise<void> {
     // PIN is set — show lock screen. State will be restored after unlock.
     showLockScreen()
   } else {
-    // No PIN — restore state directly and boot the app.
+    // No PIN — restore state directly.
     restoreState()
-    await ensureLocalIdentity()
-    buildShell()
+    const { identity } = getState()
 
-    if (window.location.hash === '#call') {
-      update({ view: 'call-demo' })
+    if (!identity?.pubkey) {
+      // No identity — show login screen instead of auto-generating
+      showLoginScreen()
+    } else {
+      // Existing identity — boot straight in
+      await bootApp()
     }
-
-    checkInviteFragment()
-    window.addEventListener('hashchange', () => checkInviteFragment())
-
-    const header = document.getElementById('header')
-    if (header) renderHeader(header)
-
-    wireSidebarToggle()
-    render()
-    subscribe(render)
-    wireGlobalEvents()
-    void bootSync()
   }
 }
 

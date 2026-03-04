@@ -2,6 +2,7 @@
 
 import { getState, update } from '../state.js'
 import { hasNip07, resolveSigner } from '../nostr/signer.js'
+import { teardownSync } from '../sync.js'
 import { DEMO_ACCOUNTS } from '../demo-accounts.js'
 import type { AppIdentity } from '../types.js'
 import { decode as nip19decode } from 'nostr-tools/nip19'
@@ -186,7 +187,8 @@ function loginWithNsec(nsec: string, displayName?: string): boolean {
       signerType: 'local',
       displayName: displayName ?? 'You',
     }
-    // Clear groups from previous identity — each account has its own session
+    // Tear down sync and clear groups from previous identity
+    teardownSync()
     update({ identity: newIdentity, groups: {}, activeGroupId: null })
     updateIdentityDisplay()
     return true
@@ -229,10 +231,10 @@ function showIdentityPopover(anchor: HTMLElement): void {
 
     <div class="identity-popover__section">
       <span class="identity-popover__label">Login with nsec</span>
-      <div style="display: flex; flex-direction: column; gap: 0.375rem; margin-top: 0.375rem;">
+      <form id="nsec-login-form" autocomplete="off" style="display: flex; flex-direction: column; gap: 0.375rem; margin-top: 0.375rem;">
         <input class="input" type="password" id="nsec-input" placeholder="nsec1..." style="width: 100%; font-size: 0.8125rem; padding: 0.5rem;" />
-        <button class="btn btn--sm btn--primary" id="nsec-login-btn" type="button" style="width: 100%;">Login</button>
-      </div>
+        <button class="btn btn--sm btn--primary" type="submit" style="width: 100%;">Login</button>
+      </form>
     </div>
 
     ${extensionAvailable ? `
@@ -255,18 +257,12 @@ function showIdentityPopover(anchor: HTMLElement): void {
 
   anchor.parentElement?.appendChild(popover)
 
-  // nsec login
-  popover.querySelector('#nsec-login-btn')?.addEventListener('click', () => {
+  // nsec login via form submit (avoids "password not in form" warning)
+  popover.querySelector<HTMLFormElement>('#nsec-login-form')?.addEventListener('submit', (e) => {
+    e.preventDefault()
     const input = popover.querySelector<HTMLInputElement>('#nsec-input')
     if (!input?.value.trim()) return
     if (loginWithNsec(input.value)) popover.remove()
-  })
-
-  popover.querySelector<HTMLInputElement>('#nsec-input')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const input = e.target as HTMLInputElement
-      if (loginWithNsec(input.value)) popover.remove()
-    }
   })
 
   // Demo account quick-select
@@ -281,6 +277,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
   // Connect NIP-07
   popover.querySelector('#nip07-connect-btn')?.addEventListener('click', async () => {
     try {
+      teardownSync()
       const pubkey = await (window as any).nostr.getPublicKey()
       const newIdentity: AppIdentity = {
         pubkey,
@@ -297,6 +294,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
 
   // Disconnect NIP-07
   popover.querySelector('#nip07-disconnect-btn')?.addEventListener('click', async () => {
+    teardownSync()
     const resolved = await resolveSigner({ pubkey: '', privkey: identity?.privkey })
     const newIdentity: AppIdentity = {
       pubkey: resolved.pubkey,
