@@ -132,6 +132,13 @@ async function decryptSeeds(
 export async function persistState(): Promise<void> {
   const state = getState()
 
+  // Fail closed when PIN protection is enabled but no unlock key is loaded.
+  // This happens while locked; writing any state here would persist secrets in plaintext.
+  if (state.settings.pinEnabled && _pinKey === null) {
+    console.error('[canary:storage] PIN enabled but key not loaded — state NOT persisted.')
+    return
+  }
+
   let groupsToWrite: Record<string, AppGroup> | Record<string, AppGroup & { _seedEncrypted?: boolean }> = state.groups
 
   if (_pinKey !== null && state.settings.pinEnabled) {
@@ -222,7 +229,14 @@ export async function unlockAndRestoreState(pin: string): Promise<void> {
   const validGroups: Record<string, AppGroup> = {}
   for (const [id, group] of Object.entries(groups)) {
     if (group && typeof group === 'object' && typeof group.name === 'string') {
-      validGroups[id] = { ...group, id, tolerance: group.tolerance ?? 1, mode: group.mode ?? 'offline' }
+      validGroups[id] = {
+        ...group,
+        id,
+        usedInvites: Array.isArray(group.usedInvites) ? group.usedInvites : [],
+        latestInviteIssuedAt: typeof group.latestInviteIssuedAt === 'number' ? group.latestInviteIssuedAt : 0,
+        tolerance: group.tolerance ?? 1,
+        mode: group.mode ?? 'offline',
+      }
     }
   }
 
@@ -256,7 +270,14 @@ export function restoreState(): void {
   const validGroups: Record<string, AppGroup> = {}
   for (const [id, group] of Object.entries(groups)) {
     if (group && typeof group === 'object' && typeof group.name === 'string') {
-      validGroups[id] = { ...group, id, tolerance: group.tolerance ?? 1, mode: group.mode ?? 'offline' }
+      validGroups[id] = {
+        ...group,
+        id,
+        usedInvites: Array.isArray(group.usedInvites) ? group.usedInvites : [],
+        latestInviteIssuedAt: typeof group.latestInviteIssuedAt === 'number' ? group.latestInviteIssuedAt : 0,
+        tolerance: group.tolerance ?? 1,
+        mode: group.mode ?? 'offline',
+      }
     }
   }
 

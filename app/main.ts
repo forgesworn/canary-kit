@@ -676,7 +676,7 @@ function wireGlobalEvents(): void {
     if (message.type === 'beacon') {
       console.info(`[canary] Beacon from ${sender.slice(0, 8)}…: ${message.lat}, ${message.lon}`)
     } else if (message.type === 'duress-alert') {
-      showDuressAlert(sender, groupId, message.lat != null ? { lat: message.lat, lon: message.lon } : undefined)
+      showDuressAlert(sender, groupId, message.lat != null ? { lat: message.lat, lon: message.lon } : undefined, message.timestamp)
     }
   })
 }

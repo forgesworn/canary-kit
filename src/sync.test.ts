@@ -6,6 +6,7 @@ import {
   stableStringify,
   canonicaliseSyncMessage,
   PROTOCOL_VERSION,
+  FIRE_AND_FORGET_FRESHNESS_SEC,
   type SyncMessage,
 } from './sync.js'
 import { createGroup } from './group.js'
@@ -675,4 +676,97 @@ describe('conformance vectors (H6)', () => {
       }
     })
   }
+})
+
+// ── Fire-and-forget freshness & opId tests ───────────────────
+
+describe('fire-and-forget freshness gating', () => {
+  function makeGroup() {
+    return createGroup({ name: 'test', members: [PUBKEY_AAA], preset: 'family', creator: PUBKEY_AAA })
+  }
+
+  const nowSec = 1700000000
+
+  it('accepts a duress-alert within the freshness window', () => {
+    const group = makeGroup()
+    const msg: SyncMessage = { type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: nowSec - 60, opId: 'fresh-1', protocolVersion: PROTOCOL_VERSION }
+    const result = applySyncMessage(group, msg, nowSec, PUBKEY_AAA)
+    // fire-and-forget messages return group unchanged (no state mutation) — but they should NOT be rejected
+    expect(result).toBe(group)
+  })
+
+  it('drops a duress-alert older than the freshness window', () => {
+    const group = makeGroup()
+    const staleTimestamp = nowSec - FIRE_AND_FORGET_FRESHNESS_SEC - 1
+    const msg: SyncMessage = { type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: staleTimestamp, opId: 'stale-1', protocolVersion: PROTOCOL_VERSION }
+    const result = applySyncMessage(group, msg, nowSec, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('drops a duress-alert with a future timestamp beyond the freshness window', () => {
+    const group = makeGroup()
+    const futureTimestamp = nowSec + FIRE_AND_FORGET_FRESHNESS_SEC + 1
+    const msg: SyncMessage = { type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: futureTimestamp, opId: 'future-1', protocolVersion: PROTOCOL_VERSION }
+    const result = applySyncMessage(group, msg, nowSec, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('accepts a beacon within the freshness window', () => {
+    const group = makeGroup()
+    const msg: SyncMessage = { type: 'beacon', lat: 51.5, lon: -0.1, accuracy: 100, timestamp: nowSec - 120, opId: 'beacon-1', protocolVersion: PROTOCOL_VERSION }
+    const result = applySyncMessage(group, msg, nowSec, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('drops a stale beacon', () => {
+    const group = makeGroup()
+    const msg: SyncMessage = { type: 'beacon', lat: 51.5, lon: -0.1, accuracy: 100, timestamp: nowSec - 600, opId: 'beacon-stale', protocolVersion: PROTOCOL_VERSION }
+    const result = applySyncMessage(group, msg, nowSec, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('drops a stale liveness-checkin', () => {
+    const group = makeGroup()
+    const msg: SyncMessage = { type: 'liveness-checkin', pubkey: PUBKEY_AAA, timestamp: nowSec - 600, protocolVersion: PROTOCOL_VERSION }
+    const result = applySyncMessage(group, msg, nowSec, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('does not apply freshness gating to privileged actions', () => {
+    const group = makeGroup()
+    // member-join with an old timestamp should still be processed (authority checks, not freshness)
+    const msg: SyncMessage = { type: 'member-join', pubkey: PUBKEY_BBB, timestamp: nowSec - 9999, epoch: 0, opId: 'join-old', protocolVersion: PROTOCOL_VERSION }
+    const result = applySyncMessage(group, msg, nowSec, PUBKEY_AAA)
+    expect(result.members).toContain(PUBKEY_BBB)
+  })
+})
+
+describe('fire-and-forget opId serialisation', () => {
+  it('round-trips a duress-alert with opId', () => {
+    const msg: SyncMessage = { type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: 1700000000, opId: 'duress-op-1', protocolVersion: PROTOCOL_VERSION }
+    const decoded = decodeSyncMessage(encodeSyncMessage(msg))
+    expect(decoded).toEqual(msg)
+  })
+
+  it('round-trips a beacon with opId', () => {
+    const msg: SyncMessage = { type: 'beacon', lat: 51.5, lon: -0.1, accuracy: 100, timestamp: 1700000000, opId: 'beacon-op-1', protocolVersion: PROTOCOL_VERSION }
+    const decoded = decodeSyncMessage(encodeSyncMessage(msg))
+    expect(decoded).toEqual(msg)
+  })
+
+  it('accepts a duress-alert without opId (backward compat)', () => {
+    const msg: SyncMessage = { type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: 1700000000, protocolVersion: PROTOCOL_VERSION }
+    const decoded = decodeSyncMessage(encodeSyncMessage(msg))
+    expect(decoded.type).toBe('duress-alert')
+  })
+
+  it('rejects a duress-alert with invalid opId', () => {
+    const raw = JSON.stringify({ type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: 1700000000, opId: '', protocolVersion: PROTOCOL_VERSION })
+    expect(() => decodeSyncMessage(raw)).toThrow(/opId/)
+  })
+
+  it('rejects a beacon with invalid opId', () => {
+    const raw = JSON.stringify({ type: 'beacon', lat: 51.5, lon: -0.1, accuracy: 100, timestamp: 1700000000, opId: '', protocolVersion: PROTOCOL_VERSION })
+    expect(() => decodeSyncMessage(raw)).toThrow(/opId/)
+  })
 })

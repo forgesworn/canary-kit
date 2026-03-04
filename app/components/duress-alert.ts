@@ -22,16 +22,29 @@ function memberName(pubkey: string, groupId: string): string {
  * Persists until dismissed — not a fleeting notification.
  * High-contrast red for maximum visibility under stress.
  */
+/** Format a unix timestamp as a relative time string ("just now", "2 min ago"). */
+function formatRelativeTime(timestampSec: number): string {
+  const nowSec = Math.floor(Date.now() / 1000)
+  const ageSec = nowSec - timestampSec
+  if (ageSec < 30) return 'just now'
+  if (ageSec < 60) return `${ageSec}s ago`
+  const mins = Math.floor(ageSec / 60)
+  if (mins < 60) return `${mins} min ago`
+  return new Date(timestampSec * 1000).toLocaleTimeString()
+}
+
 export function showDuressAlert(
   senderPubkey: string,
   groupId: string,
   location?: { lat: number; lon: number },
+  timestampSec?: number,
 ): void {
   // Don't stack multiple overlays for the same sender
   const existing = document.querySelector('.duress-overlay')
   if (existing) existing.remove()
 
   const name = memberName(senderPubkey, groupId)
+  const timeDisplay = timestampSec ? formatRelativeTime(timestampSec) : new Date().toLocaleTimeString()
 
   const overlay = document.createElement('div')
   overlay.className = 'duress-overlay'
@@ -43,7 +56,7 @@ export function showDuressAlert(
       <h1 class="duress-overlay__title">${escapeHtml(name)}</h1>
       <h2 class="duress-overlay__subtitle">NEEDS HELP</h2>
       ${location && (location.lat !== 0 || location.lon !== 0) ? `<p class="duress-overlay__location">Last known: ${location.lat.toFixed(4)}, ${location.lon.toFixed(4)}</p>` : ''}
-      <p class="duress-overlay__time">${new Date().toLocaleTimeString()}</p>
+      <p class="duress-overlay__time">${escapeHtml(timeDisplay)}</p>
       <button class="btn btn--lg duress-overlay__dismiss" id="duress-dismiss">I'm Responding</button>
     </div>
   `

@@ -18,9 +18,22 @@ interface EventSignerLike {
   sign(event: unknown): Promise<unknown>
 }
 
+/** Bounded set that evicts oldest entries when capacity is reached. */
+class BoundedSet<T> {
+  private items: T[] = []
+  constructor(private capacity: number) {}
+  has(item: T): boolean { return this.items.includes(item) }
+  add(item: T): void {
+    if (this.has(item)) return
+    if (this.items.length >= this.capacity) this.items.shift()
+    this.items.push(item)
+  }
+}
+
 export class NostrSyncTransport implements SyncTransport {
   private subs = new Map<string, { close(): void }>()
   private groupKeys = new Map<string, { key: Uint8Array; signer: EventSignerLike; tagHash: string; members: Set<string> }>()
+  private seenEventIds = new BoundedSet<string>(1000)
 
   constructor(
     private relays: string[],
@@ -113,6 +126,14 @@ export class NostrSyncTransport implements SyncTransport {
               return
             }
 
+            // Dedup: skip events we've already processed (e.g. on reconnect within the since window).
+            // IMPORTANT: this check is placed AFTER signature verification to prevent a
+            // malicious relay from poisoning the cache with forged event IDs.
+            // The add() is deferred until after successful processing so that
+            // transient failures (e.g. key-rotation timing) don't permanently
+            // suppress the event on relay replay.
+            if (typeof event.id === 'string' && this.seenEventIds.has(event.id)) return
+
             // Decrypt and verify authenticated inner envelope.
             // Format: { s: personalPubkey, sig: schnorr(sig over payload), p: syncPayload }
             const decrypted = await decryptEnvelope(groupInfo.key, event.content)
@@ -156,6 +177,10 @@ export class NostrSyncTransport implements SyncTransport {
             }
 
             onMessage(msg, sender)
+
+            // Mark event as seen only after successful processing to avoid
+            // permanently suppressing events that hit transient failures.
+            if (typeof event.id === 'string') this.seenEventIds.add(event.id)
           } catch (err) {
             console.warn('[canary:sync] Failed to process event:', err)
           }
