@@ -1122,6 +1122,19 @@ select.input option {
   font-weight: 700;
 }
 
+.liveness-item--amber .liveness-name::after {
+  content: ' — late';
+  color: var(--duress);
+  font-size: 0.75rem;
+}
+
+.liveness-item--red .liveness-name::after {
+  content: ' — missed check-in';
+  color: var(--failed);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 /* ── .liveness-time ──────────────────────────────────────── */
 
 .liveness-time {

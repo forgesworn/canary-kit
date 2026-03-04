@@ -8,6 +8,7 @@ import { GroupSigner } from './nostr/signer.js'
 import { NostrSyncTransport } from './nostr/adapter.js'
 import { updateRelayStatus, flashSyncing } from './components/header.js'
 import { showToast } from './components/toast.js'
+import { recordCheckin, startLivenessHeartbeat, stopLivenessHeartbeat } from './components/liveness.js'
 
 let _transport: SyncTransport | null = null
 const _unsubscribers = new Map<string, () => void>()
@@ -44,6 +45,7 @@ export async function ensureTransport(relays: string[], groupId?: string): Promi
     }
 
     updateRelayStatus(isConnected(), getRelayCount())
+    startLivenessHeartbeat()
   } catch (err) {
     console.warn('[canary:sync] ensureTransport failed:', err)
     updateRelayStatus(false, 0)
@@ -103,6 +105,11 @@ export function subscribeToGroup(groupId: string): void {
       showToast('Group state synced', 'info')
     }
 
+    // Record incoming liveness check-ins
+    if (msg.type === 'liveness-checkin') {
+      recordCheckin(groupId, msg.pubkey, msg.timestamp)
+    }
+
     // Flash sync indicator
     flashSyncing()
     setTimeout(() => updateRelayStatus(isConnected(), getRelayCount()), 1500)
@@ -128,6 +135,7 @@ export function subscribeToAllGroups(): void {
 
 /** Unsubscribe from all groups and disconnect the transport. */
 export function teardownSync(): void {
+  stopLivenessHeartbeat()
   for (const unsub of _unsubscribers.values()) {
     unsub()
   }

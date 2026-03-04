@@ -3,6 +3,7 @@
 import { getState, updateGroup } from '../state.js'
 import { deriveLivenessToken } from 'canary-kit/token'
 import { getCounter } from 'canary-kit'
+import { broadcastAction } from '../sync.js'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -47,11 +48,13 @@ export function renderLiveness(container: HTMLElement): void {
     const lastCheckin = group.livenessCheckins[m] ?? 0
     const elapsed = lastCheckin > 0 ? now - lastCheckin : Infinity
     const status = getStatus(elapsed, interval)
+    const isMe = identity?.pubkey === m
+    const name = isMe ? 'You' : `${m.slice(0, 8)}\u2026`
 
     return `
       <li class="liveness-item liveness-item--${status}">
         <span class="liveness-dot liveness-dot--${status}"></span>
-        <span class="liveness-name">${m.slice(0, 8)}\u2026</span>
+        <span class="liveness-name">${name}</span>
         <span class="liveness-time">${lastCheckin > 0 ? formatElapsed(elapsed, lastCheckin) : 'never'}</span>
       </li>
     `
@@ -81,5 +84,12 @@ export function renderLiveness(container: HTMLElement): void {
     // Record check-in locally.
     const checkins = { ...group.livenessCheckins, [identity.pubkey]: now }
     updateGroup(activeGroupId!, { livenessCheckins: checkins })
+
+    // Broadcast check-in to other group members via sync
+    broadcastAction(activeGroupId!, {
+      type: 'liveness-checkin',
+      pubkey: identity.pubkey,
+      timestamp: now,
+    })
   })
 }
