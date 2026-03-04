@@ -70,6 +70,7 @@ export function showCallVerify(groupId: string, theirPubkey: string): void {
         <span class="call-verify__word call-verify__word--theirs">${theirWord}</span>
       </div>
 
+      <p class="call-verify__instruction" style="margin-top: 1.5rem; font-size: 0.75rem;">In a real call, if they say the wrong word, it could be a duress signal. A production app would automatically check and silently alert the group.</p>
       <div class="call-verify__actions">
         <button class="btn btn--primary call-verify__btn" id="cv-match">Match</button>
         <button class="btn call-verify__btn call-verify__btn--danger" id="cv-mismatch">Wrong Word</button>

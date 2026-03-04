@@ -49,6 +49,7 @@ export function renderDuress(container: HTMLElement): void {
     <section class="panel duress-section">
       <h3 class="panel__title">Duress Signal</h3>
       <p class="duress-section__hint">If you are forced to verify under coercion, speak this word instead. It appears valid to the coercer. Hold for 3 seconds to silently alert your group.</p>
+      <p class="duress-section__hint" style="font-size: 0.75rem; opacity: 0.7;">On a real phone call, speaking this word instead of your verification word would alert your group — the caller would see a valid match.</p>
 
       <button
         class="btn duress-btn"
