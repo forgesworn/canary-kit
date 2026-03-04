@@ -22,6 +22,8 @@ export interface AppGroup extends GroupState {
   tolerance: number
   /** Human-readable names for members, keyed by pubkey. */
   memberNames?: Record<string, string>
+  /** Silent duress response mode: immediate alert, dead-drop, or both. */
+  duressMode?: 'immediate' | 'dead-drop' | 'both'
 }
 
 /** The local identity (Nostr keypair) for this device. */

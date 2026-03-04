@@ -46,6 +46,7 @@ export function createNewGroup(name: string, preset: PresetName, memberPubkey?: 
     livenessCheckins: {},
     tolerance: 1,
     memberNames: {},
+    duressMode: 'immediate',
   }
 
   const { groups } = getState()

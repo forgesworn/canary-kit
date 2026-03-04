@@ -84,6 +84,17 @@ export function renderSettings(container: HTMLElement): void {
           <p class="settings-hint">Accept words from neighbouring time windows (higher = more forgiving, less secure)</p>
         </div>
 
+        <!-- Duress Mode -->
+        <div class="settings-section">
+          <span class="input-label">Duress Response</span>
+          <div class="segmented">
+            <button class="segmented__btn ${group.duressMode === 'immediate' || !group.duressMode ? 'segmented__btn--active' : ''}" data-duress-mode="immediate">Immediate</button>
+            <button class="segmented__btn ${group.duressMode === 'dead-drop' ? 'segmented__btn--active' : ''}" data-duress-mode="dead-drop">Dead Drop</button>
+            <button class="segmented__btn ${group.duressMode === 'both' ? 'segmented__btn--active' : ''}" data-duress-mode="both">Both</button>
+          </div>
+          <p class="settings-hint">Immediate alerts members now. Dead drop records silently for later retrieval.</p>
+        </div>
+
         <!-- Nostr Sync Toggle -->
         <div class="settings-section">
           <label class="toggle-label">
@@ -184,6 +195,14 @@ export function renderSettings(container: HTMLElement): void {
   container.querySelectorAll('[data-tolerance]').forEach(btn => {
     btn.addEventListener('click', () => {
       updateGroup(activeGroupId!, { tolerance: Number((btn as HTMLElement).dataset.tolerance) })
+    })
+  })
+
+  // ── Duress mode ─────────────────────────────────────────────
+
+  container.querySelectorAll('[data-duress-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      updateGroup(activeGroupId!, { duressMode: (btn as HTMLElement).dataset.duressMode as 'immediate' | 'dead-drop' | 'both' })
     })
   })
 
