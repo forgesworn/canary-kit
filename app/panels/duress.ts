@@ -119,12 +119,37 @@ export function renderDuress(container: HTMLElement): void {
       // In the demo, all modes broadcast via the sync transport.
       // In production, 'dead-drop' would skip push notifications
       // and only persist on the relay for later retrieval.
-      broadcastAction(gid, {
-        type: 'duress-alert',
-        lat: 0,
-        lon: 0,
-        timestamp: Math.floor(Date.now() / 1000),
-      })
+      // Under duress, share HIGH-PRECISION location so the group can help.
+      // This is the one case where exact GPS is appropriate.
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            broadcastAction(gid, {
+              type: 'duress-alert',
+              lat: pos.coords.latitude,
+              lon: pos.coords.longitude,
+              timestamp: Math.floor(Date.now() / 1000),
+            })
+          },
+          () => {
+            // Geolocation unavailable — send without location
+            broadcastAction(gid, {
+              type: 'duress-alert',
+              lat: 0,
+              lon: 0,
+              timestamp: Math.floor(Date.now() / 1000),
+            })
+          },
+          { enableHighAccuracy: true, timeout: 5000 },
+        )
+      } else {
+        broadcastAction(gid, {
+          type: 'duress-alert',
+          lat: 0,
+          lon: 0,
+          timestamp: Math.floor(Date.now() / 1000),
+        })
+      }
 
       dispatched = true
       console.info('[canary] Silent duress dispatched (mode: %s)', mode)

@@ -41,7 +41,7 @@ export function showDuressAlert(
       <div class="duress-overlay__icon" aria-hidden="true">!</div>
       <h1 class="duress-overlay__title">${name}</h1>
       <h2 class="duress-overlay__subtitle">NEEDS HELP</h2>
-      ${location ? `<p class="duress-overlay__location">Last known: ${location.lat.toFixed(4)}, ${location.lon.toFixed(4)}</p>` : ''}
+      ${location && (location.lat !== 0 || location.lon !== 0) ? `<p class="duress-overlay__location">Last known: ${location.lat.toFixed(4)}, ${location.lon.toFixed(4)}</p>` : ''}
       <p class="duress-overlay__time">${new Date().toLocaleTimeString()}</p>
       <button class="btn btn--lg duress-overlay__dismiss" id="duress-dismiss">I'm Responding</button>
     </div>
