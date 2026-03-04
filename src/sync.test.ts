@@ -472,3 +472,64 @@ describe('authority model invariants', () => {
     expect(result).toBe(group)
   })
 })
+
+describe('authority model serialisation', () => {
+  it('round-trips a reseed with epoch, opId, admins, members', () => {
+    const seed = new Uint8Array(32).fill(42)
+    const msg: SyncMessage = {
+      type: 'reseed', seed, counter: 5, timestamp: 1700000000,
+      epoch: 3, opId: 'test-op',
+      admins: [PUBKEY_AAA], members: [PUBKEY_AAA, PUBKEY_BBB],
+    }
+    const decoded = decodeSyncMessage(encodeSyncMessage(msg))
+    expect(decoded.type).toBe('reseed')
+    if (decoded.type === 'reseed') {
+      expect(decoded.epoch).toBe(3)
+      expect(decoded.opId).toBe('test-op')
+      expect(decoded.admins).toEqual([PUBKEY_AAA])
+      expect(decoded.members).toEqual([PUBKEY_AAA, PUBKEY_BBB])
+      expect(Array.from(decoded.seed)).toEqual(Array.from(seed))
+    }
+  })
+
+  it('round-trips a member-join with epoch and opId', () => {
+    const msg: SyncMessage = {
+      type: 'member-join', pubkey: PUBKEY_AAA, timestamp: 1700000000,
+      epoch: 2, opId: 'join-op',
+    }
+    const decoded = decodeSyncMessage(encodeSyncMessage(msg))
+    expect(decoded).toEqual(msg)
+  })
+
+  it('round-trips a member-leave with epoch and opId', () => {
+    const msg: SyncMessage = {
+      type: 'member-leave', pubkey: PUBKEY_AAA, timestamp: 1700000000,
+      epoch: 2, opId: 'leave-op',
+    }
+    const decoded = decodeSyncMessage(encodeSyncMessage(msg))
+    expect(decoded).toEqual(msg)
+  })
+
+  it('rejects reseed without required epoch', () => {
+    const payload = JSON.stringify({
+      type: 'reseed', seed: 'a'.repeat(64), counter: 0, timestamp: 1700000000,
+    })
+    expect(() => decodeSyncMessage(payload)).toThrow('epoch')
+  })
+
+  it('rejects member-join without required epoch', () => {
+    const payload = JSON.stringify({
+      type: 'member-join', pubkey: 'a'.repeat(64), timestamp: 1700000000,
+    })
+    expect(() => decodeSyncMessage(payload)).toThrow('epoch')
+  })
+
+  it('rejects reseed with opId exceeding 128 chars', () => {
+    const payload = JSON.stringify({
+      type: 'reseed', seed: 'a'.repeat(64), counter: 0, timestamp: 1700000000,
+      epoch: 1, opId: 'x'.repeat(129),
+      admins: ['a'.repeat(64)], members: ['a'.repeat(64)],
+    })
+    expect(() => decodeSyncMessage(payload)).toThrow('opId')
+  })
+})
