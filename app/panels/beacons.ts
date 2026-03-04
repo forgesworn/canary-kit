@@ -59,14 +59,39 @@ function buildCircleFeatures(): any {
 
 // ── MapLibre loading ──────────────────────────────────────────
 
+const MAPLIBRE_CDN_JS = 'https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js'
+const MAPLIBRE_CDN_CSS = 'https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css'
+
 async function loadMapLibre(): Promise<typeof import('maplibre-gl')> {
   if (maplibregl) return maplibregl
-  const [ml] = await Promise.all([
-    import('maplibre-gl'),
-    import('maplibre-gl/dist/maplibre-gl.css'),
-  ])
-  maplibregl = ml
-  return ml
+
+  // Try npm bundle first (normal build). Falls back to CDN for single-file build.
+  try {
+    const [ml] = await Promise.all([
+      import('maplibre-gl'),
+      import('maplibre-gl/dist/maplibre-gl.css'),
+    ])
+    maplibregl = ml
+    return ml
+  } catch {
+    // Not bundled (single-file build) — load from CDN
+  }
+
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.href = MAPLIBRE_CDN_CSS
+  document.head.appendChild(link)
+
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = MAPLIBRE_CDN_JS
+    script.onload = () => resolve()
+    script.onerror = reject
+    document.head.appendChild(script)
+  })
+
+  maplibregl = (window as any).maplibregl
+  return maplibregl!
 }
 
 // ── Render ────────────────────────────────────────────────────
