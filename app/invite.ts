@@ -39,6 +39,10 @@ export interface InvitePayload {
   admins: string[]
   /** Protocol version at invite creation. */
   protocolVersion: number
+  /** Pubkey of the admin who created this invite. */
+  inviterPubkey: string
+  /** HMAC-SHA256(seed, canonicalPayload) — proves the inviter knew the group seed. */
+  inviterSig: string
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -134,6 +138,40 @@ function assertInvitePayload(raw: unknown): asserts raw is InvitePayload {
   if (data.protocolVersion !== PROTOCOL_VERSION) {
     throw new Error(`Unsupported invite protocol version: ${data.protocolVersion} (expected: ${PROTOCOL_VERSION})`)
   }
+  if (typeof data.inviterPubkey !== 'string' || !HEX_64_RE.test(data.inviterPubkey)) {
+    throw new Error('Invalid invite payload — inviterPubkey must be a 64-char hex pubkey.')
+  }
+  // Inviter must be in the admins list
+  if (!(data.admins as string[]).includes(data.inviterPubkey as string)) {
+    throw new Error('Invalid invite payload — inviterPubkey must be in admins.')
+  }
+  if (typeof data.inviterSig !== 'string' || !HEX_64_RE.test(data.inviterSig)) {
+    throw new Error('Invalid invite payload — inviterSig must be a 64-char hex string.')
+  }
+}
+
+/**
+ * Compute the canonical bytes for invite signing/verification.
+ * Excludes inviterSig (the field being computed) but includes all other fields.
+ * Keys are sorted for deterministic output.
+ */
+function inviteCanonicalBytes(payload: InvitePayload): Uint8Array {
+  const { inviterSig: _sig, ...rest } = payload
+  const sorted = Object.keys(rest).sort().reduce((acc, key) => {
+    acc[key] = (rest as Record<string, unknown>)[key]
+    return acc
+  }, {} as Record<string, unknown>)
+  return new TextEncoder().encode(JSON.stringify(sorted))
+}
+
+/**
+ * Compute the inviter signature: HMAC-SHA256(seed, canonicalPayload).
+ * Proves the signer knew the group seed. Returns first 32 hex chars (128 bits).
+ */
+function computeInviterSig(payload: InvitePayload): string {
+  const canonical = inviteCanonicalBytes(payload)
+  const mac = hmacSha256(hexToBytes(payload.seed), canonical)
+  return bytesToHex(mac).slice(0, 64)
 }
 
 /**
@@ -200,7 +238,11 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
     epoch: group.epoch ?? 0,
     admins: [...(group.admins ?? [])],
     protocolVersion: 1,
+    inviterPubkey: identity.pubkey,
+    inviterSig: '', // placeholder — computed below
   }
+
+  invitePayload.inviterSig = computeInviterSig(invitePayload)
 
   const payload = btoa(JSON.stringify(invitePayload))
   const confirmCode = confirmCodeFromPayload(invitePayload)
@@ -247,6 +289,14 @@ export function acceptInvite(payload: string, confirmCode?: string): InvitePaylo
     epoch: raw.epoch,
     admins: [...raw.admins],
     protocolVersion: raw.protocolVersion,
+    inviterPubkey: raw.inviterPubkey,
+    inviterSig: raw.inviterSig,
+  }
+
+  // Verify the inviter signature — proves the inviter knew the group seed.
+  const expectedSig = computeInviterSig(data)
+  if (data.inviterSig !== expectedSig) {
+    throw new Error('Invite signature is invalid — the inviter could not prove knowledge of the group seed.')
   }
 
   if (!confirmCode?.trim()) {

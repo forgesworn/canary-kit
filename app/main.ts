@@ -511,6 +511,15 @@ function wireGlobalEvents(): void {
           throw new Error('This invite is stale and has been rejected.')
         }
 
+        // Authority check: for existing groups, inviter must be a current admin
+        // in our LOCAL state (not the invite's claimed admins — those are attacker-controlled).
+        if (existingGroup) {
+          const localAdmins = existingGroup.admins ?? []
+          if (!localAdmins.includes(data.inviterPubkey)) {
+            throw new Error('Invite rejected — the inviter is not a recognised admin of this group.')
+          }
+        }
+
         // I5: invites accepted only if invite.epoch >= local.epoch
         // (strictly newer for seed change)
         if (existingGroup) {
