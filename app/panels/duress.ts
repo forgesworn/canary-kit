@@ -4,6 +4,7 @@ import { deriveDuressToken } from 'canary-kit/token'
 import { getState } from '../state.js'
 import type { AppGroup } from '../types.js'
 import { toTokenEncoding, GROUP_CONTEXT, formatForDisplay } from '../utils/encoding.js'
+import { broadcastAction } from '../sync.js'
 
 /**
  * Derive the duress display token using the universal CANARY token API.
@@ -47,7 +48,7 @@ export function renderDuress(container: HTMLElement): void {
   container.innerHTML = `
     <section class="panel duress-section">
       <h3 class="panel__title">Duress Signal</h3>
-      <p class="duress-section__hint">If you are forced to verify under coercion, speak this word instead. It appears valid but silently alerts your group.</p>
+      <p class="duress-section__hint">If you are forced to verify under coercion, speak this word instead. It appears valid to the coercer. Hold for 3 seconds to silently alert your group.</p>
 
       <button
         class="btn duress-btn"
@@ -95,11 +96,53 @@ export function renderDuress(container: HTMLElement): void {
     labelEl.textContent = 'Hold to Reveal'
   }
 
+  // ── Hold gesture with silent dispatch ───────────────────────
+  // Short hold (< 3s): reveal word only.
+  // Long hold (≥ 3s): reveal word AND silently dispatch duress alert.
+
+  let holdTimer: ReturnType<typeof setTimeout> | null = null
+  let dispatched = false
+
+  function startHold(): void {
+    dispatched = false
+    showWord()
+
+    holdTimer = setTimeout(() => {
+      // Silent dispatch — no visible UI change
+      const { groups: g, activeGroupId: gid, identity: id } = getState()
+      if (!gid || !id?.pubkey) return
+      const currentGroup = g[gid]
+      if (!currentGroup) return
+
+      const mode = currentGroup.duressMode ?? 'immediate'
+      // In the demo, all modes broadcast via the sync transport.
+      // In production, 'dead-drop' would skip push notifications
+      // and only persist on the relay for later retrieval.
+      broadcastAction(gid, {
+        type: 'duress-alert',
+        lat: 0,
+        lon: 0,
+        timestamp: Math.floor(Date.now() / 1000),
+      })
+
+      dispatched = true
+      console.info('[canary] Silent duress dispatched (mode: %s)', mode)
+    }, 3000)
+  }
+
+  function endHold(): void {
+    if (holdTimer) {
+      clearTimeout(holdTimer)
+      holdTimer = null
+    }
+    hideWord()
+  }
+
   holdBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault()
-    showWord()
+    startHold()
   })
-  holdBtn.addEventListener('pointerup', hideWord)
-  holdBtn.addEventListener('pointerleave', hideWord)
-  holdBtn.addEventListener('pointercancel', hideWord)
+  holdBtn.addEventListener('pointerup', endHold)
+  holdBtn.addEventListener('pointerleave', endHold)
+  holdBtn.addEventListener('pointercancel', endHold)
 }
