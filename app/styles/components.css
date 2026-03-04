@@ -218,6 +218,34 @@ button {
   width: 100%;
 }
 
+.identity-popover__divider {
+  border-top: 1px solid var(--border);
+  margin: 0.5rem 0;
+}
+
+.identity-popover__section {
+  margin: 0.25rem 0;
+}
+
+.identity-popover__demos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.375rem;
+}
+
+.identity-popover__demo {
+  text-align: left;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.identity-popover__demo .identity-popover__label {
+  font-weight: 400;
+}
+
 /* ── Hamburger menu button (mobile only) ─────────────────── */
 
 .header__hamburger {

@@ -1,8 +1,11 @@
 // app/components/header.ts — Header component: brand, theme toggle, relay status, identity
 
 import { getState, update } from '../state.js'
-import { hasNip07, resolveSigner, Nip07Signer } from '../nostr/signer.js'
+import { hasNip07, resolveSigner } from '../nostr/signer.js'
+import { DEMO_ACCOUNTS } from '../demo-accounts.js'
 import type { AppIdentity } from '../types.js'
+import { decode as nip19decode } from 'nostr-tools/nip19'
+import { getPublicKey } from 'nostr-tools/pure'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -161,6 +164,37 @@ export function updateIdentityDisplay(): void {
     : 'header__identity-dot header__identity-dot--local'
 }
 
+/** Convert a Uint8Array to hex string. */
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Log in with an nsec (bech32 private key). */
+function loginWithNsec(nsec: string, displayName?: string): boolean {
+  try {
+    const decoded = nip19decode(nsec.trim())
+    if (decoded.type !== 'nsec') {
+      alert('Not a valid nsec. Expected a bech32-encoded private key starting with "nsec1".')
+      return false
+    }
+    const privkeyBytes = decoded.data as Uint8Array
+    const privkey = bytesToHex(privkeyBytes)
+    const pubkey = getPublicKey(privkeyBytes)
+    const newIdentity: AppIdentity = {
+      pubkey,
+      privkey,
+      signerType: 'local',
+      displayName: displayName ?? 'You',
+    }
+    update({ identity: newIdentity })
+    updateIdentityDisplay()
+    return true
+  } catch {
+    alert('Invalid nsec format.')
+    return false
+  }
+}
+
 function showIdentityPopover(anchor: HTMLElement): void {
   // Remove existing popover
   document.getElementById('identity-popover')?.remove()
@@ -170,6 +204,12 @@ function showIdentityPopover(anchor: HTMLElement): void {
   const shortPk = pk ? `${pk.slice(0, 8)}\u2026${pk.slice(-8)}` : 'None'
   const signerLabel = identity?.signerType === 'nip07' ? 'Extension (NIP-07)' : 'Local key'
   const extensionAvailable = hasNip07()
+
+  const demoAccountsHtml = DEMO_ACCOUNTS.map(a => `
+    <button class="btn btn--sm identity-popover__demo" data-nsec="${a.nsec}" data-name="${a.name}" type="button">
+      <strong>${a.name}</strong> <span class="identity-popover__label">${a.bio}</span>
+    </button>
+  `).join('')
 
   const popover = document.createElement('div')
   popover.id = 'identity-popover'
@@ -183,18 +223,59 @@ function showIdentityPopover(anchor: HTMLElement): void {
       <span class="identity-popover__label">Signer</span>
       <span class="identity-popover__value">${signerLabel}</span>
     </div>
-    ${identity?.signerType !== 'nip07' && extensionAvailable ? `
-      <button class="btn btn--sm btn--primary" id="nip07-connect-btn" type="button">Use Extension</button>
+
+    <div class="identity-popover__divider"></div>
+
+    <div class="identity-popover__section">
+      <span class="identity-popover__label">Login with nsec</span>
+      <div style="display: flex; gap: 0.25rem; margin-top: 0.25rem;">
+        <input class="input" type="password" id="nsec-input" placeholder="nsec1..." style="flex: 1; font-size: 0.75rem;" />
+        <button class="btn btn--sm btn--primary" id="nsec-login-btn" type="button">Login</button>
+      </div>
+    </div>
+
+    ${extensionAvailable ? `
+      <button class="btn btn--sm" id="nip07-connect-btn" type="button" style="width: 100%;">Use Browser Extension</button>
     ` : ''}
-    ${identity?.signerType !== 'nip07' && !extensionAvailable ? `
-      <p class="settings-hint" style="margin: 0.5rem 0 0;">No NIP-07 extension detected. Install <a href="https://getalby.com" target="_blank" style="color: var(--amber);">Alby</a> or nos2x to sign with your Nostr identity.</p>
-    ` : ''}
+
     ${identity?.signerType === 'nip07' ? `
-      <button class="btn btn--sm" id="nip07-disconnect-btn" type="button">Use Local Key</button>
+      <button class="btn btn--sm" id="nip07-disconnect-btn" type="button" style="width: 100%;">Use Local Key</button>
     ` : ''}
+
+    <div class="identity-popover__divider"></div>
+
+    <div class="identity-popover__section">
+      <span class="identity-popover__label">Demo accounts</span>
+      <div class="identity-popover__demos">
+        ${demoAccountsHtml}
+      </div>
+    </div>
   `
 
   anchor.parentElement?.appendChild(popover)
+
+  // nsec login
+  popover.querySelector('#nsec-login-btn')?.addEventListener('click', () => {
+    const input = popover.querySelector<HTMLInputElement>('#nsec-input')
+    if (!input?.value.trim()) return
+    if (loginWithNsec(input.value)) popover.remove()
+  })
+
+  popover.querySelector<HTMLInputElement>('#nsec-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const input = e.target as HTMLInputElement
+      if (loginWithNsec(input.value)) popover.remove()
+    }
+  })
+
+  // Demo account quick-select
+  popover.querySelectorAll<HTMLButtonElement>('.identity-popover__demo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const nsec = btn.dataset.nsec!
+      const name = btn.dataset.name!
+      if (loginWithNsec(nsec, name)) popover.remove()
+    })
+  })
 
   // Connect NIP-07
   popover.querySelector('#nip07-connect-btn')?.addEventListener('click', async () => {
