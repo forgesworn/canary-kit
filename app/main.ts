@@ -135,6 +135,7 @@ function showLockScreen(): void {
       if (header) renderHeader(header)
       wireSidebarToggle()
       checkInviteFragment()
+      window.addEventListener('hashchange', () => checkInviteFragment())
       render()
       subscribe(render)
       startAutoLock()
@@ -363,7 +364,7 @@ function wireGlobalEvents(): void {
       <label class="input-label">Invite String
         <textarea name="payload" class="input" rows="3" placeholder="Paste the invite string here" required>${prefill}</textarea>
       </label>
-      <label class="input-label">Confirmation Code
+      <label class="input-label">Confirmation Code (optional)
         <input name="code" class="input" placeholder="6-character code" maxlength="6">
       </label>
       <div class="modal__actions">
@@ -547,6 +548,7 @@ async function init(): Promise<void> {
     }
 
     checkInviteFragment()
+    window.addEventListener('hashchange', () => checkInviteFragment())
 
     const header = document.getElementById('header')
     if (header) renderHeader(header)

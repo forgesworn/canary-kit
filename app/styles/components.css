@@ -917,6 +917,16 @@ select.input option {
   margin: 1rem 0;
 }
 
+.invite-share__actions .btn {
+  min-width: 10rem;
+}
+
+.btn--copied {
+  background: var(--verified) !important;
+  border-color: var(--verified) !important;
+  color: #000 !important;
+}
+
 /* ── .invite-string ──────────────────────────────────────── */
 
 .invite-string {

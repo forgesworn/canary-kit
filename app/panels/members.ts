@@ -43,12 +43,15 @@ export function showInviteModal(payload: string, confirmCode: string): void {
       <h2 class="modal__title">Invite to Group</h2>
 
       <div class="qr-container">${svgMarkup}</div>
+      <p class="invite-hint">Scan with your phone camera to join</p>
 
       <div class="confirm-code">
         <span class="confirm-code__label">Verification code</span>
         <span class="confirm-code__value">${confirmCode}</span>
       </div>
-      <p class="invite-hint">Read this code aloud to verify the invite wasn't tampered with</p>
+      <p class="invite-hint">Optional security check — ask the recipient to confirm this code</p>
+
+      <p class="invite-hint" style="color: var(--failed); font-weight: 500;">This invite contains the group secret. Share it privately.</p>
 
       <div class="invite-share__actions">
         <button class="btn btn--primary" id="invite-copy-link" type="button">Copy Link</button>
@@ -75,8 +78,9 @@ export function showInviteModal(payload: string, confirmCode: string): void {
     const btn = e.currentTarget as HTMLButtonElement
     try {
       await navigator.clipboard.writeText(joinUrl)
-      btn.textContent = 'Copied!'
-      setTimeout(() => { btn.textContent = 'Copy Link' }, 2000)
+      btn.textContent = 'Link Copied!'
+      btn.classList.add('btn--copied')
+      setTimeout(() => { btn.textContent = 'Copy Link'; btn.classList.remove('btn--copied') }, 2000)
     } catch { /* clipboard may be blocked */ }
   })
 
@@ -84,8 +88,9 @@ export function showInviteModal(payload: string, confirmCode: string): void {
     const btn = e.currentTarget as HTMLButtonElement
     try {
       await navigator.clipboard.writeText(payload)
-      btn.textContent = 'Copied!'
-      setTimeout(() => { btn.textContent = 'Copy Invite Text' }, 2000)
+      btn.textContent = 'Text Copied!'
+      btn.classList.add('btn--copied')
+      setTimeout(() => { btn.textContent = 'Copy Invite Text'; btn.classList.remove('btn--copied') }, 2000)
     } catch { /* clipboard may be blocked */ }
   })
 
