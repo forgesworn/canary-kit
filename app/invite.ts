@@ -32,6 +32,10 @@ export interface InvitePayload {
   issuedAt: number
   /** Invite expiry time (unix seconds). */
   expiresAt: number
+  /** Monotonic epoch at invite creation. */
+  epoch: number
+  /** Admin pubkeys at invite creation. */
+  admins: string[]
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -109,6 +113,17 @@ function assertInvitePayload(raw: unknown): asserts raw is InvitePayload {
   if ((data.expiresAt as number) <= (data.issuedAt as number)) {
     throw new Error('Invalid invite payload — expiresAt must be after issuedAt.')
   }
+  if (!isNonNegativeInt(data.epoch)) {
+    throw new Error('Invalid invite payload — epoch must be a non-negative integer.')
+  }
+  if (!Array.isArray(data.admins) || !data.admins.every((a) => typeof a === 'string' && HEX_64_RE.test(a))) {
+    throw new Error('Invalid invite payload — admins must be 64-char hex pubkeys.')
+  }
+  // Enforce admins ⊆ members
+  const memberSet = new Set(data.members as string[])
+  if (!(data.admins as string[]).every((a) => memberSet.has(a))) {
+    throw new Error('Invalid invite payload — all admins must be in members.')
+  }
 }
 
 /**
@@ -163,6 +178,8 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
     tolerance: group.tolerance ?? 1,
     issuedAt,
     expiresAt: issuedAt + INVITE_MAX_AGE_SEC,
+    epoch: group.epoch ?? 0,
+    admins: [...(group.admins ?? [])],
   }
 
   const payload = btoa(JSON.stringify(invitePayload))
@@ -207,6 +224,8 @@ export function acceptInvite(payload: string, confirmCode?: string): InvitePaylo
     tolerance: raw.tolerance,
     issuedAt: raw.issuedAt,
     expiresAt: raw.expiresAt,
+    epoch: raw.epoch,
+    admins: [...raw.admins],
   }
 
   if (!confirmCode?.trim()) {

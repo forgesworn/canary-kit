@@ -365,6 +365,13 @@ export function renderSettings(container: HTMLElement): void {
           beaconPrecision: typeof imported.beaconPrecision === 'number' && imported.beaconPrecision > 0 ? imported.beaconPrecision : 6,
           duressMode: (['immediate', 'dead-drop', 'both'] as const).includes(imported.duressMode) ? imported.duressMode : 'immediate',
           createdAt: typeof imported.createdAt === 'number' ? imported.createdAt : Math.floor(Date.now() / 1000),
+          admins: Array.isArray(imported.admins)
+            ? imported.admins.filter((a: unknown) => typeof a === 'string')
+            : [],
+          epoch: typeof imported.epoch === 'number' && imported.epoch >= 0 ? imported.epoch : 0,
+          consumedOps: Array.isArray(imported.consumedOps)
+            ? imported.consumedOps.filter((o: unknown) => typeof o === 'string')
+            : [],
         }
         const { groups: currentGroups } = getState()
         update({ groups: { ...currentGroups, [id]: appGroup }, activeGroupId: id })

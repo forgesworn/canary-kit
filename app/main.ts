@@ -511,6 +511,19 @@ function wireGlobalEvents(): void {
           throw new Error('This invite is stale and has been rejected.')
         }
 
+        // I5: invites accepted only if invite.epoch >= local.epoch
+        // (strictly newer for seed change)
+        if (existingGroup) {
+          const localEpoch = existingGroup.epoch ?? 0
+          const inviteEpoch = data.epoch
+          if (inviteEpoch < localEpoch) {
+            throw new Error('This invite is from an older epoch and has been rejected.')
+          }
+          if (data.seed !== existingGroup.seed && inviteEpoch <= localEpoch) {
+            throw new Error('Seed change requires a strictly newer epoch.')
+          }
+        }
+
         // Forward-only rekey migration:
         // if seed differs and invite is newer, accept as intentional rotation.
         const isSeedMigration = !!(existingGroup && existingGroup.seed !== data.seed)
@@ -572,6 +585,13 @@ function wireGlobalEvents(): void {
           livenessCheckins,
           tolerance: data.tolerance,
           createdAt: existingGroup?.createdAt ?? Math.floor(Date.now() / 1000),
+          admins: isSeedMigration
+            ? [...data.admins]
+            : [...(existingGroup?.admins ?? data.admins)],
+          epoch: isSeedMigration
+            ? data.epoch
+            : Math.max(existingGroup?.epoch ?? 0, data.epoch),
+          consumedOps: isSeedMigration ? [] : [...(existingGroup?.consumedOps ?? [])],
         }
         const groups = { ...existingGroups, [id]: appGroup }
         update({ groups, activeGroupId: id })
@@ -587,6 +607,8 @@ function wireGlobalEvents(): void {
               type: 'member-join',
               pubkey: identity.pubkey,
               timestamp: Math.floor(Date.now() / 1000),
+              epoch: data.epoch,
+              opId: crypto.randomUUID(),
             })
           })
         }
