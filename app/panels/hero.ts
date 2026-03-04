@@ -157,6 +157,7 @@ export function renderHero(container: HTMLElement): void {
 
       <button class="btn btn--ghost" id="burn-btn" type="button">I used this word</button>
       <button class="btn btn--outline" id="hero-invite-btn" type="button">Invite Someone</button>
+      ${group.members.length >= 2 ? `<button class="btn btn--outline" id="hero-call-btn" type="button" title="Start a phone call verification">Verify Call</button>` : ''}
 
     </section>
   `
@@ -215,6 +216,29 @@ export function renderHero(container: HTMLElement): void {
   const inviteBtn = container.querySelector<HTMLButtonElement>('#hero-invite-btn')
   inviteBtn?.addEventListener('click', () => {
     document.dispatchEvent(new CustomEvent('canary:show-invite', { detail: { groupId: activeGroupId } }))
+  })
+
+  const callBtn = container.querySelector<HTMLButtonElement>('#hero-call-btn')
+  callBtn?.addEventListener('click', () => {
+    // Show a simple member picker
+    const { identity } = getState()
+    const others = group.members.filter(m => m !== identity?.pubkey)
+    if (others.length === 0) return
+
+    if (others.length === 1) {
+      // Only one other member — start directly
+      document.dispatchEvent(new CustomEvent('canary:verify-call', {
+        detail: { groupId: activeGroupId, pubkey: others[0] },
+      }))
+      return
+    }
+
+    // Multiple members — show a simple picker overlay
+    // For now, just use the first other member (simplest approach for Phase 1)
+    // TODO: member picker modal in Phase 2
+    document.dispatchEvent(new CustomEvent('canary:verify-call', {
+      detail: { groupId: activeGroupId, pubkey: others[0] },
+    }))
   })
 
   // ── Countdown tick ─────────────────────────────────────────

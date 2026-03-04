@@ -30,6 +30,7 @@ import { renderBeacons } from './panels/beacons.js'
 import { renderLiveness } from './panels/liveness.js'
 import { renderSettings } from './panels/settings.js'
 import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
+import { showCallVerify } from './components/call-verify.js'
 import { acceptInvite, createInvite } from './invite.js'
 import { resolveSigner } from './nostr/signer.js'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
@@ -437,6 +438,11 @@ function wireGlobalEvents(): void {
     if (!group) return
     const { payload, confirmCode } = createInvite(group)
     showInviteModal(payload, confirmCode)
+  })
+
+  document.addEventListener('canary:verify-call', (evt) => {
+    const { groupId, pubkey } = (evt as CustomEvent).detail
+    showCallVerify(groupId, pubkey)
   })
 
   // Fired by the settings panel PIN toggle.
