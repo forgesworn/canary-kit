@@ -129,8 +129,10 @@ export class NostrSyncTransport implements SyncTransport {
             // Dedup: skip events we've already processed (e.g. on reconnect within the since window).
             // IMPORTANT: this check is placed AFTER signature verification to prevent a
             // malicious relay from poisoning the cache with forged event IDs.
+            // The add() is deferred until after successful processing so that
+            // transient failures (e.g. key-rotation timing) don't permanently
+            // suppress the event on relay replay.
             if (typeof event.id === 'string' && this.seenEventIds.has(event.id)) return
-            if (typeof event.id === 'string') this.seenEventIds.add(event.id)
 
             // Decrypt and verify authenticated inner envelope.
             // Format: { s: personalPubkey, sig: schnorr(sig over payload), p: syncPayload }
@@ -175,6 +177,10 @@ export class NostrSyncTransport implements SyncTransport {
             }
 
             onMessage(msg, sender)
+
+            // Mark event as seen only after successful processing to avoid
+            // permanently suppressing events that hit transient failures.
+            if (typeof event.id === 'string') this.seenEventIds.add(event.id)
           } catch (err) {
             console.warn('[canary:sync] Failed to process event:', err)
           }
