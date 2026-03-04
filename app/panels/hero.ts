@@ -156,6 +156,7 @@ export function renderHero(container: HTMLElement): void {
       </div>
 
       <button class="btn btn--ghost" id="burn-btn" type="button">I used this word</button>
+      <button class="btn btn--outline" id="hero-invite-btn" type="button">Invite Someone</button>
 
     </section>
   `
@@ -209,6 +210,11 @@ export function renderHero(container: HTMLElement): void {
     if (!currentGroup) return
     const advanced = advanceCounter(currentGroup)
     updateGroup(activeGroupId, advanced)
+  })
+
+  const inviteBtn = container.querySelector<HTMLButtonElement>('#hero-invite-btn')
+  inviteBtn?.addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent('canary:show-invite', { detail: { groupId: activeGroupId } }))
   })
 
   // ── Countdown tick ─────────────────────────────────────────

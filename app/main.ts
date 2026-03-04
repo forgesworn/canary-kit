@@ -25,12 +25,12 @@ import { renderWelcome } from './panels/welcome.js'
 import { renderHero } from './panels/hero.js'
 import { renderDuress } from './panels/duress.js'
 import { renderVerify } from './panels/verify.js'
-import { renderMembers } from './panels/members.js'
+import { renderMembers, showInviteModal } from './panels/members.js'
 import { renderBeacons } from './panels/beacons.js'
 import { renderLiveness } from './panels/liveness.js'
 import { renderSettings } from './panels/settings.js'
 import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
-import { acceptInvite } from './invite.js'
+import { acceptInvite, createInvite } from './invite.js'
 import { resolveSigner } from './nostr/signer.js'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
 import type { AppIdentity } from './types.js'
@@ -427,6 +427,15 @@ function wireGlobalEvents(): void {
         dialog?.close()
       })
     })
+  })
+
+  document.addEventListener('canary:show-invite', (evt) => {
+    const { groupId } = (evt as CustomEvent).detail
+    const { groups } = getState()
+    const group = groups[groupId]
+    if (!group) return
+    const { payload, confirmCode } = createInvite(group)
+    showInviteModal(payload, confirmCode)
   })
 
   // Fired by the settings panel PIN toggle.

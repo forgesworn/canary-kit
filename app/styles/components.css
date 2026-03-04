@@ -903,6 +903,19 @@ select.input option {
   margin: 0;
 }
 
+/* ── .invite-share ─────────────────────────────────────────── */
+
+.invite-share {
+  text-align: center;
+}
+
+.invite-share__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
 /* ── .invite-string ──────────────────────────────────────── */
 
 .invite-string {

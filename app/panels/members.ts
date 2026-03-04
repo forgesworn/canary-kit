@@ -22,17 +22,14 @@ function formatPubkey(pubkey: string, members: string[]): string {
 // ── Invite modal ───────────────────────────────────────────────
 
 /**
- * Open the invite modal with QR and Paste tabs.
- * Uses a plain <dialog> element rather than the shared modal helper so
- * we can manage two tabs without a form submit workflow.
+ * Open the invite share sheet with QR, Copy Link, and Copy Invite Text all visible at once.
+ * Uses a plain <dialog> element rather than the shared modal helper.
  */
-function showInviteModal(payload: string, confirmCode: string): void {
-  // QR encodes a URL so scanning opens the demo directly with the invite pre-filled.
+export function showInviteModal(payload: string, confirmCode: string): void {
   const base = window.location.origin + window.location.pathname
-  const qrUrl = `${base}#join/${encodeURIComponent(payload)}`
-  const svgMarkup = generateQR(qrUrl)
+  const joinUrl = `${base}#join/${encodeURIComponent(payload)}`
+  const svgMarkup = generateQR(joinUrl)
 
-  // Reuse or create an invite-specific dialog.
   let dialog = document.getElementById('invite-modal') as HTMLDialogElement | null
   if (!dialog) {
     dialog = document.createElement('dialog')
@@ -42,92 +39,54 @@ function showInviteModal(payload: string, confirmCode: string): void {
   }
 
   dialog.innerHTML = `
-    <div class="modal__form">
-      <h2 class="modal__title">Invite Member</h2>
+    <div class="modal__form invite-share">
+      <h2 class="modal__title">Invite to Group</h2>
 
-      <div class="invite-tabs">
-        <button class="invite-tab invite-tab--active" data-tab="qr" type="button">QR Code</button>
-        <button class="invite-tab" data-tab="paste" type="button">Paste Link</button>
+      <div class="qr-container">${svgMarkup}</div>
+
+      <div class="confirm-code">
+        <span class="confirm-code__label">Verification code</span>
+        <span class="confirm-code__value">${confirmCode}</span>
+      </div>
+      <p class="invite-hint">Read this code aloud to verify the invite wasn't tampered with</p>
+
+      <div class="invite-share__actions">
+        <button class="btn btn--primary" id="invite-copy-link" type="button">Copy Link</button>
+        <button class="btn" id="invite-copy-text" type="button">Copy Invite Text</button>
       </div>
 
-      <div class="invite-content" id="invite-content-qr">
-        <div class="qr-container">
-          ${svgMarkup}
-        </div>
-        <p class="invite-hint">Scan this QR code to join the group.</p>
-        <div class="confirm-code">
-          <span class="confirm-code__label">Confirm code</span>
-          <span class="confirm-code__value">${confirmCode}</span>
-        </div>
-      </div>
-
-      <div class="invite-content" id="invite-content-paste" hidden>
-        <textarea
-          class="input invite-string"
-          id="invite-string-textarea"
-          readonly
-          rows="5"
-          spellcheck="false"
-        >${payload}</textarea>
-        <div class="members-actions">
-          <button class="btn btn--sm" id="copy-invite-btn" type="button">Copy</button>
-        </div>
-        <div class="confirm-code">
-          <span class="confirm-code__label">Confirm code</span>
-          <span class="confirm-code__value">${confirmCode}</span>
-        </div>
-      </div>
+      <p class="invite-hint">Share via WhatsApp, Signal, email, or any messaging app</p>
 
       <div class="modal__actions">
-        <button class="btn" id="invite-close-btn" type="button">Close</button>
+        <button class="btn" id="invite-close-btn" type="button">Done</button>
       </div>
     </div>
   `
 
-  // Close on backdrop click.
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) dialog!.close()
   })
 
-  // Close button.
   dialog.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => {
     dialog!.close()
   })
 
-  // Tab switching.
-  const tabBar = dialog.querySelector<HTMLElement>('.invite-tabs')
-  const qrPane = dialog.querySelector<HTMLElement>('#invite-content-qr')
-  const pastePane = dialog.querySelector<HTMLElement>('#invite-content-paste')
-
-  tabBar?.addEventListener('click', (e) => {
-    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-tab]')
-    if (!btn) return
-    const tab = btn.dataset.tab
-
-    // Update active tab button.
-    tabBar.querySelectorAll<HTMLButtonElement>('.invite-tab').forEach((t) => {
-      t.classList.toggle('invite-tab--active', t.dataset.tab === tab)
-    })
-
-    // Show/hide panes.
-    if (qrPane) qrPane.hidden = tab !== 'qr'
-    if (pastePane) pastePane.hidden = tab !== 'paste'
+  dialog.querySelector<HTMLButtonElement>('#invite-copy-link')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement
+    try {
+      await navigator.clipboard.writeText(joinUrl)
+      btn.textContent = 'Copied!'
+      setTimeout(() => { btn.textContent = 'Copy Link' }, 2000)
+    } catch { /* clipboard may be blocked */ }
   })
 
-  // Copy button.
-  dialog.querySelector<HTMLButtonElement>('#copy-invite-btn')?.addEventListener('click', async (e) => {
+  dialog.querySelector<HTMLButtonElement>('#invite-copy-text')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget as HTMLButtonElement
     try {
       await navigator.clipboard.writeText(payload)
       btn.textContent = 'Copied!'
-      setTimeout(() => {
-        btn.textContent = 'Copy'
-      }, 2000)
-    } catch {
-      // Fallback: select the textarea.
-      const textarea = dialog!.querySelector<HTMLTextAreaElement>('#invite-string-textarea')
-      textarea?.select()
-    }
+      setTimeout(() => { btn.textContent = 'Copy Invite Text' }, 2000)
+    } catch { /* clipboard may be blocked */ }
   })
 
   dialog.showModal()
