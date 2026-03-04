@@ -59,8 +59,12 @@ function buildCircleFeatures(): any {
 
 // ── MapLibre loading ──────────────────────────────────────────
 
-const MAPLIBRE_CDN_JS = 'https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js'
-const MAPLIBRE_CDN_CSS = 'https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css'
+// Pinned version + SRI hashes to prevent supply-chain attacks via CDN.
+const MAPLIBRE_VERSION = '5.19.0'
+const MAPLIBRE_CDN_JS = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.js`
+const MAPLIBRE_CDN_CSS = `https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css`
+const MAPLIBRE_JS_SRI = 'sha384-pEfbADcwebVj4NNOvWFLUkm+FiGTICE5bChpV647czG7OpSqcHNgxM8QawfAkbRO'
+const MAPLIBRE_CSS_SRI = 'sha384-MGCxhspF/+ufueUgol3FDkiAYQbpSNRhBT0VWHJt64U8qIy9qlnXWx8LAbj6niPH'
 
 async function loadMapLibre(): Promise<typeof import('maplibre-gl')> {
   if (maplibregl) return maplibregl
@@ -80,11 +84,15 @@ async function loadMapLibre(): Promise<typeof import('maplibre-gl')> {
   const link = document.createElement('link')
   link.rel = 'stylesheet'
   link.href = MAPLIBRE_CDN_CSS
+  link.integrity = MAPLIBRE_CSS_SRI
+  link.crossOrigin = 'anonymous'
   document.head.appendChild(link)
 
   await new Promise<void>((resolve, reject) => {
     const script = document.createElement('script')
     script.src = MAPLIBRE_CDN_JS
+    script.integrity = MAPLIBRE_JS_SRI
+    script.crossOrigin = 'anonymous'
     script.onload = () => resolve()
     script.onerror = reject
     document.head.appendChild(script)
