@@ -36,9 +36,7 @@ export async function ensureTransport(relays: string[], groupId?: string): Promi
     connectRelays(relays)
 
     if (!_transport) {
-      const transport = new NostrSyncTransport(relays)
-      if (identity.pubkey) transport.setPersonalPubkey(identity.pubkey)
-      initSync(transport)
+      initSync(new NostrSyncTransport(relays, identity.pubkey))
     }
 
     if (groupId) {
