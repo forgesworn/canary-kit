@@ -276,3 +276,77 @@ export function burnWord(id: string): void {
   updateGroup(id, updated)
   broadcastAction(id, { type: 'counter-advance', counter: updated.counter, usageOffset: updated.usageOffset, timestamp: Math.floor(Date.now() / 1000) })
 }
+
+const HEX_64_RE = /^[0-9a-f]{64}$/
+
+/**
+ * Validate an imported group JSON object against protocol structural invariants.
+ * Throws descriptive errors for each violation.
+ * Does NOT check protocolVersion (imports are plain group JSON, not wire envelopes).
+ */
+export function validateGroupImport(data: unknown): void {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Import failed — expected a JSON object.')
+  }
+  const obj = data as Record<string, unknown>
+
+  // Required string fields
+  if (typeof obj.name !== 'string' || obj.name.trim().length === 0) {
+    throw new Error('Import failed — name is required.')
+  }
+  if (typeof obj.seed !== 'string' || !HEX_64_RE.test(obj.seed)) {
+    throw new Error('Import failed — seed must be a 64-character lowercase hex string.')
+  }
+
+  // Members: array of valid hex pubkeys
+  if (!Array.isArray(obj.members) || obj.members.length === 0) {
+    throw new Error('Import failed — members must be a non-empty array.')
+  }
+  for (const m of obj.members) {
+    if (typeof m !== 'string' || !HEX_64_RE.test(m)) {
+      throw new Error(`Import failed — invalid member pubkey: "${String(m)}".`)
+    }
+  }
+
+  // Admins: array of valid hex pubkeys, must be subset of members
+  if (Array.isArray(obj.admins)) {
+    for (const a of obj.admins) {
+      if (typeof a !== 'string' || !HEX_64_RE.test(a)) {
+        throw new Error(`Import failed — invalid admin pubkey: "${String(a)}".`)
+      }
+    }
+    const memberSet = new Set(obj.members as string[])
+    for (const a of obj.admins as string[]) {
+      if (!memberSet.has(a)) {
+        throw new Error(`Import failed — admin "${a}" is not in the members list.`)
+      }
+    }
+  }
+
+  // Numeric fields
+  if (obj.rotationInterval !== undefined) {
+    if (typeof obj.rotationInterval !== 'number' || !Number.isInteger(obj.rotationInterval) || obj.rotationInterval <= 0) {
+      throw new Error('Import failed — rotationInterval must be a positive integer.')
+    }
+  }
+  if (obj.wordCount !== undefined) {
+    if (obj.wordCount !== 1 && obj.wordCount !== 2 && obj.wordCount !== 3) {
+      throw new Error('Import failed — wordCount must be 1, 2, or 3.')
+    }
+  }
+  if (obj.encodingFormat !== undefined) {
+    if (obj.encodingFormat !== 'words' && obj.encodingFormat !== 'pin' && obj.encodingFormat !== 'hex') {
+      throw new Error('Import failed — encodingFormat must be words, pin, or hex.')
+    }
+  }
+  if (obj.epoch !== undefined) {
+    if (typeof obj.epoch !== 'number' || !Number.isInteger(obj.epoch) || obj.epoch < 0) {
+      throw new Error('Import failed — epoch must be a non-negative integer.')
+    }
+  }
+  if (obj.consumedOps !== undefined) {
+    if (!Array.isArray(obj.consumedOps) || !obj.consumedOps.every((o: unknown) => typeof o === 'string')) {
+      throw new Error('Import failed — consumedOps must be an array of strings.')
+    }
+  }
+}

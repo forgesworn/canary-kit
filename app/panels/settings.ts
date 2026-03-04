@@ -1,7 +1,7 @@
 // app/panels/settings.ts — Group settings drawer
 
 import { getState, updateGroup, update } from '../state.js'
-import { deleteGroup, reseedGroup, compromiseReseed } from '../actions/groups.js'
+import { deleteGroup, reseedGroup, compromiseReseed, validateGroupImport } from '../actions/groups.js'
 import { showToast } from '../components/toast.js'
 import { disconnectRelays, isConnected, getRelayCount } from '../nostr/connect.js'
 import { ensureTransport, teardownSync } from '../sync.js'
@@ -345,11 +345,7 @@ export function renderSettings(container: HTMLElement): void {
       try {
         const text = await file.text()
         const imported = JSON.parse(text)
-        if (typeof imported.seed !== 'string' || !imported.seed ||
-            typeof imported.name !== 'string' || !imported.name ||
-            !Array.isArray(imported.members)) {
-          throw new Error('Invalid group file')
-        }
+        validateGroupImport(imported)
         const id = crypto.randomUUID()
         // Whitelist known fields only — never spread untrusted JSON into state
         const appGroup = {
