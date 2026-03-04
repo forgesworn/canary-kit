@@ -45,7 +45,7 @@ export async function encryptEnvelope(groupKey: Uint8Array, plaintext: string): 
 
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
-    groupKey,
+    groupKey as BufferSource,
     { name: 'AES-GCM' },
     false,
     ['encrypt'],
@@ -54,7 +54,7 @@ export async function encryptEnvelope(groupKey: Uint8Array, plaintext: string): 
   const ciphertextBuf = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     cryptoKey,
-    utf8(plaintext),
+    utf8(plaintext) as BufferSource,
   )
 
   // Web Crypto returns ciphertext || auth_tag concatenated; prepend IV.
@@ -80,7 +80,7 @@ export async function decryptEnvelope(groupKey: Uint8Array, encoded: string): Pr
 
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
-    groupKey,
+    groupKey as BufferSource,
     { name: 'AES-GCM' },
     false,
     ['decrypt'],
@@ -91,7 +91,7 @@ export async function decryptEnvelope(groupKey: Uint8Array, encoded: string): Pr
     plaintextBuf = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },
       cryptoKey,
-      ciphertextWithTag,
+      ciphertextWithTag as BufferSource,
     )
   } catch {
     throw new Error('decryptEnvelope: decryption failed — wrong key or tampered data')
