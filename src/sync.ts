@@ -14,10 +14,11 @@ export type SyncMessage =
   | { type: 'reseed'; seed: Uint8Array; counter: number; timestamp: number }
   | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number }
   | { type: 'duress-alert'; lat: number; lon: number; timestamp: number }
+  | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; timestamp: number }
 
 const VALID_TYPES = new Set<string>([
   'member-join', 'member-leave', 'counter-advance',
-  'reseed', 'beacon', 'duress-alert',
+  'reseed', 'beacon', 'duress-alert', 'state-snapshot',
 ])
 
 // ── Serialisation ─────────────────────────────────────────────
@@ -86,6 +87,15 @@ export function applySyncMessage(group: GroupState, msg: SyncMessage): GroupStat
     case 'reseed':
       // GroupState.seed is a hex string; SyncMessage.reseed.seed is Uint8Array
       return { ...group, seed: bytesToHex(msg.seed), counter: msg.counter, usageOffset: 0 }
+
+    case 'state-snapshot':
+      return {
+        ...group,
+        seed: msg.seed,
+        counter: msg.counter,
+        usageOffset: msg.usageOffset,
+        members: [...msg.members],
+      }
 
     case 'beacon':
     case 'duress-alert':

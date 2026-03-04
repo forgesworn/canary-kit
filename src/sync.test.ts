@@ -133,6 +133,54 @@ describe('applySyncMessage', () => {
   })
 })
 
+describe('state-snapshot', () => {
+  it('round-trips a state-snapshot message', () => {
+    const msg: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'a'.repeat(64),
+      counter: 100,
+      usageOffset: 3,
+      members: ['b'.repeat(64), 'c'.repeat(64)],
+      timestamp: 1700000000,
+    }
+    const encoded = encodeSyncMessage(msg)
+    const decoded = decodeSyncMessage(encoded)
+    expect(decoded).toEqual(msg)
+  })
+
+  it('applySyncMessage replaces group state from snapshot', () => {
+    // Create a group state, apply a snapshot with different values, verify state updated
+    const group = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: ['b'.repeat(64)],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 2,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+    }
+
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'c'.repeat(64),
+      counter: 200,
+      usageOffset: 5,
+      members: ['b'.repeat(64), 'd'.repeat(64)],
+      timestamp: 1700001000,
+    }
+
+    const updated = applySyncMessage(group, snapshot)
+    expect(updated.seed).toBe('c'.repeat(64))
+    expect(updated.counter).toBe(200)
+    expect(updated.usageOffset).toBe(5)
+    expect(updated.members).toEqual(['b'.repeat(64), 'd'.repeat(64)])
+  })
+})
+
 describe('full round-trip: encode → decode → apply', () => {
   function makeGroup() {
     return createGroup({ name: 'test', members: [PUBKEY_AAA], preset: 'family' })
