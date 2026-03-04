@@ -1,7 +1,7 @@
 // app/sync.ts — Thin wiring layer between app actions and sync transport
 
 import type { SyncTransport, SyncMessage } from 'canary-kit/sync'
-import { applySyncMessage } from 'canary-kit/sync'
+import { applySyncMessage, FIRE_AND_FORGET_FRESHNESS_SEC } from 'canary-kit/sync'
 import { getState, updateGroup } from './state.js'
 import { connectRelays, isConnected, getRelayCount } from './nostr/connect.js'
 import { GroupSigner } from './nostr/signer.js'
@@ -147,17 +147,26 @@ export function subscribeToGroup(groupId: string): void {
       showToast('Group secret was rotated', 'warning')
     }
 
-    // Record incoming liveness check-ins
+    // Record incoming liveness check-ins (freshness-gated to prevent stale replay)
     if (msg.type === 'liveness-checkin') {
-      recordCheckin(groupId, sender, msg.timestamp)
+      const age = Math.abs(Math.floor(Date.now() / 1000) - msg.timestamp)
+      if (age <= FIRE_AND_FORGET_FRESHNESS_SEC) {
+        recordCheckin(groupId, sender, msg.timestamp)
+      }
     }
 
     // Flash sync indicator
     flashSyncing()
     setTimeout(() => updateRelayStatus(isConnected(), getRelayCount()), 1500)
 
-    // App-layer side effects for fire-and-forget messages (with replay protection)
+    // App-layer side effects for fire-and-forget messages (with replay protection).
+    // Freshness gate: applySyncMessage silently drops stale messages but returns
+    // the same group reference for all fire-and-forget types, so we must also
+    // check freshness here before dispatching UI effects.
     if (msg.type === 'beacon' || msg.type === 'duress-alert') {
+      const age = Math.abs(Math.floor(Date.now() / 1000) - msg.timestamp)
+      if (age > FIRE_AND_FORGET_FRESHNESS_SEC) return // stale — suppress
+
       const opId = (msg as { opId?: string }).opId
       if (opId) {
         if (isSeenOpId(groupId, opId)) return // replay — suppress
