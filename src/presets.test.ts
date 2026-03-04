@@ -23,6 +23,12 @@ describe('PRESETS', () => {
     expect(p.wordCount).toBe(2)
     expect(p.rotationInterval).toBe(172_800) // 48 hours
   })
+
+  it('exports event preset with 1 word and 4h rotation', () => {
+    const p = PRESETS.event
+    expect(p.wordCount).toBe(1)
+    expect(p.rotationInterval).toBe(14_400) // 4 hours
+  })
 })
 
 describe('createGroup with preset', () => {
@@ -66,6 +72,16 @@ describe('createGroup with preset', () => {
     })
     expect(group.rotationInterval).toBe(3600)
     expect(group.wordCount).toBe(2) // still from preset
+  })
+
+  it('applies event preset defaults', () => {
+    const group = createGroup({
+      name: 'Bitcoin Conference',
+      members: [ALICE, BOB],
+      preset: 'event',
+    })
+    expect(group.wordCount).toBe(1)
+    expect(group.rotationInterval).toBe(14_400)
   })
 
   it('throws on unknown preset name', () => {

@@ -511,6 +511,30 @@ The full `en-v1` wordlist is defined in Appendix A of [NIP-CANARY.md](NIP-CANARY
 implementation claiming compliance with this protocol MUST use the exact wordlist defined
 there.
 
+### Why Not BIP-39 Directly?
+
+CANARY's `en-v1` wordlist is **derived from** BIP-39 English — it starts with the same
+2048 words, then filters for spoken-word clarity. The two lists optimise for different
+threat models:
+
+| Concern | BIP-39 | CANARY `en-v1` |
+|---------|--------|----------------|
+| **Primary channel** | Written (paper backup) | Spoken (voice call, radio) |
+| **Identification** | First 4 characters unique | First syllable distinct |
+| **Homophones** | Allowed (`write`/`right`) | Removed |
+| **Audio confusion** | Not considered | Filtered (`ship`/`chip`, `thin`/`fin`) |
+| **Emotional charge** | Allowed (`bomb`, `kill`) | Removed (avoids alarm if overheard) |
+
+BIP-39 words are designed to be **written down and read back** — uniqueness from the first
+4 characters is enough. CANARY words are designed to be **spoken aloud over a degraded
+channel** — a phone call, a radio, a noisy conference room. The filtering removes ~15% of
+BIP-39 words and replaces them with concrete, unambiguous alternatives.
+
+**Custom wordlists are supported.** The `wordlist` field in group configuration accepts any
+wordlist identifier. Implementations MAY offer BIP-39 as an alternative for teams that
+prefer familiarity over spoken clarity. The protocol does not mandate `en-v1` — it mandates
+that all group members use the **same** list.
+
 ### Internationalisation
 
 Other languages can propose wordlists following the same criteria. Each list is identified

@@ -1,7 +1,7 @@
 import { DEFAULT_ROTATION_INTERVAL } from './counter.js'
 
 /** Named threat-profile preset identifier. */
-export type PresetName = 'family' | 'field-ops' | 'enterprise'
+export type PresetName = 'family' | 'field-ops' | 'enterprise' | 'event'
 
 /**
  * A threat-profile preset — pre-configured group settings optimised for
@@ -24,6 +24,7 @@ export interface GroupPreset {
  * | `family`     | 1     | 7 days   | Casual family/friend verification  |
  * | `field-ops`  | 2     | 24 hours | Journalism, activism, field work   |
  * | `enterprise` | 2     | 48 hours | Corporate incident response        |
+ * | `event`      | 1     | 4 hours  | Conferences, festivals, meetups    |
  */
 export const PRESETS: Readonly<Record<PresetName, Readonly<GroupPreset>>> = Object.freeze({
   family: Object.freeze({
@@ -46,5 +47,12 @@ export const PRESETS: Readonly<Record<PresetName, Readonly<GroupPreset>>> = Obje
     description:
       'Enterprise incident response. Two-word phrases with 48-hour rotation. ' +
       'Balances security with operational convenience for larger teams.',
+  }),
+  event: Object.freeze({
+    wordCount: 1,
+    rotationInterval: 14_400,
+    description:
+      'Temporary groups for conferences, festivals, and meetups. ' +
+      'Single word with 4-hour rotation. Fast setup, easy to share at the door.',
   }),
 })

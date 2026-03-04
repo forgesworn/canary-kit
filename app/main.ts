@@ -316,6 +316,13 @@ function showCreateGroupModal(): void {
         placeholder="e.g. Alice"
       />
     </label>
+    <fieldset class="segmented" style="margin-top: 0.5rem;">
+      <legend class="input-label__text" style="margin-bottom: 0.25rem;">Preset</legend>
+      <button type="button" class="segmented__btn segmented__btn--active" data-preset="family">Family</button>
+      <button type="button" class="segmented__btn" data-preset="field-ops">Field Ops</button>
+      <button type="button" class="segmented__btn" data-preset="enterprise">Enterprise</button>
+      <button type="button" class="segmented__btn" data-preset="event">Event</button>
+    </fieldset>
     <div class="modal__actions">
       <button type="button" class="btn" id="modal-cancel-btn">Cancel</button>
       <button type="submit" class="btn btn--primary">Create</button>
@@ -326,8 +333,10 @@ function showCreateGroupModal(): void {
     const name = (formData.get('name') as string | null)?.trim() ?? ''
     if (!name) return
     const myName = (formData.get('myname') as string | null)?.trim() ?? ''
+    const activeBtn = document.querySelector<HTMLButtonElement>('.segmented__btn.segmented__btn--active[data-preset]')
+    const preset = (activeBtn?.dataset.preset ?? 'family') as 'family' | 'field-ops' | 'enterprise' | 'event'
     const { identity } = getState()
-    const groupId = createNewGroup(name, 'family', identity?.pubkey)
+    const groupId = createNewGroup(name, preset, identity?.pubkey)
     if (myName && identity?.pubkey) {
       const group = getState().groups[groupId]
       if (group) {
@@ -343,6 +352,13 @@ function showCreateGroupModal(): void {
   requestAnimationFrame(() => {
     document.getElementById('modal-cancel-btn')?.addEventListener('click', () => {
       (document.getElementById('app-modal') as HTMLDialogElement | null)?.close()
+    })
+    // Preset segmented control
+    document.querySelectorAll<HTMLButtonElement>('.segmented__btn[data-preset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.segmented__btn[data-preset]').forEach(b => b.classList.remove('segmented__btn--active'))
+        btn.classList.add('segmented__btn--active')
+      })
     })
   })
 }
