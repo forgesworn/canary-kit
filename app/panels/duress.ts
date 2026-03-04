@@ -102,10 +102,8 @@ export function renderDuress(container: HTMLElement): void {
   // Long hold (≥ 3s): reveal word AND silently dispatch duress alert.
 
   let holdTimer: ReturnType<typeof setTimeout> | null = null
-  let dispatched = false
 
   function startHold(): void {
-    dispatched = false
     showWord()
 
     holdTimer = setTimeout(() => {
@@ -116,6 +114,7 @@ export function renderDuress(container: HTMLElement): void {
       if (!currentGroup) return
 
       const mode = currentGroup.duressMode ?? 'immediate'
+      const opId = crypto.randomUUID()
       // In the demo, all modes broadcast via the sync transport.
       // In production, 'dead-drop' would skip push notifications
       // and only persist on the relay for later retrieval.
@@ -129,6 +128,7 @@ export function renderDuress(container: HTMLElement): void {
               lat: pos.coords.latitude,
               lon: pos.coords.longitude,
               timestamp: Math.floor(Date.now() / 1000),
+              opId,
             })
           },
           () => {
@@ -138,6 +138,7 @@ export function renderDuress(container: HTMLElement): void {
               lat: 0,
               lon: 0,
               timestamp: Math.floor(Date.now() / 1000),
+              opId,
             })
           },
           { enableHighAccuracy: true, timeout: 5000 },
@@ -148,10 +149,10 @@ export function renderDuress(container: HTMLElement): void {
           lat: 0,
           lon: 0,
           timestamp: Math.floor(Date.now() / 1000),
+          opId,
         })
       }
 
-      dispatched = true
       console.info('[canary] Silent duress dispatched (mode: %s)', mode)
     }, 3000)
   }

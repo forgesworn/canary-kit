@@ -13,6 +13,27 @@ import { recordCheckin, startLivenessHeartbeat, stopLivenessHeartbeat } from './
 let _transport: SyncTransport | null = null
 const _unsubscribers = new Map<string, () => void>()
 
+// ── Fire-and-forget opId dedup ───────────────────────────────
+// Tracks seen opIds for duress-alert and beacon messages per group
+// to prevent replayed messages from triggering side effects.
+const SEEN_OPID_CAP = 500
+const _seenOpIds = new Map<string, string[]>()
+
+function isSeenOpId(groupId: string, opId: string): boolean {
+  const seen = _seenOpIds.get(groupId)
+  return seen ? seen.includes(opId) : false
+}
+
+function recordOpId(groupId: string, opId: string): void {
+  let seen = _seenOpIds.get(groupId)
+  if (!seen) {
+    seen = []
+    _seenOpIds.set(groupId, seen)
+  }
+  if (seen.length >= SEEN_OPID_CAP) seen.shift()
+  seen.push(opId)
+}
+
 /** Initialise the sync layer with a transport. Call once on startup. */
 export function initSync(transport: SyncTransport): void {
   _transport = transport
@@ -135,8 +156,13 @@ export function subscribeToGroup(groupId: string): void {
     flashSyncing()
     setTimeout(() => updateRelayStatus(isConnected(), getRelayCount()), 1500)
 
-    // App-layer side effects for fire-and-forget messages
+    // App-layer side effects for fire-and-forget messages (with replay protection)
     if (msg.type === 'beacon' || msg.type === 'duress-alert') {
+      const opId = (msg as { opId?: string }).opId
+      if (opId) {
+        if (isSeenOpId(groupId, opId)) return // replay — suppress
+        recordOpId(groupId, opId)
+      }
       document.dispatchEvent(
         new CustomEvent('canary:sync-message', { detail: { groupId, message: msg, sender } }),
       )

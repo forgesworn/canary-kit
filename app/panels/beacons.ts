@@ -292,6 +292,7 @@ function startBeaconWatch(): void {
             lon,
             accuracy: precisionToRadius(geohashPrecision),
             timestamp: Math.floor(Date.now() / 1000),
+            opId: crypto.randomUUID(),
           })
         }
       }

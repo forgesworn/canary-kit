@@ -18,9 +18,22 @@ interface EventSignerLike {
   sign(event: unknown): Promise<unknown>
 }
 
+/** Bounded set that evicts oldest entries when capacity is reached. */
+class BoundedSet<T> {
+  private items: T[] = []
+  constructor(private capacity: number) {}
+  has(item: T): boolean { return this.items.includes(item) }
+  add(item: T): void {
+    if (this.has(item)) return
+    if (this.items.length >= this.capacity) this.items.shift()
+    this.items.push(item)
+  }
+}
+
 export class NostrSyncTransport implements SyncTransport {
   private subs = new Map<string, { close(): void }>()
   private groupKeys = new Map<string, { key: Uint8Array; signer: EventSignerLike; tagHash: string; members: Set<string> }>()
+  private seenEventIds = new BoundedSet<string>(1000)
 
   constructor(
     private relays: string[],
@@ -103,6 +116,10 @@ export class NostrSyncTransport implements SyncTransport {
           try {
             if (!event || typeof event !== 'object') return
             if (typeof event.pubkey !== 'string' || typeof event.content !== 'string') return
+
+            // Dedup: skip events we've already processed (e.g. on reconnect within the since window)
+            if (typeof event.id === 'string' && this.seenEventIds.has(event.id)) return
+            if (typeof event.id === 'string') this.seenEventIds.add(event.id)
 
             // Skip our own events
             if (event.pubkey === groupInfo.signer.pubkey) return

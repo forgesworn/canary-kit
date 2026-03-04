@@ -122,7 +122,9 @@ export function renderVerify(container: HTMLElement): void {
     const icon = STATUS_ICONS[result.status]
     const message = buildMessage(result.status, result.identities)
 
-    resultEl!.innerHTML = `<span class="verify-icon">${icon}</span>${message}`
+    resultEl!.innerHTML = `<span class="verify-icon">${icon}</span><span class="verify-message"></span>`
+    const messageEl = resultEl!.querySelector<HTMLElement>('.verify-message')
+    if (messageEl) messageEl.textContent = message
     resultEl!.hidden = false
 
     if (result.status === 'duress') {
@@ -153,6 +155,7 @@ export function renderVerify(container: HTMLElement): void {
           lat: 0,
           lon: 0,
           timestamp: Math.floor(Date.now() / 1000),
+          opId: crypto.randomUUID(),
         })
       }
     }
