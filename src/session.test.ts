@@ -368,6 +368,114 @@ describe('createSession — custom config (no preset)', () => {
   })
 })
 
+describe('createSession — pair across time windows', () => {
+  it('pair changes when counter rotates', () => {
+    const session = createSession({
+      secret: SECRET,
+      namespace: 'aviva',
+      roles: ['caller', 'agent'],
+      myRole: 'agent',
+      preset: 'call',
+    })
+    const pair0 = session.pair(0)
+    const pair1 = session.pair(30)
+    expect(pair0.caller).not.toBe(pair1.caller)
+    expect(pair0.agent).not.toBe(pair1.agent)
+  })
+
+  it('pair is stable within same rotation window', () => {
+    const session = createSession({
+      secret: SECRET,
+      namespace: 'aviva',
+      roles: ['caller', 'agent'],
+      myRole: 'agent',
+      preset: 'call',
+    })
+    const pairA = session.pair(10)
+    const pairB = session.pair(25)
+    expect(pairA).toEqual(pairB)
+  })
+})
+
+describe('createSession — echo protection', () => {
+  it('verifying own token returns invalid (prevents echo attack)', () => {
+    const agent = createSession({
+      secret: SECRET,
+      namespace: 'aviva',
+      roles: ['caller', 'agent'],
+      myRole: 'agent',
+      preset: 'call',
+    })
+    const FIXED_NOW = 1_000_000_050
+    // Agent's own token should NOT verify — verify checks theirContext, not myContext
+    const myWord = agent.myToken(FIXED_NOW)
+    const result = agent.verify(myWord, FIXED_NOW)
+    expect(result.status).toBe('invalid')
+  })
+})
+
+describe('createSession — duress with tolerance drift', () => {
+  const FIXED_NOW = 1_000_000_050
+
+  it('detects duress at adjacent counter within tolerance', () => {
+    const agent = createSession({
+      secret: SECRET,
+      namespace: 'aviva',
+      roles: ['caller', 'agent'],
+      myRole: 'agent',
+      preset: 'call',
+      theirIdentity: 'customer-123',
+    })
+    // Derive duress at slightly earlier counter
+    const counter = agent.counter(FIXED_NOW)
+    const prevCounter = counter - 1
+    const duressWord = deriveDuressToken(SECRET, 'aviva:caller', 'customer-123', prevCounter, undefined, 1)
+    const result = agent.verify(duressWord, FIXED_NOW)
+    expect(result.status).toBe('duress')
+    expect(result.identities).toEqual(['customer-123'])
+  })
+})
+
+describe('createSession — handoff duress detection', () => {
+  it('detects duress in fixed counter (handoff) mode', () => {
+    const provider = createSession({
+      secret: SECRET,
+      namespace: 'dispatch',
+      roles: ['requester', 'provider'],
+      myRole: 'provider',
+      preset: 'handoff',
+      counter: 42,
+      theirIdentity: 'rider-456',
+    })
+    const duressWord = deriveDuressToken(SECRET, 'dispatch:requester', 'rider-456', 42, undefined, 0)
+    const result = provider.verify(duressWord)
+    expect(result.status).toBe('duress')
+    expect(result.identities).toEqual(['rider-456'])
+  })
+
+  it('valid token still works in handoff mode with theirIdentity', () => {
+    const provider = createSession({
+      secret: SECRET,
+      namespace: 'dispatch',
+      roles: ['requester', 'provider'],
+      myRole: 'provider',
+      preset: 'handoff',
+      counter: 42,
+      theirIdentity: 'rider-456',
+    })
+    const requester = createSession({
+      secret: SECRET,
+      namespace: 'dispatch',
+      roles: ['requester', 'provider'],
+      myRole: 'requester',
+      preset: 'handoff',
+      counter: 42,
+    })
+    const result = provider.verify(requester.myToken())
+    expect(result.status).toBe('valid')
+  })
+})
+
 describe('createSession — numeric validation', () => {
   const secret = generateSeed()
   const base = { secret, namespace: 'test', roles: ['a', 'b'] as [string, string], myRole: 'a' }

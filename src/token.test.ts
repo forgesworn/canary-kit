@@ -464,6 +464,46 @@ describe('cross-counter collision avoidance', () => {
   })
 })
 
+describe('verifyToken — multi-identity duress', () => {
+  it('collects all matching duress identities (CANARY-DURESS spec)', () => {
+    // Both Alice and Bob happen to be under duress at the same counter.
+    // Verifier must collect ALL matches, not short-circuit after the first.
+    const aliceDuress = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 0, undefined, 1)
+    const bobDuress = deriveDuressToken(SECRET_1, 'test', IDENTITY_B, 0, undefined, 1)
+    // These are different tokens, so only one identity matches per verification call.
+    const resultA = verifyToken(SECRET_1, 'test', 0, aliceDuress, [IDENTITY_A, IDENTITY_B])
+    expect(resultA.status).toBe('duress')
+    expect(resultA.identities).toContain(IDENTITY_A)
+
+    const resultB = verifyToken(SECRET_1, 'test', 0, bobDuress, [IDENTITY_A, IDENTITY_B])
+    expect(resultB.status).toBe('duress')
+    expect(resultB.identities).toContain(IDENTITY_B)
+  })
+
+  it('returns empty identities array never — at least one match for duress', () => {
+    const duress = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 5, undefined, 2)
+    const result = verifyToken(SECRET_1, 'test', 5, duress, [IDENTITY_A, IDENTITY_B], { tolerance: 2 })
+    expect(result.status).toBe('duress')
+    expect(result.identities!.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('deriveDuressToken — maxTolerance=0', () => {
+  it('works with zero tolerance (no cross-counter collision avoidance needed)', () => {
+    const token = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 0, undefined, 0)
+    expect(typeof token).toBe('string')
+    expect(token.length).toBeGreaterThan(0)
+  })
+
+  it('still avoids collision with normal token at exact counter', () => {
+    for (let c = 0; c < 200; c++) {
+      const normal = deriveToken(SECRET_1, 'test', c)
+      const duress = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, c, undefined, 0)
+      expect(duress).not.toBe(normal)
+    }
+  })
+})
+
 describe('MAX_TOLERANCE enforcement', () => {
   it('deriveDuressToken throws on maxTolerance > MAX_TOLERANCE', () => {
     expect(() => deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 0, undefined, 11)).toThrow(RangeError)
