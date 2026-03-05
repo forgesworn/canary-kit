@@ -35,6 +35,14 @@ export const FIRE_AND_FORGET_FRESHNESS_SEC = 300
 /** Maximum allowed future skew (in seconds) for fire-and-forget timestamps. */
 export const MAX_FUTURE_SKEW_SEC = 60
 
+/** Maximum consumedOps entries per epoch before oldest are evicted. */
+const MAX_CONSUMED_OPS = 1000
+
+function appendConsumedOp(ops: string[], opId: string): string[] {
+  const next = [...ops, opId]
+  return next.length > MAX_CONSUMED_OPS ? next.slice(-MAX_CONSUMED_OPS) : next
+}
+
 /** Current protocol version. Bump on any breaking wire format change. */
 export const PROTOCOL_VERSION = 1
 
@@ -314,7 +322,10 @@ export function applySyncMessage(
 
     // I2: opId must not be consumed in current epoch
     // reseed starts a new epoch so its opId is not subject to the current-epoch replay guard
-    if (msg.type !== 'reseed' && group.consumedOps.includes(msgOpId)) return group
+    if (msg.type !== 'reseed') {
+      const consumedSet = new Set(group.consumedOps)
+      if (consumedSet.has(msgOpId)) return group
+    }
   }
 
   // ── Freshness gate for fire-and-forget messages ────────────
@@ -328,7 +339,7 @@ export function applySyncMessage(
   switch (msg.type) {
     case 'member-join': {
       const updated = addMember(group, msg.pubkey)
-      return { ...updated, consumedOps: [...updated.consumedOps, msg.opId] }
+      return { ...updated, consumedOps: appendConsumedOp(updated.consumedOps, msg.opId) }
     }
 
     case 'member-leave':
@@ -337,7 +348,7 @@ export function applySyncMessage(
       {
         const updated = removeMember(group, msg.pubkey)
         if (msg.epoch !== undefined && msg.opId !== undefined) {
-          return { ...updated, consumedOps: [...updated.consumedOps, msg.opId] }
+          return { ...updated, consumedOps: appendConsumedOp(updated.consumedOps, msg.opId) }
         }
         return updated
       }

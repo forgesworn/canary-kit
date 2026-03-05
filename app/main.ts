@@ -453,7 +453,14 @@ function showCreateGroupModal(): void {
 function checkInviteFragment(): void {
   const hash = window.location.hash
   if (!hash.startsWith('#join/')) return
-  const payload = decodeURIComponent(hash.slice(6))
+  let payload: string
+  try {
+    payload = decodeURIComponent(hash.slice(6))
+  } catch {
+    console.warn('[canary] Malformed invite fragment — ignoring.')
+    window.location.hash = ''
+    return
+  }
   window.location.hash = ''
   document.dispatchEvent(
     new CustomEvent('canary:join-group', { detail: { payload } }),

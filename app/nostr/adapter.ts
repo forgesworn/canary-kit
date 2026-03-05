@@ -105,7 +105,10 @@ export class NostrSyncTransport implements SyncTransport {
     const filter = {
       kinds: [SYNC_EVENT_KIND],
       '#d': [groupInfo.tagHash],
-      since: Math.floor(Date.now() / 1000) - 3600,
+      // 7-day window covers the default rotation interval and typical offline periods.
+      // Privileged ops use epoch+opId for ordering, so receiving stale messages is safe
+      // (they're idempotent or rejected by epoch/opId checks).
+      since: Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60,
     }
 
     const sub = pool.subscribeMany(
@@ -155,18 +158,21 @@ export class NostrSyncTransport implements SyncTransport {
               return
             }
 
-            // Enforce sender membership using personal identity key (inside envelope).
-            if (!groupInfo.members.has(sender)) {
-              console.warn('[canary:sync] Rejected message from non-member pubkey')
-              return
-            }
-
             const msg = decodeSyncMessage(payload)
             const canonical = canonicaliseSyncMessage(msg)
             const payloadHash = sha256(ENCODER.encode(canonical))
             const isValidInnerSig = schnorr.verify(hexToBytes(sig), payloadHash, hexToBytes(sender))
             if (!isValidInnerSig) {
               console.warn('[canary:sync] Rejected envelope with invalid sender proof')
+              return
+            }
+
+            // Enforce sender membership using personal identity key (inside envelope).
+            // member-join is exempt: new members who can decrypt the group envelope
+            // (proving they received a valid invite with the group key) are allowed
+            // to announce themselves before existing members know about them.
+            if (msg.type !== 'member-join' && !groupInfo.members.has(sender)) {
+              console.warn('[canary:sync] Rejected message from non-member pubkey')
               return
             }
 

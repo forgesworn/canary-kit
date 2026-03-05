@@ -170,6 +170,12 @@ describe('assertInvitePayload', () => {
     ;(payload as unknown as Record<string, unknown>).protocolVersion = 99
     expect(() => assertInvitePayload(payload)).toThrow('Unsupported invite protocol version')
   })
+
+  it('rejects tolerance > 10 (MAX_TOLERANCE)', () => {
+    const payload = makeValidPayload()
+    ;(payload as unknown as Record<string, unknown>).tolerance = 11
+    expect(() => assertInvitePayload(payload)).toThrow('tolerance must be <= 10')
+  })
 })
 
 // ── Confirmation code ───────────────────────────────────────────

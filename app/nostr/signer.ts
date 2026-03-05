@@ -8,6 +8,9 @@ import { encrypt as nip44encrypt, decrypt as nip44decrypt, getConversationKey } 
 // ── Helpers ───────────────────────────────────────────────────
 
 function hexToBytes(hex: string): Uint8Array {
+  if (!/^[0-9a-f]*$/i.test(hex) || hex.length % 2 !== 0) {
+    throw new Error(`Invalid hex string: "${hex.slice(0, 20)}${hex.length > 20 ? '…' : ''}"`)
+  }
   const bytes = new Uint8Array(hex.length / 2)
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16)

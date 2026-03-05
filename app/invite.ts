@@ -118,6 +118,9 @@ export function assertInvitePayload(raw: unknown): asserts raw is InvitePayload 
   if (!isNonNegativeInt(data.tolerance)) {
     throw new Error('Invalid invite payload — tolerance must be a non-negative integer.')
   }
+  if ((data.tolerance as number) > 10) {
+    throw new Error('Invalid invite payload — tolerance must be <= 10.')
+  }
   if (!isNonNegativeInt(data.issuedAt) || !isNonNegativeInt(data.expiresAt)) {
     throw new Error('Invalid invite payload — issuedAt/expiresAt must be unix seconds.')
   }
@@ -254,7 +257,7 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
     expiresAt: issuedAt + INVITE_MAX_AGE_SEC,
     epoch: group.epoch ?? 0,
     admins: [...(group.admins ?? [])],
-    protocolVersion: 1,
+    protocolVersion: PROTOCOL_VERSION,
     inviterPubkey: identity.pubkey,
     inviterSig: '', // placeholder — computed below
   }
