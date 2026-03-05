@@ -207,7 +207,7 @@ export function verifyInviteSig(payload: InvitePayload): boolean {
 }
 
 /**
- * Derive a 12-character confirmation code that authenticates the full invite payload.
+ * Derive a 3-word confirmation code that authenticates the full invite payload.
  *
  * Computes HMAC-SHA256 over the canonical payload content (all fields except nonce),
  * keyed by the nonce. This means any modification to the payload fields invalidates
@@ -240,7 +240,7 @@ export function confirmCodeFromPayload(payload: InvitePayload): string {
  * to prevent replay attacks.
  *
  * @returns `payload` — base64 invite string to share with the new member.
- * @returns `confirmCode` — 12-char code (XXXX-XXXX-XXXX) to read aloud for out-of-band confirmation.
+ * @returns `confirmCode` — 3 hyphen-separated words (e.g. "apple-river-castle") to read aloud for out-of-band confirmation.
  */
 export function createInvite(group: AppGroup): { payload: string; confirmCode: string } {
   // Only admins can create invites
@@ -292,7 +292,7 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
  * Accept and decode an invite payload.
  *
  * @param payload     Base64-encoded JSON invite string.
- * @param confirmCode 12-char confirmation code (with or without separators) for verification.
+ * @param confirmCode 3 hyphen-separated confirmation words (case-insensitive, extra spaces tolerated).
  * @throws            If the payload is invalid or the confirmation code does not match.
  */
 export function acceptInvite(payload: string, confirmCode?: string): InvitePayload {
