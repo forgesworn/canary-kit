@@ -21,6 +21,14 @@ test.describe('Settings panel', () => {
     await page.click('#theme-toggle')
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
 
+    // Wait for debounced settings write to flush before reload
+    await page.waitForFunction(
+      () => {
+        const raw = localStorage.getItem('canary:settings')
+        return raw !== null && JSON.parse(raw).theme === 'light'
+      },
+      { timeout: 3000 },
+    )
     await page.reload()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
   })

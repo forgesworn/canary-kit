@@ -1,6 +1,6 @@
 // e2e/offline/members.spec.ts — Members panel tests
 import { test, expect } from '../fixtures.js'
-import { loginOffline, createGroup } from '../helpers.js'
+import { loginOffline, createGroup, addSimulatedMember } from '../helpers.js'
 
 test.describe('Members panel', () => {
   test.beforeEach(async ({ cleanPage: page }) => {
@@ -16,16 +16,16 @@ test.describe('Members panel', () => {
     await expect(page.locator('.member-item__remove')).toBeVisible()
   })
 
-  test('add member increases member count', async ({ cleanPage: page }) => {
+  test('adding a member increases member count', async ({ cleanPage: page }) => {
     const countBefore = await page.locator('.member-item').count()
-    await page.click('#add-member-btn')
+    await addSimulatedMember(page)
     const countAfter = await page.locator('.member-item').count()
     expect(countAfter).toBe(countBefore + 1)
   })
 
   test('remove member triggers confirm and removes', async ({ cleanPage: page }) => {
     // Add a member first
-    await page.click('#add-member-btn')
+    await addSimulatedMember(page)
     const countBefore = await page.locator('.member-item').count()
 
     // Click remove on the second member (not "You")

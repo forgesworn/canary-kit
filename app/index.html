@@ -10,8 +10,8 @@
     <script>
       (function () {
         try {
-          var t = localStorage.getItem('canary:theme')
-          if (t === 'light') document.documentElement.setAttribute('data-theme', 'light')
+          var s = localStorage.getItem('canary:settings')
+          if (s && JSON.parse(s).theme === 'light') document.documentElement.setAttribute('data-theme', 'light')
         } catch (_) {}
       })()
     </script>

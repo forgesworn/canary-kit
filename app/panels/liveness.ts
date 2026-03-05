@@ -4,6 +4,8 @@ import { getState, updateGroup } from '../state.js'
 import { deriveLivenessToken } from 'canary-kit/token'
 import { getCounter } from 'canary-kit'
 import { broadcastAction } from '../sync.js'
+import { showToast } from '../components/toast.js'
+import { sendLocationPing } from './beacons.js'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -53,19 +55,21 @@ export function renderLiveness(container: HTMLElement): void {
 
   const memberItems = group.members.map(m => {
     const lastCheckin = group.livenessCheckins[m] ?? 0
-    const elapsed = lastCheckin > 0 ? now - lastCheckin : Infinity
-    const status = getStatus(elapsed, interval)
-    const healthPct = lastCheckin > 0
+    const hasCheckedIn = lastCheckin > 0
+    const elapsed = hasCheckedIn ? now - lastCheckin : Infinity
+    const status: 'green' | 'amber' | 'red' | 'grey' = hasCheckedIn ? getStatus(elapsed, interval) : 'grey'
+    const healthPct = hasCheckedIn
       ? Math.max(0, Math.min(100, (1 - elapsed / interval) * 100))
       : 0
     const isMe = identity?.pubkey === m
-    const name = isMe ? 'You' : `${m.slice(0, 8)}\u2026`
+    const memberName = group.memberNames?.[m]
+    const name = isMe ? 'You' : (memberName ?? `${m.slice(0, 8)}\u2026`)
 
     return `
       <li class="liveness-item liveness-item--${status}">
         <span class="liveness-dot liveness-dot--${status}"></span>
         <span class="liveness-name">${name}</span>
-        <span class="liveness-time">${lastCheckin > 0 ? formatElapsed(elapsed, lastCheckin) : 'never'}</span>
+        <span class="liveness-time">${hasCheckedIn ? formatElapsed(elapsed, lastCheckin) : 'awaiting first check-in'}</span>
         <div class="liveness-bar">
           <div class="liveness-bar__fill liveness-bar__fill--${status}" style="width: ${healthPct}%"></div>
         </div>
@@ -109,18 +113,44 @@ export function renderLiveness(container: HTMLElement): void {
   })
 
   document.getElementById('checkin-btn')?.addEventListener('click', () => {
-    if (!identity?.pubkey) return
-    const counter = getCounter(now, group.rotationInterval)
-    deriveLivenessToken(group.seed, 'canary:liveness', identity.pubkey, counter)
+    try {
+      const { identity: id, activeGroupId: gid, groups: gs } = getState()
+      if (!id?.pubkey || !gid) {
+        console.warn('[canary:liveness] No identity or activeGroupId', { pubkey: id?.pubkey, gid })
+        return
+      }
+      const g = gs[gid]
+      if (!g) {
+        console.warn('[canary:liveness] Group not found', gid)
+        return
+      }
 
-    const checkins = { ...group.livenessCheckins, [identity.pubkey]: now }
-    updateGroup(activeGroupId!, { livenessCheckins: checkins })
+      const freshNow = Math.floor(Date.now() / 1000)
+      const counter = getCounter(freshNow, g.rotationInterval)
+      deriveLivenessToken(g.seed, 'canary:liveness', id.pubkey, counter)
 
-    broadcastAction(activeGroupId!, {
-      type: 'liveness-checkin',
-      pubkey: identity.pubkey,
-      timestamp: now,
-      opId: crypto.randomUUID(),
-    })
+      const checkins = { ...g.livenessCheckins, [id.pubkey]: freshNow }
+      updateGroup(gid, { livenessCheckins: checkins })
+
+      broadcastAction(gid, {
+        type: 'liveness-checkin',
+        pubkey: id.pubkey,
+        timestamp: freshNow,
+        opId: crypto.randomUUID(),
+      })
+
+      // Send a location beacon and scroll the map into view
+      sendLocationPing()
+
+      // Scroll the beacon map into view so the user sees their location update
+      setTimeout(() => {
+        document.getElementById('beacon-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
+
+      showToast('Check-in sent — location updated', 'success', 2000)
+    } catch (err) {
+      console.error('[canary:liveness] Check-in failed:', err)
+      showToast('Check-in failed', 'error', 3000)
+    }
   })
 }

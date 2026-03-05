@@ -31,6 +31,8 @@ export interface AppGroup extends GroupState {
   /** Geohash precision for location beacons (1–11, default 6 ≈ 1.2km). Higher = more precise.
    * Inherited from GroupState where it's required; optional here for backwards compat with persisted state. */
   beaconPrecision: number
+  /** Last known beacon positions per member pubkey — persisted so map shows data on refresh. */
+  lastPositions?: Record<string, { lat: number; lon: number; geohash: string; precision: number; timestamp: number }>
 }
 
 /** The local identity (Nostr keypair) for this device. */

@@ -70,7 +70,6 @@ export async function ensureTransport(relays: string[], groupId?: string): Promi
     }
 
     updateRelayStatus(isConnected(), getRelayCount())
-    startLivenessHeartbeat()
   } catch (err) {
     console.warn('[canary:sync] ensureTransport failed:', err)
     updateRelayStatus(false, 0)

@@ -42,13 +42,42 @@ function circlePolygon(lat: number, lon: number, radiusM: number, segments = 48)
   return coords
 }
 
+/** Stable hue per member — deterministic from pubkey so each person is always the same colour. */
+const MEMBER_HUES = [210, 140, 30, 280, 60, 330, 170, 0] // blue, green, orange, purple, yellow, pink, teal, red
+
+function memberHue(pubkey: string): number {
+  const { groups, activeGroupId } = getState()
+  const group = activeGroupId ? groups[activeGroupId] : null
+  const members = group?.members ?? []
+  const idx = members.indexOf(pubkey)
+  return MEMBER_HUES[(idx >= 0 ? idx : 0) % MEMBER_HUES.length]
+}
+
+/**
+ * Get a member's display colour based on liveness status + their personal hue.
+ * Healthy = saturated personal colour, overdue = desaturated, missed = grey, duress = red.
+ */
+function memberColour(pubkey: string): string {
+  if (duressMembers.has(pubkey)) return '#f87171' // red — duress
+  const { groups, activeGroupId } = getState()
+  const group = activeGroupId ? groups[activeGroupId] : null
+  if (!group) return `hsl(${memberHue(pubkey)}, 70%, 55%)`
+  const lastCheckin = group.livenessCheckins[pubkey] ?? 0
+  if (lastCheckin === 0) return `hsl(${memberHue(pubkey)}, 20%, 50%)` // desaturated — never checked in
+  const elapsed = Math.floor(Date.now() / 1000) - lastCheckin
+  const interval = group.livenessInterval
+  if (elapsed <= interval) return `hsl(${memberHue(pubkey)}, 70%, 55%)` // vibrant — healthy
+  if (elapsed <= interval * 1.25) return `hsl(${memberHue(pubkey)}, 40%, 50%)` // fading — overdue
+  return '#94a3b8' // grey — missed
+}
+
 /** Build GeoJSON FeatureCollection for all member circles. */
 function buildCircleFeatures(): any {
   return {
     type: 'FeatureCollection',
     features: Object.entries(positions).map(([pubkey, pos]) => ({
       type: 'Feature',
-      properties: { pubkey, duress: duressMembers.has(pubkey) },
+      properties: { pubkey, duress: duressMembers.has(pubkey), colour: memberColour(pubkey) },
       geometry: {
         type: 'Polygon',
         coordinates: [circlePolygon(pos.lat, pos.lon, precisionToRadius(pos.precision))],
@@ -114,6 +143,13 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
 
   const group = groups[activeGroupId]
   const precision = group.beaconPrecision ?? 4
+
+  // Restore persisted positions into the in-memory map (runs once per session)
+  if (Object.keys(positions).length === 0 && group.lastPositions) {
+    for (const [pk, pos] of Object.entries(group.lastPositions)) {
+      positions[pk] = pos
+    }
+  }
 
   // If map is already initialised, skip re-rendering to preserve the live
   // MapLibre instance (replacing innerHTML would orphan the GL context).
@@ -201,6 +237,7 @@ function initMap(): void {
 
   map.on('load', () => {
     mapReady = true
+    console.info('[canary:beacon] map loaded, positions to catch up:', Object.keys(positions).length)
 
     // Add GeoJSON source for geohash area circles
     map.addSource('geohash-circles', {
@@ -208,14 +245,14 @@ function initMap(): void {
       data: buildCircleFeatures(),
     })
 
-    // Fill layer — amber for normal, red for duress
+    // Fill layer — colour per member based on liveness status
     map.addLayer({
       id: 'geohash-fill',
       type: 'fill',
       source: 'geohash-circles',
       paint: {
-        'fill-color': ['case', ['get', 'duress'], '#f87171', '#f59e0b'],
-        'fill-opacity': ['case', ['get', 'duress'], 0.25, 0.12],
+        'fill-color': ['get', 'colour'],
+        'fill-opacity': ['case', ['get', 'duress'], 0.35, 0.2],
       },
     })
 
@@ -225,12 +262,25 @@ function initMap(): void {
       type: 'line',
       source: 'geohash-circles',
       paint: {
-        'line-color': ['case', ['get', 'duress'], '#f87171', '#f59e0b'],
-        'line-width': 2,
-        'line-opacity': ['case', ['get', 'duress'], 0.8, 0.5],
+        'line-color': ['get', 'colour'],
+        'line-width': 2.5,
+        'line-opacity': ['case', ['get', 'duress'], 0.9, 0.6],
       },
     })
+
+    // Render any positions that arrived before the map was ready
+    for (const [pubkey, pos] of Object.entries(positions)) {
+      updateMapMarker(pubkey, pos.lat, pos.lon)
+    }
+    if (Object.keys(positions).length > 0) fitMapToMarkers()
   })
+}
+
+/** Persist current positions to group state so they survive page reload. */
+function persistPositions(): void {
+  const { activeGroupId } = getState()
+  if (!activeGroupId) return
+  updateGroup(activeGroupId, { lastPositions: { ...positions } })
 }
 
 /** Update the GeoJSON source with current positions and duress state. */
@@ -291,6 +341,7 @@ function startBeaconWatch(): void {
         refreshCircles()
         fitMapToMarkers()
         updateBeaconList()
+        persistPositions()
 
         // Broadcast geohash center (not raw GPS) to group members
         if (activeGroupId) {
@@ -305,28 +356,68 @@ function startBeaconWatch(): void {
         }
       }
     },
-    () => { /* geolocation error — silent */ },
-    { enableHighAccuracy: false, maximumAge: 60000 },
+    (err) => { console.warn('[canary:beacon] watchPosition error', err.code, err.message) },
+    { enableHighAccuracy: false, maximumAge: 60000, timeout: 15000 },
   )
 }
 
 // ── Markers (small center dots) ───────────────────────────────
 
 function updateMapMarker(pubkey: string, lat: number, lon: number): void {
-  if (!map || !maplibregl) return
+  if (!map || !maplibregl) {
+    console.warn('[canary:beacon] updateMapMarker skipped — map not ready', { map: !!map, maplibregl: !!maplibregl, pubkey: pubkey.slice(0, 8) })
+    return
+  }
+  const colour = memberColour(pubkey)
   const isDuress = duressMembers.has(pubkey)
+
+  const name = resolveName(pubkey)
+  const size = isDuress ? 20 : 16
 
   if (markers[pubkey]) {
     markers[pubkey].setLngLat([lon, lat])
+    const wrapper = markers[pubkey].getElement()
+    const dot = wrapper.querySelector('.beacon-dot') as HTMLElement
+    if (dot) {
+      dot.style.background = colour
+      dot.style.width = `${size}px`
+      dot.style.height = `${size}px`
+      dot.style.boxShadow = `0 0 8px ${colour}80`
+      dot.style.animation = isDuress ? 'beacon-pulse 1s ease-in-out infinite' : 'none'
+    }
+    const label = wrapper.querySelector('.beacon-label') as HTMLElement
+    if (label) label.textContent = name
   } else {
-    const el = document.createElement('div')
-    el.style.width = '10px'
-    el.style.height = '10px'
-    el.style.borderRadius = '50%'
-    el.style.background = isDuress ? '#f87171' : '#f59e0b'
-    el.style.border = '2px solid #0a0e17'
-    el.style.zIndex = '2'
-    markers[pubkey] = new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map)
+    const wrapper = document.createElement('div')
+    wrapper.style.display = 'flex'
+    wrapper.style.flexDirection = 'column'
+    wrapper.style.alignItems = 'center'
+    wrapper.style.pointerEvents = 'none'
+
+    const dot = document.createElement('div')
+    dot.className = 'beacon-dot'
+    dot.style.width = `${size}px`
+    dot.style.height = `${size}px`
+    dot.style.borderRadius = '50%'
+    dot.style.background = colour
+    dot.style.border = '2px solid #0a0e17'
+    dot.style.boxShadow = `0 0 8px ${colour}80`
+    dot.style.zIndex = '2'
+    if (isDuress) dot.style.animation = 'beacon-pulse 1s ease-in-out infinite'
+    wrapper.appendChild(dot)
+
+    const label = document.createElement('div')
+    label.className = 'beacon-label'
+    label.textContent = name
+    label.style.fontSize = '11px'
+    label.style.fontWeight = '600'
+    label.style.color = '#fff'
+    label.style.textShadow = '0 1px 3px rgba(0,0,0,0.8)'
+    label.style.marginTop = '2px'
+    label.style.whiteSpace = 'nowrap'
+    wrapper.appendChild(label)
+
+    markers[pubkey] = new maplibregl.Marker({ element: wrapper, anchor: 'center' }).setLngLat([lon, lat]).addTo(map)
   }
 }
 
@@ -347,18 +438,28 @@ function fitMapToMarkers(): void {
   )
 }
 
+function resolveName(pubkey: string): string {
+  const { groups, activeGroupId, identity } = getState()
+  if (identity?.pubkey === pubkey) return 'You'
+  const group = activeGroupId ? groups[activeGroupId] : null
+  return group?.memberNames?.[pubkey] ?? `${pubkey.slice(0, 8)}\u2026`
+}
+
 function updateBeaconList(): void {
   const listEl = document.getElementById('beacon-list')
   if (!listEl) return
 
   const entries = Object.entries(positions).map(([pk, pos]) => {
-    const encrypted = encryptedPayloads[pk]
-    const truncated = encrypted ? encrypted.slice(0, 24) + '\u2026' : 'n/a'
+    const colour = memberColour(pk)
+    const name = resolveName(pk)
+    const age = Math.floor(Date.now() / 1000) - pos.timestamp
+    const ageLabel = age < 60 ? 'just now' : age < 3600 ? `${Math.floor(age / 60)}m ago` : `${Math.floor(age / 3600)}h ago`
     return `
-      <div class="beacon-entry">
-        <span class="beacon-member">${pk.slice(0, 8)}\u2026</span>
-        <span class="beacon-geohash">${pos.geohash}</span>
-        <span class="beacon-encrypted" title="${encrypted ?? ''}">${truncated}</span>
+      <div class="beacon-entry" style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0;">
+        <span style="width:8px;height:8px;border-radius:50%;background:${colour};flex-shrink:0;"></span>
+        <span class="beacon-member" style="font-weight:500;">${name}</span>
+        <span class="beacon-geohash" style="color:var(--text-muted);font-size:0.8rem;">${pos.geohash}</span>
+        <span style="color:var(--text-muted);font-size:0.75rem;margin-left:auto;">${ageLabel}</span>
       </div>
     `
   }).join('')
@@ -402,6 +503,112 @@ function setMarkerDuress(pubkey: string): void {
   el.style.width = '14px'
   el.style.height = '14px'
   el.style.boxShadow = '0 0 12px rgba(248, 113, 113, 0.6)'
+}
+
+/**
+ * Send a one-shot location beacon (used by liveness check-in).
+ * Starts the continuous watch if not already active, then fires a single
+ * position update so the map refreshes immediately.
+ */
+export function sendLocationPing(): void {
+  console.info('[canary:beacon] sendLocationPing called', { hasGeo: 'geolocation' in navigator, map: !!map, mapReady })
+
+  if (!('geolocation' in navigator)) return
+
+  const { groups, activeGroupId, identity } = getState()
+  if (!activeGroupId || !groups[activeGroupId] || !identity?.pubkey) {
+    console.warn('[canary:beacon] sendLocationPing: missing state', { activeGroupId, hasPubkey: !!identity?.pubkey })
+    return
+  }
+
+  const group = groups[activeGroupId]
+  const beaconKey = deriveBeaconKey(group.seed)
+  const geohashPrecision = group.beaconPrecision || 4
+
+  // Start the continuous watch if not already running
+  if (geoWatchId === null) startBeaconWatch()
+
+  // Also fire a single high-priority position request for immediate feedback
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      console.info('[canary:beacon] getCurrentPosition success', { lat: pos.coords.latitude, lon: pos.coords.longitude, map: !!map, mapReady })
+
+      const geohash = encode(pos.coords.latitude, pos.coords.longitude, geohashPrecision)
+      const center = decode(geohash)
+      const lat = center.lat
+      const lon = center.lon
+
+      const encrypted = await encryptBeacon(beaconKey, geohash, geohashPrecision)
+      if (identity?.pubkey) {
+        encryptedPayloads[identity.pubkey] = encrypted
+        positions[identity.pubkey] = { lat, lon, geohash, precision: geohashPrecision, timestamp: Math.floor(Date.now() / 1000) }
+        console.info('[canary:beacon] position saved, updating map', { pubkey: identity.pubkey.slice(0, 8), lat, lon, map: !!map, mapReady, markerExists: !!markers[identity.pubkey] })
+        updateMapMarker(identity.pubkey, lat, lon)
+        refreshCircles()
+        fitMapToMarkers()
+        updateBeaconList()
+        persistPositions()
+
+        if (activeGroupId) {
+          broadcastAction(activeGroupId, {
+            type: 'beacon',
+            lat,
+            lon,
+            accuracy: precisionToRadius(geohashPrecision),
+            timestamp: Math.floor(Date.now() / 1000),
+            opId: crypto.randomUUID(),
+          })
+        }
+      }
+    },
+    (err) => {
+      console.warn('[canary:beacon] getCurrentPosition FAILED', err.code, err.message)
+      // Import toast dynamically to avoid circular deps
+      import('../components/toast.js').then(({ showToast }) => {
+        if (err.code === 1) showToast('Location permission denied', 'error', 3000)
+        else if (err.code === 3) showToast('Location request timed out', 'error', 3000)
+        else showToast('Could not get location', 'error', 3000)
+      })
+    },
+    { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 },
+  )
+}
+
+/**
+ * Handle an incoming beacon from another member (received via sync).
+ * Updates the positions map and refreshes the map if it's ready.
+ */
+export function handleIncomingBeacon(
+  pubkey: string,
+  lat: number,
+  lon: number,
+  accuracy: number,
+  timestamp: number,
+): void {
+  console.info('[canary:beacon] handleIncomingBeacon', { pubkey: pubkey.slice(0, 8), lat, lon, accuracy, map: !!map, mapReady })
+  // Estimate geohash precision from accuracy radius
+  const precision = accuracyToPrecision(accuracy)
+  const geohash = encode(lat, lon, precision)
+
+  positions[pubkey] = { lat, lon, geohash, precision, timestamp }
+  updateMapMarker(pubkey, lat, lon)
+  refreshCircles()
+  fitMapToMarkers()
+  updateBeaconList()
+  persistPositions()
+}
+
+/** Map accuracy (metres) back to approximate geohash precision. */
+function accuracyToPrecision(accuracyM: number): number {
+  if (accuracyM <= 3) return 9
+  if (accuracyM <= 20) return 8
+  if (accuracyM <= 80) return 7
+  if (accuracyM <= 620) return 6
+  if (accuracyM <= 2500) return 5
+  if (accuracyM <= 20000) return 4
+  if (accuracyM <= 80000) return 3
+  if (accuracyM <= 630000) return 2
+  return 1
 }
 
 export function cleanupBeacons(): void {

@@ -230,6 +230,14 @@ export async function verifyWord(
   page: Page,
   word: string,
 ): Promise<'valid' | 'duress' | 'invalid'> {
+  // Select the first available member in the dropdown (if present)
+  const memberSelect = page.locator('#verify-member')
+  if (await memberSelect.count() > 0) {
+    const options = memberSelect.locator('option[value]:not([value=""])')
+    const firstValue = await options.first().getAttribute('value')
+    if (firstValue) await memberSelect.selectOption(firstValue)
+  }
+
   await page.fill('#verify-input', word)
   await page.click('#verify-btn')
 
@@ -240,6 +248,76 @@ export async function verifyWord(
   if (classes.includes('verify-result--valid')) return 'valid'
   if (classes.includes('verify-result--duress')) return 'duress'
   return 'invalid'
+}
+
+// ── Persistence ──────────────────────────────────────────────
+
+/**
+ * Wait for the debounced persistence write to flush to localStorage.
+ * The app debounces writes with 100ms + async encryption. This waits
+ * until `canary:groups` contains at least one group entry.
+ */
+export async function waitForPersist(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const raw = localStorage.getItem('canary:groups')
+      if (!raw) return false
+      const groups = JSON.parse(raw)
+      return Object.keys(groups).length > 0
+    },
+    { timeout: 3000 },
+  )
+}
+
+// ── Member management ────────────────────────────────────────
+
+/**
+ * Add a simulated member directly via localStorage, then reload
+ * so the app picks up the change.
+ * Replaces the removed #add-member-btn with a programmatic equivalent.
+ */
+export async function addSimulatedMember(page: Page): Promise<void> {
+  // Wait for debounced state to flush to localStorage with at least one group
+  await waitForPersist(page)
+
+  // Read the active group name before reload so we can re-select it
+  const activeGroupName = await page.locator('.group-list__item--active .group-list__name').textContent()
+
+  // Add a fake member directly to the persisted groups in localStorage.
+  // Re-reads localStorage inside evaluate to guarantee consistency.
+  await page.evaluate(async () => {
+    // Poll until groups are available (handles debounce edge cases)
+    let groups: Record<string, { members: string[]; [k: string]: unknown }> | null = null
+    for (let i = 0; i < 30; i++) {
+      const raw = localStorage.getItem('canary:groups')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Object.keys(parsed).length > 0) {
+          groups = parsed
+          break
+        }
+      }
+      await new Promise(r => setTimeout(r, 100))
+    }
+    if (!groups) throw new Error('No groups in localStorage after waiting')
+
+    const groupId = Object.keys(groups)[0]
+    const group = groups[groupId]
+
+    const bytes = new Uint8Array(32)
+    crypto.getRandomValues(bytes)
+    const fakePubkey = Array.from(bytes, (b: number) => b.toString(16).padStart(2, '0')).join('')
+    group.members = [...group.members, fakePubkey]
+    localStorage.setItem('canary:groups', JSON.stringify(groups))
+  })
+  // Reload so the app restores the updated state from localStorage
+  await page.reload()
+  await page.waitForSelector('#sidebar', { timeout: 5000 })
+  // Re-select the group to make it active
+  if (activeGroupName) {
+    await page.click(`.group-list__item:has-text("${activeGroupName.trim()}")`)
+    await page.waitForSelector(`.group-list__item--active:has-text("${activeGroupName.trim()}")`)
+  }
 }
 
 // ── Settings ─────────────────────────────────────────────────

@@ -184,6 +184,22 @@ body::after {
     display: flex;
   }
 
+  .header__nav {
+    display: none;
+  }
+
+  .header__actions {
+    gap: 0.5rem;
+  }
+
+  .header__identity-label {
+    max-width: 72px;
+  }
+
+  .relay-label {
+    display: none;
+  }
+
   .panels-grid {
     grid-template-columns: 1fr;
   }

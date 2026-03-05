@@ -10,6 +10,7 @@ const KEY_GROUPS = 'canary:groups'
 const KEY_IDENTITY = 'canary:identity'
 const KEY_SETTINGS = 'canary:settings'
 const KEY_PIN_SALT = 'canary:pin-salt'
+const KEY_ACTIVE_GROUP = 'canary:active-group'
 
 // ── Module-level PIN state ─────────────────────────────────────
 // The active CryptoKey is held in memory only — never written to storage.
@@ -38,7 +39,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   pinEnabled: false,
   autoLockMinutes: 5,
-  defaultRelays: ['wss://relay.damus.io/', 'wss://nos.lol/'],
+  defaultRelays: ['wss://relay.trotters.cc/'],
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -122,6 +123,14 @@ async function decryptSeeds(
   return out
 }
 
+/** Resolve persisted activeGroupId, falling back to the first group. */
+function resolveActiveGroupId(validGroups: Record<string, unknown>): string | null {
+  const saved = safeRead<string>(KEY_ACTIVE_GROUP)
+  if (saved && saved in validGroups) return saved
+  const ids = Object.keys(validGroups)
+  return ids.length > 0 ? ids[0] : null
+}
+
 // ── Public API ─────────────────────────────────────────────────
 
 /**
@@ -167,6 +176,11 @@ export async function persistState(): Promise<void> {
     safeWrite(KEY_IDENTITY, state.identity)
   }
   safeWrite(KEY_SETTINGS, state.settings)
+  if (state.activeGroupId) {
+    safeWrite(KEY_ACTIVE_GROUP, state.activeGroupId)
+  } else {
+    localStorage.removeItem(KEY_ACTIVE_GROUP)
+  }
 }
 
 /**
@@ -243,7 +257,7 @@ export async function unlockAndRestoreState(pin: string): Promise<void> {
   const restored: AppState = {
     view: 'groups',
     groups: validGroups,
-    activeGroupId: null,
+    activeGroupId: resolveActiveGroupId(validGroups),
     identity,
     settings,
   }
@@ -284,7 +298,7 @@ export function restoreState(): void {
   const restored: AppState = {
     view: 'groups',
     groups: validGroups,
-    activeGroupId: null,
+    activeGroupId: resolveActiveGroupId(validGroups),
     identity: identity && typeof identity.pubkey === 'string'
       ? {
           pubkey: identity.pubkey,
@@ -337,6 +351,25 @@ export function initStorage(): void {
       })
     }, DEBOUNCE_MS)
   })
+
+  // Flush pending writes when the page is being unloaded (mobile tab switch,
+  // refresh, navigate away). pagehide fires reliably on mobile browsers,
+  // unlike beforeunload which is not guaranteed on iOS Safari.
+  window.addEventListener('pagehide', () => flushPersist())
+}
+
+/**
+ * Cancel the debounce timer and persist state immediately (synchronous best-effort).
+ * Called on page unload and after critical state changes like invite acceptance.
+ */
+export function flushPersist(): void {
+  clearTimeout(_debounceTimer)
+  _writeVersion++
+  // persistState is async (PIN encryption) but on unload we can only do sync work.
+  // For the common non-PIN case, safeWrite is synchronous (localStorage.setItem).
+  // For PIN-enabled sessions, the debounced write will have already fired for most
+  // state changes; this is a last-resort catch for the final unload race.
+  persistState().catch(() => {})
 }
 
 /**

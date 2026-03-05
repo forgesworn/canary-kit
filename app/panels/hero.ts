@@ -1,10 +1,21 @@
 // app/panels/hero.ts — Hero panel: verification word display with press-and-hold reveal
 
 import { advanceCounter, syncCounter, getCounter } from 'canary-kit'
-import { deriveToken } from 'canary-kit/token'
+import { deriveToken, deriveDuressToken } from 'canary-kit/token'
 import { getState, updateGroup } from '../state.js'
 import type { AppGroup } from '../types.js'
 import { toTokenEncoding, GROUP_CONTEXT, formatForDisplay } from '../utils/encoding.js'
+import { escapeHtml } from '../utils/escape.js'
+
+// ── Helpers ───────────────────────────────────────────────────
+
+function resolveName(pubkey: string, group: AppGroup): string {
+  const { identity } = getState()
+  if (identity?.pubkey === pubkey) return 'You'
+  const name = group.memberNames?.[pubkey]
+  if (name) return name
+  return pubkey.slice(0, 8) + '\u2026'
+}
 
 // ── Tick interval management ───────────────────────────────────
 
@@ -96,6 +107,24 @@ function getDisplayToken(group: AppGroup): string {
   return deriveToken(group.seed, GROUP_CONTEXT, effectiveCounter, toTokenEncoding(group))
 }
 
+/**
+ * Derive this user's duress token — the word to speak when under coercion.
+ * Returns null if no identity is available.
+ */
+function getDuressToken(group: AppGroup): string | null {
+  const { identity } = getState()
+  if (!identity?.pubkey) return null
+  const effectiveCounter = group.counter + group.usageOffset
+  return deriveDuressToken(
+    group.seed,
+    GROUP_CONTEXT,
+    identity.pubkey,
+    effectiveCounter,
+    toTokenEncoding(group),
+    group.tolerance,
+  )
+}
+
 // ── Render ─────────────────────────────────────────────────────
 
 /**
@@ -129,6 +158,8 @@ export function renderHero(container: HTMLElement): void {
 
   const rawWord = getDisplayToken(group)
   const word = formatForDisplay(rawWord, group.encodingFormat)
+  const rawDuress = getDuressToken(group)
+  const duressWord = rawDuress ? formatForDisplay(rawDuress, group.encodingFormat) : null
   const masked = maskWord(word)
   const secsLeft = secondsUntilRotation(group)
   const progressPct = Math.min(
@@ -164,13 +195,20 @@ export function renderHero(container: HTMLElement): void {
   `
 
   // ── Press-and-hold reveal ──────────────────────────────────
+  //
+  // WHERE you press determines WHICH word you see:
+  //   Left half  → normal "all clear" word
+  //   Right half → your personal duress word
+  //
+  // Both look identical to an observer — same button, same animation,
+  // same styling. The attacker cannot tell which word was revealed.
 
   const wordEl = container.querySelector<HTMLElement>('#hero-word')
   const revealBtn = container.querySelector<HTMLButtonElement>('#hero-reveal-btn')
 
-  function showWord(): void {
+  function showWord(isDuress: boolean): void {
     if (!wordEl) return
-    wordEl.textContent = word
+    wordEl.textContent = (isDuress && duressWord) ? duressWord : word
     wordEl.classList.remove('hero__word--masked')
     wordEl.classList.add('hero__word--revealed')
   }
@@ -185,7 +223,10 @@ export function renderHero(container: HTMLElement): void {
   if (revealBtn) {
     revealBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault() // prevent text selection on long press
-      showWord()
+      const rect = revealBtn!.getBoundingClientRect()
+      const pressX = (e as PointerEvent).clientX - rect.left
+      const isDuress = pressX > rect.width / 2
+      showWord(isDuress)
     })
     revealBtn.addEventListener('pointerup', hideWord)
     revealBtn.addEventListener('pointerleave', hideWord)
@@ -210,25 +251,54 @@ export function renderHero(container: HTMLElement): void {
 
   const callBtn = container.querySelector<HTMLButtonElement>('#hero-call-btn')
   callBtn?.addEventListener('click', () => {
-    // Show a simple member picker
     const { identity } = getState()
     const others = group.members.filter(m => m !== identity?.pubkey)
     if (others.length === 0) return
 
     if (others.length === 1) {
-      // Only one other member — start directly
       document.dispatchEvent(new CustomEvent('canary:verify-call', {
         detail: { groupId: activeGroupId, pubkey: others[0] },
       }))
       return
     }
 
-    // Multiple members — show a simple picker overlay
-    // For now, just use the first other member (simplest approach for Phase 1)
-    // TODO: member picker modal in Phase 2
-    document.dispatchEvent(new CustomEvent('canary:verify-call', {
-      detail: { groupId: activeGroupId, pubkey: others[0] },
-    }))
+    // Multiple members — show a picker
+    const pickerItems = others.map(pk => `
+      <button class="btn btn--outline member-pick-btn" data-pubkey="${escapeHtml(pk)}" type="button" style="width:100%;text-align:left;margin-bottom:0.5rem;">
+        ${escapeHtml(resolveName(pk, group))}
+      </button>
+    `).join('')
+
+    let picker = document.getElementById('member-picker') as HTMLDialogElement | null
+    if (!picker) {
+      picker = document.createElement('dialog')
+      picker.id = 'member-picker'
+      picker.className = 'modal'
+      document.body.appendChild(picker)
+    }
+    picker.innerHTML = `
+      <div class="modal__form" style="min-width:240px;">
+        <h2 class="modal__title">Who are you calling?</h2>
+        ${pickerItems}
+        <div class="modal__actions">
+          <button class="btn" id="picker-cancel" type="button">Cancel</button>
+        </div>
+      </div>
+    `
+    picker.querySelector('#picker-cancel')?.addEventListener('click', () => picker!.close())
+    picker.addEventListener('click', (e) => { if (e.target === picker) picker!.close() })
+    picker.querySelectorAll('.member-pick-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pk = (btn as HTMLElement).dataset.pubkey
+        picker!.close()
+        if (pk) {
+          document.dispatchEvent(new CustomEvent('canary:verify-call', {
+            detail: { groupId: activeGroupId, pubkey: pk },
+          }))
+        }
+      })
+    })
+    picker.showModal()
   })
 
   // ── Countdown tick ─────────────────────────────────────────

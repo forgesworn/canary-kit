@@ -28,20 +28,6 @@ function resolveName(pubkey: string): string {
   return pubkey.slice(0, 8) + '\u2026'
 }
 
-function buildMessage(status: VerifyDisplayStatus, identities?: string[]): string {
-  switch (status) {
-    case 'valid':
-      return 'Verified — token is correct.'
-    case 'duress': {
-      const names = identities?.length
-        ? identities.map(resolveName).join(', ')
-        : 'unknown member'
-      return `Duress — ${names} may be under coercion.`
-    }
-    case 'invalid':
-      return 'Failed — token does not match.'
-  }
-}
 
 // ── Render ─────────────────────────────────────────────────
 
@@ -65,12 +51,23 @@ export function renderVerify(container: HTMLElement): void {
 
   const placeholder = group.encodingFormat === 'pin' ? 'Enter PIN' : group.encodingFormat === 'hex' ? 'Enter hex' : 'Enter word'
 
+  const { identity } = getState()
+  const others = group.members.filter(m => m !== identity?.pubkey)
+  const memberOptions = others.map(pk =>
+    `<option value="${pk}">${resolveName(pk).replace(/</g, '&lt;')}</option>`
+  ).join('')
+  const showMemberPicker = others.length > 0
+
   container.innerHTML = `
     <section class="panel verify-panel">
       <h2 class="panel__title">Verify Someone</h2>
-      <p class="settings-hint">Someone told you a word? Type it here to check if it's valid, expired, or a duress signal.</p>
+      <p class="settings-hint">Someone told you a word? ${showMemberPicker ? 'Pick who you\'re talking to and type' : 'Type'} it here.</p>
 
       <div class="verify-form">
+        ${showMemberPicker ? `<select class="input" id="verify-member" style="margin-bottom: 0.5rem;">
+          ${others.length > 1 ? '<option value="">Who are you verifying?</option>' : ''}
+          ${memberOptions}
+        </select>` : ''}
         <input
           class="input"
           id="verify-input"
@@ -87,6 +84,7 @@ export function renderVerify(container: HTMLElement): void {
   `
 
   const input = container.querySelector<HTMLInputElement>('#verify-input')
+  const memberSelect = container.querySelector<HTMLSelectElement>('#verify-member')
   const verifyBtn = container.querySelector<HTMLButtonElement>('#verify-btn')
   const resultEl = container.querySelector<HTMLElement>('#verify-result')
 
@@ -99,6 +97,14 @@ export function renderVerify(container: HTMLElement): void {
     if (!currentGroupId) return
     const currentGroup = currentGroups[currentGroupId]
     if (!currentGroup) return
+
+    const selectedMember = memberSelect?.value
+    if (memberSelect && !selectedMember) {
+      resultEl!.className = 'verify-result verify-result--invalid'
+      resultEl!.innerHTML = `<span class="verify-icon">${STATUS_ICONS.invalid}</span><span class="verify-message">Pick who you're verifying first.</span>`
+      resultEl!.hidden = false
+      return
+    }
 
     const spokenWord = input!.value.trim().toLowerCase().replace(/-/g, '')
     if (!spokenWord) return
@@ -119,8 +125,17 @@ export function renderVerify(container: HTMLElement): void {
     resultEl!.className = 'verify-result'
     resultEl!.classList.add(`verify-result--${result.status}`)
 
+    const memberName = selectedMember ? resolveName(selectedMember) : 'Speaker'
     const icon = STATUS_ICONS[result.status]
-    const message = buildMessage(result.status, result.identities)
+    let message: string
+    if (result.status === 'valid') {
+      message = `${memberName} is verified — word is correct.`
+    } else if (result.status === 'duress') {
+      const duressNames = result.identities?.map(resolveName).join(', ') ?? 'unknown'
+      message = `Duress — ${duressNames} may be under coercion.`
+    } else {
+      message = `${memberName} gave the wrong word — they may not have the current group key.`
+    }
 
     resultEl!.innerHTML = `<span class="verify-icon">${icon}</span><span class="verify-message"></span>`
     const messageEl = resultEl!.querySelector<HTMLElement>('.verify-message')

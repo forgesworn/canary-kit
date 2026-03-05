@@ -12,6 +12,23 @@ import { GROUP_CONTEXT, toTokenEncoding } from '../utils/encoding.js'
 
 // ── Helpers ────────────────────────────────────────────────────
 
+const MEMBER_HUES = [210, 140, 30, 280, 60, 330, 170, 0] // stable colour per member slot
+
+function memberHue(pubkey: string, members: string[]): number {
+  const idx = members.indexOf(pubkey)
+  return MEMBER_HUES[(idx >= 0 ? idx : 0) % MEMBER_HUES.length]
+}
+
+function memberColourDot(pubkey: string, members: string[], livenessCheckins: Record<string, number>, livenessInterval: number): string {
+  const hue = memberHue(pubkey, members)
+  const lastCheckin = livenessCheckins[pubkey] ?? 0
+  if (lastCheckin === 0) return `hsl(${hue}, 20%, 50%)` // desaturated — never checked in
+  const elapsed = Math.floor(Date.now() / 1000) - lastCheckin
+  if (elapsed <= livenessInterval) return `hsl(${hue}, 70%, 55%)` // vibrant
+  if (elapsed <= livenessInterval * 1.25) return `hsl(${hue}, 40%, 50%)` // fading
+  return '#94a3b8' // grey — missed
+}
+
 /**
  * Format a pubkey for display: "You" for local identity, memberNames, or truncated pubkey.
  */
@@ -36,6 +53,8 @@ interface InviteModalOptions {
   title?: string
   scanHint?: string
   showConfirmMemberNote?: boolean
+  /** Hash fragment prefix for the link, e.g. 'join' or 'sync'. Defaults to 'join'. */
+  hashPrefix?: string
 }
 
 export function showInviteModal(payload: string, confirmCode: string, options?: InviteModalOptions): void {
@@ -44,7 +63,8 @@ export function showInviteModal(payload: string, confirmCode: string, options?: 
   const showConfirmMemberNote = options?.showConfirmMemberNote ?? true
 
   const base = window.location.href.split('#')[0]
-  const joinUrl = `${base}#join/${encodeURIComponent(payload)}`
+  const prefix = options?.hashPrefix ?? 'join'
+  const joinUrl = `${base}#${prefix}/${encodeURIComponent(payload)}`
   const svgMarkup = generateQR(joinUrl)
 
   let dialog = document.getElementById('invite-modal') as HTMLDialogElement | null
@@ -126,6 +146,7 @@ export function showShareStateModal(payload: string, confirmCode: string): void 
     title: 'Share Group State',
     scanHint: 'Share with existing members to sync the latest group state.',
     showConfirmMemberNote: false,
+    hashPrefix: 'sync',
   })
 }
 
@@ -156,8 +177,11 @@ export function renderMembers(container: HTMLElement): void {
     group.members.length > 0
       ? group.members
           .map(
-            (pubkey) => `
+            (pubkey) => {
+              const dotColour = memberColourDot(pubkey, group.members, group.livenessCheckins ?? {}, group.livenessInterval)
+              return `
           <li class="member-item" data-pubkey="${escapeHtml(pubkey)}">
+            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${dotColour};flex-shrink:0;box-shadow:0 0 6px ${dotColour}80;"></span>
             <span class="member-item__pubkey">${escapeHtml(formatPubkey(pubkey, group.members, activeGroupId))}</span>
             ${isAdmin ? `<button
               class="btn btn--sm member-item__remove"
@@ -165,7 +189,8 @@ export function renderMembers(container: HTMLElement): void {
               type="button"
               aria-label="Remove member"
             >\u2715</button>` : ''}
-          </li>`,
+          </li>`
+            },
           )
           .join('')
       : `<li class="member-item member-item--empty">No members yet.</li>`
@@ -182,7 +207,7 @@ export function renderMembers(container: HTMLElement): void {
         <button class="btn btn--sm" id="confirm-member-btn" type="button">Confirm Member</button>
       </div>` : ''}
       <div class="members-sync">
-        <button class="btn btn--sm" id="sync-state-btn" type="button">Sync State</button>
+        <button class="btn btn--sm" id="sync-state-btn" type="button">${isAdmin ? 'Sync State' : 'Update Group'}</button>
       </div>
     </section>
   `
@@ -253,16 +278,17 @@ export function renderMembers(container: HTMLElement): void {
 
 // ── Confirm member helpers ──────────────────────────────────────
 
-function addConfirmedMember(groupId: string, pubkey: string, displayName: string): void {
+function addConfirmedMember(groupId: string, pubkey: string, displayName: string): boolean {
   const { groups, identity } = getState()
   const group = groups[groupId]
-  if (!group) return
-  if (!identity?.pubkey || !group.admins.includes(identity.pubkey)) return
-  if (group.members.includes(pubkey)) return
+  if (!group) return false
+  if (!identity?.pubkey || !group.admins.includes(identity.pubkey)) return false
+  if (group.members.includes(pubkey)) return false
 
   const members = [...group.members, pubkey]
   const memberNames = { ...group.memberNames, [pubkey]: displayName }
   updateGroup(groupId, { members, memberNames })
+  return true
 }
 
 export function showConfirmMemberModal(prefillToken?: string): void {
@@ -317,12 +343,15 @@ export function showConfirmMemberModal(prefillToken?: string): void {
           counter: currentGroup.counter + (currentGroup.usageOffset ?? 0),
           context: 'canary:group',
           encoding: toTokenEncoding(currentGroup),
+          tolerance: currentGroup.tolerance ?? 1,
         })
         if (!result.valid) {
           throw new Error(result.error ?? 'Invalid join token.')
         }
 
-        addConfirmedMember(currentGroupId, result.pubkey!, result.displayName || nameInput || '')
+        if (!addConfirmedMember(currentGroupId, result.pubkey!, result.displayName || nameInput || '')) {
+          throw new Error('Member could not be added — they may already be in the group or you are not an admin.')
+        }
         showToast(`${result.displayName || 'Member'} has joined the group`, 'success')
       } else if (wordInput) {
         if (!nameInput) throw new Error('Please enter the member name.')
@@ -339,7 +368,9 @@ export function showConfirmMemberModal(prefillToken?: string): void {
         const bytes = new Uint8Array(32)
         crypto.getRandomValues(bytes)
         const placeholderPubkey = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
-        addConfirmedMember(currentGroupId, placeholderPubkey, nameInput)
+        if (!addConfirmedMember(currentGroupId, placeholderPubkey, nameInput)) {
+          throw new Error('Member could not be added — you may not be an admin of this group.')
+        }
         showToast(`${nameInput} has joined the group`, 'success')
       } else {
         throw new Error('Provide either an ack token or a verification word.')

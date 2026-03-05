@@ -16,6 +16,7 @@ import {
   clearPinKey,
   enablePin,
   disablePin,
+  flushPersist,
 } from './storage.js'
 import { getState, subscribe, update, updateGroup } from './state.js'
 import { renderHeader } from './components/header.js'
@@ -27,7 +28,7 @@ import { renderHero } from './panels/hero.js'
 import { renderDuress } from './panels/duress.js'
 import { renderVerify } from './panels/verify.js'
 import { renderMembers, showInviteModal } from './panels/members.js'
-import { renderBeacons } from './panels/beacons.js'
+import { renderBeacons, handleIncomingBeacon } from './panels/beacons.js'
 import { renderLiveness } from './panels/liveness.js'
 import { renderSettings } from './panels/settings.js'
 import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
@@ -465,6 +466,19 @@ function checkInviteFragment(): void {
     document.dispatchEvent(
       new CustomEvent('canary:join-group', { detail: { payload } }),
     )
+  } else if (hash.startsWith('#sync/')) {
+    let payload: string
+    try {
+      payload = decodeURIComponent(hash.slice(6))
+    } catch {
+      console.warn('[canary] Malformed sync fragment — ignoring.')
+      window.location.hash = ''
+      return
+    }
+    window.location.hash = ''
+    document.dispatchEvent(
+      new CustomEvent('canary:sync-state', { detail: { payload } }),
+    )
   } else if (hash.startsWith('#ack/')) {
     let token: string
     try {
@@ -598,9 +612,12 @@ async function applyInvite(data: ReturnType<typeof acceptInvite>, myName: string
   }
   const members = Array.from(memberSet)
 
+  // Invite names are unsigned/advisory. For existing groups, use them only as
+  // fallback for members we don't already have a local name for — local names
+  // always take precedence. For new joins, accept invite names as initial values.
   const memberNames: Record<string, string> = {
-    ...(data.memberNames ?? {}),        // names from invite (advisory, not signed)
-    ...(existingGroup?.memberNames ?? {}), // local names take precedence
+    ...(data.memberNames ?? {}),
+    ...(existingGroup?.memberNames ?? {}),
   }
   if (myName && identity?.pubkey) {
     memberNames[identity.pubkey] = myName
@@ -716,6 +733,7 @@ function wireGlobalEvents(): void {
         const data = acceptInvite(payload.trim(), code.trim() || undefined)
 
         const { appGroup } = await applyInvite(data, myName)
+        flushPersist()
 
         const dialog = document.getElementById('app-modal') as HTMLDialogElement | null
         dialog?.close()
@@ -755,8 +773,9 @@ function wireGlobalEvents(): void {
     })
   })
 
-  // Fired by the members panel "Sync State" button.
-  document.addEventListener('canary:sync-state', () => {
+  // Fired by the members panel "Sync State" button or #sync/ deep link.
+  document.addEventListener('canary:sync-state', (evt) => {
+    const prefillPayload = (evt as CustomEvent<{ payload?: string }>).detail?.payload ?? ''
     const { identity: syncIdentity } = getState()
     const syncName = syncIdentity?.displayName && syncIdentity.displayName !== 'You' ? syncIdentity.displayName : ''
 
@@ -764,7 +783,7 @@ function wireGlobalEvents(): void {
       <h2 class="modal__title">Sync Group State</h2>
       <p class="settings-hint" style="margin-bottom: 0.75rem;">Paste the state update from your group admin.</p>
       <label class="input-label">Invite String
-        <textarea name="payload" class="input" rows="3" placeholder="Paste the state string here" required></textarea>
+        <textarea name="payload" class="input" rows="3" placeholder="Paste the state string here" required>${escapeHtml(prefillPayload)}</textarea>
       </label>
       <label class="input-label">Confirmation Words
         <input name="code" class="input" placeholder="word word word" maxlength="40" required>
@@ -780,6 +799,7 @@ function wireGlobalEvents(): void {
         const data = acceptInvite(payload.trim(), code.trim() || undefined)
 
         await applyInvite(data, syncName)
+        flushPersist()
 
         const dialog = document.getElementById('app-modal') as HTMLDialogElement | null
         dialog?.close()
@@ -852,6 +872,7 @@ function wireGlobalEvents(): void {
     const { groupId, message, sender } = (evt as CustomEvent).detail
     if (message.type === 'beacon') {
       console.info(`[canary] Beacon from ${sender.slice(0, 8)}…: ${message.lat}, ${message.lon}`)
+      handleIncomingBeacon(sender, message.lat, message.lon, message.accuracy ?? 20000, message.timestamp)
     } else if (message.type === 'duress-alert') {
       showDuressAlert(sender, groupId, message.lat != null ? { lat: message.lat, lon: message.lon } : undefined, message.timestamp)
     }
@@ -888,19 +909,40 @@ async function ensureLocalIdentity(): Promise<void> {
 // ── Relay sync boot ────────────────────────────────────────────
 
 async function bootSync(): Promise<void> {
-  const { groups } = getState()
+  const { groups, identity } = getState()
+
+  const groupCount = Object.keys(groups).length
+  const hasPrivkey = !!identity?.privkey
+  console.warn('[canary:boot] bootSync — groups:', groupCount, 'identity:', identity?.pubkey?.slice(0, 8) ?? 'none', 'privkey:', hasPrivkey ? 'yes' : 'NO')
 
   // Collect unique relays from all groups
   const allRelays = new Set<string>()
   for (const group of Object.values(groups)) {
+    console.warn('[canary:boot]   group', group.id.slice(0, 8), 'mode:', group.mode, 'relays:', JSON.stringify(group.relays), 'members:', group.members.length)
     for (const relay of group.relays) {
       allRelays.add(relay)
     }
   }
-  if (allRelays.size === 0) return
+  if (allRelays.size === 0) {
+    console.warn('[canary:boot] No relays found — sync disabled')
+    showToast(`Sync disabled — ${groupCount} group(s), no relays configured`, 'warning', 5000)
+    return
+  }
 
+  if (!hasPrivkey) {
+    console.warn('[canary:boot] No privkey — sync disabled')
+    showToast('Sync disabled — no private key', 'warning', 5000)
+    return
+  }
+
+  console.warn('[canary:boot] Connecting to relays:', Array.from(allRelays))
   await ensureTransport(Array.from(allRelays))
   subscribeToAllGroups()
+  showToast(`Syncing via ${allRelays.size} relay(s)`, 'success', 2000)
+
+  // Start heartbeat AFTER groups are registered (not inside ensureTransport)
+  const { startLivenessHeartbeat } = await import('./components/liveness.js')
+  startLivenessHeartbeat()
 }
 
 // ── Login screen ──────────────────────────────────────────────

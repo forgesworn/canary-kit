@@ -26,6 +26,14 @@ test.describe('Verify input panel', () => {
   })
 
   test('Enter key triggers verification', async ({ cleanPage: page }) => {
+    // Select a member if the dropdown is present
+    const memberSelect = page.locator('#verify-member')
+    if (await memberSelect.count() > 0) {
+      const firstOption = memberSelect.locator('option[value]:not([value=""])')
+      const firstValue = await firstOption.first().getAttribute('value')
+      if (firstValue) await memberSelect.selectOption(firstValue)
+    }
+
     const word = await getDisplayedWord(page)
     await page.fill('#verify-input', word)
     await page.press('#verify-input', 'Enter')

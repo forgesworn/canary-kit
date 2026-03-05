@@ -13,7 +13,7 @@ const DEFAULT_STATE: AppState = {
     theme: 'dark',
     pinEnabled: false,
     autoLockMinutes: 5,
-    defaultRelays: ['wss://relay.damus.io/', 'wss://nos.lol/'],
+    defaultRelays: ['wss://relay.trotters.cc/'],
   },
 }
 

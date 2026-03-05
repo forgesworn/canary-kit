@@ -80,6 +80,7 @@ export class NostrSyncTransport implements SyncTransport {
   /** Register a group's seed so we can encrypt/decrypt and sign for it. */
   registerGroup(groupId: string, seedHex: string, signer: EventSignerLike, members: string[], options?: GroupRegistrationOptions): void {
     const tagHash = hashGroupTag(groupId)
+    console.info('[canary:sync] registerGroup', groupId.slice(0, 8), '→ tagHash', tagHash.slice(0, 12), 'members:', members.length)
     this.groupKeys.set(groupId, {
       key: deriveGroupKey(seedHex),
       signer,
@@ -131,7 +132,9 @@ export class NostrSyncTransport implements SyncTransport {
 
     try {
       const signed = await groupInfo.signer.sign(unsigned)
+      console.info('[canary:sync] Publishing', message.type, 'to', groupId.slice(0, 8), '→ d-tag:', groupInfo.tagHash.slice(0, 12))
       await pool.publish(this.relays, signed as any)
+      console.info('[canary:sync] Published OK')
     } catch (err) {
       console.error('[canary:sync] Publish failed:', err)
     }
@@ -159,14 +162,17 @@ export class NostrSyncTransport implements SyncTransport {
       since: Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60,
     }
 
+    console.info('[canary:sync] Subscribing to', groupId.slice(0, 8), '→ filter:', JSON.stringify(filter))
+
     const sub = pool.subscribeMany(
       this.relays,
-      [filter],
+      filter as any,
       {
         onevent: async (event: any) => {
           try {
             if (!event || typeof event !== 'object') return
             if (typeof event.pubkey !== 'string' || typeof event.content !== 'string') return
+            console.info('[canary:sync] Received event', event.id?.slice(0, 12), 'kind:', event.kind, 'from pubkey:', event.pubkey?.slice(0, 12))
 
             // Re-fetch active group info on every event to avoid stale closure
             // references after reRegisterGroup() replaces the map entry.
@@ -249,6 +255,7 @@ export class NostrSyncTransport implements SyncTransport {
               return
             }
 
+            console.info('[canary:sync] Dispatching', msg.type, 'from sender', sender.slice(0, 8))
             onMessage(msg, sender)
 
             // Mark event as seen only after successful processing to avoid
@@ -318,14 +325,15 @@ export class NostrSyncTransport implements SyncTransport {
     const pool = getPool()
     if (!pool) return
 
-    const filters = [
-      { kinds: [RECOVERY_REQUEST_KIND], '#p': [this.personalPubkey], since: Math.floor(Date.now() / 1000) - 300 },
-      { kinds: [RECOVERY_RESPONSE_KIND], '#p': [this.personalPubkey], since: Math.floor(Date.now() / 1000) - 300 },
-    ]
+    const filter = {
+      kinds: [RECOVERY_REQUEST_KIND, RECOVERY_RESPONSE_KIND],
+      '#p': [this.personalPubkey],
+      since: Math.floor(Date.now() / 1000) - 300,
+    }
 
     this.recoverySub = pool.subscribeMany(
       this.relays,
-      filters,
+      filter as any,
       {
         onevent: async (event: any) => {
           try {

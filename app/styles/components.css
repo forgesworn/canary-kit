@@ -1233,6 +1233,12 @@ select.input option {
   box-shadow: 0 0 6px rgba(248, 113, 113, 0.4);
 }
 
+.liveness-dot--grey {
+  background: var(--text-muted);
+  box-shadow: none;
+  opacity: 0.5;
+}
+
 /* ── .liveness-name ──────────────────────────────────────── */
 
 .liveness-name {
@@ -1258,6 +1264,10 @@ select.input option {
   color: var(--failed);
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+.liveness-item--grey .liveness-name {
+  color: var(--text-muted);
 }
 
 /* ── .liveness-time ──────────────────────────────────────── */
@@ -1287,6 +1297,7 @@ select.input option {
 .liveness-bar__fill--green { background: var(--verified); }
 .liveness-bar__fill--amber { background: var(--duress); }
 .liveness-bar__fill--red   { background: var(--failed); }
+.liveness-bar__fill--grey  { background: var(--text-muted); opacity: 0.3; }
 
 /* ── .settings-drawer ────────────────────────────────────── */
 
@@ -2077,8 +2088,9 @@ select.input option {
 
 .call-verify__timer {
   font-size: 0.875rem;
-  opacity: 0.4;
-  margin: 1.5rem 0 2rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 1.5rem 0 0;
 }
 
 .call-verify__actions {

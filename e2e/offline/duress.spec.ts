@@ -1,6 +1,6 @@
 // e2e/offline/duress.spec.ts — Duress panel tests
 import { test, expect } from '../fixtures.js'
-import { loginOffline, createGroup, getDisplayedWord } from '../helpers.js'
+import { loginOffline, createGroup, getDisplayedWord, addSimulatedMember } from '../helpers.js'
 
 test.describe('Duress panel', () => {
   test.beforeEach(async ({ cleanPage: page }) => {
@@ -8,7 +8,7 @@ test.describe('Duress panel', () => {
     // Need at least 2 members for duress to be meaningful
     await createGroup(page, 'Test', { preset: 'family' })
     // Add a simulated member so duress words can be derived
-    await page.click('#add-member-btn')
+    await addSimulatedMember(page)
   })
 
   test('duress panel shows masked word', async ({ cleanPage: page }) => {

@@ -298,7 +298,12 @@ export function renderSettings(container: HTMLElement): void {
   // ── Emergency reseed ─────────────────────────────────────────
 
   document.getElementById('reseed-btn')?.addEventListener('click', () => {
-    if (confirm('Rotate the group key? This broadcasts the new key to all members via the relay.')) {
+    const { groups: g } = getState()
+    const isOnline = g[activeGroupId!]?.mode === 'online'
+    const msg = isOnline
+      ? 'Rotate the group key? This broadcasts the new key to all members via the relay.'
+      : 'Rotate the group key? Remaining members will need to re-sync via Share State.'
+    if (confirm(msg)) {
       reseedGroup(activeGroupId!)
       showToast('Key rotated. New verification words are active.', 'warning', 6000)
     }
@@ -367,7 +372,7 @@ export function renderSettings(container: HTMLElement): void {
           latestInviteIssuedAt: 0,
           livenessInterval: typeof imported.rotationInterval === 'number' && imported.rotationInterval > 0 ? imported.rotationInterval : 86400,
           livenessCheckins: {} as Record<string, number>,
-          tolerance: typeof imported.tolerance === 'number' && imported.tolerance >= 0 ? imported.tolerance : 1,
+          tolerance: typeof imported.tolerance === 'number' && imported.tolerance >= 0 && imported.tolerance <= 10 ? imported.tolerance : 1,
           beaconInterval: typeof imported.beaconInterval === 'number' && imported.beaconInterval > 0 ? imported.beaconInterval : 60,
           beaconPrecision: typeof imported.beaconPrecision === 'number' && imported.beaconPrecision > 0 ? imported.beaconPrecision : 6,
           duressMode: (['immediate', 'dead-drop', 'both'] as const).includes(imported.duressMode) ? imported.duressMode : 'immediate',

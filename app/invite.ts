@@ -3,6 +3,7 @@
 import { sha256, hmacSha256, bytesToHex, hexToBytes } from 'canary-kit/crypto'
 import { getWord } from 'canary-kit/wordlist'
 import { deriveToken } from 'canary-kit/token'
+import type { TokenEncoding } from 'canary-kit/encoding'
 import { PROTOCOL_VERSION } from 'canary-kit/sync'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { getState, updateGroup } from './state.js'
@@ -58,6 +59,8 @@ export interface InvitePayload {
   inviterPubkey: string
   /** Schnorr signature over SHA-256(canonicalPayload) — proves the inviter controls the admin private key. */
   inviterSig: string
+  /** Display names for members — not signed, advisory only. */
+  memberNames?: Record<string, string>
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -177,7 +180,7 @@ export function assertInvitePayload(raw: unknown): asserts raw is InvitePayload 
  */
 /** @internal Exported for contract testing — not part of the public API. */
 export function inviteCanonicalBytes(payload: InvitePayload): Uint8Array {
-  const { inviterSig: _sig, ...rest } = payload
+  const { inviterSig: _sig, memberNames: _names, ...rest } = payload
   const sorted = Object.keys(rest).sort().reduce((acc, key) => {
     acc[key] = (rest as Record<string, unknown>)[key]
     return acc
@@ -279,6 +282,7 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
     protocolVersion: PROTOCOL_VERSION,
     inviterPubkey: identity.pubkey,
     inviterSig: '', // placeholder — computed below
+    memberNames: { ...group.memberNames },
   }
 
   invitePayload.inviterSig = signInvite(invitePayload, identity.privkey)
@@ -330,6 +334,9 @@ export function acceptInvite(payload: string, confirmCode?: string): InvitePaylo
     protocolVersion: raw.protocolVersion,
     inviterPubkey: raw.inviterPubkey,
     inviterSig: raw.inviterSig,
+    memberNames: raw.memberNames && typeof raw.memberNames === 'object'
+      ? { ...raw.memberNames as Record<string, string> }
+      : undefined,
   }
 
   // Verify the Schnorr signature — proves the inviter controls the claimed admin private key.
@@ -450,7 +457,7 @@ export function createJoinToken(opts: {
  */
 export function verifyJoinToken(
   encoded: string,
-  context: { groupId: string; groupSeed: string; counter: number; context: string },
+  context: { groupId: string; groupSeed: string; counter: number; context: string; encoding?: TokenEncoding; tolerance?: number },
 ): JoinTokenResult {
   let raw: JoinToken
   try {
@@ -493,11 +500,11 @@ export function verifyJoinToken(
 
   // Verify word proves seed possession (F1 hardening)
   const word = (raw.w || '').toLowerCase()
-  const tolerance = 1
+  const tolerance = context.tolerance ?? 1
   let wordValid = false
   for (let c = context.counter - tolerance; c <= context.counter + tolerance; c++) {
     if (c < 0) continue
-    if (word === deriveToken(context.groupSeed, context.context, c).toLowerCase()) {
+    if (word === deriveToken(context.groupSeed, context.context, c, context.encoding).toLowerCase()) {
       wordValid = true
       break
     }

@@ -1,10 +1,11 @@
 // app/components/call-verify.ts — Directional call verification overlay
 
-import { createSession } from 'canary-kit/session'
+import { createSession, SESSION_PRESETS } from 'canary-kit/session'
 import { getState } from '../state.js'
 import { escapeHtml } from '../utils/escape.js'
 
-const MEMBER_NAMES = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry']
+/** Cleanup function for the current overlay (timer + keydown listener). */
+let activeCleanup: (() => void) | null = null
 
 function memberName(pubkey: string, groupId: string): string {
   const group = getState().groups[groupId]
@@ -13,9 +14,7 @@ function memberName(pubkey: string, groupId: string): string {
   if (identity?.pubkey === pubkey) return 'You'
   const name = group.memberNames?.[pubkey]
   if (name) return name
-  const others = group.members.filter(m => m !== identity?.pubkey)
-  const idx = others.indexOf(pubkey)
-  return idx >= 0 && idx < MEMBER_NAMES.length ? MEMBER_NAMES[idx] : pubkey.slice(0, 8)
+  return `${pubkey.slice(0, 8)}\u2026${pubkey.slice(-4)}`
 }
 
 /**
@@ -23,7 +22,11 @@ function memberName(pubkey: string, groupId: string): string {
  * Each party gets a different word — speak yours, listen for theirs.
  */
 export function showCallVerify(groupId: string, theirPubkey: string): void {
-  // Remove any existing overlay
+  // Clean up any existing overlay (timer + listener) before creating a new one
+  if (activeCleanup) {
+    activeCleanup()
+    activeCleanup = null
+  }
   document.querySelector('.call-verify')?.remove()
 
   const { groups, identity } = getState()
@@ -46,7 +49,7 @@ export function showCallVerify(groupId: string, theirPubkey: string): void {
     preset: 'call',
   })
 
-  // Snapshot words once for the call duration — no live rotation
+  const rotationSeconds = SESSION_PRESETS.call.rotationSeconds
   const nowSec = Math.floor(Date.now() / 1000)
   const myWord = session.myToken(nowSec)
   const theirWord = session.theirToken(nowSec)
@@ -61,15 +64,17 @@ export function showCallVerify(groupId: string, theirPubkey: string): void {
 
       <div class="call-verify__section call-verify__section--say">
         <span class="call-verify__label">Say this:</span>
-        <span class="call-verify__word call-verify__word--mine">${myWord}</span>
+        <span class="call-verify__word call-verify__word--mine" id="cv-word-mine">${myWord}</span>
       </div>
 
       <div class="call-verify__divider"></div>
 
       <div class="call-verify__section call-verify__section--hear">
         <span class="call-verify__label">They should say:</span>
-        <span class="call-verify__word call-verify__word--theirs">${theirWord}</span>
+        <span class="call-verify__word call-verify__word--theirs" id="cv-word-theirs">${theirWord}</span>
       </div>
+
+      <p class="call-verify__timer">Words change in <span id="cv-countdown">${rotationSeconds}</span>s</p>
 
       <p class="call-verify__instruction" style="margin-top: 1.5rem; font-size: 0.75rem;">In a real call, if they say the wrong word, it could be a duress signal. A production app would automatically check and silently alert the group.</p>
       <div class="call-verify__actions">
@@ -80,14 +85,47 @@ export function showCallVerify(groupId: string, theirPubkey: string): void {
     </div>
   `
 
+  // Live rotation: update words and countdown every second
+  let timerId: ReturnType<typeof setInterval> | null = null
+
+  function updateWords(): void {
+    const t = Math.floor(Date.now() / 1000)
+    const mineEl = overlay.querySelector('#cv-word-mine')
+    const theirsEl = overlay.querySelector('#cv-word-theirs')
+    const countdownEl = overlay.querySelector('#cv-countdown')
+    if (mineEl) mineEl.textContent = session.myToken(t)
+    if (theirsEl) theirsEl.textContent = session.theirToken(t)
+    if (countdownEl) {
+      const elapsed = t % rotationSeconds
+      countdownEl.textContent = String(rotationSeconds - elapsed)
+    }
+  }
+
+  timerId = setInterval(updateWords, 1000)
+
+  function stopTimer(): void {
+    if (timerId !== null) {
+      clearInterval(timerId)
+      timerId = null
+    }
+  }
+
   function dismiss(): void {
+    if (activeCleanup) {
+      activeCleanup()
+      activeCleanup = null
+    }
     overlay.classList.remove('call-verify--visible')
     setTimeout(() => overlay.remove(), 300)
-    document.removeEventListener('keydown', onEscape)
   }
 
   function onEscape(e: KeyboardEvent): void {
     if (e.key === 'Escape') dismiss()
+  }
+
+  activeCleanup = () => {
+    stopTimer()
+    document.removeEventListener('keydown', onEscape)
   }
 
   document.body.appendChild(overlay)
@@ -95,6 +133,7 @@ export function showCallVerify(groupId: string, theirPubkey: string): void {
   document.addEventListener('keydown', onEscape)
 
   overlay.querySelector('#cv-match')?.addEventListener('click', () => {
+    stopTimer()
     overlay.innerHTML = `
       <div class="call-verify__content">
         <h2 class="call-verify__title" style="color: var(--clr-success, #27ae60);">Call Verified</h2>
@@ -108,6 +147,7 @@ export function showCallVerify(groupId: string, theirPubkey: string): void {
   })
   overlay.querySelector('#cv-close')?.addEventListener('click', dismiss)
   overlay.querySelector('#cv-mismatch')?.addEventListener('click', () => {
+    stopTimer()
     overlay.innerHTML = `
       <div class="call-verify__content">
         <h2 class="call-verify__title" style="color: var(--clr-danger, #e74c3c);">Verification Failed</h2>

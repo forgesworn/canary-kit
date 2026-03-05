@@ -14,10 +14,10 @@ test.describe('Invite flow (offline)', () => {
     await expect(pageA.locator('#invite-modal[open]')).toBeVisible()
     await expect(pageA.locator('.qr-container')).toBeVisible()
 
-    // Confirmation words should be 3 lowercase words separated by hyphens
+    // Confirmation words should be 3 lowercase words separated by spaces
     const confirmText = await pageA.locator('.confirm-code__value').textContent()
     expect(confirmText).toBeTruthy()
-    const words = confirmText!.split('-')
+    const words = confirmText!.split(' ')
     expect(words).toHaveLength(3)
     words.forEach(w => {
       expect(w).toMatch(/^[a-z]+$/)
@@ -39,6 +39,17 @@ test.describe('Invite flow (offline)', () => {
     // Both should see a group called "Family"
     const groupsB = await getGroupNames(pageB)
     expect(groupsB).toContain('Family')
+  })
+
+  test('joiner sees creator name in member list', async ({ twoUsers: { pageA, pageB } }) => {
+    await loginOffline(pageA, 'Alice')
+    await createGroup(pageA, 'NameTest')
+
+    const { payload, confirmCode } = await createInvite(pageA)
+    await acceptInviteViaLink(pageB, payload, confirmCode, 'Bob')
+
+    // Bob should see Alice's name in the member list (from invite memberNames)
+    await expect(pageB.locator('.member-list')).toContainText('Alice')
   })
 
   test('both users see same verification word after join', async ({ twoUsers: { pageA, pageB } }) => {

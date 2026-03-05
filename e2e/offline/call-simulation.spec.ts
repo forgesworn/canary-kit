@@ -1,13 +1,13 @@
 // e2e/offline/call-simulation.spec.ts — Call verification demo tests
 import { test, expect } from '../fixtures.js'
-import { loginOffline, createGroup } from '../helpers.js'
+import { loginOffline, createGroup, addSimulatedMember } from '../helpers.js'
 
 test.describe('Call simulation', () => {
   test('verify call button shown for 2+ member groups', async ({ cleanPage: page }) => {
     await loginOffline(page, 'Alice')
     await createGroup(page, 'Pair')
     // Add a second member
-    await page.click('#add-member-btn')
+    await addSimulatedMember(page)
     await expect(page.locator('#hero-call-btn')).toBeVisible()
   })
 

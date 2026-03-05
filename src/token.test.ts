@@ -488,6 +488,24 @@ describe('verifyToken — multi-identity duress', () => {
   })
 })
 
+describe('deriveDuressToken — distinct words per pubkey', () => {
+  it('produces distinct duress words for different pubkeys with same seed and counter', () => {
+    // Simulates two group members (different pubkeys) — their duress words must differ.
+    // This confirms the identical-word observation in same-browser testing is an artefact
+    // of both tabs sharing the same identity, not a protocol bug.
+    const pubkeyAlice = 'aaaa'.repeat(16) // 64-char hex
+    const pubkeyBob = 'bbbb'.repeat(16)
+    const seed = SECRET_1
+    const context = 'canary:group'
+
+    for (let c = 0; c < 50; c++) {
+      const aliceDuress = deriveDuressToken(seed, context, pubkeyAlice, c, undefined, 1)
+      const bobDuress = deriveDuressToken(seed, context, pubkeyBob, c, undefined, 1)
+      expect(aliceDuress, `counter=${c}: Alice and Bob duress words should differ`).not.toBe(bobDuress)
+    }
+  })
+})
+
 describe('deriveDuressToken — maxTolerance=0', () => {
   it('works with zero tolerance (no cross-counter collision avoidance needed)', () => {
     const token = deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 0, undefined, 0)
