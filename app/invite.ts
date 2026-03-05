@@ -6,6 +6,18 @@ import { schnorr } from '@noble/curves/secp256k1.js'
 import { getState, updateGroup } from './state.js'
 import type { AppGroup } from './types.js'
 
+/** Allow wss:// relays, plus ws:// only for localhost development. */
+function isAllowedRelayUrl(url: string): boolean {
+  if (url.startsWith('wss://')) return true
+  if (url.startsWith('ws://')) {
+    try {
+      const parsed = new URL(url)
+      return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '[::1]'
+    } catch { return false }
+  }
+  return false
+}
+
 // ── Types ──────────────────────────────────────────────────────
 
 /** Serialisable invite payload passed between devices. */
@@ -109,8 +121,8 @@ export function assertInvitePayload(raw: unknown): asserts raw is InvitePayload 
   if (!Array.isArray(data.members) || !data.members.every((m) => typeof m === 'string' && HEX_64_RE.test(m))) {
     throw new Error('Invalid invite payload — members must be 64-char hex pubkeys.')
   }
-  if (!Array.isArray(data.relays) || !data.relays.every((r) => typeof r === 'string' && r.startsWith('wss://'))) {
-    throw new Error('Invalid invite payload — relays must be wss:// URLs.')
+  if (!Array.isArray(data.relays) || !data.relays.every((r) => typeof r === 'string' && isAllowedRelayUrl(r))) {
+    throw new Error('Invalid invite payload — relays must be wss:// URLs (or ws:// for localhost).')
   }
   if (data.encodingFormat !== 'words' && data.encodingFormat !== 'pin' && data.encodingFormat !== 'hex') {
     throw new Error('Invalid invite payload — encodingFormat must be words|pin|hex.')

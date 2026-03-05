@@ -20,6 +20,8 @@ export class MockRelay {
   private wss: WebSocketServer | null = null
   private events: StoredEvent[] = []
   private subs = new Map<string, Subscription[]>()
+  debug = false
+  private _connCount = 0
 
   get port(): number {
     const addr = this.wss?.address()
@@ -58,12 +60,18 @@ export class MockRelay {
   }
 
   private handleConnection(ws: WebSocket): void {
+    const connId = ++this._connCount
+    if (this.debug) console.log(`[relay] conn #${connId} opened`)
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(raw.toString()) as unknown[]
         if (!Array.isArray(msg) || msg.length < 2) return
 
         const type = msg[0] as string
+        if (this.debug && type === 'EVENT') {
+          const ev = msg[1] as StoredEvent
+          console.log(`[relay] ← EVENT kind:${ev.kind} id:${ev.id?.slice(0, 8)}… pubkey:${ev.pubkey?.slice(0, 8)}… tags:${JSON.stringify(ev.tags)}`)
+        }
         if (type === 'EVENT') {
           this.handleEvent(ws, msg[1] as StoredEvent)
         } else if (type === 'REQ') {
@@ -92,19 +100,23 @@ export class MockRelay {
     this.events.push(event)
     sender.send(JSON.stringify(['OK', event.id, true, '']))
 
+    let delivered = 0
     for (const [subId, subs] of this.subs) {
       for (const sub of subs) {
         if (sub.ws === sender) continue
         if (sub.ws.readyState !== 1) continue
         if (this.matchesFilter(event, sub.filters)) {
           sub.ws.send(JSON.stringify(['EVENT', subId, event]))
+          delivered++
         }
       }
     }
+    if (this.debug) console.log(`[relay] EVENT kind:${event.kind} id:${event.id?.slice(0, 8)}… → delivered to ${delivered} sub(s), total subs: ${this.subs.size}`)
   }
 
   private handleReq(ws: WebSocket, subId: string, filters: Record<string, unknown>[]): void {
     const filter = filters[0] ?? {}
+    if (this.debug) console.log(`[relay] REQ subId:${subId} filter:`, JSON.stringify(filter))
     const existing = this.subs.get(subId) ?? []
     existing.push({ ws, filters: filter })
     this.subs.set(subId, existing)

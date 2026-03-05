@@ -105,7 +105,44 @@ export function reRegisterGroup(groupId: string): void {
 
   _transport.unregisterGroup(groupId)
   const signer = new GroupSigner(group.seed, identity.privkey)
-  _transport.registerGroup(groupId, group.seed, signer, group.members)
+  _transport.registerGroup(groupId, group.seed, signer, group.members, _recoveryOptions(groupId))
+}
+
+/** Build recovery callbacks for a group registration. */
+function _recoveryOptions(groupId: string) {
+  return {
+    admins: getState().groups[groupId]?.admins ?? [],
+    onRecoveryRequest: (requesterPubkey: string, _localEpoch: number, _localCounter: number): SyncMessage | null => {
+      const { groups } = getState()
+      const group = groups[groupId]
+      if (!group) return null
+      // Only respond if requester is a known member
+      if (!group.members.includes(requesterPubkey)) return null
+      // Build state-snapshot from current group state
+      return {
+        type: 'state-snapshot',
+        seed: group.seed,
+        counter: group.counter,
+        usageOffset: group.usageOffset,
+        members: group.members,
+        admins: group.admins,
+        epoch: group.epoch,
+        opId: `recovery-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        timestamp: Math.floor(Date.now() / 1000),
+      }
+    },
+    onRecoveryResponse: (snapshot: SyncMessage, adminPubkey: string): void => {
+      const { groups } = getState()
+      const group = groups[groupId]
+      if (!group) return
+      const updated = applySyncMessage(group, snapshot, undefined, adminPubkey)
+      if (updated !== group) {
+        updateGroup(groupId, updated)
+        reRegisterGroup(groupId)
+        showToast('Group state recovered from admin', 'success')
+      }
+    },
+  }
 }
 
 /**
@@ -164,7 +201,7 @@ export function subscribeToGroup(groupId: string): void {
     const group = groups[groupId]
     if (identity?.privkey && group?.seed) {
       const signer = new GroupSigner(group.seed, identity.privkey)
-      ;(_transport as NostrSyncTransport).registerGroup(groupId, group.seed, signer, group.members)
+      ;(_transport as NostrSyncTransport).registerGroup(groupId, group.seed, signer, group.members, _recoveryOptions(groupId))
     }
   }
 
@@ -181,7 +218,8 @@ export function subscribeToGroup(groupId: string): void {
     if (
       msg.type === 'member-join' ||
       msg.type === 'member-leave' ||
-      msg.type === 'reseed'
+      msg.type === 'reseed' ||
+      msg.type === 'state-snapshot'
     ) {
       reRegisterGroup(groupId)
     }
@@ -191,6 +229,8 @@ export function subscribeToGroup(groupId: string): void {
       showToast('New member joined the group', 'success')
     } else if (msg.type === 'reseed') {
       showToast('Group secret was rotated', 'warning')
+    } else if (msg.type === 'state-snapshot') {
+      showToast('Group state recovered', 'success')
     }
 
     handleFireAndForget(groupId, msg, sender)

@@ -3,6 +3,7 @@
 import { getState, update } from '../state.js'
 import { hasNip07, resolveSigner } from '../nostr/signer.js'
 import { teardownSync } from '../sync.js'
+import { isConnected, getRelayCount } from '../nostr/connect.js'
 import { DEMO_ACCOUNTS } from '../demo-accounts.js'
 import type { AppIdentity } from '../types.js'
 import { decode as nip19decode } from 'nostr-tools/nip19'
@@ -89,6 +90,11 @@ export function renderHeader(container: HTMLElement): void {
   updateIdentityDisplay()
   const identityBtn = container.querySelector<HTMLButtonElement>('#identity-btn')
   identityBtn?.addEventListener('click', () => showIdentityPopover(identityBtn))
+
+  // Restore relay status after innerHTML rebuild (which resets #relay-status to hidden)
+  if (isConnected()) {
+    updateRelayStatus(true, getRelayCount())
+  }
 
   const nav = container.querySelector<HTMLElement>('#header-nav')
   nav?.addEventListener('click', (e) => {

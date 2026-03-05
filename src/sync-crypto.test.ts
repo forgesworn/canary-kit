@@ -170,7 +170,10 @@ describe('integration: encrypt sync message → decrypt → apply', () => {
       seed: 'a'.repeat(64),
       counter: 200,
       usageOffset: 3,
-      members: ['b'.repeat(64)],
+      members: ['a'.repeat(64), 'b'.repeat(64)],
+      admins: ['a'.repeat(64)],
+      epoch: 5,
+      opId: 'snap-crypto-1',
       timestamp: Math.floor(Date.now() / 1000),
       protocolVersion: 1,
     }

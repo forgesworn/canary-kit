@@ -8,23 +8,34 @@ const BOB_NSEC = 'nsec1hszs2j8elt78kq6ewresrxfallpc6qvf0p33usgy9ujdkgu0mcesd4qry
 test.describe('Online sync: reseed', () => {
   test('reseed propagates to other members', async ({ browser, mockRelay }) => {
     const relayUrl = mockRelay.url
+    const baseURL = 'http://localhost:5173'
 
     // Setup: Alice creates group, Bob joins
-    const ctxA = await browser.newContext()
+    const ctxA = await browser.newContext({ baseURL })
     const pageA = await ctxA.newPage()
     await seedRelayUrl(pageA, relayUrl)
     await pageA.goto('/')
     await loginWithNsec(pageA, ALICE_NSEC)
     await createGroup(pageA, 'Rekey Test', { mode: 'online' })
-    await pageA.waitForTimeout(1000)
+
+    // Wait for Alice's relay connection to be established
+    await expect(pageA.locator('#relay-status')).toBeVisible({ timeout: 5000 })
 
     const { payload, confirmCode } = await createInvite(pageA)
 
-    const ctxB = await browser.newContext()
+    const ctxB = await browser.newContext({ baseURL })
     const pageB = await ctxB.newPage()
     await seedRelayUrl(pageB, relayUrl)
     await pageB.goto('/')
     await loginWithNsec(pageB, BOB_NSEC)
+
+    // Capture any errors from invite acceptance
+    let alertMessage = ''
+    pageB.on('dialog', async (dialog) => {
+      alertMessage = dialog.message()
+      await dialog.accept()
+    })
+
     await pageB.evaluate(() => {
       document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
     })
@@ -32,23 +43,31 @@ test.describe('Online sync: reseed', () => {
     await pageB.fill('[name="payload"]', payload)
     await pageB.fill('[name="code"]', confirmCode)
     await pageB.click('#modal-form button[type="submit"]')
-    await pageB.waitForSelector('#app-modal:not([open])', { timeout: 5000 })
+    await pageB.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
+
+    if (alertMessage) {
+      throw new Error(`Invite acceptance failed: ${alertMessage}`)
+    }
+
+    // Wait for Bob's relay connection to be fully established
+    await expect(pageB.locator('#relay-status')).toBeVisible({ timeout: 5000 })
+    // Extra time for WebSocket subscription to be fully active
+    await pageB.waitForTimeout(1000)
 
     // Both should now see the same word
-    await pageA.waitForTimeout(2000)
     const wordBefore = await getDisplayedWord(pageA)
 
     // Alice reseeds
     await openSettings(pageA)
     pageA.once('dialog', async (d) => await d.accept())
-    await pageA.click('text=Rotate Seed')
+    await pageA.click('#reseed-btn')
     await pageA.waitForTimeout(1000)
 
     const wordAfterA = await getDisplayedWord(pageA)
     expect(wordAfterA).not.toBe(wordBefore)
 
     // Wait for propagation
-    await pageB.waitForTimeout(3000)
+    await pageB.waitForTimeout(5000)
 
     // Bob should now show the new word (same as Alice)
     const wordAfterB = await getDisplayedWord(pageB)

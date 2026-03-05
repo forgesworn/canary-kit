@@ -5,17 +5,39 @@ import { encodeSyncMessage, decodeSyncMessage, hashGroupTag, encryptEnvelope, de
 import { bytesToHex, hexToBytes, sha256 } from 'canary-kit/crypto'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { getPool, isConnected, connectRelays } from './connect.js'
-import { verifyEvent } from 'nostr-tools/pure'
+import { verifyEvent, finalizeEvent } from 'nostr-tools/pure'
+import { encrypt as nip44Encrypt, decrypt as nip44Decrypt, getConversationKey } from 'nostr-tools/nip44'
 
 /** Single event kind for all CANARY-SYNC messages (type is inside encrypted payload). */
 const SYNC_EVENT_KIND = 29_111
+/** Event kind for recovery requests (NIP-44 personal-key encrypted). */
+const RECOVERY_REQUEST_KIND = 29_112
+/** Event kind for recovery responses (NIP-44 personal-key encrypted). */
+const RECOVERY_RESPONSE_KIND = 29_113
+
 const HEX_64_RE = /^[0-9a-f]{64}$/
 const HEX_128_RE = /^[0-9a-f]{128}$/
 const ENCODER = new TextEncoder()
 
+/** Consecutive decrypt failures before auto-requesting recovery. */
+const DECRYPT_FAIL_THRESHOLD = 3
+
+/** How long a pending recovery request blocks retries (ms). */
+const RECOVERY_PENDING_TIMEOUT_MS = 60_000
+
 interface EventSignerLike {
   pubkey: string
   sign(event: unknown): Promise<unknown>
+}
+
+/** Options for group registration including recovery callbacks. */
+export interface GroupRegistrationOptions {
+  /** Admin pubkeys (personal identity keys) for sending recovery requests. */
+  admins?: string[]
+  /** Called (admin side) when a member requests state recovery. Return a snapshot or null to decline. */
+  onRecoveryRequest?: (requesterPubkey: string, localEpoch: number, localCounter: number) => SyncMessage | null
+  /** Called (requester side) when a recovery response arrives. */
+  onRecoveryResponse?: (snapshot: SyncMessage, adminPubkey: string) => void
 }
 
 /** Bounded set that evicts oldest entries when capacity is reached. */
@@ -30,10 +52,24 @@ class BoundedSet<T> {
   }
 }
 
+interface GroupInfo {
+  key: Uint8Array
+  signer: EventSignerLike
+  tagHash: string
+  members: Set<string>
+  admins: Set<string>
+  onRecoveryRequest?: (requesterPubkey: string, localEpoch: number, localCounter: number) => SyncMessage | null
+  onRecoveryResponse?: (snapshot: SyncMessage, adminPubkey: string) => void
+}
+
 export class NostrSyncTransport implements SyncTransport {
   private subs = new Map<string, { close(): void }>()
-  private groupKeys = new Map<string, { key: Uint8Array; signer: EventSignerLike; tagHash: string; members: Set<string> }>()
+  private groupKeys = new Map<string, GroupInfo>()
+  private tagHashToGroupId = new Map<string, string>()
   private seenEventIds = new BoundedSet<string>(1000)
+  private decryptFailures = new Map<string, number>()
+  private recoveryPending = new Map<string, number>()
+  private recoverySub: { close(): void } | null = null
 
   constructor(
     private relays: string[],
@@ -42,18 +78,27 @@ export class NostrSyncTransport implements SyncTransport {
   ) {}
 
   /** Register a group's seed so we can encrypt/decrypt and sign for it. */
-  registerGroup(groupId: string, seedHex: string, signer: EventSignerLike, members: string[]): void {
+  registerGroup(groupId: string, seedHex: string, signer: EventSignerLike, members: string[], options?: GroupRegistrationOptions): void {
+    const tagHash = hashGroupTag(groupId)
     this.groupKeys.set(groupId, {
       key: deriveGroupKey(seedHex),
       signer,
-      tagHash: hashGroupTag(groupId),
+      tagHash,
       members: new Set(members),
+      admins: new Set(options?.admins ?? []),
+      onRecoveryRequest: options?.onRecoveryRequest,
+      onRecoveryResponse: options?.onRecoveryResponse,
     })
+    this.tagHashToGroupId.set(tagHash, groupId)
   }
 
   /** Unregister a group (e.g. after removal or reseed). */
   unregisterGroup(groupId: string): void {
+    const info = this.groupKeys.get(groupId)
+    if (info) this.tagHashToGroupId.delete(info.tagHash)
     this.groupKeys.delete(groupId)
+    this.decryptFailures.delete(groupId)
+    this.recoveryPending.delete(groupId) // clear pending on unregister
   }
 
   async send(groupId: string, message: SyncMessage, _recipients?: string[]): Promise<void> {
@@ -70,7 +115,7 @@ export class NostrSyncTransport implements SyncTransport {
     // encodeSyncMessage injects PROTOCOL_VERSION and returns wire JSON
     const payload = encodeSyncMessage(message)
     // Canonicalise a versioned copy for signing (must match what decode+canonicalise produces on receive)
-    const versioned = { ...message, protocolVersion: PROTOCOL_VERSION }
+    const versioned: SyncMessage = { ...message, protocolVersion: PROTOCOL_VERSION }
     const canonical = canonicaliseSyncMessage(versioned)
     const payloadHash = sha256(ENCODER.encode(canonical))
     const innerSig = bytesToHex(schnorr.sign(payloadHash, hexToBytes(this.personalPrivkey)))
@@ -102,6 +147,9 @@ export class NostrSyncTransport implements SyncTransport {
       return () => {}
     }
 
+    // Start the personal-key recovery channel if not already active
+    this._ensureRecoverySub()
+
     const filter = {
       kinds: [SYNC_EVENT_KIND],
       '#d': [groupInfo.tagHash],
@@ -113,7 +161,7 @@ export class NostrSyncTransport implements SyncTransport {
 
     const sub = pool.subscribeMany(
       this.relays,
-      filter,
+      [filter],
       {
         onevent: async (event: any) => {
           try {
@@ -137,9 +185,20 @@ export class NostrSyncTransport implements SyncTransport {
             // suppress the event on relay replay.
             if (typeof event.id === 'string' && this.seenEventIds.has(event.id)) return
 
-            // Decrypt and verify authenticated inner envelope.
+            // Decrypt with group key — track failures for auto-recovery
+            let decrypted: string
+            try {
+              decrypted = await decryptEnvelope(groupInfo.key, event.content)
+            } catch {
+              this._trackDecryptFailure(groupId)
+              return
+            }
+
+            // Decrypt succeeded — clear failure counter
+            this.decryptFailures.delete(groupId)
+
+            // Verify authenticated inner envelope.
             // Format: { s: personalPubkey, sig: schnorr(sig over payload), p: syncPayload }
-            const decrypted = await decryptEnvelope(groupInfo.key, event.content)
             const parsed = JSON.parse(decrypted) as unknown
             if (!parsed || typeof parsed !== 'object') {
               console.warn('[canary:sync] Rejected malformed envelope')
@@ -159,7 +218,10 @@ export class NostrSyncTransport implements SyncTransport {
             }
 
             const msg = decodeSyncMessage(payload)
-            const canonical = canonicaliseSyncMessage(msg)
+            // Add protocolVersion back for canonical form — decodeSyncMessage validates
+            // but strips it, while the send side includes it in the signed canonical.
+            const versioned: SyncMessage = { ...msg, protocolVersion: PROTOCOL_VERSION }
+            const canonical = canonicaliseSyncMessage(versioned)
             const payloadHash = sha256(ENCODER.encode(canonical))
             const isValidInnerSig = schnorr.verify(hexToBytes(sig), payloadHash, hexToBytes(sender))
             if (!isValidInnerSig) {
@@ -198,8 +260,258 @@ export class NostrSyncTransport implements SyncTransport {
     return () => { sub.close(); this.subs.delete(groupId) }
   }
 
+  // ── Recovery protocol ─────────────────────────────────────────
+  // Personal-key NIP-44 channel for state recovery after missed reseeds.
+  // If a client can't decrypt group-key messages (missed a reseed), it
+  // sends a recovery request to admins encrypted to their personal pubkey.
+  // Admins respond with a signed state-snapshot encrypted to the requester.
+
+  /**
+   * Request state recovery from admins via personal-key NIP-44 encryption.
+   * Sends a recovery request to each known admin for the group.
+   */
+  async requestRecovery(groupId: string, localEpoch: number, localCounter: number): Promise<void> {
+    const pool = getPool()
+    if (!pool) return
+
+    const groupInfo = this.groupKeys.get(groupId)
+    if (!groupInfo) return
+
+    this.recoveryPending.set(groupId, Date.now())
+    const privkeyBytes = hexToBytes(this.personalPrivkey)
+
+    for (const adminPubkey of groupInfo.admins) {
+      if (adminPubkey === this.personalPubkey) continue // don't request from self
+      try {
+        const requestPayload = JSON.stringify({
+          groupTag: groupInfo.tagHash,
+          epoch: localEpoch,
+          counter: localCounter,
+        })
+
+        const ck = getConversationKey(privkeyBytes, adminPubkey)
+        const encrypted = nip44Encrypt(requestPayload, ck)
+
+        const unsigned = {
+          kind: RECOVERY_REQUEST_KIND,
+          content: encrypted,
+          tags: [['p', adminPubkey]],
+          created_at: Math.floor(Date.now() / 1000),
+        }
+
+        const signed = finalizeEvent(unsigned, privkeyBytes)
+        await pool.publish(this.relays, signed as any)
+      } catch (err) {
+        console.warn('[canary:sync] Recovery request to', adminPubkey.slice(0, 8), 'failed:', err)
+      }
+    }
+  }
+
+  /** Start the personal-key recovery subscription if not already active. */
+  private _ensureRecoverySub(): void {
+    if (this.recoverySub) return
+    const pool = getPool()
+    if (!pool) return
+
+    const filters = [
+      { kinds: [RECOVERY_REQUEST_KIND], '#p': [this.personalPubkey], since: Math.floor(Date.now() / 1000) - 300 },
+      { kinds: [RECOVERY_RESPONSE_KIND], '#p': [this.personalPubkey], since: Math.floor(Date.now() / 1000) - 300 },
+    ]
+
+    this.recoverySub = pool.subscribeMany(
+      this.relays,
+      filters,
+      {
+        onevent: async (event: any) => {
+          try {
+            if (!event || typeof event !== 'object') return
+            if (!verifyEvent(event)) return
+
+            if (event.kind === RECOVERY_REQUEST_KIND) {
+              await this._handleRecoveryRequest(event)
+            } else if (event.kind === RECOVERY_RESPONSE_KIND) {
+              await this._handleRecoveryResponse(event)
+            }
+          } catch (err) {
+            console.warn('[canary:sync] Recovery event processing failed:', err)
+          }
+        },
+      },
+    )
+  }
+
+  /** Handle an incoming recovery request (admin side). */
+  private async _handleRecoveryRequest(event: any): Promise<void> {
+    const pool = getPool()
+    if (!pool) return
+
+    const requesterPubkey = event.pubkey as string
+    if (!HEX_64_RE.test(requesterPubkey)) return
+
+    // Decrypt with personal NIP-44 key
+    const privkeyBytes = hexToBytes(this.personalPrivkey)
+    const ck = getConversationKey(privkeyBytes, requesterPubkey)
+    const decrypted = nip44Decrypt(event.content, ck)
+    const parsed = JSON.parse(decrypted) as Record<string, unknown>
+
+    const groupTag = parsed.groupTag
+    const localEpoch = parsed.epoch
+    const localCounter = parsed.counter
+    if (typeof groupTag !== 'string' || typeof localEpoch !== 'number' || typeof localCounter !== 'number') return
+
+    // Find group by tag hash
+    const groupId = this.tagHashToGroupId.get(groupTag)
+    if (!groupId) return
+
+    const groupInfo = this.groupKeys.get(groupId)
+    if (!groupInfo) return
+
+    // Verify requester is a known member
+    if (!groupInfo.members.has(requesterPubkey)) {
+      console.warn('[canary:sync] Recovery request from non-member', requesterPubkey.slice(0, 8))
+      return
+    }
+
+    // Ask app layer for the snapshot
+    if (!groupInfo.onRecoveryRequest) return
+    const snapshot = groupInfo.onRecoveryRequest(requesterPubkey, localEpoch, localCounter)
+    if (!snapshot) return
+
+    // Sign the snapshot (inner Schnorr signature over canonical bytes)
+    const payload = encodeSyncMessage(snapshot)
+    const versioned: SyncMessage = { ...snapshot, protocolVersion: PROTOCOL_VERSION }
+    const canonical = canonicaliseSyncMessage(versioned)
+    const payloadHash = sha256(ENCODER.encode(canonical))
+    const innerSig = bytesToHex(schnorr.sign(payloadHash, privkeyBytes))
+
+    // Build recovery response envelope
+    const responseEnvelope = JSON.stringify({
+      s: this.personalPubkey,
+      sig: innerSig,
+      groupTag,
+      p: payload,
+    })
+
+    // Encrypt to requester's personal pubkey
+    const responseCk = getConversationKey(privkeyBytes, requesterPubkey)
+    const encrypted = nip44Encrypt(responseEnvelope, responseCk)
+
+    const unsigned = {
+      kind: RECOVERY_RESPONSE_KIND,
+      content: encrypted,
+      tags: [['p', requesterPubkey]],
+      created_at: Math.floor(Date.now() / 1000),
+    }
+
+    const signed = finalizeEvent(unsigned, privkeyBytes)
+    await pool.publish(this.relays, signed as any)
+    console.info('[canary:sync] Sent recovery response to', requesterPubkey.slice(0, 8))
+  }
+
+  /** Handle an incoming recovery response (requester side). */
+  private async _handleRecoveryResponse(event: any): Promise<void> {
+    const adminPubkey = event.pubkey as string
+    if (!HEX_64_RE.test(adminPubkey)) return
+
+    // Decrypt with personal NIP-44 key
+    const privkeyBytes = hexToBytes(this.personalPrivkey)
+    const ck = getConversationKey(privkeyBytes, adminPubkey)
+    const decrypted = nip44Decrypt(event.content, ck)
+    const parsed = JSON.parse(decrypted) as Record<string, unknown>
+
+    const sender = parsed.s
+    const sig = parsed.sig
+    const groupTag = parsed.groupTag
+    const payload = parsed.p
+    if (typeof sender !== 'string' || typeof sig !== 'string' || typeof groupTag !== 'string' || typeof payload !== 'string') return
+    if (!HEX_64_RE.test(sender) || !HEX_128_RE.test(sig)) return
+
+    // Verify sender matches event author
+    if (sender !== adminPubkey) return
+
+    // Find group by tag hash
+    const groupId = this.tagHashToGroupId.get(groupTag)
+    if (!groupId) return
+
+    const groupInfo = this.groupKeys.get(groupId)
+    if (!groupInfo) return
+
+    // Verify admin is trusted (in our known admins set)
+    if (!groupInfo.admins.has(adminPubkey)) {
+      console.warn('[canary:sync] Recovery response from non-admin', adminPubkey.slice(0, 8))
+      return
+    }
+
+    // Verify inner Schnorr signature
+    const msg = decodeSyncMessage(payload)
+    const versioned: SyncMessage = { ...msg, protocolVersion: PROTOCOL_VERSION }
+    const canonical = canonicaliseSyncMessage(versioned)
+    const payloadHash = sha256(ENCODER.encode(canonical))
+    const isValidSig = schnorr.verify(hexToBytes(sig), payloadHash, hexToBytes(adminPubkey))
+    if (!isValidSig) {
+      console.warn('[canary:sync] Recovery response with invalid signature')
+      return
+    }
+
+    // Constrain recovery channel to state-snapshot only.
+    // Other message types must go through the group-key sync channel.
+    if (msg.type !== 'state-snapshot') {
+      console.warn('[canary:sync] Recovery response contains non-snapshot type:', msg.type)
+      return
+    }
+
+    // Self-consistency: sender must be in the snapshot's own admins list.
+    // Prevents a removed admin (still in stale local cache) from sending a
+    // snapshot that doesn't even claim they're admin. A removed admin who
+    // fabricates a snapshot including themselves remains a residual risk that
+    // requires reseed-chain verification for full mitigation.
+    if (!msg.admins.includes(adminPubkey)) {
+      console.warn('[canary:sync] Recovery response sender not in snapshot admins')
+      return
+    }
+
+    // Clear recovery state
+    this.decryptFailures.delete(groupId)
+    this.recoveryPending.delete(groupId)
+
+    // Deliver to app layer
+    if (groupInfo.onRecoveryResponse) {
+      groupInfo.onRecoveryResponse(msg, adminPubkey)
+    }
+
+    console.info('[canary:sync] Applied recovery response from', adminPubkey.slice(0, 8))
+  }
+
+  /** Track decrypt failures and auto-request recovery after threshold. */
+  private _trackDecryptFailure(groupId: string): void {
+    const count = (this.decryptFailures.get(groupId) ?? 0) + 1
+    this.decryptFailures.set(groupId, count)
+
+    if (count < DECRYPT_FAIL_THRESHOLD) return
+
+    // Check if a pending request is still within its timeout window
+    const pendingSince = this.recoveryPending.get(groupId)
+    if (pendingSince !== undefined && Date.now() - pendingSince < RECOVERY_PENDING_TIMEOUT_MS) return
+
+    // Timeout expired or no pending request — clear and retry
+    this.recoveryPending.delete(groupId)
+
+    const groupInfo = this.groupKeys.get(groupId)
+    if (groupInfo && groupInfo.admins.size > 0 && groupInfo.onRecoveryResponse) {
+      console.warn(`[canary:sync] ${count} decrypt failures for group — requesting recovery`)
+      // Auto-request with epoch 0 / counter 0 (admin will send latest state regardless)
+      this.requestRecovery(groupId, 0, 0).catch(err => {
+        console.warn('[canary:sync] Auto-recovery request failed:', err)
+      })
+    }
+  }
+
   disconnect(): void {
     for (const [, sub] of this.subs) sub.close()
     this.subs.clear()
+    if (this.recoverySub) {
+      this.recoverySub.close()
+      this.recoverySub = null
+    }
   }
 }

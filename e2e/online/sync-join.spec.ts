@@ -12,9 +12,10 @@ test.describe('Online sync: join', () => {
     mockRelay,
   }) => {
     const relayUrl = mockRelay.url
+    const baseURL = 'http://localhost:5173'
 
     // User A: create context, seed relay, login, create online group
-    const ctxA = await browser.newContext()
+    const ctxA = await browser.newContext({ baseURL })
     const pageA = await ctxA.newPage()
     await seedRelayUrl(pageA, relayUrl)
     await pageA.goto('/')
@@ -28,11 +29,18 @@ test.describe('Online sync: join', () => {
     const { payload, confirmCode } = await createInvite(pageA)
 
     // User B: create context, seed relay, login, accept invite
-    const ctxB = await browser.newContext()
+    const ctxB = await browser.newContext({ baseURL })
     const pageB = await ctxB.newPage()
     await seedRelayUrl(pageB, relayUrl)
     await pageB.goto('/')
     await loginWithNsec(pageB, BOB_NSEC)
+
+    // Capture any errors from invite acceptance
+    let alertMessage = ''
+    pageB.on('dialog', async (dialog) => {
+      alertMessage = dialog.message()
+      await dialog.accept()
+    })
 
     // Accept invite via modal
     await pageB.evaluate(() => {
@@ -42,7 +50,12 @@ test.describe('Online sync: join', () => {
     await pageB.fill('[name="payload"]', payload)
     await pageB.fill('[name="code"]', confirmCode)
     await pageB.click('#modal-form button[type="submit"]')
-    await pageB.waitForSelector('#app-modal:not([open])', { timeout: 5000 })
+    await pageB.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
+
+    // Fail fast if invite acceptance showed an error
+    if (alertMessage) {
+      throw new Error(`Invite acceptance failed: ${alertMessage}`)
+    }
 
     // Both should see the group
     await expect(pageB.locator('.group-list__name')).toHaveText('Synced Team')

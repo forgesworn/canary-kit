@@ -33,7 +33,7 @@ function formatPubkey(pubkey: string, members: string[], groupId?: string): stri
  * Uses a plain <dialog> element rather than the shared modal helper.
  */
 export function showInviteModal(payload: string, confirmCode: string): void {
-  const base = window.location.origin + window.location.pathname
+  const base = window.location.href.split('#')[0]
   const joinUrl = `${base}#join/${encodeURIComponent(payload)}`
   const svgMarkup = generateQR(joinUrl)
 

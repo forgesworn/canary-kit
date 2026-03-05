@@ -173,7 +173,10 @@ describe('state-snapshot', () => {
       seed: 'a'.repeat(64),
       counter: 100,
       usageOffset: 3,
-      members: ['b'.repeat(64), 'c'.repeat(64)],
+      members: [PUBKEY_AAA, PUBKEY_BBB],
+      admins: [PUBKEY_AAA],
+      epoch: 5,
+      opId: 'snap-1',
       timestamp: 1700000000,
       protocolVersion: 1,
     }
@@ -182,12 +185,11 @@ describe('state-snapshot', () => {
     expect(decoded).toEqual(msg)
   })
 
-  it('applySyncMessage replaces group state from snapshot', () => {
-    // Create a group state, apply a snapshot with different values, verify state updated
-    const group = {
+  it('admin-signed snapshot replaces group state', () => {
+    const group: GroupState = {
       name: 'Test',
       seed: 'a'.repeat(64),
-      members: ['b'.repeat(64)],
+      members: [PUBKEY_AAA, PUBKEY_BBB],
       rotationInterval: 604800,
       wordCount: 1,
       wordlist: 'en-v1',
@@ -196,8 +198,8 @@ describe('state-snapshot', () => {
       createdAt: 1700000000,
       beaconInterval: 300,
       beaconPrecision: 6,
-      admins: [],
-      epoch: 0,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
       consumedOps: [],
     }
 
@@ -206,13 +208,334 @@ describe('state-snapshot', () => {
       seed: 'c'.repeat(64),
       counter: 200,
       usageOffset: 5,
-      members: ['b'.repeat(64), 'd'.repeat(64)],
+      members: [PUBKEY_AAA, PUBKEY_BBB, 'd'.repeat(64)],
+      admins: [PUBKEY_AAA],
+      epoch: 5,
+      opId: 'snap-1',
       timestamp: 1700001000,
     }
 
-    // state-snapshot is intentionally disabled (containment) — returns group unchanged
-    const updated = applySyncMessage(group, snapshot)
-    expect(updated).toBe(group)
+    const updated = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(updated.seed).toBe('c'.repeat(64))
+    expect(updated.counter).toBe(200)
+    expect(updated.usageOffset).toBe(5)
+    expect(updated.members).toEqual([PUBKEY_AAA, PUBKEY_BBB, 'd'.repeat(64)])
+    expect(updated.admins).toEqual([PUBKEY_AAA])
+    expect(updated.epoch).toBe(5)
+    expect(updated.consumedOps).toEqual(['snap-1'])
+  })
+
+  it('snapshot from non-admin is rejected', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA, PUBKEY_BBB],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 2,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      consumedOps: [],
+    }
+
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'c'.repeat(64),
+      counter: 200,
+      usageOffset: 5,
+      members: [PUBKEY_AAA, PUBKEY_BBB],
+      admins: [PUBKEY_AAA],
+      epoch: 5,
+      opId: 'snap-2',
+      timestamp: 1700001000,
+    }
+
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_BBB)
+    expect(result).toBe(group)
+  })
+
+  it('snapshot with stale epoch is rejected', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA, PUBKEY_BBB],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 2,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 5,
+      consumedOps: [],
+    }
+
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'c'.repeat(64),
+      counter: 200,
+      usageOffset: 5,
+      members: [PUBKEY_AAA, PUBKEY_BBB],
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      opId: 'snap-stale',
+      timestamp: 1700001000,
+    }
+
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('same-epoch snapshot with advanced counter and added members is accepted', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 2,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      consumedOps: ['old-op'],
+    }
+
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'a'.repeat(64),  // same seed (same epoch)
+      counter: 200,
+      usageOffset: 5,
+      members: [PUBKEY_AAA, PUBKEY_BBB],  // superset: added BBB
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      opId: 'snap-same-epoch',
+      timestamp: 1700001000,
+    }
+
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(result.seed).toBe('a'.repeat(64))
+    expect(result.counter).toBe(200)
+    expect(result.usageOffset).toBe(5)
+    expect(result.members).toEqual([PUBKEY_AAA, PUBKEY_BBB])
+    expect(result.epoch).toBe(3)
+    // consumedOps preserved and appended (not reset)
+    expect(result.consumedOps).toContain('old-op')
+    expect(result.consumedOps).toContain('snap-same-epoch')
+  })
+
+  it('same-epoch snapshot with different seed is rejected (no silent reseed)', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 2,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      consumedOps: [],
+    }
+
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'c'.repeat(64),  // different seed in same epoch
+      counter: 200,
+      usageOffset: 5,
+      members: [PUBKEY_AAA],
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      opId: 'snap-bad-seed',
+      timestamp: 1700001000,
+    }
+
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('same-epoch snapshot with lower effective counter is rejected (rollback)', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 200,
+      usageOffset: 5,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      consumedOps: [],
+    }
+
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'a'.repeat(64),
+      counter: 50,
+      usageOffset: 2,  // effective 52 < local 205
+      members: [PUBKEY_AAA],
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      opId: 'snap-rollback',
+      timestamp: 1700001000,
+    }
+
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('same-epoch snapshot with fewer members is rejected (superset violation)', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA, PUBKEY_BBB],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 2,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      consumedOps: [],
+    }
+
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'a'.repeat(64),
+      counter: 200,
+      usageOffset: 5,
+      members: [PUBKEY_AAA],  // missing BBB — not a superset
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      opId: 'snap-shrink',
+      timestamp: 1700001000,
+    }
+
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('same-epoch snapshot replayed with duplicate opId is rejected', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 2,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      consumedOps: ['snap-dup'],  // already consumed
+    }
+
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'a'.repeat(64),
+      counter: 200,
+      usageOffset: 5,
+      members: [PUBKEY_AAA],
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      opId: 'snap-dup',
+      timestamp: 1700001000,
+    }
+
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('snapshot without sender is rejected (fail-closed)', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 2,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      consumedOps: [],
+    }
+
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'c'.repeat(64),
+      counter: 200,
+      usageOffset: 5,
+      members: [PUBKEY_AAA],
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      opId: 'snap-no-sender',
+      timestamp: 1700001000,
+    }
+
+    const result = applySyncMessage(group, snapshot)
+    expect(result).toBe(group)
+  })
+
+  it('snapshot enforces admins ⊆ members', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 2,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      consumedOps: [],
+    }
+
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'c'.repeat(64),
+      counter: 200,
+      usageOffset: 5,
+      members: [PUBKEY_AAA],
+      admins: [PUBKEY_AAA, PUBKEY_BBB],  // BBB not in members
+      epoch: 3,
+      opId: 'snap-bad-admins',
+      timestamp: 1700001000,
+    }
+
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(result).toBe(group)
   })
 })
 
@@ -651,6 +974,30 @@ describe('canonical JSON (H2)', () => {
     const wireFields = Object.keys(JSON.parse(encodeSyncMessage(msg))).sort()
     const canonicalFields = Object.keys(JSON.parse(canonicaliseSyncMessage(versioned))).sort()
     expect(canonicalFields).toEqual(wireFields)
+  })
+
+  it('encode → decode → canonicalise round-trip matches send-side canonical for all message types', () => {
+    const messages: SyncMessage[] = [
+      { type: 'member-join', pubkey: PUBKEY_AAA, timestamp: 1700000000, epoch: 0, opId: 'mj-1' },
+      { type: 'member-leave', pubkey: PUBKEY_AAA, timestamp: 1700000000 },
+      { type: 'counter-advance', counter: 5, usageOffset: 2, timestamp: 1700000000 },
+      {
+        type: 'reseed', seed: new Uint8Array(32).fill(42), counter: 0,
+        timestamp: 1700000000, epoch: 1, opId: 'rs-1',
+        admins: [PUBKEY_AAA], members: [PUBKEY_AAA],
+      },
+      { type: 'beacon', lat: 51.5, lon: -0.1, accuracy: 10, timestamp: 1700000000, opId: 'bc-1' },
+      { type: 'duress-alert', lat: 51.5, lon: -0.1, timestamp: 1700000000, opId: 'da-1' },
+      { type: 'liveness-checkin', pubkey: PUBKEY_AAA, timestamp: 1700000000, opId: 'lc-1' },
+    ]
+    for (const msg of messages) {
+      // Send side: canonicalise with protocolVersion
+      const sendCanonical = canonicaliseSyncMessage({ ...msg, protocolVersion: PROTOCOL_VERSION })
+      // Receive side: encode → decode → canonicalise (decode should preserve protocolVersion)
+      const decoded = decodeSyncMessage(encodeSyncMessage(msg))
+      const recvCanonical = canonicaliseSyncMessage(decoded)
+      expect(recvCanonical).toBe(sendCanonical)
+    }
   })
 })
 

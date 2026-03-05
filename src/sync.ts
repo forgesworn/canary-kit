@@ -17,7 +17,7 @@ export type SyncMessage =
   | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number; opId: string; protocolVersion?: number }
   | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId: string; protocolVersion?: number }
   | { type: 'liveness-checkin'; pubkey: string; timestamp: number; opId: string; protocolVersion?: number }
-  | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; timestamp: number; protocolVersion?: number }
+  | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; admins: string[]; epoch: number; opId: string; timestamp: number; protocolVersion?: number }
 
 const VALID_TYPES = new Set<string>([
   'member-join', 'member-leave', 'counter-advance',
@@ -211,6 +211,7 @@ export function decodeSyncMessage(payload: string): SyncMessage {
         type, seed: hexToBytes(parsed.seed), counter: parsed.counter, timestamp: ts,
         epoch: parsed.epoch, opId: parsed.opId,
         admins: [...parsed.admins], members: [...parsed.members],
+        protocolVersion: PROTOCOL_VERSION,
       }
 
     case 'beacon':
@@ -253,6 +254,15 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (!Array.isArray(parsed.members) || !parsed.members.every((m: unknown) => typeof m === 'string' && HEX_64_RE.test(m))) {
         throw new Error('Invalid sync message: state-snapshot members must be 64-char hex pubkeys')
       }
+      if (!Array.isArray(parsed.admins) || !parsed.admins.every((a: unknown) => typeof a === 'string' && HEX_64_RE.test(a))) {
+        throw new Error('Invalid sync message: state-snapshot admins must be 64-char hex pubkeys')
+      }
+      if (!isNonNegativeInt(parsed.epoch)) {
+        throw new Error('Invalid sync message: state-snapshot requires a non-negative epoch')
+      }
+      if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
+        throw new Error('Invalid sync message: state-snapshot requires a non-empty opId (max 128 chars)')
+      }
       break
   }
 
@@ -268,6 +278,7 @@ export function decodeSyncMessage(payload: string): SyncMessage {
  */
 function isPrivilegedAction(msg: SyncMessage, sender?: string): boolean {
   if (msg.type === 'reseed') return true
+  if (msg.type === 'state-snapshot') return true
   if (msg.type === 'member-join') return true
   if (msg.type === 'member-leave' && msg.pubkey !== sender) return true
   return false
@@ -315,6 +326,17 @@ export function applySyncMessage(
       // Enforce admins ⊆ members
       const memberSet = new Set(reseedMsg.members)
       if (!reseedMsg.admins.every(a => memberSet.has(a))) return group
+    } else if (msg.type === 'state-snapshot') {
+      // I5: snapshot epoch must be >= local epoch (allows catch-up across multiple reseeds)
+      if (msgEpoch < group.epoch) return group
+
+      // Snapshot must carry admins and members
+      const snapMsg = msg as { admins?: string[]; members?: string[] }
+      if (!snapMsg.admins || !snapMsg.members) return group
+
+      // Enforce admins ⊆ members
+      const memberSet = new Set(snapMsg.members)
+      if (!snapMsg.admins.every(a => memberSet.has(a))) return group
     } else {
       // I3: non-reseed privileged ops must have msg.epoch == local.epoch
       if (msgEpoch !== group.epoch) return group
@@ -322,7 +344,8 @@ export function applySyncMessage(
 
     // I2: opId must not be consumed in current epoch
     // reseed starts a new epoch so its opId is not subject to the current-epoch replay guard
-    if (msg.type !== 'reseed') {
+    // Higher-epoch snapshots also start fresh; same-epoch snapshot opId is checked in the switch case
+    if (msg.type !== 'reseed' && !(msg.type === 'state-snapshot' && msgEpoch > group.epoch)) {
       const consumedSet = new Set(group.consumedOps)
       if (consumedSet.has(msgOpId)) return group
     }
@@ -380,10 +403,41 @@ export function applySyncMessage(
         consumedOps: [msg.opId],
       }
 
-    case 'state-snapshot':
-      // Containment: disable remote full-state overwrite until epoch/version
-      // semantics are formalised and enforced.
-      return group
+    case 'state-snapshot': {
+      // I5: admin-gated state recovery for clients that missed transitions.
+      if (msg.epoch === group.epoch) {
+        // ── Same-epoch recovery: anti-rollback constraints ──
+        // No silent reseed within the same epoch
+        if (msg.seed !== group.seed) return group
+        // Effective counter must not regress
+        const localEffective = group.counter + group.usageOffset
+        const incomingEffective = msg.counter + msg.usageOffset
+        if (incomingEffective < localEffective) return group
+        // Members and admins must be supersets of current (removals require reseed/epoch bump)
+        if (!group.members.every(m => msg.members.includes(m))) return group
+        if (!group.admins.every(a => msg.admins.includes(a))) return group
+        // Append to consumedOps (preserve replay history within epoch)
+        return {
+          ...group,
+          counter: msg.counter,
+          usageOffset: msg.usageOffset,
+          members: [...msg.members],
+          admins: [...msg.admins],
+          consumedOps: appendConsumedOp(group.consumedOps, msg.opId),
+        }
+      }
+      // ── Higher-epoch recovery: full state replacement ──
+      return {
+        ...group,
+        seed: msg.seed,
+        counter: msg.counter,
+        usageOffset: msg.usageOffset,
+        members: [...msg.members],
+        admins: [...msg.admins],
+        epoch: msg.epoch,
+        consumedOps: [msg.opId],
+      }
+    }
 
     case 'beacon':
     case 'duress-alert':

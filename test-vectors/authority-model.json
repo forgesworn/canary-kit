@@ -534,6 +534,368 @@
       "expected": "accept",
       "fireAndForget": true,
       "note": "timestamp is 200s behind nowSec, within FIRE_AND_FORGET_FRESHNESS_SEC (300). Fire-and-forget returns group unchanged but is accepted."
+    },
+    {
+      "id": "I5-snapshot-from-admin",
+      "invariant": "I5",
+      "description": "State-snapshot from admin with epoch >= local is accepted",
+      "initialGroup": {
+        "name": "test",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "rotationInterval": 604800,
+        "wordCount": 1,
+        "wordlist": "en-v1",
+        "counter": 0,
+        "usageOffset": 0,
+        "createdAt": 1700000000,
+        "beaconInterval": 300,
+        "beaconPrecision": 6,
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "consumedOps": []
+      },
+      "message": {
+        "type": "state-snapshot",
+        "seed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "counter": 200,
+        "usageOffset": 5,
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 7,
+        "opId": "snap-1",
+        "timestamp": 1700001000
+      },
+      "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "accept",
+      "expectedState": {
+        "seed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "counter": 200,
+        "usageOffset": 5,
+        "epoch": 7,
+        "consumedOps": ["snap-1"],
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ]
+      }
+    },
+    {
+      "id": "I5-snapshot-from-non-admin",
+      "invariant": "I5",
+      "description": "State-snapshot from non-admin member is rejected",
+      "initialGroup": {
+        "name": "test",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "rotationInterval": 604800,
+        "wordCount": 1,
+        "wordlist": "en-v1",
+        "counter": 0,
+        "usageOffset": 0,
+        "createdAt": 1700000000,
+        "beaconInterval": 300,
+        "beaconPrecision": 6,
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "consumedOps": []
+      },
+      "message": {
+        "type": "state-snapshot",
+        "seed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "counter": 200,
+        "usageOffset": 5,
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 5,
+        "opId": "snap-2",
+        "timestamp": 1700001000
+      },
+      "sender": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expected": "reject"
+    },
+    {
+      "id": "I5-snapshot-stale-epoch",
+      "invariant": "I5",
+      "description": "State-snapshot with epoch < local epoch is rejected",
+      "initialGroup": {
+        "name": "test",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "rotationInterval": 604800,
+        "wordCount": 1,
+        "wordlist": "en-v1",
+        "counter": 0,
+        "usageOffset": 0,
+        "createdAt": 1700000000,
+        "beaconInterval": 300,
+        "beaconPrecision": 6,
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 5,
+        "consumedOps": []
+      },
+      "message": {
+        "type": "state-snapshot",
+        "seed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "counter": 200,
+        "usageOffset": 5,
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "opId": "snap-stale",
+        "timestamp": 1700001000
+      },
+      "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "reject"
+    },
+    {
+      "id": "I5-snapshot-admins-not-subset-members",
+      "invariant": "I5",
+      "description": "State-snapshot where admins is not a subset of members is rejected",
+      "initialGroup": {
+        "name": "test",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "rotationInterval": 604800,
+        "wordCount": 1,
+        "wordlist": "en-v1",
+        "counter": 0,
+        "usageOffset": 0,
+        "createdAt": 1700000000,
+        "beaconInterval": 300,
+        "beaconPrecision": 6,
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "consumedOps": []
+      },
+      "message": {
+        "type": "state-snapshot",
+        "seed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "counter": 200,
+        "usageOffset": 5,
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "epoch": 3,
+        "opId": "snap-bad-admins",
+        "timestamp": 1700001000
+      },
+      "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "reject"
+    },
+    {
+      "id": "I5-same-epoch-seed-change-rejected",
+      "invariant": "I5",
+      "description": "Same-epoch snapshot with different seed is rejected (no silent reseed)",
+      "initialGroup": {
+        "name": "test",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "rotationInterval": 604800,
+        "wordCount": 1,
+        "wordlist": "en-v1",
+        "counter": 50,
+        "usageOffset": 2,
+        "createdAt": 1700000000,
+        "beaconInterval": 300,
+        "beaconPrecision": 6,
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "consumedOps": []
+      },
+      "message": {
+        "type": "state-snapshot",
+        "seed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "counter": 200,
+        "usageOffset": 5,
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "opId": "snap-bad-seed",
+        "timestamp": 1700001000
+      },
+      "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "reject"
+    },
+    {
+      "id": "I5-same-epoch-counter-rollback-rejected",
+      "invariant": "I5",
+      "description": "Same-epoch snapshot with lower effective counter is rejected (anti-rollback)",
+      "initialGroup": {
+        "name": "test",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "rotationInterval": 604800,
+        "wordCount": 1,
+        "wordlist": "en-v1",
+        "counter": 200,
+        "usageOffset": 5,
+        "createdAt": 1700000000,
+        "beaconInterval": 300,
+        "beaconPrecision": 6,
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "consumedOps": []
+      },
+      "message": {
+        "type": "state-snapshot",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "counter": 50,
+        "usageOffset": 2,
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "opId": "snap-rollback",
+        "timestamp": 1700001000
+      },
+      "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "reject",
+      "note": "Incoming effective counter 52 < local effective counter 205"
+    },
+    {
+      "id": "I5-same-epoch-member-shrink-rejected",
+      "invariant": "I5",
+      "description": "Same-epoch snapshot with fewer members is rejected (superset violation)",
+      "initialGroup": {
+        "name": "test",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "rotationInterval": 604800,
+        "wordCount": 1,
+        "wordlist": "en-v1",
+        "counter": 50,
+        "usageOffset": 2,
+        "createdAt": 1700000000,
+        "beaconInterval": 300,
+        "beaconPrecision": 6,
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "consumedOps": []
+      },
+      "message": {
+        "type": "state-snapshot",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "counter": 200,
+        "usageOffset": 5,
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "opId": "snap-shrink",
+        "timestamp": 1700001000
+      },
+      "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "reject",
+      "note": "Missing bbbb... from members — not a superset of current group.members"
+    },
+    {
+      "id": "I5-same-epoch-opId-replay-rejected",
+      "invariant": "I5",
+      "description": "Same-epoch snapshot with already-consumed opId is rejected",
+      "initialGroup": {
+        "name": "test",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "rotationInterval": 604800,
+        "wordCount": 1,
+        "wordlist": "en-v1",
+        "counter": 50,
+        "usageOffset": 2,
+        "createdAt": 1700000000,
+        "beaconInterval": 300,
+        "beaconPrecision": 6,
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "consumedOps": ["snap-dup"]
+      },
+      "message": {
+        "type": "state-snapshot",
+        "seed": "0000000000000000000000000000000000000000000000000000000000000001",
+        "counter": 200,
+        "usageOffset": 5,
+        "members": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "admins": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "epoch": 3,
+        "opId": "snap-dup",
+        "timestamp": 1700001000
+      },
+      "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "reject"
     }
   ]
 }
