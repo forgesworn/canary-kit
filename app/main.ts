@@ -452,19 +452,33 @@ function showCreateGroupModal(): void {
  */
 function checkInviteFragment(): void {
   const hash = window.location.hash
-  if (!hash.startsWith('#join/')) return
-  let payload: string
-  try {
-    payload = decodeURIComponent(hash.slice(6))
-  } catch {
-    console.warn('[canary] Malformed invite fragment — ignoring.')
+  if (hash.startsWith('#join/')) {
+    let payload: string
+    try {
+      payload = decodeURIComponent(hash.slice(6))
+    } catch {
+      console.warn('[canary] Malformed invite fragment — ignoring.')
+      window.location.hash = ''
+      return
+    }
     window.location.hash = ''
-    return
+    document.dispatchEvent(
+      new CustomEvent('canary:join-group', { detail: { payload } }),
+    )
+  } else if (hash.startsWith('#ack/')) {
+    let token: string
+    try {
+      token = decodeURIComponent(hash.slice(5))
+    } catch {
+      console.warn('[canary] Malformed ack fragment — ignoring.')
+      window.location.hash = ''
+      return
+    }
+    window.location.hash = ''
+    document.dispatchEvent(
+      new CustomEvent('canary:confirm-member', { detail: { token } }),
+    )
   }
-  window.location.hash = ''
-  document.dispatchEvent(
-    new CustomEvent('canary:join-group', { detail: { payload } }),
-  )
 }
 
 // ── Join confirmation modal ─────────────────────────────────────
@@ -732,6 +746,13 @@ function wireGlobalEvents(): void {
     if (!group) return
     const { payload, confirmCode } = createInvite(group)
     showInviteModal(payload, confirmCode)
+  })
+
+  document.addEventListener('canary:confirm-member', (evt) => {
+    const token = (evt as CustomEvent<{ token?: string }>).detail?.token ?? ''
+    import('./panels/members.js').then(({ showConfirmMemberModal }) => {
+      showConfirmMemberModal(token)
+    })
   })
 
   document.addEventListener('canary:verify-call', (evt) => {

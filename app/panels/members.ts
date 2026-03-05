@@ -1,10 +1,13 @@
 // app/panels/members.ts — Members panel: list members and generate invites
 
-import { getState } from '../state.js'
+import { getState, updateGroup } from '../state.js'
 import { addGroupMember, removeGroupMember } from '../actions/groups.js'
-import { createInvite } from '../invite.js'
+import { createInvite, verifyJoinToken } from '../invite.js'
 import { generateQR } from '../components/qr.js'
 import { escapeHtml } from '../utils/escape.js'
+import { showModal } from '../components/modal.js'
+import { showToast } from '../components/toast.js'
+import { deriveVerificationWord } from 'canary-kit'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -155,6 +158,7 @@ export function renderMembers(container: HTMLElement): void {
       ${isAdmin ? `<div class="members-actions">
         <button class="btn btn--sm" id="add-member-btn" type="button">+ Add Member</button>
         <button class="btn btn--sm" id="invite-btn" type="button">+ Invite</button>
+        <button class="btn btn--sm" id="confirm-member-btn" type="button">Confirm Member</button>
       </div>` : ''}
     </section>
   `
@@ -199,5 +203,113 @@ export function renderMembers(container: HTMLElement): void {
 
     const { payload, confirmCode } = createInvite(currentGroup)
     showInviteModal(payload, confirmCode)
+  })
+
+  // ── Confirm member button ──────────────────────────────────────
+
+  container.querySelector<HTMLButtonElement>('#confirm-member-btn')?.addEventListener('click', () => {
+    showConfirmMemberModal()
+  })
+}
+
+// ── Confirm member helpers ──────────────────────────────────────
+
+function addConfirmedMember(groupId: string, pubkey: string, displayName: string): void {
+  const { groups } = getState()
+  const group = groups[groupId]
+  if (!group) return
+  if (group.members.includes(pubkey)) return
+
+  const members = [...group.members, pubkey]
+  const memberNames = { ...group.memberNames, [pubkey]: displayName }
+  updateGroup(groupId, { members, memberNames })
+}
+
+export function showConfirmMemberModal(prefillToken?: string): void {
+  const { groups, activeGroupId } = getState()
+  if (!activeGroupId) return
+  const group = groups[activeGroupId]
+  if (!group) return
+
+  showModal(`
+    <h2 class="modal__title">Confirm Member</h2>
+
+    <label class="input-label">Acknowledgement link or token
+      <textarea name="ackToken" class="input" rows="2" placeholder="Paste #ack/... link or token">${escapeHtml(prefillToken ?? '')}</textarea>
+    </label>
+
+    <div class="confirm-member__divider">
+      <span>— or verify by word —</span>
+    </div>
+
+    <label class="input-label">Verification word
+      <input name="word" class="input" placeholder="e.g. sparrow">
+    </label>
+    <label class="input-label">Member name
+      <input name="memberName" class="input" placeholder="e.g. Alice">
+    </label>
+
+    <div class="modal__actions">
+      <button type="button" class="btn" id="modal-cancel-btn">Cancel</button>
+      <button type="submit" class="btn btn--primary">Confirm</button>
+    </div>
+  `, (form) => {
+    try {
+      const ackToken = (form.get('ackToken') as string)?.trim()
+      const wordInput = (form.get('word') as string)?.trim().toLowerCase()
+      const nameInput = (form.get('memberName') as string)?.trim()
+
+      const { activeGroupId: currentGroupId } = getState()
+      if (!currentGroupId) throw new Error('No active group.')
+      const { groups: currentGroups } = getState()
+      const currentGroup = currentGroups[currentGroupId]
+      if (!currentGroup) throw new Error('Group not found.')
+
+      if (ackToken) {
+        // Extract token from #ack/ URL or raw base64
+        const tokenStr = ackToken.includes('#ack/')
+          ? decodeURIComponent(ackToken.split('#ack/')[1])
+          : ackToken
+
+        const result = verifyJoinToken(tokenStr, {
+          groupId: currentGroupId,
+          groupSeed: currentGroup.seed,
+        })
+        if (!result.valid) {
+          throw new Error(result.error ?? 'Invalid join token.')
+        }
+
+        addConfirmedMember(currentGroupId, result.pubkey!, result.displayName || nameInput || '')
+        showToast(`${result.displayName || 'Member'} has joined the group`, 'success')
+      } else if (wordInput) {
+        if (!nameInput) throw new Error('Please enter the member name.')
+
+        // Verify word against current group derivation
+        const currentWord = deriveVerificationWord(currentGroup.seed, currentGroup.counter).toLowerCase()
+        if (wordInput !== currentWord) {
+          throw new Error('Word does not match — the member may not have the current group key.')
+        }
+
+        // For word-only verification, we don't have the real pubkey.
+        // Generate a placeholder that will be reconciled on online sync.
+        const bytes = new Uint8Array(32)
+        crypto.getRandomValues(bytes)
+        const placeholderPubkey = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+        addConfirmedMember(currentGroupId, placeholderPubkey, nameInput)
+        showToast(`${nameInput} has joined the group`, 'success')
+      } else {
+        throw new Error('Provide either an ack token or a verification word.')
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Confirmation failed.')
+      throw err  // prevent closeModal — keep modal open so user can correct input
+    }
+  })
+
+  requestAnimationFrame(() => {
+    document.getElementById('modal-cancel-btn')?.addEventListener('click', () => {
+      const dialog = document.getElementById('app-modal') as HTMLDialogElement | null
+      dialog?.close()
+    })
   })
 }
