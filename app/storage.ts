@@ -307,11 +307,36 @@ export function restoreState(): void {
  * When PIN is enabled, this function does NOT restore groups — main.ts handles
  * that after the user unlocks. It only restores settings so the UI has a base.
  */
+// ── Write serialisation (F3 hardening) ────────────────────────
+
+let _writeVersion = 0
+let _debounceTimer: ReturnType<typeof setTimeout> | undefined
+let _pendingWrite: Promise<void> = Promise.resolve()
+
+const DEBOUNCE_MS = 100
+
+/**
+ * Initialise storage: restore previously saved state then subscribe so that
+ * every subsequent state change is automatically persisted.
+ *
+ * Writes are debounced (100ms) and serialised with a version guard:
+ * - Rapid state changes batch into a single write.
+ * - Only one write runs at a time (chained via _pendingWrite).
+ * - A stale write (version superseded while queued) is skipped.
+ */
 export function initStorage(): void {
-  // Subscribe first so all future state changes are persisted.
-  // The async nature of persistState() is fire-and-forget here — errors are
-  // logged inside persistState() itself.
-  subscribe(() => { void persistState() })
+  subscribe(() => {
+    const version = ++_writeVersion
+    clearTimeout(_debounceTimer)
+    _debounceTimer = setTimeout(() => {
+      _pendingWrite = _pendingWrite.then(async () => {
+        if (version !== _writeVersion) return  // stale — newer version queued
+        await persistState()
+      }).catch(err => {
+        console.error('[canary:storage] Serialised write failed:', err)
+      })
+    }, DEBOUNCE_MS)
+  })
 }
 
 /**
