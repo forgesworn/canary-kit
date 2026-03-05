@@ -17,7 +17,7 @@ export type SyncMessage =
   | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number; opId: string; protocolVersion?: number }
   | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId: string; protocolVersion?: number }
   | { type: 'liveness-checkin'; pubkey: string; timestamp: number; opId: string; protocolVersion?: number }
-  | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; admins: string[]; epoch: number; opId: string; timestamp: number; protocolVersion?: number }
+  | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; admins: string[]; epoch: number; opId: string; timestamp: number; prevEpochSeed?: string; protocolVersion?: number }
 
 const VALID_TYPES = new Set<string>([
   'member-join', 'member-leave', 'counter-advance',
@@ -262,6 +262,12 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
         throw new Error('Invalid sync message: state-snapshot requires a non-empty opId (max 128 chars)')
       }
+      // Optional prevEpochSeed for epoch continuity verification
+      if (parsed.prevEpochSeed !== undefined) {
+        if (typeof parsed.prevEpochSeed !== 'string' || !HEX_64_RE.test(parsed.prevEpochSeed)) {
+          throw new Error('Invalid sync message: state-snapshot.prevEpochSeed must be a 64-char hex string')
+        }
+      }
       break
   }
 
@@ -440,6 +446,11 @@ export function applySyncMessage(
         }
       }
       // ── Higher-epoch recovery: full state replacement ──
+      // If prevEpochSeed is provided, verify it matches our current seed
+      // (proves the sender knew the previous epoch's secret)
+      if (msg.prevEpochSeed !== undefined && msg.prevEpochSeed !== group.seed) {
+        return group  // continuity proof failed — reject
+      }
       return {
         ...group,
         seed: msg.seed,
