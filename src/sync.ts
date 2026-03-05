@@ -405,6 +405,17 @@ export function applySyncMessage(
 
     case 'state-snapshot': {
       // I5: admin-gated state recovery for clients that missed transitions.
+      //
+      // KNOWN LIMITATION — stale-admin higher-epoch hijack:
+      // A removed admin still in the receiver's stale local cache can fabricate
+      // a higher-epoch snapshot. Single-field continuity proofs (prevEpochSeed)
+      // are either bypassable (optional) or create multi-epoch recovery dead-ends
+      // (mandatory). Full mitigation requires either:
+      //   (a) quorum-based recovery (multiple admins must agree), or
+      //   (b) a verifiable reseed-chain (signed epoch transitions stored on relays).
+      // Both are deferred to a future protocol version. The self-consistency check
+      // in the adapter (sender must be in snapshot's own admins list) narrows the
+      // attack surface to fabrication, not impersonation.
       if (msg.epoch === group.epoch) {
         // ── Same-epoch recovery: anti-rollback constraints ──
         // No silent reseed within the same epoch

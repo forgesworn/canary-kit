@@ -537,6 +537,59 @@ describe('state-snapshot', () => {
     const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
     expect(result).toBe(group)
   })
+
+  it('reseed does not leak previous seed into state', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 0,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 0,
+      consumedOps: [],
+    }
+
+    const reseedMsg: SyncMessage = {
+      type: 'reseed',
+      seed: hexToBytes('b'.repeat(64)),
+      counter: 51,
+      timestamp: 1700001000,
+      epoch: 1,
+      opId: 'reseed-1',
+      admins: [PUBKEY_AAA],
+      members: [PUBKEY_AAA],
+    }
+
+    const updated = applySyncMessage(group, reseedMsg, undefined, PUBKEY_AAA)
+    expect(updated.seed).toBe('b'.repeat(64))
+    expect(updated.epoch).toBe(1)
+    expect((updated as Record<string, unknown>).prevEpochSeed).toBeUndefined()
+  })
+
+  it('decode ignores unknown extra fields on state-snapshot', () => {
+    const raw = JSON.stringify({
+      type: 'state-snapshot',
+      seed: 'a'.repeat(64),
+      counter: 10,
+      usageOffset: 0,
+      members: ['a'.repeat(64)],
+      admins: ['a'.repeat(64)],
+      epoch: 1,
+      opId: 'snap-extra',
+      timestamp: 1700000000,
+      someUnknownField: 'ignored',
+      protocolVersion: PROTOCOL_VERSION,
+    })
+    const msg = decodeSyncMessage(raw)
+    expect(msg.type).toBe('state-snapshot')
+  })
 })
 
 describe('liveness-checkin', () => {
