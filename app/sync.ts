@@ -16,15 +16,15 @@ const _unsubscribers = new Map<string, () => void>()
 // ── Fire-and-forget opId dedup ───────────────────────────────
 // Tracks seen opIds for duress-alert and beacon messages per group
 // to prevent replayed messages from triggering side effects.
-const SEEN_OPID_CAP = 500
+export const SEEN_OPID_CAP = 500
 const _seenOpIds = new Map<string, string[]>()
 
-function isSeenOpId(groupId: string, opId: string): boolean {
+export function isSeenOpId(groupId: string, opId: string): boolean {
   const seen = _seenOpIds.get(groupId)
   return seen ? seen.includes(opId) : false
 }
 
-function recordOpId(groupId: string, opId: string): void {
+export function recordOpId(groupId: string, opId: string): void {
   let seen = _seenOpIds.get(groupId)
   if (!seen) {
     seen = []
@@ -32,6 +32,11 @@ function recordOpId(groupId: string, opId: string): void {
   }
   if (seen.length >= SEEN_OPID_CAP) seen.shift()
   seen.push(opId)
+}
+
+/** Reset opId tracking (for tests). */
+export function _resetSeenOpIds(): void {
+  _seenOpIds.clear()
 }
 
 /** Initialise the sync layer with a transport. Call once on startup. */
@@ -104,6 +109,46 @@ export function reRegisterGroup(groupId: string): void {
 }
 
 /**
+ * Handle fire-and-forget side effects (liveness, beacon, duress) with
+ * freshness gating and opId dedup. Extracted for testability.
+ */
+export function handleFireAndForget(
+  groupId: string,
+  msg: SyncMessage,
+  sender: string | undefined,
+  nowSec: number = Math.floor(Date.now() / 1000),
+  dispatch: (groupId: string, msg: SyncMessage, sender: string | undefined) => void = _defaultDispatch,
+): void {
+  // Record incoming liveness check-ins (freshness-gated + opId dedup)
+  if (msg.type === 'liveness-checkin') {
+    const elapsed = nowSec - msg.timestamp
+    if (elapsed <= FIRE_AND_FORGET_FRESHNESS_SEC && elapsed >= -60) {
+      if (!isSeenOpId(groupId, msg.opId)) {
+        recordOpId(groupId, msg.opId)
+        recordCheckin(groupId, sender, msg.timestamp)
+      }
+    }
+    return
+  }
+
+  // App-layer side effects for fire-and-forget messages (with replay protection).
+  if (msg.type === 'beacon' || msg.type === 'duress-alert') {
+    const elapsed = nowSec - msg.timestamp
+    if (elapsed > FIRE_AND_FORGET_FRESHNESS_SEC || elapsed < -60) return // stale or future — suppress
+
+    if (isSeenOpId(groupId, msg.opId)) return // replay — suppress
+    recordOpId(groupId, msg.opId)
+    dispatch(groupId, msg, sender)
+  }
+}
+
+function _defaultDispatch(groupId: string, msg: SyncMessage, sender: string | undefined): void {
+  document.dispatchEvent(
+    new CustomEvent('canary:sync-message', { detail: { groupId, message: msg, sender } }),
+  )
+}
+
+/**
  * Subscribe to incoming sync messages for a group.
  * Applies received messages to group state via the pure applySyncMessage function.
  */
@@ -147,35 +192,11 @@ export function subscribeToGroup(groupId: string): void {
       showToast('Group secret was rotated', 'warning')
     }
 
-    // Record incoming liveness check-ins (freshness-gated + opId dedup)
-    if (msg.type === 'liveness-checkin') {
-      const elapsed = Math.floor(Date.now() / 1000) - msg.timestamp
-      if (elapsed <= FIRE_AND_FORGET_FRESHNESS_SEC && elapsed >= -60) {
-        if (!isSeenOpId(groupId, msg.opId)) {
-          recordOpId(groupId, msg.opId)
-          recordCheckin(groupId, sender, msg.timestamp)
-        }
-      }
-    }
+    handleFireAndForget(groupId, msg, sender)
 
     // Flash sync indicator
     flashSyncing()
     setTimeout(() => updateRelayStatus(isConnected(), getRelayCount()), 1500)
-
-    // App-layer side effects for fire-and-forget messages (with replay protection).
-    // Freshness gate: applySyncMessage silently drops stale messages but returns
-    // the same group reference for all fire-and-forget types, so we must also
-    // check freshness here before dispatching UI effects.
-    if (msg.type === 'beacon' || msg.type === 'duress-alert') {
-      const elapsed = Math.floor(Date.now() / 1000) - msg.timestamp
-      if (elapsed > FIRE_AND_FORGET_FRESHNESS_SEC || elapsed < -60) return // stale or future — suppress
-
-      if (isSeenOpId(groupId, msg.opId)) return // replay — suppress
-      recordOpId(groupId, msg.opId)
-      document.dispatchEvent(
-        new CustomEvent('canary:sync-message', { detail: { groupId, message: msg, sender } }),
-      )
-    }
   })
 
   _unsubscribers.set(groupId, unsub)
