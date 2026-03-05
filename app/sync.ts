@@ -121,6 +121,7 @@ export function handleFireAndForget(
 ): void {
   // Record incoming liveness check-ins (freshness-gated + opId dedup)
   if (msg.type === 'liveness-checkin') {
+    if (!sender) return // no authenticated sender — suppress
     const elapsed = nowSec - msg.timestamp
     if (elapsed <= FIRE_AND_FORGET_FRESHNESS_SEC && elapsed >= -60) {
       if (!isSeenOpId(groupId, msg.opId)) {

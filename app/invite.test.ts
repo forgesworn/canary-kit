@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { schnorr } from '@noble/curves/secp256k1.js'
-import { sha256, bytesToHex, hexToBytes, hmacSha256 } from 'canary-kit/crypto'
+import { sha256, bytesToHex, hexToBytes } from 'canary-kit/crypto'
 import {
   assertInvitePayload,
   inviteCanonicalBytes,
@@ -143,31 +143,31 @@ describe('assertInvitePayload', () => {
 
   it('rejects missing inviterSig', () => {
     const payload = makeValidPayload()
-    ;(payload as Record<string, unknown>).inviterSig = undefined
+    ;(payload as unknown as Record<string, unknown>).inviterSig = undefined
     expect(() => assertInvitePayload(payload)).toThrow('inviterSig')
   })
 
   it('rejects invalid seed format', () => {
     const payload = makeValidPayload()
-    ;(payload as Record<string, unknown>).seed = 'not-hex'
+    ;(payload as unknown as Record<string, unknown>).seed = 'not-hex'
     expect(() => assertInvitePayload(payload)).toThrow('seed')
   })
 
   it('rejects ws:// relay (requires wss://)', () => {
     const payload = makeValidPayload()
-    ;(payload as Record<string, unknown>).relays = ['ws://insecure.relay.com']
+    ;(payload as unknown as Record<string, unknown>).relays = ['ws://insecure.relay.com']
     expect(() => assertInvitePayload(payload)).toThrow('wss://')
   })
 
   it('rejects expiresAt <= issuedAt', () => {
     const payload = makeValidPayload()
-    ;(payload as Record<string, unknown>).expiresAt = payload.issuedAt
+    ;(payload as unknown as Record<string, unknown>).expiresAt = payload.issuedAt
     expect(() => assertInvitePayload(payload)).toThrow('expiresAt must be after issuedAt')
   })
 
   it('rejects wrong protocol version', () => {
     const payload = makeValidPayload()
-    ;(payload as Record<string, unknown>).protocolVersion = 99
+    ;(payload as unknown as Record<string, unknown>).protocolVersion = 99
     expect(() => assertInvitePayload(payload)).toThrow('Unsupported invite protocol version')
   })
 })

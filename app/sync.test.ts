@@ -78,6 +78,18 @@ describe('liveness-checkin freshness guards', () => {
     handleFireAndForget(GROUP, msg, SENDER, nowSec)
     expect(mockRecordCheckin).toHaveBeenCalledWith(GROUP, SENDER, msg.timestamp)
   })
+
+  it('liveness-checkin with missing sender does not call recordCheckin', () => {
+    const nowSec = 1700000000
+    const msg: SyncMessage = {
+      type: 'liveness-checkin',
+      pubkey: SENDER,
+      timestamp: nowSec - 10,
+      opId: 'no-sender-liveness',
+    }
+    handleFireAndForget(GROUP, msg, undefined, nowSec)
+    expect(mockRecordCheckin).not.toHaveBeenCalled()
+  })
 })
 
 // ── Beacon/duress opId dedup guards ─────────────────────────────
