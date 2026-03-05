@@ -168,8 +168,13 @@ export class NostrSyncTransport implements SyncTransport {
             if (!event || typeof event !== 'object') return
             if (typeof event.pubkey !== 'string' || typeof event.content !== 'string') return
 
+            // Re-fetch active group info on every event to avoid stale closure
+            // references after reRegisterGroup() replaces the map entry.
+            const active = this.groupKeys.get(groupId)
+            if (!active) return // group was unregistered
+
             // Skip our own events
-            if (event.pubkey === groupInfo.signer.pubkey) return
+            if (event.pubkey === active.signer.pubkey) return
 
             // Verify relay event signature before trusting event.pubkey.
             if (!verifyEvent(event)) {
@@ -188,7 +193,7 @@ export class NostrSyncTransport implements SyncTransport {
             // Decrypt with group key — track failures for auto-recovery
             let decrypted: string
             try {
-              decrypted = await decryptEnvelope(groupInfo.key, event.content)
+              decrypted = await decryptEnvelope(active.key, event.content)
             } catch {
               this._trackDecryptFailure(groupId)
               return
@@ -233,7 +238,7 @@ export class NostrSyncTransport implements SyncTransport {
             // member-join is exempt: new members who can decrypt the group envelope
             // (proving they received a valid invite with the group key) are allowed
             // to announce themselves before existing members know about them.
-            if (msg.type !== 'member-join' && !groupInfo.members.has(sender)) {
+            if (msg.type !== 'member-join' && !active.members.has(sender)) {
               console.warn('[canary:sync] Rejected message from non-member pubkey')
               return
             }
