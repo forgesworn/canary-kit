@@ -112,6 +112,13 @@ export async function acceptInviteViaModal(
   await page.fill('[name="code"]', confirmCode)
   await page.click('#modal-form button[type="submit"]')
   await page.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
+
+  // Dismiss join confirmation modal if it appears (backward compatibility)
+  const joinConfirmModal = page.locator('#join-confirm-modal[open]')
+  if (await joinConfirmModal.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await page.click('#join-confirm-done')
+    await page.waitForSelector('#join-confirm-modal:not([open])', { state: 'attached', timeout: 2000 }).catch(() => {})
+  }
 }
 
 /** Accept an invite by navigating to the invite URL hash. */
@@ -151,12 +158,57 @@ export async function acceptInviteViaLink(
   await page.click('#modal-form button[type="submit"]')
   await page.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
 
+  // Dismiss join confirmation modal if it appears (backward compatibility)
+  const joinConfirmModal = page.locator('#join-confirm-modal[open]')
+  if (await joinConfirmModal.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await page.click('#join-confirm-done')
+    await page.waitForSelector('#join-confirm-modal:not([open])', { state: 'attached', timeout: 2000 }).catch(() => {})
+  }
+
   // Clean up dialog handler to avoid interfering with subsequent dialog expectations
   page.off('dialog', dialogHandler)
 
   if (alertMessage) {
     throw new Error(`Invite acceptance failed: ${alertMessage}`)
   }
+}
+
+/** After accepting an invite, read the join confirmation word and ack URL. */
+export async function getJoinToken(page: Page): Promise<{ word: string; ackUrl: string }> {
+  await page.waitForSelector('#join-confirm-modal[open]', { timeout: 3000 })
+  const word = await page.locator('#join-word-value').textContent()
+  if (!word) throw new Error('Could not read join word from confirmation modal')
+
+  // Read the ack URL by clicking copy and reading clipboard
+  // NOTE: clipboard may not work in all test environments — use the QR container as fallback
+  await page.click('#join-ack-copy')
+  // Small wait for clipboard to be written
+  await page.waitForTimeout(200)
+  const ackUrl = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '')
+
+  await page.click('#join-confirm-done')
+  await page.waitForSelector('#join-confirm-modal:not([open])', { state: 'attached', timeout: 2000 }).catch(() => {})
+  return { word: word.trim(), ackUrl }
+}
+
+/** Accept an invite via the join modal and return the join token info. */
+export async function acceptInviteAndGetToken(
+  page: Page,
+  payload: string,
+  confirmCode: string,
+): Promise<{ word: string; ackUrl: string }> {
+  await page.evaluate(() => {
+    document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
+  })
+  await page.waitForSelector('#app-modal[open]', { timeout: 3000 })
+
+  await page.fill('[name="payload"]', payload)
+  await page.fill('[name="code"]', confirmCode)
+  await page.click('#modal-form button[type="submit"]')
+  await page.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
+
+  // Now the join-confirm-modal should appear
+  return getJoinToken(page)
 }
 
 // ── Verification ─────────────────────────────────────────────
