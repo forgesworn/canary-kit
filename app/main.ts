@@ -32,7 +32,7 @@ import { renderLiveness } from './panels/liveness.js'
 import { renderSettings } from './panels/settings.js'
 import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
 import { showCallVerify } from './components/call-verify.js'
-import { acceptInvite, createInvite, isInviteConsumed } from './invite.js'
+import { acceptInvite, createInvite, createJoinToken, isInviteConsumed } from './invite.js'
 import { resolveSigner, hasNip07 } from './nostr/signer.js'
 import { DEMO_ACCOUNTS } from './demo-accounts.js'
 import { decode as nip19decode } from 'nostr-tools/nip19'
@@ -467,6 +467,65 @@ function checkInviteFragment(): void {
   )
 }
 
+// ── Join confirmation modal ─────────────────────────────────────
+
+function showJoinConfirmation(groupName: string, joinTokenEncoded: string, currentWord: string): void {
+  const base = window.location.href.split('#')[0]
+  const ackUrl = `${base}#ack/${encodeURIComponent(joinTokenEncoded)}`
+
+  let dialog = document.getElementById('join-confirm-modal') as HTMLDialogElement | null
+  if (!dialog) {
+    dialog = document.createElement('dialog')
+    dialog.id = 'join-confirm-modal'
+    dialog.className = 'modal'
+    document.body.appendChild(dialog)
+  }
+
+  dialog.innerHTML = `
+    <div class="modal__form join-confirm">
+      <h2 class="modal__title">You've joined ${escapeHtml(groupName)}</h2>
+
+      <div class="join-confirm__word">
+        <span class="join-confirm__label">Tell the group creator your word:</span>
+        <span class="join-confirm__value" id="join-word-value">${escapeHtml(currentWord)}</span>
+      </div>
+
+      <div class="qr-container" id="join-ack-qr"></div>
+      <p class="invite-hint">Or let them scan this QR code</p>
+
+      <div class="invite-share__actions">
+        <button class="btn btn--primary" id="join-ack-copy" type="button">Copy Link</button>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn" id="join-confirm-done" type="button">Done</button>
+      </div>
+    </div>
+  `
+
+  // Generate QR code
+  import('./components/qr.js').then(({ generateQR }) => {
+    const qrContainer = dialog!.querySelector('#join-ack-qr')
+    if (qrContainer) qrContainer.innerHTML = generateQR(ackUrl)
+  }).catch(() => {
+    // QR generation optional
+  })
+
+  dialog.querySelector('#join-ack-copy')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement
+    try {
+      await navigator.clipboard.writeText(ackUrl)
+      btn.textContent = 'Link Copied!'
+      btn.classList.add('btn--copied')
+      setTimeout(() => { btn.textContent = 'Copy Link'; btn.classList.remove('btn--copied') }, 2000)
+    } catch { /* clipboard may be blocked */ }
+  })
+
+  dialog.querySelector('#join-confirm-done')?.addEventListener('click', () => dialog!.close())
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog!.close() })
+  dialog.showModal()
+}
+
 // ── Global event listeners ──────────────────────────────────────
 
 function wireGlobalEvents(): void {
@@ -497,7 +556,7 @@ function wireGlobalEvents(): void {
         <button type="button" class="btn" id="modal-cancel-btn">Cancel</button>
         <button type="submit" class="btn btn--primary">Join</button>
       </div>
-    `, (form) => {
+    `, async (form) => {
       try {
         const payload = form.get('payload') as string
         const code = form.get('code') as string
@@ -632,6 +691,21 @@ function wireGlobalEvents(): void {
 
         const dialog = document.getElementById('app-modal') as HTMLDialogElement | null
         dialog?.close()
+
+        // Show join confirmation with signed token for the creator
+        const { identity: joinedIdentity } = getState()
+        if (joinedIdentity?.privkey) {
+          const { deriveCurrentWord } = await import('canary-kit')
+          const currentWord = deriveCurrentWord({ seed: data.seed, counter: appGroup.counter })
+          const joinToken = createJoinToken({
+            groupId: id,
+            privkey: joinedIdentity.privkey,
+            pubkey: joinedIdentity.pubkey,
+            displayName: myName,
+            currentWord,
+          })
+          showJoinConfirmation(data.groupName, joinToken, currentWord)
+        }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Invalid invite'
         alert(message)
