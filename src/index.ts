@@ -17,6 +17,7 @@ export {
   deriveVerificationPhrase,
   deriveDuressWord,
   deriveDuressPhrase,
+  deriveCurrentWord,
 } from './derive.js'
 
 export {

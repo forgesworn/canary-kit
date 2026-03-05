@@ -147,3 +147,11 @@ export function deriveDuressPhrase(
 
   return words
 }
+
+/**
+ * Derive the current verification word for a group.
+ * Returns the first word of the current derivation.
+ */
+export function deriveCurrentWord(group: { seed: string; counter: number }): string {
+  return deriveVerificationWord(group.seed, group.counter)
+}

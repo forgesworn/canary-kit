@@ -4,6 +4,7 @@ import {
   deriveVerificationPhrase,
   deriveDuressWord,
   deriveDuressPhrase,
+  deriveCurrentWord,
 } from './derive.js'
 
 // Fixed test seed (32 bytes hex = 64 hex chars)
@@ -130,6 +131,16 @@ describe('deriveDuressPhrase', () => {
       const duress = deriveDuressPhrase(TEST_SEED, ALICE_PUBKEY, c, 2)
       expect(duress).not.toEqual(verify)
     }
+  })
+})
+
+describe('deriveCurrentWord', () => {
+  it('returns the verification word for group seed + counter', () => {
+    const word = deriveCurrentWord({ seed: 'a'.repeat(64), counter: 42 })
+    expect(typeof word).toBe('string')
+    expect(word.length).toBeGreaterThan(0)
+    // Should match deriveVerificationWord directly
+    expect(word).toBe(deriveVerificationWord('a'.repeat(64), 42))
   })
 })
 
