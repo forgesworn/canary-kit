@@ -1,7 +1,8 @@
 // app/invite.ts — Invite creation and acceptance for CANARY groups
 
-import { hmacSha256, bytesToHex, hexToBytes } from 'canary-kit/crypto'
+import { sha256, hmacSha256, bytesToHex, hexToBytes } from 'canary-kit/crypto'
 import { PROTOCOL_VERSION } from 'canary-kit/sync'
+import { schnorr } from '@noble/curves/secp256k1.js'
 import { getState, updateGroup } from './state.js'
 import type { AppGroup } from './types.js'
 
@@ -41,13 +42,14 @@ export interface InvitePayload {
   protocolVersion: number
   /** Pubkey of the admin who created this invite. */
   inviterPubkey: string
-  /** HMAC-SHA256(seed, canonicalPayload) — proves the inviter knew the group seed. */
+  /** Schnorr signature over SHA-256(canonicalPayload) — proves the inviter controls the admin private key. */
   inviterSig: string
 }
 
 // ── Helpers ────────────────────────────────────────────────────
 
 const HEX_64_RE = /^[0-9a-f]{64}$/
+const HEX_128_RE = /^[0-9a-f]{128}$/
 const HEX_32_RE = /^[0-9a-f]{32}$/
 const INVITE_MAX_AGE_SEC = 7 * 24 * 60 * 60
 const MAX_CLOCK_SKEW_SEC = 300
@@ -145,8 +147,8 @@ function assertInvitePayload(raw: unknown): asserts raw is InvitePayload {
   if (!(data.admins as string[]).includes(data.inviterPubkey as string)) {
     throw new Error('Invalid invite payload — inviterPubkey must be in admins.')
   }
-  if (typeof data.inviterSig !== 'string' || !HEX_64_RE.test(data.inviterSig)) {
-    throw new Error('Invalid invite payload — inviterSig must be a 64-char hex string.')
+  if (typeof data.inviterSig !== 'string' || !HEX_128_RE.test(data.inviterSig)) {
+    throw new Error('Invalid invite payload — inviterSig must be a 128-char hex Schnorr signature.')
   }
 }
 
@@ -165,13 +167,23 @@ function inviteCanonicalBytes(payload: InvitePayload): Uint8Array {
 }
 
 /**
- * Compute the inviter signature: HMAC-SHA256(seed, canonicalPayload).
- * Proves the signer knew the group seed. Returns first 32 hex chars (128 bits).
+ * Sign the invite payload with the inviter's Schnorr private key.
+ * Proves the invite was created by someone who controls the admin private key,
+ * not merely someone who knows the group seed.
  */
-function computeInviterSig(payload: InvitePayload): string {
+function signInvite(payload: InvitePayload, privkey: string): string {
   const canonical = inviteCanonicalBytes(payload)
-  const mac = hmacSha256(hexToBytes(payload.seed), canonical)
-  return bytesToHex(mac).slice(0, 64)
+  const hash = sha256(canonical)
+  return bytesToHex(schnorr.sign(hash, hexToBytes(privkey)))
+}
+
+/**
+ * Verify the invite signature against the claimed inviter pubkey.
+ */
+function verifyInviteSig(payload: InvitePayload): boolean {
+  const canonical = inviteCanonicalBytes(payload)
+  const hash = sha256(canonical)
+  return schnorr.verify(hexToBytes(payload.inviterSig), hash, hexToBytes(payload.inviterPubkey))
 }
 
 /**
@@ -207,7 +219,7 @@ function confirmCodeFromPayload(payload: InvitePayload): string {
 export function createInvite(group: AppGroup): { payload: string; confirmCode: string } {
   // Only admins can create invites
   const { identity } = getState()
-  if (!identity?.pubkey) {
+  if (!identity?.pubkey || !identity?.privkey) {
     throw new Error('No local identity — cannot create invite.')
   }
   if (!group.admins.includes(identity.pubkey)) {
@@ -242,7 +254,7 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
     inviterSig: '', // placeholder — computed below
   }
 
-  invitePayload.inviterSig = computeInviterSig(invitePayload)
+  invitePayload.inviterSig = signInvite(invitePayload, identity.privkey)
 
   const payload = btoa(JSON.stringify(invitePayload))
   const confirmCode = confirmCodeFromPayload(invitePayload)
@@ -293,10 +305,9 @@ export function acceptInvite(payload: string, confirmCode?: string): InvitePaylo
     inviterSig: raw.inviterSig,
   }
 
-  // Verify the inviter signature — proves the inviter knew the group seed.
-  const expectedSig = computeInviterSig(data)
-  if (data.inviterSig !== expectedSig) {
-    throw new Error('Invite signature is invalid — the inviter could not prove knowledge of the group seed.')
+  // Verify the Schnorr signature — proves the inviter controls the claimed admin private key.
+  if (!verifyInviteSig(data)) {
+    throw new Error('Invite signature is invalid — the inviter could not prove control of the admin key.')
   }
 
   if (!confirmCode?.trim()) {
