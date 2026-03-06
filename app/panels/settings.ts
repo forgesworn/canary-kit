@@ -1,6 +1,7 @@
 // app/panels/settings.ts — Group settings drawer
 
 import { getState, updateGroup, update } from '../state.js'
+import { groupMode } from '../types.js'
 import { deleteGroup, reseedGroup, compromiseReseed, validateGroupImport } from '../actions/groups.js'
 import { showToast } from '../components/toast.js'
 import { disconnectRelays, isConnected, getRelayCount } from '../nostr/connect.js'
@@ -112,7 +113,7 @@ export function renderSettings(container: HTMLElement): void {
         </div>
 
         <!-- Nostr Sync Toggle (online mode only) -->
-        <div class="settings-section"${group.mode === 'offline' ? ' hidden' : ''}>
+        <div class="settings-section"${groupMode(group) === 'offline' ? ' hidden' : ''}>
           <label class="toggle-label">
             <input type="checkbox" id="nostr-toggle" ${group.nostrEnabled ? 'checked' : ''}>
             <span>Nostr Sync</span>
@@ -299,7 +300,8 @@ export function renderSettings(container: HTMLElement): void {
 
   document.getElementById('reseed-btn')?.addEventListener('click', () => {
     const { groups: g } = getState()
-    const isOnline = g[activeGroupId!]?.mode === 'online'
+    const ag = g[activeGroupId!]
+    const isOnline = ag ? groupMode(ag) === 'online' : false
     const msg = isOnline
       ? 'Rotate the group key? This broadcasts the new key to all members via the relay.'
       : 'Rotate the group key? Remaining members will need to re-sync via Share State.'
@@ -359,7 +361,6 @@ export function renderSettings(container: HTMLElement): void {
           seed: String(imported.seed),
           members: imported.members.filter((m: unknown) => typeof m === 'string'),
           memberNames: {} as Record<string, string>,
-          mode: (imported.mode === 'online' ? 'online' : 'offline') as 'offline' | 'online',
           nostrEnabled: false,
           relays: [] as string[],
           wordlist: typeof imported.wordlist === 'string' ? imported.wordlist : 'en-v1',

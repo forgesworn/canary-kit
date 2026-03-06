@@ -23,6 +23,7 @@ import { renderHeader } from './components/header.js'
 import { renderSidebar } from './components/sidebar.js'
 import { showModal } from './components/modal.js'
 import { createNewGroup } from './actions/groups.js'
+import { groupMode } from './types.js'
 import { renderWelcome } from './panels/welcome.js'
 import { renderHero } from './panels/hero.js'
 import { renderDuress } from './panels/duress.js'
@@ -315,7 +316,7 @@ function render(): void {
     if (members) renderMembers(members)
 
     const activeGroup = getState().groups[getState().activeGroupId ?? '']
-    const isOnline = activeGroup?.mode === 'online'
+    const isOnline = activeGroup ? groupMode(activeGroup) === 'online' : false
 
     const beacons = document.getElementById('beacon-container')
     if (beacons) {
@@ -378,12 +379,6 @@ function showCreateGroupModal(): void {
     </label>
     ` : ''}
     <fieldset class="segmented" style="margin-top: 0.5rem;">
-      <legend class="input-label__text" style="margin-bottom: 0.25rem;">Mode</legend>
-      <button type="button" class="segmented__btn segmented__btn--active" data-mode="offline">Offline</button>
-      <button type="button" class="segmented__btn" data-mode="online">Online</button>
-    </fieldset>
-    <p class="settings-hint" id="mode-hint">No network needed. Verification words work locally.</p>
-    <fieldset class="segmented" style="margin-top: 0.5rem;">
       <legend class="input-label__text" style="margin-bottom: 0.25rem;">Preset</legend>
       <button type="button" class="segmented__btn segmented__btn--active" data-preset="family">Family</button>
       <button type="button" class="segmented__btn" data-preset="field-ops">Field Ops</button>
@@ -402,9 +397,7 @@ function showCreateGroupModal(): void {
     const myName = knownName || (formData.get('myname') as string | null)?.trim() || ''
     const activePresetBtn = document.querySelector<HTMLButtonElement>('.segmented__btn.segmented__btn--active[data-preset]')
     const preset = (activePresetBtn?.dataset.preset ?? 'family') as 'family' | 'field-ops' | 'enterprise' | 'event'
-    const activeModeBtn = document.querySelector<HTMLButtonElement>('.segmented__btn.segmented__btn--active[data-mode]')
-    const mode = (activeModeBtn?.dataset.mode ?? 'offline') as 'offline' | 'online'
-    const groupId = createNewGroup(name, preset, identity?.pubkey, mode)
+    const groupId = createNewGroup(name, preset, identity?.pubkey)
     if (myName && identity?.pubkey) {
       const group = getState().groups[groupId]
       if (group) {
@@ -412,7 +405,7 @@ function showCreateGroupModal(): void {
       }
     }
     const newGroup = getState().groups[groupId]
-    if (newGroup?.mode === 'online' && newGroup?.relays?.length) {
+    if (newGroup && groupMode(newGroup) === 'online' && newGroup.relays?.length) {
       void ensureTransport(newGroup.relays, groupId)
     }
   })
@@ -420,19 +413,6 @@ function showCreateGroupModal(): void {
   requestAnimationFrame(() => {
     document.getElementById('modal-cancel-btn')?.addEventListener('click', () => {
       (document.getElementById('app-modal') as HTMLDialogElement | null)?.close()
-    })
-    // Mode segmented control
-    const modeHint = document.getElementById('mode-hint')
-    const MODE_HINTS: Record<string, string> = {
-      offline: 'No network needed. Verification words work locally.',
-      online: 'Sync via Nostr relays. Enables live map, liveness beacons, and remote alerts.',
-    }
-    document.querySelectorAll<HTMLButtonElement>('.segmented__btn[data-mode]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.segmented__btn[data-mode]').forEach(b => b.classList.remove('segmented__btn--active'))
-        btn.classList.add('segmented__btn--active')
-        if (modeHint) modeHint.textContent = MODE_HINTS[btn.dataset.mode!] ?? ''
-      })
     })
     // Preset segmented control
     document.querySelectorAll<HTMLButtonElement>('.segmented__btn[data-preset]').forEach(btn => {
@@ -638,7 +618,6 @@ async function applyInvite(data: ReturnType<typeof acceptInvite>, myName: string
     seed: data.seed,
     members,
     memberNames,
-    mode: (hasRelays ? 'online' : 'offline') as 'offline' | 'online',
     nostrEnabled: hasRelays,
     relays,
     wordlist: data.wordlist,
@@ -920,7 +899,7 @@ async function bootSync(): Promise<void> {
   // Collect unique relays from all groups
   const allRelays = new Set<string>()
   for (const group of Object.values(groups)) {
-    console.warn('[canary:boot]   group', group.id.slice(0, 8), 'mode:', group.mode, 'relays:', JSON.stringify(group.relays), 'members:', group.members.length)
+    console.warn('[canary:boot]   group', group.id.slice(0, 8), 'mode:', groupMode(group), 'relays:', JSON.stringify(group.relays), 'members:', group.members.length)
     for (const relay of group.relays) {
       allRelays.add(relay)
     }

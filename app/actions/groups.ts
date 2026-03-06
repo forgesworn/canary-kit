@@ -52,18 +52,19 @@ function hexToBytes(hex: string): Uint8Array {
  * @param preset       Named threat-profile preset ('family' | 'field-ops' | 'enterprise').
  * @param memberPubkey Optional 64-char hex pubkey to add as the first member.
  */
-export function createNewGroup(name: string, preset: PresetName, memberPubkey?: string, mode: 'offline' | 'online' = 'offline'): string {
+export function createNewGroup(name: string, preset: PresetName, memberPubkey?: string): string {
   const id = crypto.randomUUID()
 
   const members: string[] = memberPubkey ? [memberPubkey] : []
   const sdkGroup = createGroup({ name, members, preset, creator: memberPubkey })
 
+  const relays = [...getState().settings.defaultRelays]
+
   const appGroup: AppGroup = {
     ...sdkGroup,
     id,
-    mode,
-    nostrEnabled: mode === 'online',
-    relays: mode === 'online' ? [...getState().settings.defaultRelays] : [],
+    nostrEnabled: relays.length > 0,
+    relays,
     encodingFormat: 'words',
     usedInvites: [],
     latestInviteIssuedAt: 0,

@@ -47,8 +47,24 @@ export async function createGroup(
     }
   }
 
-  if (options?.mode) {
-    await page.click(`.segmented__btn[data-mode="${options.mode}"]`)
+  if (options?.mode === 'online') {
+    // Inject a default relay so the group is created in online mode
+    await page.evaluate(() => {
+      const raw = localStorage.getItem('canary:settings')
+      const settings = raw ? JSON.parse(raw) : {}
+      if (!settings.defaultRelays?.length) {
+        settings.defaultRelays = ['wss://relay.trotters.cc/']
+        localStorage.setItem('canary:settings', JSON.stringify(settings))
+      }
+    })
+  } else if (options?.mode === 'offline') {
+    // Clear default relays so the group is created in offline mode
+    await page.evaluate(() => {
+      const raw = localStorage.getItem('canary:settings')
+      const settings = raw ? JSON.parse(raw) : {}
+      settings.defaultRelays = []
+      localStorage.setItem('canary:settings', JSON.stringify(settings))
+    })
   }
 
   if (options?.preset) {

@@ -249,7 +249,6 @@ export async function unlockAndRestoreState(pin: string): Promise<void> {
         usedInvites: Array.isArray(group.usedInvites) ? group.usedInvites : [],
         latestInviteIssuedAt: typeof group.latestInviteIssuedAt === 'number' ? group.latestInviteIssuedAt : 0,
         tolerance: group.tolerance ?? 1,
-        mode: group.mode ?? 'offline',
       }
     }
   }
@@ -290,7 +289,6 @@ export function restoreState(): void {
         usedInvites: Array.isArray(group.usedInvites) ? group.usedInvites : [],
         latestInviteIssuedAt: typeof group.latestInviteIssuedAt === 'number' ? group.latestInviteIssuedAt : 0,
         tolerance: group.tolerance ?? 1,
-        mode: group.mode ?? 'offline',
       }
     }
   }
