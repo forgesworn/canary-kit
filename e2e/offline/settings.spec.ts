@@ -1,6 +1,6 @@
 // e2e/offline/settings.spec.ts — Settings panel tests
 import { test, expect } from '../fixtures.js'
-import { loginOffline, createGroup, openSettings, setEncodingFormat, getDisplayedWord } from '../helpers.js'
+import { loginOffline, createGroup, openSettings, setEncodingFormat, getDisplayedWord, getGroupState } from '../helpers.js'
 
 test.describe('Settings panel', () => {
   test.beforeEach(async ({ cleanPage: page }) => {
@@ -64,5 +64,88 @@ test.describe('Settings panel', () => {
     await page.waitForTimeout(200)
     const word2 = await getDisplayedWord(page)
     expect(word2.split(' ').length).toBe(2)
+  })
+
+  test('rotation interval change: 30s to 24h', async ({ cleanPage: page }) => {
+    await openSettings(page)
+    await page.click('[data-interval="86400"]')
+    await expect(page.locator('[data-interval="86400"]')).toHaveClass(/segmented__btn--active/)
+    await page.waitForTimeout(300)
+    const state = await getGroupState(page)
+    expect(state.rotationInterval).toBe(86400)
+  })
+
+  test('rotation interval persists across reload', async ({ cleanPage: page }) => {
+    await openSettings(page)
+    await page.click('[data-interval="604800"]')
+    await page.waitForTimeout(200)
+    await page.reload()
+    await page.waitForSelector('#sidebar', { timeout: 5000 })
+    await openSettings(page)
+    await expect(page.locator('[data-interval="604800"]')).toHaveClass(/segmented__btn--active/)
+  })
+
+  test('tolerance change: +/-1 to +/-3', async ({ cleanPage: page }) => {
+    await openSettings(page)
+    await page.click('[data-tolerance="3"]')
+    await expect(page.locator('[data-tolerance="3"]')).toHaveClass(/segmented__btn--active/)
+    await page.waitForTimeout(300)
+    const state = await getGroupState(page)
+    expect(state.tolerance).toBe(3)
+  })
+
+  test('tolerance 0 (exact match only)', async ({ cleanPage: page }) => {
+    await openSettings(page)
+    await page.click('[data-tolerance="0"]')
+    await expect(page.locator('[data-tolerance="0"]')).toHaveClass(/segmented__btn--active/)
+    await page.waitForTimeout(300)
+    const state = await getGroupState(page)
+    expect(state.tolerance).toBe(0)
+  })
+
+  test('duress mode change: immediate to dead-drop', async ({ cleanPage: page }) => {
+    await openSettings(page)
+    await page.click('[data-duress-mode="dead-drop"]')
+    await expect(page.locator('[data-duress-mode="dead-drop"]')).toHaveClass(/segmented__btn--active/)
+    await page.waitForTimeout(300)
+    const state = await getGroupState(page)
+    expect(state.duressMode).toBe('dead-drop')
+  })
+
+  test('duress mode change: to both', async ({ cleanPage: page }) => {
+    await openSettings(page)
+    await page.click('[data-duress-mode="both"]')
+    await expect(page.locator('[data-duress-mode="both"]')).toHaveClass(/segmented__btn--active/)
+    await page.waitForTimeout(300)
+    const state = await getGroupState(page)
+    expect(state.duressMode).toBe('both')
+  })
+
+  test('disabling Nostr sync hides relay settings', async ({ cleanPage: page }) => {
+    // Need an online group to see the Nostr toggle
+    await createGroup(page, 'OnlineTest', { mode: 'online', myName: 'Tester' })
+    await openSettings(page)
+
+    const toggle = page.locator('#nostr-toggle')
+    await expect(toggle).toBeChecked()
+
+    await toggle.uncheck()
+    await expect(page.locator('#nostr-settings')).toBeHidden()
+
+    // Verification should still work offline
+    const word = await getDisplayedWord(page)
+    expect(word).toBeTruthy()
+  })
+
+  test('settings drawer stays open after state change', async ({ cleanPage: page }) => {
+    await openSettings(page)
+    await expect(page.locator('#settings-body')).toBeVisible()
+
+    // Trigger a state change by changing encoding (causes re-render)
+    await page.click('[data-enc="pin"]')
+    await page.waitForTimeout(200)
+
+    // Drawer should still be open after re-render
+    await expect(page.locator('#settings-body')).toBeVisible()
   })
 })

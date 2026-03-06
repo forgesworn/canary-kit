@@ -457,6 +457,23 @@ export async function waitForSync(page: Page, timeoutMs = 2000): Promise<void> {
   await page.waitForTimeout(timeoutMs)
 }
 
+/** Read the active group's state from localStorage. */
+export async function getGroupState(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem('canary:groups')
+    if (!raw) return {}
+    const groups = JSON.parse(raw)
+    const stateRaw = localStorage.getItem('canary:state')
+    const activeId = stateRaw ? JSON.parse(stateRaw).activeGroupId : null
+    if (!activeId) {
+      // fallback: use first group
+      const keys = Object.keys(groups)
+      return keys.length > 0 ? groups[keys[0]] : {}
+    }
+    return groups[activeId] ?? {}
+  })
+}
+
 // ── Console error tracking ───────────────────────────────────
 
 /** Set up console error tracking. Returns the errors array. */
