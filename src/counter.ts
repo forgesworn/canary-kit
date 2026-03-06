@@ -9,6 +9,12 @@ export function getCounter(
   timestampSec: number,
   rotationIntervalSec: number = DEFAULT_ROTATION_INTERVAL,
 ): number {
+  if (!Number.isFinite(timestampSec) || timestampSec < 0) {
+    throw new RangeError(`timestampSec must be a non-negative finite number, got ${timestampSec}`)
+  }
+  if (!Number.isFinite(rotationIntervalSec) || rotationIntervalSec <= 0) {
+    throw new RangeError(`rotationIntervalSec must be a positive finite number, got ${rotationIntervalSec}`)
+  }
   return Math.floor(timestampSec / rotationIntervalSec)
 }
 

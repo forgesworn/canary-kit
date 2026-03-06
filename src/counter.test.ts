@@ -73,11 +73,44 @@ describe('counterToBytes', () => {
   })
 })
 
-describe('getCounter with negative timestamp', () => {
-  it('negative timestamp still returns a number (floor division)', () => {
-    // Math.floor(-1 / 604800) = -1, so getCounter returns a number
-    const result = getCounter(-1, 604_800)
-    expect(typeof result).toBe('number')
-    expect(result).toBe(-1)
+describe('getCounter input validation', () => {
+  it('throws RangeError on negative timestamp', () => {
+    expect(() => getCounter(-1, 604_800)).toThrow(RangeError)
+  })
+
+  it('throws RangeError on NaN timestamp', () => {
+    expect(() => getCounter(NaN, 604_800)).toThrow(RangeError)
+  })
+
+  it('throws RangeError on Infinity timestamp', () => {
+    expect(() => getCounter(Infinity, 604_800)).toThrow(RangeError)
+  })
+
+  it('throws RangeError on negative Infinity timestamp', () => {
+    expect(() => getCounter(-Infinity, 604_800)).toThrow(RangeError)
+  })
+
+  it('throws RangeError on zero interval', () => {
+    expect(() => getCounter(1000, 0)).toThrow(RangeError)
+  })
+
+  it('throws RangeError on negative interval', () => {
+    expect(() => getCounter(1000, -100)).toThrow(RangeError)
+  })
+
+  it('throws RangeError on NaN interval', () => {
+    expect(() => getCounter(1000, NaN)).toThrow(RangeError)
+  })
+
+  it('throws RangeError on Infinity interval', () => {
+    expect(() => getCounter(1000, Infinity)).toThrow(RangeError)
+  })
+
+  it('accepts zero timestamp', () => {
+    expect(getCounter(0, 604_800)).toBe(0)
+  })
+
+  it('accepts valid positive inputs', () => {
+    expect(getCounter(1_209_600, 604_800)).toBe(2)
   })
 })
