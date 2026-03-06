@@ -46,6 +46,10 @@ async function aesGcmEncrypt(key: Uint8Array, plaintext: Uint8Array): Promise<st
 
 async function aesGcmDecrypt(key: Uint8Array, content: string): Promise<Uint8Array> {
   const combined = base64ToBytes(content)
+  const MIN_CIPHERTEXT_LEN = 28 // 12-byte IV + 16-byte GCM auth tag
+  if (combined.length < MIN_CIPHERTEXT_LEN) {
+    throw new Error('Invalid ciphertext: too short (minimum 28 bytes: 12-byte IV + 16-byte GCM tag)')
+  }
   const iv = combined.slice(0, 12)
   const ciphertext = combined.slice(12)
   const cryptoKey = await crypto.subtle.importKey(

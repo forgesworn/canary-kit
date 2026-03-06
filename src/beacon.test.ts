@@ -120,6 +120,22 @@ describe('buildDuressAlert', () => {
   })
 })
 
+describe('aesGcmDecrypt minimum ciphertext length', () => {
+  it('rejects ciphertext shorter than 28 bytes (12-byte IV + 16-byte GCM tag)', async () => {
+    const key = deriveBeaconKey(SEED_1)
+    // 20 bytes = too short (needs at least 28)
+    const shortBytes = new Uint8Array(20)
+    const shortBase64 = btoa(String.fromCharCode(...shortBytes))
+    await expect(decryptBeacon(key, shortBase64)).rejects.toThrow(/too short/)
+  })
+
+  it('rejects empty ciphertext', async () => {
+    const key = deriveBeaconKey(SEED_1)
+    const emptyBase64 = btoa('')
+    await expect(decryptBeacon(key, emptyBase64)).rejects.toThrow(/too short/)
+  })
+})
+
 describe('decryptBeacon validation', () => {
   it('rejects payload missing required fields', async () => {
     const key = deriveBeaconKey(SEED_1)
