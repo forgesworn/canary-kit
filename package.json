@@ -41,10 +41,6 @@
     "./sync": {
       "types": "./dist/sync.d.ts",
       "import": "./dist/sync.js"
-    },
-    "./crypto": {
-      "types": "./dist/crypto.d.ts",
-      "import": "./dist/crypto.js"
     }
   },
   "files": [

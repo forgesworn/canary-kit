@@ -1,5 +1,16 @@
-import { deriveVerificationWord, deriveDuressWord, deriveVerificationPhrase, deriveDuressPhrase } from './derive.js'
-import { timingSafeStringEqual } from './crypto.js'
+/**
+ * Group-level word verification — thin wrapper around the universal token API.
+ *
+ * Maps verifyToken results to group-specific statuses:
+ * - 'verified' = exact counter match
+ * - 'duress'   = duress token detected (with member pubkeys)
+ * - 'stale'    = valid token from an adjacent counter (out of sync)
+ * - 'failed'   = no match
+ */
+
+import { verifyToken, deriveToken } from './token.js'
+import type { TokenEncoding } from './encoding.js'
+import { GROUP_CONTEXT } from './derive.js'
 
 export type VerifyStatus = 'verified' | 'duress' | 'stale' | 'failed'
 
@@ -15,10 +26,9 @@ export interface VerifyResult {
  *
  * Checks in order:
  * 1. Current verification word → verified
- * 2. ALL members' duress words at current counter → duress (with all matching members)
- * 3. ALL members' duress words at previous counter → duress (stale duress, out of sync)
- * 4. Previous window's verification word → stale (out of sync)
- * 5. None matched → failed
+ * 2. ALL members' duress words within tolerance window → duress (with all matching members)
+ * 3. Adjacent verification word within tolerance → stale (out of sync)
+ * 4. None matched → failed
  *
  * Per CANARY-DURESS: the verifier MUST check all identities and collect all matches.
  * The verifier MUST NOT short-circuit after the first duress match.
@@ -29,50 +39,24 @@ export function verifyWord(
   memberPubkeys: string[],
   counter: number,
   wordCount: 1 | 2 | 3 = 1,
+  tolerance: number = 1,
 ): VerifyResult {
+  const encoding: TokenEncoding = wordCount === 1
+    ? undefined as unknown as TokenEncoding  // default single-word encoding
+    : { format: 'words', count: wordCount }
+  const encodingOpt = wordCount === 1 ? undefined : encoding
+
+  const result = verifyToken(seedHex, GROUP_CONTEXT, counter, spokenWord, memberPubkeys, {
+    encoding: encodingOpt,
+    tolerance,
+  })
+
+  if (result.status === 'invalid') return { status: 'failed' }
+  if (result.status === 'duress') return { status: 'duress', members: result.identities }
+
+  // result.status === 'valid' — distinguish exact from stale
   const normalised = spokenWord.toLowerCase().trim().replace(/\s+/g, ' ')
-
-  function verifyPhrase(seed: string, c: number): string {
-    if (wordCount === 1) return deriveVerificationWord(seed, c)
-    return deriveVerificationPhrase(seed, c, wordCount).join(' ')
-  }
-
-  function duressPhrase(seed: string, pubkey: string, c: number): string {
-    if (wordCount === 1) return deriveDuressWord(seed, pubkey, c)
-    return deriveDuressPhrase(seed, pubkey, c, wordCount).join(' ')
-  }
-
-  // Compute all branches to prevent timing side-channels from revealing
-  // which branch matched (verified vs duress vs stale vs failed).
-
-  // 1. Check current verification word
-  const currentMatch = timingSafeStringEqual(normalised, verifyPhrase(seedHex, counter))
-
-  // 2. Check ALL members' duress words at current counter — collect all matches
-  const currentDuressMatches: string[] = []
-  for (const pubkey of memberPubkeys) {
-    if (timingSafeStringEqual(normalised, duressPhrase(seedHex, pubkey, counter))) {
-      currentDuressMatches.push(pubkey)
-    }
-  }
-
-  // 3. Check duress words at previous counter (stale duress) — collect all matches
-  const staleDuressMatches: string[] = []
-  if (counter > 0) {
-    for (const pubkey of memberPubkeys) {
-      if (timingSafeStringEqual(normalised, duressPhrase(seedHex, pubkey, counter - 1))) {
-        staleDuressMatches.push(pubkey)
-      }
-    }
-  }
-
-  // 4. Check previous window's verification word (1-window lookback for sync issues)
-  const staleMatch = counter > 0 && timingSafeStringEqual(normalised, verifyPhrase(seedHex, counter - 1))
-
-  // Return in priority order
-  if (currentMatch) return { status: 'verified' }
-  if (currentDuressMatches.length > 0) return { status: 'duress', members: currentDuressMatches }
-  if (staleDuressMatches.length > 0) return { status: 'duress', members: staleDuressMatches }
-  if (staleMatch) return { status: 'stale' }
-  return { status: 'failed' }
+  const exact = deriveToken(seedHex, GROUP_CONTEXT, counter, encodingOpt)
+  if (normalised === exact) return { status: 'verified' }
+  return { status: 'stale' }
 }

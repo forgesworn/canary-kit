@@ -1,11 +1,7 @@
 import { randomSeed, hmacSha256, hexToBytes, bytesToHex } from './crypto.js'
 import { getCounter, DEFAULT_ROTATION_INTERVAL } from './counter.js'
-import {
-  deriveVerificationWord,
-  deriveVerificationPhrase,
-  deriveDuressWord,
-  deriveDuressPhrase,
-} from './derive.js'
+import { deriveToken, deriveDuressToken } from './token.js'
+import { GROUP_CONTEXT } from './derive.js'
 import { PRESETS, type PresetName } from './presets.js'
 
 const HEX_64_RE = /^[0-9a-f]{64}$/
@@ -16,7 +12,7 @@ const MAX_MEMBERS = 100
 /** Validate that a string is a 64-character lowercase hex pubkey. */
 function validatePubkey(pubkey: string): void {
   if (!HEX_64_RE.test(pubkey)) {
-    throw new Error(`Invalid member pubkey: expected 64 hex characters, got "${pubkey}"`)
+    throw new Error(`Invalid member pubkey: expected 64 hex characters, got ${pubkey.length} chars`)
   }
 }
 
@@ -29,6 +25,8 @@ export interface GroupConfig {
   rotationInterval?: number
   wordCount?: 1 | 2 | 3
   wordlist?: string
+  /** Counter tolerance for verification: accept tokens within ±tolerance counter values (default: 1). */
+  tolerance?: number
   /** Beacon broadcast interval in seconds (default: 300 = 5 minutes). */
   beaconInterval?: number
   /** Geohash precision for normal beacons, 1–11 (default: 6 ≈ 1.2km). */
@@ -50,6 +48,8 @@ export interface GroupState {
   /** Burn-after-use offset applied on top of the time-based counter. */
   usageOffset: number
   createdAt: number
+  /** Counter tolerance for verification: accept tokens within ±tolerance counter values. */
+  tolerance: number
   /** Beacon broadcast interval in seconds. */
   beaconInterval: number
   /** Geohash precision for normal beacons (1–11). */
@@ -83,6 +83,7 @@ export function createGroup(config: GroupConfig): GroupState {
   const base = config.preset !== undefined ? PRESETS[config.preset as keyof typeof PRESETS] : undefined
   const interval = config.rotationInterval ?? base?.rotationInterval ?? DEFAULT_ROTATION_INTERVAL
   const wordCount = config.wordCount ?? base?.wordCount ?? 1
+  const tolerance = config.tolerance ?? 1
 
   // Validate resolved config values
   if (!Number.isInteger(interval) || interval <= 0) {
@@ -119,6 +120,7 @@ export function createGroup(config: GroupConfig): GroupState {
     members: [...config.members],
     rotationInterval: interval,
     wordCount,
+    tolerance,
     wordlist: config.wordlist ?? 'en-v1',
     counter: getCounter(now, interval),
     usageOffset: 0,
@@ -137,10 +139,8 @@ export function createGroup(config: GroupConfig): GroupState {
  */
 export function getCurrentWord(state: GroupState): string {
   const counter = effectiveCounter(state)
-  if (state.wordCount === 1) {
-    return deriveVerificationWord(state.seed, counter)
-  }
-  return deriveVerificationPhrase(state.seed, counter, state.wordCount).join(' ')
+  const encoding = state.wordCount === 1 ? undefined : { format: 'words' as const, count: state.wordCount }
+  return deriveToken(state.seed, GROUP_CONTEXT, counter, encoding)
 }
 
 /**
@@ -150,10 +150,8 @@ export function getCurrentWord(state: GroupState): string {
  */
 export function getCurrentDuressWord(state: GroupState, memberPubkey: string): string {
   const counter = effectiveCounter(state)
-  if (state.wordCount === 1) {
-    return deriveDuressWord(state.seed, memberPubkey, counter)
-  }
-  return deriveDuressPhrase(state.seed, memberPubkey, counter, state.wordCount).join(' ')
+  const encoding = state.wordCount === 1 ? undefined : { format: 'words' as const, count: state.wordCount }
+  return deriveDuressToken(state.seed, GROUP_CONTEXT, memberPubkey, counter, encoding, state.tolerance)
 }
 
 /**

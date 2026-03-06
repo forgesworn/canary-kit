@@ -13,6 +13,7 @@ export {
 } from './counter.js'
 
 export {
+  GROUP_CONTEXT,
   deriveVerificationWord,
   deriveVerificationPhrase,
   deriveDuressWord,

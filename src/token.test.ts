@@ -531,6 +531,39 @@ describe('deriveDuressToken — maxTolerance=0', () => {
   })
 })
 
+describe('secret validation', () => {
+  it('rejects empty secret string', () => {
+    expect(() => deriveToken('', 'test', 0)).toThrow(RangeError)
+  })
+
+  it('rejects short secret (< 16 bytes)', () => {
+    const shortSecret = '00'.repeat(15) // 15 bytes = 30 hex chars
+    expect(() => deriveToken(shortSecret, 'test', 0)).toThrow(RangeError)
+  })
+
+  it('accepts 16-byte secret', () => {
+    const minSecret = '00'.repeat(16) // 16 bytes = 32 hex chars
+    expect(() => deriveToken(minSecret, 'test', 0)).not.toThrow()
+  })
+
+  it('rejects short Uint8Array secret', () => {
+    expect(() => deriveToken(new Uint8Array(15), 'test', 0)).toThrow(RangeError)
+  })
+})
+
+describe('unicode identity handling', () => {
+  it('NFC and NFD representations produce different tokens (no normalisation)', () => {
+    // café as precomposed (NFC) vs decomposed (NFD)
+    const nfc = 'caf\u00e9'   // é as single codepoint
+    const nfd = 'cafe\u0301'  // e + combining acute accent
+    const a = deriveDuressToken(SECRET_1, 'test', nfc, 0, undefined, 1)
+    const b = deriveDuressToken(SECRET_1, 'test', nfd, 0, undefined, 1)
+    // These SHOULD be different — the protocol does not normalise unicode.
+    // Implementations must ensure consistent normalisation at the application layer.
+    expect(a).not.toBe(b)
+  })
+})
+
 describe('MAX_TOLERANCE enforcement', () => {
   it('deriveDuressToken throws on maxTolerance > MAX_TOLERANCE', () => {
     expect(() => deriveDuressToken(SECRET_1, 'test', IDENTITY_A, 0, undefined, 11)).toThrow(RangeError)

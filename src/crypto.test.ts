@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { timingSafeEqual, timingSafeStringEqual, hexToBytes, bytesToHex, readUint16BE, sha256, hmacSha256 } from './crypto.js'
+import { timingSafeEqual, timingSafeStringEqual, hexToBytes, bytesToHex, readUint16BE, sha256, hmacSha256, randomSeed } from './crypto.js'
 
 describe('timingSafeEqual', () => {
   it('returns true for equal arrays', () => {
@@ -80,6 +80,37 @@ describe('sha256', () => {
     const input = new TextEncoder().encode('abc')
     const hash = bytesToHex(sha256(input))
     expect(hash).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+  })
+
+  it('handles 55-byte input (one-block padding boundary)', () => {
+    const input = new Uint8Array(55).fill(0x61) // 55 × 'a'
+    const hash = bytesToHex(sha256(input))
+    expect(hash).toBe('9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318')
+  })
+
+  it('handles 56-byte input (two-block padding boundary)', () => {
+    const input = new Uint8Array(56).fill(0x61) // 56 × 'a'
+    const hash = bytesToHex(sha256(input))
+    expect(hash).toBe('b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a')
+  })
+
+  it('handles 64-byte input (exact block boundary)', () => {
+    const input = new Uint8Array(64).fill(0x61) // 64 × 'a'
+    const hash = bytesToHex(sha256(input))
+    expect(hash).toBe('ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb')
+  })
+})
+
+describe('randomSeed', () => {
+  it('returns a 64-char hex string', () => {
+    const seed = randomSeed()
+    expect(seed).toHaveLength(64)
+    expect(seed).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('produces unique values', () => {
+    const seeds = new Set(Array.from({ length: 10 }, () => randomSeed()))
+    expect(seeds.size).toBe(10)
   })
 })
 
