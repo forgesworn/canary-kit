@@ -291,6 +291,10 @@ Lines 58-61 use `===` (non-constant-time) for the exact vs stale distinction. Th
 | F-017 | Info | Token | MIN_SECRET_BYTES = 16 is intentional for universal API flexibility | Verified |
 | F-018 | Info | Verify | `===` in verify.ts:58–61 is post-verification, no security impact | Verified |
 | F-019 | Info | Token | `break` in verifyToken duress loop is inner-loop only, accepted timing | Verified |
+| F-020 | High | App | Invite payload carries live group seed in URL hashes, QR codes, clipboard | Accepted — architectural; serverless protocol requires seed transport |
+| F-021 | High | App | localStorage stores seeds/keys; PIN-encrypted after unlock, plaintext when PIN disabled | Accepted — demo app; production must use platform secure storage |
+| F-022 | Medium | Sync | Higher-epoch snapshot accepted from single admin; stale-admin fabrication possible | Accepted — quorum recovery deferred to v2; self-consistency check narrows surface |
+| F-023 | Low | App | No CSP or Trusted Types hardening in demo app HTML | Accepted — deployment-level concern; demo app out of scope |
 
 ## 9. Remediation Log
 
@@ -335,15 +339,20 @@ The protocol is cryptographically sound. The implementation faithfully follows t
 | Risk | Severity | Mitigation |
 |------|----------|------------|
 | Symmetric key design: device compromise = full access until reseed | By design | `removeMemberAndReseed()`, prompt reseed |
-| State-snapshot epoch hijack by stale admin | Low | Self-consistency check; quorum deferred to v2 |
+| Invite payload transports live seed (F-020) | High (app) | Nonce + expiry + admin-only + out-of-band confirm code; per-recipient encryption or opaque enrolment IDs needed for enterprise |
+| Browser localStorage stores secrets (F-021) | High (app) | PIN uses PBKDF2 600k / AES-256-GCM / non-extractable keys / fail-closed; production must use platform secure storage |
+| State-snapshot epoch hijack by stale admin (F-022) | Medium | Self-consistency check; quorum or signed reseed chain deferred to v2 |
 | Nostr metadata exposure (p-tags) | Low | Protocol limitation; relay access controls |
 | 1/2048 word guess probability | Low | Use 2+ words for high-security groups |
 | PIN encoding bias (0.085%) | Negligible | Documented; word encoding recommended |
 
 ### Deployment Recommendations
 
-1. **Seed storage** — Implementations MUST store group seeds in platform-native secure storage (iOS Keychain, Android Keystore, OS credential manager)
-2. **Reseed promptness** — On member removal or compromise, reseed immediately using `removeMemberAndReseed()`
-3. **Multi-word phrases** — Groups with >10 members SHOULD use 2+ word phrases to reduce collision probability
-4. **Transport security** — Always use NIP-44 encryption for Nostr events; never transmit seeds in plaintext
-5. **UI discipline** — MUST NOT display duress tokens, labels, or detection status in default view
+1. **Seed storage** — Implementations MUST store group seeds in platform-native secure storage (iOS Keychain, Android Keystore, OS credential manager). The browser demo app uses localStorage with optional PIN encryption — this is NOT suitable for enterprise secret custody.
+2. **Invite transport** — Seed-bearing invites MUST be shared over secure channels. For enterprise deployments, implement per-recipient encrypted envelopes or opaque enrolment tokens instead of URL-embedded payloads.
+3. **Reseed promptness** — On member removal or compromise, reseed immediately using `removeMemberAndReseed()`
+4. **Multi-word phrases** — Groups with >10 members SHOULD use 2+ word phrases to reduce collision probability
+5. **Transport security** — Always use NIP-44 encryption for Nostr events; never transmit seeds in plaintext
+6. **UI discipline** — MUST NOT display duress tokens, labels, or detection status in default view
+7. **Recovery path** — Higher-epoch snapshot recovery accepts a single admin signature. For enterprise sync, disable this path or implement quorum-based recovery until signed reseed chains are available (v2).
+8. **CSP hardening** — Web deployments SHOULD set a strict Content-Security-Policy at the server level (e.g. nginx) and remove inline scripts from the HTML bootstrap.
