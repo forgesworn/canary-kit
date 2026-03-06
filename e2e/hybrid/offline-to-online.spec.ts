@@ -14,7 +14,16 @@ test.describe('Hybrid: offline to online', () => {
     await expect(page.locator('#beacon-container')).toBeHidden()
     await expect(page.locator('#liveness-container')).toBeHidden()
 
-    // Add relay via settings by seeding localStorage and reloading
+    // Add relay to the group's relays array (not just settings) and reload
+    await page.addInitScript((relayUrl: string) => {
+      const raw = localStorage.getItem('canary:groups')
+      if (!raw) return
+      const groups = JSON.parse(raw)
+      for (const g of Object.values(groups) as Array<{ relays?: string[] }>) {
+        g.relays = [relayUrl]
+      }
+      localStorage.setItem('canary:groups', JSON.stringify(groups))
+    }, mockRelay.url)
     await seedRelayUrl(page, mockRelay.url)
     await page.reload()
     await page.waitForSelector('#sidebar', { timeout: 5000 })

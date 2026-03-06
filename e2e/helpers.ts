@@ -35,6 +35,31 @@ export async function createGroup(
     myName?: string
   },
 ): Promise<void> {
+  // Set relay mode BEFORE opening modal so the app's in-memory state is correct
+  if (options?.mode === 'offline') {
+    // Clear relays to force offline mode (overrides the hardcoded default)
+    await page.addInitScript(() => {
+      const raw = localStorage.getItem('canary:settings')
+      const settings = raw ? JSON.parse(raw) : {}
+      settings.defaultRelays = []
+      localStorage.setItem('canary:settings', JSON.stringify(settings))
+    })
+    await page.reload()
+    await page.waitForSelector('#sidebar', { timeout: 5000 })
+  } else if (options?.mode === 'online') {
+    // Ensure at least one relay exists (don't overwrite if already seeded)
+    await page.addInitScript(() => {
+      const raw = localStorage.getItem('canary:settings')
+      const settings = raw ? JSON.parse(raw) : {}
+      if (!settings.defaultRelays?.length) {
+        settings.defaultRelays = ['wss://relay.trotters.cc/']
+      }
+      localStorage.setItem('canary:settings', JSON.stringify(settings))
+    })
+    await page.reload()
+    await page.waitForSelector('#sidebar', { timeout: 5000 })
+  }
+
   await page.click('#create-group-btn')
   await page.waitForSelector('#app-modal[open]', { timeout: 3000 })
 
@@ -45,26 +70,6 @@ export async function createGroup(
     if (await myNameInput.isVisible()) {
       await myNameInput.fill(options.myName)
     }
-  }
-
-  if (options?.mode === 'online') {
-    // Inject a default relay so the group is created in online mode
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('canary:settings')
-      const settings = raw ? JSON.parse(raw) : {}
-      if (!settings.defaultRelays?.length) {
-        settings.defaultRelays = ['wss://relay.trotters.cc/']
-        localStorage.setItem('canary:settings', JSON.stringify(settings))
-      }
-    })
-  } else if (options?.mode === 'offline') {
-    // Clear default relays so the group is created in offline mode
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('canary:settings')
-      const settings = raw ? JSON.parse(raw) : {}
-      settings.defaultRelays = []
-      localStorage.setItem('canary:settings', JSON.stringify(settings))
-    })
   }
 
   if (options?.preset) {
@@ -302,34 +307,24 @@ export async function addSimulatedMember(page: Page): Promise<void> {
   // Read the active group name before reload so we can re-select it
   const activeGroupName = await page.locator('.group-list__item--active .group-list__name').textContent()
 
-  // Add a fake member directly to the persisted groups in localStorage.
-  // Re-reads localStorage inside evaluate to guarantee consistency.
-  await page.evaluate(async () => {
-    // Poll until groups are available (handles debounce edge cases)
-    let groups: Record<string, { members: string[]; [k: string]: unknown }> | null = null
-    for (let i = 0; i < 30; i++) {
-      const raw = localStorage.getItem('canary:groups')
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (Object.keys(parsed).length > 0) {
-          groups = parsed
-          break
-        }
-      }
-      await new Promise(r => setTimeout(r, 100))
-    }
-    if (!groups) throw new Error('No groups in localStorage after waiting')
+  // Generate the fake pubkey in Node and inject via addInitScript so the
+  // member is added to localStorage before app JS runs on reload.
+  const fakePubkey = Array.from(
+    { length: 32 },
+    () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0'),
+  ).join('')
 
+  await page.addInitScript((pubkey: string) => {
+    const raw = localStorage.getItem('canary:groups')
+    if (!raw) return
+    const groups = JSON.parse(raw)
     const groupId = Object.keys(groups)[0]
+    if (!groupId) return
     const group = groups[groupId]
-
-    const bytes = new Uint8Array(32)
-    crypto.getRandomValues(bytes)
-    const fakePubkey = Array.from(bytes, (b: number) => b.toString(16).padStart(2, '0')).join('')
-    group.members = [...group.members, fakePubkey]
+    group.members = [...group.members, pubkey]
     localStorage.setItem('canary:groups', JSON.stringify(groups))
-  })
-  // Reload so the app restores the updated state from localStorage
+  }, fakePubkey)
+
   await page.reload()
   await page.waitForSelector('#sidebar', { timeout: 5000 })
   // Re-select the group to make it active
