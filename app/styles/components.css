@@ -1879,6 +1879,23 @@ select.input option {
   color: var(--text-primary);
 }
 
+/* ── Mobile: show Groups button, hide Call Demo ──────────── */
+
+@media (max-width: 768px) {
+  .header__nav {
+    margin-left: 0.5rem;
+    gap: 0;
+  }
+  .header__nav-tab[data-view="call-demo"] {
+    display: none;
+  }
+  .header__nav-tab {
+    border-radius: 4px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+  }
+}
+
 @media (max-width: 768px) {
   .call-sim__panels { grid-template-columns: 1fr; }
   .call-sim__divider { width: 100%; height: 1px; }

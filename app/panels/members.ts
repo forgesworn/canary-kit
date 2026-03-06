@@ -13,6 +13,7 @@ import { showModal } from '../components/modal.js'
 import { showToast } from '../components/toast.js'
 import { deriveToken } from 'canary-kit/token'
 import { GROUP_CONTEXT, toTokenEncoding } from '../utils/encoding.js'
+import { fetchProfiles, getCachedName } from '../nostr/profiles.js'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -44,6 +45,8 @@ function formatPubkey(pubkey: string, _members: string[], groupId?: string): str
     const name = group?.memberNames?.[pubkey]
     if (name) return name
   }
+  const profileName = getCachedName(pubkey)
+  if (profileName) return profileName
   return `${pubkey.slice(0, 8)}\u2026${pubkey.slice(-4)}`
 }
 
@@ -332,6 +335,9 @@ export function renderMembers(container: HTMLElement): void {
 
   const { identity } = getState()
   const isAdmin = !!identity?.pubkey && group.admins.includes(identity.pubkey)
+
+  // Fetch kind 0 profiles for members we don't have names for yet
+  fetchProfiles(group.members, activeGroupId)
 
   const memberItems =
     group.members.length > 0
