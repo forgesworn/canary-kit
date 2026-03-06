@@ -953,7 +953,7 @@ function wireGlobalEvents(): void {
   document.addEventListener('canary:sync-message', (evt) => {
     const { groupId, message, sender } = (evt as CustomEvent).detail
     if (message.type === 'beacon') {
-      console.info(`[canary] Beacon from ${sender.slice(0, 8)}…: ${message.lat}, ${message.lon}`)
+      if (import.meta.env.DEV) console.info(`[canary] Beacon from ${sender.slice(0, 8)}…`)
       handleIncomingBeacon(sender, message.lat, message.lon, message.accuracy ?? 20000, message.timestamp)
     } else if (message.type === 'duress-alert') {
       // Use subject (person under duress) if available, fall back to sender
@@ -997,12 +997,12 @@ async function bootSync(): Promise<void> {
 
   const groupCount = Object.keys(groups).length
   const hasPrivkey = !!identity?.privkey
-  console.warn('[canary:boot] bootSync — groups:', groupCount, 'identity:', identity?.pubkey?.slice(0, 8) ?? 'none', 'privkey:', hasPrivkey ? 'yes' : 'NO')
+  if (import.meta.env.DEV) console.warn('[canary:boot] bootSync — groups:', groupCount, 'identity:', identity?.pubkey?.slice(0, 8) ?? 'none', 'privkey:', hasPrivkey ? 'yes' : 'NO')
 
   // Collect unique relays from all groups
   const allRelays = new Set<string>()
   for (const group of Object.values(groups)) {
-    console.warn('[canary:boot]   group', group.id.slice(0, 8), 'mode:', groupMode(group), 'relays:', JSON.stringify(group.relays), 'members:', group.members.length)
+    if (import.meta.env.DEV) console.warn('[canary:boot]   group', group.id.slice(0, 8), 'mode:', groupMode(group), 'relays:', JSON.stringify(group.relays), 'members:', group.members.length)
     for (const relay of group.relays) {
       allRelays.add(relay)
     }

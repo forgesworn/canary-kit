@@ -63,7 +63,7 @@ export function createNewGroup(name: string, preset: PresetName, memberPubkey?: 
   const PRESET_ENCODING: Record<string, 'words' | 'pin' | 'hex'> = {
     family: 'words',
     'field-ops': 'words',
-    enterprise: 'pin',
+    enterprise: 'words',
     event: 'pin',
   }
 

@@ -4,6 +4,7 @@ import { getState, updateGroup } from '../state.js'
 import { broadcastAction } from '../sync.js'
 import { deriveBeaconKey, encryptBeacon } from 'canary-kit'
 import { encode, decode, precisionToRadius } from 'geohash-kit'
+import { getCachedName, getCachedProfile } from '../nostr/profiles.js'
 
 let map: any = null
 let maplibregl: typeof import('maplibre-gl') | null = null
@@ -372,17 +373,20 @@ function updateMapMarker(pubkey: string, lat: number, lon: number): void {
   const isDuress = duressMembers.has(pubkey)
 
   const name = resolveName(pubkey)
-  const size = isDuress ? 20 : 16
+  const profile = getCachedProfile(pubkey)
+  const hasPicture = !!profile?.picture
+  const size = isDuress ? 40 : 32
 
   if (markers[pubkey]) {
     markers[pubkey].setLngLat([lon, lat])
     const wrapper = markers[pubkey].getElement()
     const dot = wrapper.querySelector('.beacon-dot') as HTMLElement
     if (dot) {
-      dot.style.background = colour
+      if (!hasPicture) dot.style.background = colour
       dot.style.width = `${size}px`
       dot.style.height = `${size}px`
-      dot.style.boxShadow = `0 0 8px ${colour}80`
+      dot.style.borderColor = colour
+      dot.style.boxShadow = `0 0 10px ${colour}80`
       dot.style.animation = isDuress ? 'beacon-pulse 1s ease-in-out infinite' : 'none'
     }
     const label = wrapper.querySelector('.beacon-label') as HTMLElement
@@ -394,14 +398,21 @@ function updateMapMarker(pubkey: string, lat: number, lon: number): void {
     wrapper.style.alignItems = 'center'
     wrapper.style.pointerEvents = 'none'
 
-    const dot = document.createElement('div')
+    let dot: HTMLElement
+    if (hasPicture) {
+      dot = document.createElement('img')
+      ;(dot as HTMLImageElement).src = profile!.picture!
+      dot.style.objectFit = 'cover'
+    } else {
+      dot = document.createElement('div')
+      dot.style.background = colour
+    }
     dot.className = 'beacon-dot'
     dot.style.width = `${size}px`
     dot.style.height = `${size}px`
     dot.style.borderRadius = '50%'
-    dot.style.background = colour
-    dot.style.border = '2px solid #0a0e17'
-    dot.style.boxShadow = `0 0 8px ${colour}80`
+    dot.style.border = `3px solid ${colour}`
+    dot.style.boxShadow = `0 0 10px ${colour}80`
     dot.style.zIndex = '2'
     if (isDuress) dot.style.animation = 'beacon-pulse 1s ease-in-out infinite'
     wrapper.appendChild(dot)
@@ -440,9 +451,17 @@ function fitMapToMarkers(): void {
 
 function resolveName(pubkey: string): string {
   const { groups, activeGroupId, identity } = getState()
-  if (identity?.pubkey === pubkey) return 'You'
   const group = activeGroupId ? groups[activeGroupId] : null
-  return group?.memberNames?.[pubkey] ?? `${pubkey.slice(0, 8)}\u2026`
+  const isSelf = identity?.pubkey === pubkey
+
+  let name: string | undefined
+  const mn = group?.memberNames?.[pubkey]
+  if (mn && mn !== 'You') name = mn
+  if (!name) name = getCachedName(pubkey)
+
+  if (isSelf) return name ? `${name} (you)` : 'You'
+  if (name) return name
+  return `${pubkey.slice(0, 8)}\u2026`
 }
 
 function updateBeaconList(): void {
@@ -452,11 +471,15 @@ function updateBeaconList(): void {
   const entries = Object.entries(positions).map(([pk, pos]) => {
     const colour = memberColour(pk)
     const name = resolveName(pk)
+    const prof = getCachedProfile(pk)
     const age = Math.floor(Date.now() / 1000) - pos.timestamp
     const ageLabel = age < 60 ? 'just now' : age < 3600 ? `${Math.floor(age / 60)}m ago` : `${Math.floor(age / 3600)}h ago`
+    const dotHtml = prof?.picture
+      ? `<img src="${prof.picture}" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid ${colour};" />`
+      : `<span style="width:8px;height:8px;border-radius:50%;background:${colour};flex-shrink:0;"></span>`
     return `
       <div class="beacon-entry" style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0;">
-        <span style="width:8px;height:8px;border-radius:50%;background:${colour};flex-shrink:0;"></span>
+        ${dotHtml}
         <span class="beacon-member" style="font-weight:500;">${name}</span>
         <span class="beacon-geohash" style="color:var(--text-muted);font-size:0.8rem;">${pos.geohash}</span>
         <span style="color:var(--text-muted);font-size:0.75rem;margin-left:auto;">${ageLabel}</span>
@@ -531,7 +554,7 @@ export function sendLocationPing(): void {
   // Also fire a single high-priority position request for immediate feedback
   navigator.geolocation.getCurrentPosition(
     async (pos) => {
-      console.info('[canary:beacon] getCurrentPosition success', { lat: pos.coords.latitude, lon: pos.coords.longitude, map: !!map, mapReady })
+      if (import.meta.env.DEV) console.info('[canary:beacon] getCurrentPosition success', { map: !!map, mapReady })
 
       const geohash = encode(pos.coords.latitude, pos.coords.longitude, geohashPrecision)
       const center = decode(geohash)
@@ -542,7 +565,7 @@ export function sendLocationPing(): void {
       if (identity?.pubkey) {
         encryptedPayloads[identity.pubkey] = encrypted
         positions[identity.pubkey] = { lat, lon, geohash, precision: geohashPrecision, timestamp: Math.floor(Date.now() / 1000) }
-        console.info('[canary:beacon] position saved, updating map', { pubkey: identity.pubkey.slice(0, 8), lat, lon, map: !!map, mapReady, markerExists: !!markers[identity.pubkey] })
+        if (import.meta.env.DEV) console.info('[canary:beacon] position saved, updating map', { pubkey: identity.pubkey.slice(0, 8), map: !!map, mapReady, markerExists: !!markers[identity.pubkey] })
         updateMapMarker(identity.pubkey, lat, lon)
         refreshCircles()
         fitMapToMarkers()
@@ -585,7 +608,7 @@ export function handleIncomingBeacon(
   accuracy: number,
   timestamp: number,
 ): void {
-  console.info('[canary:beacon] handleIncomingBeacon', { pubkey: pubkey.slice(0, 8), lat, lon, accuracy, map: !!map, mapReady })
+  if (import.meta.env.DEV) console.info('[canary:beacon] handleIncomingBeacon', { pubkey: pubkey.slice(0, 8), accuracy, map: !!map, mapReady })
   // Estimate geohash precision from accuracy radius
   const precision = accuracyToPrecision(accuracy)
   const geohash = encode(lat, lon, precision)
