@@ -444,7 +444,7 @@ function addConfirmedMember(groupId: string, pubkey: string, displayName: string
   if (!group.members.includes(pubkey)) {
     // addGroupMember broadcasts member-join to the network and re-registers
     // the relay subscription so the new member's messages are accepted.
-    addGroupMember(groupId, pubkey)
+    addGroupMember(groupId, pubkey, displayName)
   }
 
   // Always update the display name (self-join via relay may have arrived

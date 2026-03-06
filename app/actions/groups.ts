@@ -187,7 +187,7 @@ export function compromiseReseed(id: string): void {
  * Add a member pubkey to the group.
  * Delegates validation to the SDK `addMember()` function.
  */
-export function addGroupMember(id: string, pubkey: string): void {
+export function addGroupMember(id: string, pubkey: string, displayName?: string): void {
   const { groups } = getState()
   const group = groups[id]
   if (!group) {
@@ -207,6 +207,7 @@ export function addGroupMember(id: string, pubkey: string): void {
   broadcastAction(id, {
     type: 'member-join',
     pubkey,
+    displayName: displayName || undefined,
     timestamp: Math.floor(Date.now() / 1000),
     epoch: group.epoch ?? 0,
     opId,

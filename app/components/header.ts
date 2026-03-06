@@ -101,7 +101,20 @@ export function renderHeader(container: HTMLElement): void {
     const tab = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-view]')
     if (!tab) return
     const targetView = tab.dataset.view as 'groups' | 'call-demo'
-    if (targetView && targetView !== getState().view) {
+    if (!targetView) return
+
+    // On mobile, the Groups tab also toggles the sidebar
+    if (targetView === 'groups' && window.innerWidth <= 768) {
+      const sidebar = document.getElementById('sidebar')
+      const overlay = document.getElementById('sidebar-overlay')
+      if (sidebar && overlay) {
+        const isOpen = sidebar.classList.contains('sidebar--open')
+        sidebar.classList.toggle('sidebar--open', !isOpen)
+        overlay.classList.toggle('sidebar-overlay--visible', !isOpen)
+      }
+    }
+
+    if (targetView !== getState().view) {
       update({ view: targetView })
     }
   })

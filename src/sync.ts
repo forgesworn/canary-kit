@@ -10,7 +10,7 @@ import { addMember, removeMember } from './group.js'
 
 /** A typed, serialisable description of a group state change. */
 export type SyncMessage =
-  | { type: 'member-join'; pubkey: string; timestamp: number; epoch: number; opId: string; protocolVersion?: number }
+  | { type: 'member-join'; pubkey: string; displayName?: string; timestamp: number; epoch: number; opId: string; protocolVersion?: number }
   | { type: 'member-leave'; pubkey: string; timestamp: number; epoch: number; opId: string; protocolVersion?: number }
   | { type: 'counter-advance'; counter: number; usageOffset: number; timestamp: number; protocolVersion?: number }
   | { type: 'reseed'; seed: Uint8Array; counter: number; timestamp: number; epoch: number; opId: string; admins: string[]; members: string[]; protocolVersion?: number }
@@ -396,7 +396,10 @@ export function applySyncMessage(
     case 'member-join': {
       const updated = addMember(group, msg.pubkey)
       const ops = appendConsumedOp(updated.consumedOps, msg.opId, msg.timestamp, group.consumedOpsFloor)
-      return { ...updated, ...ops }
+      const names = msg.displayName
+        ? { memberNames: { ...(updated as any).memberNames, [msg.pubkey]: msg.displayName } }
+        : {}
+      return { ...updated, ...ops, ...names }
     }
 
     case 'member-leave':
