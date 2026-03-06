@@ -27,6 +27,10 @@ export default defineConfig({
       name: 'protocol',
       testDir: './protocol',
     },
+    {
+      name: 'hybrid',
+      testDir: './hybrid',
+    },
   ],
 
   use: {
