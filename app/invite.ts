@@ -520,3 +520,54 @@ export function verifyJoinToken(
     word: raw.w || '',
   }
 }
+
+// ── Invite Session ────────────────────────────────────────────
+
+export interface InviteSession {
+  groupId: string
+  payload: string
+  confirmCode: string
+  nonce: string
+  joinCount: number
+}
+
+let _activeSession: InviteSession | null = null
+
+/**
+ * Start an invite session for the given group.
+ * Generates a fresh invite and tracks it as the active session.
+ */
+export function startInviteSession(group: AppGroup): InviteSession {
+  const { payload, confirmCode } = createInvite(group)
+  const decoded: InvitePayload = JSON.parse(atob(payload))
+  _activeSession = {
+    groupId: group.id,
+    payload,
+    confirmCode,
+    nonce: decoded.nonce,
+    joinCount: 0,
+  }
+  return _activeSession
+}
+
+/**
+ * Rotate the current session: generate a new invite with a fresh nonce.
+ * Returns the updated session, or null if no session is active.
+ */
+export function rotateInviteSession(group: AppGroup): InviteSession | null {
+  if (!_activeSession || _activeSession.groupId !== group.id) return null
+  const prev = _activeSession
+  const session = startInviteSession(group)
+  session.joinCount = prev.joinCount + 1
+  return session
+}
+
+/** Get the current active session, or null. */
+export function getInviteSession(): InviteSession | null {
+  return _activeSession
+}
+
+/** End the active invite session. */
+export function endInviteSession(): void {
+  _activeSession = null
+}
