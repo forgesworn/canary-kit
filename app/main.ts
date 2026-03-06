@@ -34,7 +34,7 @@ import { renderLiveness } from './panels/liveness.js'
 import { renderSettings } from './panels/settings.js'
 import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
 import { showCallVerify } from './components/call-verify.js'
-import { acceptInvite, createInvite, createJoinToken, isInviteConsumed } from './invite.js'
+import { acceptInvite, createJoinToken, isInviteConsumed } from './invite.js'
 import { resolveSigner, hasNip07 } from './nostr/signer.js'
 import { DEMO_ACCOUNTS } from './demo-accounts.js'
 import { decode as nip19decode } from 'nostr-tools/nip19'
@@ -813,8 +813,7 @@ function wireGlobalEvents(): void {
     const { groups } = getState()
     const group = groups[groupId]
     if (!group) return
-    const { payload, confirmCode } = createInvite(group)
-    showInviteModal(payload, confirmCode)
+    showInviteModal(group)
   })
 
   document.addEventListener('canary:confirm-member', (evt) => {

@@ -2,7 +2,11 @@
 
 import { getState, updateGroup } from '../state.js'
 import { removeGroupMember } from '../actions/groups.js'
-import { createInvite, verifyJoinToken } from '../invite.js'
+import {
+  verifyJoinToken,
+  startInviteSession, rotateInviteSession, endInviteSession,
+} from '../invite.js'
+import { groupMode } from '../types.js'
 import { generateQR } from '../components/qr.js'
 import { escapeHtml } from '../utils/escape.js'
 import { showModal } from '../components/modal.js'
@@ -57,15 +61,23 @@ interface InviteModalOptions {
   hashPrefix?: string
 }
 
-export function showInviteModal(payload: string, confirmCode: string, options?: InviteModalOptions): void {
+export function showInviteModal(group: import('../types.js').AppGroup, options?: InviteModalOptions): void {
   const title = options?.title ?? 'Invite to Group'
   const scanHint = options?.scanHint ?? 'Scan with your phone camera to join'
   const showConfirmMemberNote = options?.showConfirmMemberNote ?? true
 
-  const base = window.location.href.split('#')[0]
-  const prefix = options?.hashPrefix ?? 'join'
-  const joinUrl = `${base}#${prefix}/${encodeURIComponent(payload)}`
-  const svgMarkup = generateQR(joinUrl)
+  const isOnline = groupMode(group) === 'online'
+  let session = startInviteSession(group)
+
+  function currentScanUrl(): string {
+    const base = window.location.href.split('#')[0]
+    return `${base}#scan/${encodeURIComponent(session.payload)}`
+  }
+  function currentLinkUrl(): string {
+    const base = window.location.href.split('#')[0]
+    const prefix = options?.hashPrefix ?? 'join'
+    return `${base}#${prefix}/${encodeURIComponent(session.payload)}`
+  }
 
   let dialog = document.getElementById('invite-modal') as HTMLDialogElement | null
   if (!dialog) {
@@ -75,11 +87,11 @@ export function showInviteModal(payload: string, confirmCode: string, options?: 
     document.body.appendChild(dialog)
     // Attach backdrop-close once — never leaks handlers on innerHTML replacement
     dialog.addEventListener('click', (e) => {
-      if (e.target === dialog) dialog!.close()
+      if (e.target === dialog) { endInviteSession(); dialog!.close() }
     })
   }
 
-  dialog.dataset.payload = payload
+  dialog.dataset.payload = session.payload
 
   // ── Inner renderers ──────────────────────────────────────
   const d = dialog // stable reference for closures
@@ -102,16 +114,26 @@ export function showInviteModal(payload: string, confirmCode: string, options?: 
     `
     d.querySelector<HTMLButtonElement>('#invite-qr-path')?.addEventListener('click', renderQRPath)
     d.querySelector<HTMLButtonElement>('#invite-link-path')?.addEventListener('click', renderLinkPath)
-    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => d.close())
+    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => { endInviteSession(); d.close() })
   }
 
   function renderQRPath(): void {
+    const svgMarkup = generateQR(currentScanUrl())
+    const joinCountHtml = session.joinCount > 0
+      ? `<p class="invite-hint" style="color: var(--success);">${session.joinCount} joined so far</p>`
+      : ''
+    const actionHtml = isOnline
+      ? '<p class="invite-hint" id="invite-waiting-status">Waiting for scan...</p>'
+      : '<button class="btn" id="invite-next-btn" type="button">Next</button>'
+
     d.innerHTML = `
       <div class="modal__form invite-share">
         <h2 class="modal__title">${escapeHtml(title)}</h2>
 
         <div class="qr-container">${svgMarkup}</div>
         <p class="invite-hint">${escapeHtml(scanHint)}</p>
+        ${joinCountHtml}
+        ${actionHtml}
 
         <div class="modal__actions" style="gap: 0.5rem;">
           <button class="btn" id="invite-back-btn" type="button">Back</button>
@@ -119,18 +141,53 @@ export function showInviteModal(payload: string, confirmCode: string, options?: 
         </div>
       </div>
     `
-    d.querySelector<HTMLButtonElement>('#invite-back-btn')?.addEventListener('click', renderChooser)
-    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => d.close())
+
+    // Offline: "Next" rotates to a fresh invite for the next person
+    d.querySelector<HTMLButtonElement>('#invite-next-btn')?.addEventListener('click', () => {
+      const currentGroup = getState().groups[group.id]
+      if (currentGroup) {
+        const rotated = rotateInviteSession(currentGroup)
+        if (rotated) {
+          session = rotated
+          d.dataset.payload = session.payload
+          renderQRPath()
+        }
+      }
+    })
+
+    // Online: listen for member-joined events to auto-rotate
+    const joinHandler = (evt: Event) => {
+      const detail = (evt as CustomEvent).detail
+      if (detail.groupId !== group.id) return
+      showToast(`${detail.name} joined`, 'success')
+      const currentGroup = getState().groups[group.id]
+      if (currentGroup) {
+        const rotated = rotateInviteSession(currentGroup)
+        if (rotated) {
+          session = rotated
+          d.dataset.payload = session.payload
+          renderQRPath()
+        }
+      }
+    }
+    if (isOnline) {
+      document.addEventListener('canary:member-joined', joinHandler)
+    }
+    const removeJoinHandler = () => document.removeEventListener('canary:member-joined', joinHandler)
+
+    d.querySelector<HTMLButtonElement>('#invite-back-btn')?.addEventListener('click', () => { removeJoinHandler(); renderChooser() })
+    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => { removeJoinHandler(); endInviteSession(); d.close() })
   }
 
   function renderLinkPath(): void {
+    const linkUrl = currentLinkUrl()
     d.innerHTML = `
       <div class="modal__form invite-share">
         <h2 class="modal__title">${escapeHtml(title)}</h2>
 
         <div class="confirm-code">
           <span class="confirm-code__label">Confirmation words</span>
-          <span class="confirm-code__value">${confirmCode}</span>
+          <span class="confirm-code__value">${session.confirmCode}</span>
         </div>
         <p class="invite-hint">Read these words to the recipient on a phone call — they'll need them to join</p>
 
@@ -152,12 +209,12 @@ export function showInviteModal(payload: string, confirmCode: string, options?: 
       </div>
     `
     d.querySelector<HTMLButtonElement>('#invite-back-btn')?.addEventListener('click', renderChooser)
-    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => d.close())
+    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => { endInviteSession(); d.close() })
 
     d.querySelector<HTMLButtonElement>('#invite-copy-link')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget as HTMLButtonElement
       try {
-        await navigator.clipboard.writeText(joinUrl)
+        await navigator.clipboard.writeText(linkUrl)
         btn.textContent = 'Link Copied!'
         btn.classList.add('btn--copied')
         setTimeout(() => { btn.textContent = 'Copy Link'; btn.classList.remove('btn--copied') }, 2000)
@@ -167,7 +224,7 @@ export function showInviteModal(payload: string, confirmCode: string, options?: 
     d.querySelector<HTMLButtonElement>('#invite-copy-text')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget as HTMLButtonElement
       try {
-        await navigator.clipboard.writeText(payload)
+        await navigator.clipboard.writeText(session.payload)
         btn.textContent = 'Text Copied!'
         btn.classList.add('btn--copied')
         setTimeout(() => { btn.textContent = 'Copy Invite Text'; btn.classList.remove('btn--copied') }, 2000)
@@ -184,8 +241,8 @@ export function showInviteModal(payload: string, confirmCode: string, options?: 
  * Open the share-state modal — a thin wrapper around showInviteModal
  * with copy tailored for syncing existing members after rekey/membership changes.
  */
-export function showShareStateModal(payload: string, confirmCode: string): void {
-  showInviteModal(payload, confirmCode, {
+export function showShareStateModal(group: import('../types.js').AppGroup): void {
+  showInviteModal(group, {
     title: 'Share Group State',
     scanHint: 'Share with existing members to sync the latest group state.',
     showConfirmMemberNote: false,
@@ -277,8 +334,7 @@ export function renderMembers(container: HTMLElement): void {
     const { groups: updatedGroups } = getState()
     const updatedGroup = updatedGroups[currentGroupId]
     if (updatedGroup && updatedGroup.members.length > 0) {
-      const { payload, confirmCode } = createInvite(updatedGroup)
-      showShareStateModal(payload, confirmCode)
+      showShareStateModal(updatedGroup)
     }
   })
 
@@ -290,8 +346,7 @@ export function renderMembers(container: HTMLElement): void {
     const currentGroup = currentGroups[currentGroupId]
     if (!currentGroup) return
 
-    const { payload, confirmCode } = createInvite(currentGroup)
-    showInviteModal(payload, confirmCode)
+    showInviteModal(currentGroup)
   })
 
   // ── Share state button ──────────────────────────────────────
@@ -302,8 +357,7 @@ export function renderMembers(container: HTMLElement): void {
     const currentGroup = currentGroups[currentGroupId]
     if (!currentGroup) return
 
-    const { payload, confirmCode } = createInvite(currentGroup)
-    showShareStateModal(payload, confirmCode)
+    showShareStateModal(currentGroup)
   })
 
   // ── Confirm member button ──────────────────────────────────────

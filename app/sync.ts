@@ -245,6 +245,18 @@ export function subscribeToGroup(groupId: string): void {
       reRegisterGroup(groupId)
     }
 
+    // Dispatch custom event so the invite modal can react to new members
+    if (msg.type === 'member-join' && updated !== group) {
+      const joinerName = msg.pubkey
+        ? (updated.memberNames?.[msg.pubkey] ?? sender?.slice(0, 8) ?? 'Someone')
+        : 'Someone'
+      document.dispatchEvent(
+        new CustomEvent('canary:member-joined', {
+          detail: { groupId, pubkey: msg.pubkey, name: joinerName },
+        }),
+      )
+    }
+
     // Toast notifications for important sync events
     if (msg.type === 'member-join') {
       showToast('New member joined the group', 'success')
