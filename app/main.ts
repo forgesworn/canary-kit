@@ -160,7 +160,7 @@ function showLockScreen(): void {
       if (header) renderHeader(header)
       wireSidebarToggle()
       render()
-      subscribe(render)
+      subscribe(scheduleRender)
       startAutoLock()
       wireGlobalEvents()
       // Must come AFTER wireGlobalEvents so the 'canary:join-group' listener is registered
@@ -281,6 +281,16 @@ function wireSidebarToggle(): void {
 // ── Render loop ────────────────────────────────────────────────
 
 /** Re-render all reactive components from current state. */
+let _renderPending = false
+function scheduleRender(): void {
+  if (_renderPending) return
+  _renderPending = true
+  requestAnimationFrame(() => {
+    _renderPending = false
+    render()
+  })
+}
+
 function render(): void {
   const { view } = getState()
 
@@ -687,7 +697,7 @@ async function applyInvite(data: ReturnType<typeof acceptInvite>, myName: string
       broadcastAction(id, {
         type: 'member-join',
         pubkey: identity.pubkey,
-        displayName: myName || identity.displayName || undefined,
+        displayName: myName || (identity.displayName && identity.displayName !== 'You' ? identity.displayName : undefined),
         timestamp: Math.floor(Date.now() / 1000),
         epoch: data.epoch,
         opId: crypto.randomUUID(),
@@ -1207,7 +1217,7 @@ async function bootApp(): Promise<void> {
 
   wireSidebarToggle()
   render()
-  subscribe(render)
+  subscribe(scheduleRender)
   wireGlobalEvents()
 
   // Must come AFTER wireGlobalEvents so the 'canary:join-group' listener is registered
