@@ -319,16 +319,13 @@ export function showShareStateModal(group: import('../types.js').AppGroup): void
   })
 }
 
-// ── Member detail popover ──────────────────────────────────────
+// ── Member detail modal ───────────────────────────────────────
 
-function showMemberDetail(pubkey: string, anchor: HTMLElement, groupId: string): void {
-  // Remove any existing popover
-  document.getElementById('member-detail-popover')?.remove()
-
+function showMemberDetail(pubkey: string, groupId: string): void {
   const { identity, groups } = getState()
   const group = groups[groupId]
   const isYou = identity?.pubkey === pubkey
-  const isAdmin = group?.admins.includes(pubkey) ?? false
+  const isAdminUser = group?.admins.includes(pubkey) ?? false
   const displayName = formatPubkey(pubkey, group?.members ?? [], groupId)
   const profileName = getCachedName(pubkey)
   const demoName = _demoNameByPubkey.get(pubkey)
@@ -343,56 +340,56 @@ function showMemberDetail(pubkey: string, anchor: HTMLElement, groupId: string):
     else livenessLabel = `${Math.floor(elapsed / 3600)}h ago`
   }
 
-  const popover = document.createElement('div')
-  popover.id = 'member-detail-popover'
-  popover.className = 'member-detail-popover'
-  popover.innerHTML = `
-    <div class="member-detail-popover__header">
-      <strong>${escapeHtml(displayName)}</strong>
-      ${isYou ? '<span class="member-detail-popover__badge">You</span>' : ''}
-      ${isAdmin ? '<span class="member-detail-popover__badge member-detail-popover__badge--admin">Admin</span>' : ''}
-    </div>
-    <div class="member-detail-popover__row">
-      <span class="member-detail-popover__label">Pubkey</span>
-      <span class="member-detail-popover__value" title="${escapeHtml(pubkey)}">${escapeHtml(pubkey.slice(0, 12))}…${escapeHtml(pubkey.slice(-8))}</span>
-    </div>
-    ${profileName ? `<div class="member-detail-popover__row">
-      <span class="member-detail-popover__label">Nostr profile</span>
-      <span class="member-detail-popover__value">${escapeHtml(profileName)}</span>
-    </div>` : ''}
-    ${memberName && memberName !== 'You' ? `<div class="member-detail-popover__row">
-      <span class="member-detail-popover__label">Display name</span>
-      <span class="member-detail-popover__value">${escapeHtml(memberName)}</span>
-    </div>` : ''}
-    ${demoName ? `<div class="member-detail-popover__row">
-      <span class="member-detail-popover__label">Demo account</span>
-      <span class="member-detail-popover__value">${escapeHtml(demoName)}</span>
-    </div>` : ''}
-    <div class="member-detail-popover__row">
-      <span class="member-detail-popover__label">Liveness</span>
-      <span class="member-detail-popover__value">${livenessLabel}</span>
-    </div>
-    <button class="btn btn--sm member-detail-popover__copy" type="button">Copy Pubkey</button>
-  `
+  const badges = [
+    isYou ? '<span class="member-detail__badge">You</span>' : '',
+    isAdminUser ? '<span class="member-detail__badge member-detail__badge--admin">Admin</span>' : '',
+  ].filter(Boolean).join(' ')
 
-  anchor.closest('.member-item')?.appendChild(popover)
+  const rows = [
+    `<div class="member-detail__row">
+      <span class="member-detail__label">Pubkey</span>
+      <span class="member-detail__value" title="${escapeHtml(pubkey)}">${escapeHtml(pubkey.slice(0, 16))}…${escapeHtml(pubkey.slice(-8))}</span>
+    </div>`,
+    profileName ? `<div class="member-detail__row">
+      <span class="member-detail__label">Nostr profile</span>
+      <span class="member-detail__value">${escapeHtml(profileName)}</span>
+    </div>` : '',
+    memberName && memberName !== 'You' && memberName !== profileName ? `<div class="member-detail__row">
+      <span class="member-detail__label">Display name</span>
+      <span class="member-detail__value">${escapeHtml(memberName)}</span>
+    </div>` : '',
+    demoName ? `<div class="member-detail__row">
+      <span class="member-detail__label">Demo account</span>
+      <span class="member-detail__value">${escapeHtml(demoName)}</span>
+    </div>` : '',
+    `<div class="member-detail__row">
+      <span class="member-detail__label">Liveness</span>
+      <span class="member-detail__value">${livenessLabel}</span>
+    </div>`,
+  ].filter(Boolean).join('')
 
-  popover.querySelector('.member-detail-popover__copy')?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(pubkey)
-      const btn = popover.querySelector('.member-detail-popover__copy') as HTMLButtonElement
-      btn.textContent = 'Copied!'
-      setTimeout(() => { btn.textContent = 'Copy Pubkey' }, 1500)
-    } catch { /* clipboard blocked */ }
+  showModal(`
+    <h2 class="modal__title">${escapeHtml(displayName)} ${badges}</h2>
+    <div class="member-detail__rows">${rows}</div>
+    <div class="modal__actions">
+      <button class="btn btn--sm" id="member-detail-copy" type="button">Copy Pubkey</button>
+      <button class="btn" id="modal-cancel-btn" type="button">Close</button>
+    </div>
+  `, () => { /* no-op submit */ })
+
+  requestAnimationFrame(() => {
+    document.getElementById('member-detail-copy')?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(pubkey)
+        const btn = document.getElementById('member-detail-copy') as HTMLButtonElement
+        btn.textContent = 'Copied!'
+        setTimeout(() => { btn.textContent = 'Copy Pubkey' }, 1500)
+      } catch { /* clipboard blocked */ }
+    })
+    document.getElementById('modal-cancel-btn')?.addEventListener('click', () => {
+      (document.getElementById('app-modal') as HTMLDialogElement)?.close()
+    })
   })
-
-  const close = (e: MouseEvent) => {
-    if (!popover.contains(e.target as Node) && e.target !== anchor) {
-      popover.remove()
-      document.removeEventListener('click', close)
-    }
-  }
-  requestAnimationFrame(() => document.addEventListener('click', close))
 }
 
 // ── Render ─────────────────────────────────────────────────────
@@ -466,7 +463,7 @@ export function renderMembers(container: HTMLElement): void {
     btn.addEventListener('click', () => {
       const pubkey = btn.dataset.pubkey
       if (!pubkey) return
-      showMemberDetail(pubkey, btn, activeGroupId)
+      showMemberDetail(pubkey, activeGroupId)
     })
   })
 
