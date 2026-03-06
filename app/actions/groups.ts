@@ -60,12 +60,19 @@ export function createNewGroup(name: string, preset: PresetName, memberPubkey?: 
 
   const relays = [...getState().settings.defaultRelays]
 
+  const PRESET_ENCODING: Record<string, 'words' | 'pin' | 'hex'> = {
+    family: 'words',
+    'field-ops': 'words',
+    enterprise: 'pin',
+    event: 'pin',
+  }
+
   const appGroup: AppGroup = {
     ...sdkGroup,
     id,
     nostrEnabled: relays.length > 0,
     relays,
-    encodingFormat: 'words',
+    encodingFormat: PRESET_ENCODING[preset] ?? 'words',
     usedInvites: [],
     latestInviteIssuedAt: 0,
     livenessInterval: sdkGroup.rotationInterval,
