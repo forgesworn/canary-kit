@@ -3,11 +3,16 @@
 import { getPool } from './connect.js'
 import { getState, updateGroup } from '../state.js'
 
-interface NostrProfile {
+export interface NostrProfile {
   name?: string
   display_name?: string
   picture?: string
   about?: string
+  nip05?: string
+  lud16?: string
+  lud06?: string
+  website?: string
+  banner?: string
 }
 
 /** In-memory cache: pubkey → profile. Survives re-renders but not page reload. */
@@ -28,6 +33,11 @@ export function getCachedName(pubkey: string): string | undefined {
   const profile = _cache.get(pubkey)
   if (!profile) return undefined
   return profile.display_name || profile.name || undefined
+}
+
+/** Get the full cached profile for a pubkey, or undefined if not yet fetched. */
+export function getCachedProfile(pubkey: string): NostrProfile | undefined {
+  return _cache.get(pubkey)
 }
 
 /**

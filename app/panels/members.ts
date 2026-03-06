@@ -13,7 +13,7 @@ import { showModal } from '../components/modal.js'
 import { showToast } from '../components/toast.js'
 import { deriveToken } from 'canary-kit/token'
 import { GROUP_CONTEXT, toTokenEncoding } from '../utils/encoding.js'
-import { fetchProfiles, getCachedName } from '../nostr/profiles.js'
+import { fetchProfiles, getCachedName, getCachedProfile } from '../nostr/profiles.js'
 import { DEMO_ACCOUNTS } from '../demo-accounts.js'
 
 /** Quick lookup: pubkey → demo account name (compile-time, no relay needed). */
@@ -327,7 +327,7 @@ function showMemberDetail(pubkey: string, groupId: string): void {
   const isYou = identity?.pubkey === pubkey
   const isAdminUser = group?.admins.includes(pubkey) ?? false
   const displayName = formatPubkey(pubkey, group?.members ?? [], groupId)
-  const profileName = getCachedName(pubkey)
+  const profile = getCachedProfile(pubkey)
   const demoName = _demoNameByPubkey.get(pubkey)
   const memberName = group?.memberNames?.[pubkey]
 
@@ -345,32 +345,41 @@ function showMemberDetail(pubkey: string, groupId: string): void {
     isAdminUser ? '<span class="member-detail__badge member-detail__badge--admin">Admin</span>' : '',
   ].filter(Boolean).join(' ')
 
-  const rows = [
-    `<div class="member-detail__row">
-      <span class="member-detail__label">Pubkey</span>
-      <span class="member-detail__value" title="${escapeHtml(pubkey)}">${escapeHtml(pubkey.slice(0, 16))}…${escapeHtml(pubkey.slice(-8))}</span>
-    </div>`,
-    profileName ? `<div class="member-detail__row">
-      <span class="member-detail__label">Nostr profile</span>
-      <span class="member-detail__value">${escapeHtml(profileName)}</span>
-    </div>` : '',
-    memberName && memberName !== 'You' && memberName !== profileName ? `<div class="member-detail__row">
-      <span class="member-detail__label">Display name</span>
-      <span class="member-detail__value">${escapeHtml(memberName)}</span>
-    </div>` : '',
-    demoName ? `<div class="member-detail__row">
-      <span class="member-detail__label">Demo account</span>
-      <span class="member-detail__value">${escapeHtml(demoName)}</span>
-    </div>` : '',
-    `<div class="member-detail__row">
-      <span class="member-detail__label">Liveness</span>
-      <span class="member-detail__value">${livenessLabel}</span>
-    </div>`,
-  ].filter(Boolean).join('')
+  const profileName = profile?.display_name || profile?.name
+
+  // Build detail rows
+  const row = (label: string, value: string) =>
+    `<div class="member-detail__row"><span class="member-detail__label">${label}</span><span class="member-detail__value">${escapeHtml(value)}</span></div>`
+
+  const rows: string[] = [
+    row('Pubkey', `${pubkey.slice(0, 16)}…${pubkey.slice(-8)}`),
+  ]
+
+  if (profileName) rows.push(row('Nostr name', profileName))
+  if (profile?.nip05) rows.push(row('NIP-05', profile.nip05))
+  if (profile?.about) rows.push(row('About', profile.about.length > 80 ? profile.about.slice(0, 80) + '…' : profile.about))
+  if (profile?.lud16) rows.push(row('Lightning', profile.lud16))
+  if (profile?.website) rows.push(row('Website', profile.website))
+  if (memberName && memberName !== 'You' && memberName !== profileName) rows.push(row('Display name', memberName))
+  if (demoName) rows.push(row('Demo account', demoName))
+  rows.push(row('Liveness', livenessLabel))
+
+  if (!profile && !demoName) {
+    rows.push(`<div class="member-detail__row"><span class="member-detail__label" style="color: var(--text-muted); font-style: italic;">No Nostr profile found on relay</span></div>`)
+  }
+
+  const avatarHtml = profile?.picture
+    ? `<img class="member-detail__avatar" src="${escapeHtml(profile.picture)}" alt="" />`
+    : ''
 
   showModal(`
-    <h2 class="modal__title">${escapeHtml(displayName)} ${badges}</h2>
-    <div class="member-detail__rows">${rows}</div>
+    <div class="member-detail__header">
+      ${avatarHtml}
+      <div>
+        <h2 class="modal__title" style="margin:0;">${escapeHtml(displayName)} ${badges}</h2>
+      </div>
+    </div>
+    <div class="member-detail__rows">${rows.join('')}</div>
     <div class="modal__actions">
       <button class="btn btn--sm" id="member-detail-copy" type="button">Copy Pubkey</button>
       <button class="btn" id="modal-cancel-btn" type="button">Close</button>

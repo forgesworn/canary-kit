@@ -931,6 +931,22 @@ select.input option {
 
 /* ── Member detail (inside modal) ───────────────────────── */
 
+.member-detail__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.member-detail__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+}
+
 .member-detail__rows {
   display: flex;
   flex-direction: column;
