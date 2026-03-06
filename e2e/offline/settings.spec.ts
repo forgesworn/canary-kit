@@ -148,4 +148,162 @@ test.describe('Settings panel', () => {
     // Drawer should still be open after re-render
     await expect(page.locator('#settings-body')).toBeVisible()
   })
+
+  // ── Export / Import ──────────────────────────────────────────
+
+  test('export group triggers download with correct filename', async ({ cleanPage: page }) => {
+    await openSettings(page)
+
+    page.on('dialog', async dialog => await dialog.accept())
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('#export-btn'),
+    ])
+
+    expect(download.suggestedFilename()).toBe('canary-test.json')
+
+    // Verify the downloaded content is valid group JSON
+    const path = await download.path()
+    if (path) {
+      const fs = await import('fs')
+      const content = JSON.parse(fs.readFileSync(path, 'utf-8'))
+      expect(content.name).toBe('Test')
+      expect(content.seed).toMatch(/^[0-9a-f]{64}$/)
+      expect(content.members).toBeInstanceOf(Array)
+    }
+  })
+
+  test('import group creates new group from exported JSON', async ({ cleanPage: page }) => {
+    await openSettings(page)
+
+    // First export the current group to get valid JSON
+    page.on('dialog', async dialog => await dialog.accept())
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('#export-btn'),
+    ])
+    const dlPath = await download.path()
+    const fs = await import('fs')
+    const exportedJson = dlPath ? fs.readFileSync(dlPath, 'utf-8') : ''
+    expect(exportedJson).toBeTruthy()
+
+    // Modify the name so we can distinguish the import
+    const modified = JSON.parse(exportedJson)
+    modified.name = 'Imported Group'
+
+    const os = await import('os')
+    const pathMod = await import('path')
+    const tmpFile = pathMod.join(os.tmpdir(), 'canary-import-test.json')
+    fs.writeFileSync(tmpFile, JSON.stringify(modified))
+
+    try {
+      // Click import — triggers confirm dialog (already accepted above) + file picker
+      const [fileChooser] = await Promise.all([
+        page.waitForEvent('filechooser'),
+        page.click('#import-btn'),
+      ])
+      await fileChooser.setFiles(tmpFile)
+
+      // Wait for the imported group to appear in sidebar
+      await page.waitForSelector('.group-list__name:has-text("Imported Group")', { timeout: 5000 })
+      const groups = await page.locator('.group-list__name').allTextContents()
+      expect(groups).toContain('Imported Group')
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
+  test('import rejects invalid JSON with alert', async ({ cleanPage: page }) => {
+    await openSettings(page)
+
+    let alertMessage = ''
+    page.on('dialog', async dialog => {
+      alertMessage = dialog.message()
+      await dialog.accept()
+    })
+
+    const fs = await import('fs')
+    const os = await import('os')
+    const pathMod = await import('path')
+    const tmpFile = pathMod.join(os.tmpdir(), 'canary-bad-import.json')
+    fs.writeFileSync(tmpFile, '{"name": "bad", "seed": "tooshort"}')
+
+    try {
+      const [fileChooser] = await Promise.all([
+        page.waitForEvent('filechooser'),
+        page.click('#import-btn'),
+      ])
+      await fileChooser.setFiles(tmpFile)
+      await page.waitForTimeout(500)
+
+      expect(alertMessage).toContain('import')
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
+  // ── Reseed / Key rotation ────────────────────────────────────
+
+  test('rotate key changes verification word', async ({ cleanPage: page }) => {
+    const wordBefore = await getDisplayedWord(page)
+    await openSettings(page)
+
+    page.on('dialog', async dialog => await dialog.accept())
+    await page.click('#reseed-btn')
+
+    // Toast should confirm
+    await expect(page.locator('.toast')).toContainText('Key rotated')
+
+    // Word should change (new seed)
+    const wordAfter = await getDisplayedWord(page)
+    expect(wordAfter).not.toBe(wordBefore)
+  })
+
+  test('rotate key bumps epoch', async ({ cleanPage: page }) => {
+    await openSettings(page)
+    await page.waitForTimeout(300)
+    const stateBefore = await getGroupState(page)
+
+    page.on('dialog', async dialog => await dialog.accept())
+    await page.click('#reseed-btn')
+    await page.waitForTimeout(300)
+
+    const stateAfter = await getGroupState(page)
+    expect(stateAfter.seed).not.toBe(stateBefore.seed)
+    expect(stateAfter.epoch).toBe(((stateBefore.epoch as number) ?? 0) + 1)
+  })
+
+  test('compromise reseed changes seed', async ({ cleanPage: page }) => {
+    await openSettings(page)
+    await page.waitForTimeout(300)
+    const stateBefore = await getGroupState(page)
+
+    page.on('dialog', async dialog => {
+      expect(dialog.message()).toContain('Compromise reseed')
+      await dialog.accept()
+    })
+    await page.click('#compromise-reseed-btn')
+
+    await expect(page.locator('.toast')).toContainText('Emergency reseed')
+    await page.waitForTimeout(300)
+
+    const stateAfter = await getGroupState(page)
+    expect(stateAfter.seed).not.toBe(stateBefore.seed)
+    expect(stateAfter.epoch).toBe(((stateBefore.epoch as number) ?? 0) + 1)
+  })
+
+  test('decline reseed keeps same seed', async ({ cleanPage: page }) => {
+    await openSettings(page)
+    await page.waitForTimeout(300)
+    const stateBefore = await getGroupState(page)
+
+    page.on('dialog', async dialog => await dialog.dismiss())
+    await page.click('#reseed-btn')
+    await page.waitForTimeout(300)
+
+    const stateAfter = await getGroupState(page)
+    expect(stateAfter.seed).toBe(stateBefore.seed)
+  })
 })
