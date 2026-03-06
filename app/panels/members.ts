@@ -73,67 +73,110 @@ export function showInviteModal(payload: string, confirmCode: string, options?: 
     dialog.id = 'invite-modal'
     dialog.className = 'modal'
     document.body.appendChild(dialog)
+    // Attach backdrop-close once — never leaks handlers on innerHTML replacement
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog!.close()
+    })
   }
 
   dialog.dataset.payload = payload
-  dialog.innerHTML = `
-    <div class="modal__form invite-share">
-      <h2 class="modal__title">${escapeHtml(title)}</h2>
 
-      <div class="qr-container">${svgMarkup}</div>
-      <p class="invite-hint">${escapeHtml(scanHint)}</p>
+  // ── Inner renderers ──────────────────────────────────────
+  const d = dialog // stable reference for closures
 
-      <div class="confirm-code">
-        <span class="confirm-code__label">Confirmation words</span>
-        <span class="confirm-code__value">${confirmCode}</span>
+  function renderChooser(): void {
+    d.innerHTML = `
+      <div class="modal__form invite-share">
+        <h2 class="modal__title">${escapeHtml(title)}</h2>
+        <p class="invite-hint">How are you sharing this?</p>
+
+        <div class="invite-share__actions" style="flex-direction: column; gap: 0.75rem;">
+          <button class="btn btn--primary" id="invite-qr-path" type="button">Scan QR &mdash; they're with me</button>
+          <button class="btn btn--primary" id="invite-link-path" type="button">Share Link &mdash; send it to them</button>
+        </div>
+
+        <div class="modal__actions">
+          <button class="btn" id="invite-close-btn" type="button">Cancel</button>
+        </div>
       </div>
-      <p class="invite-hint">Read these words to the recipient — they'll need them to join</p>
+    `
+    d.querySelector<HTMLButtonElement>('#invite-qr-path')?.addEventListener('click', renderQRPath)
+    d.querySelector<HTMLButtonElement>('#invite-link-path')?.addEventListener('click', renderLinkPath)
+    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => d.close())
+  }
 
-      <p class="invite-hint" style="color: var(--duress); font-weight: 500;">Share via a private channel — WhatsApp, Signal, or in person. The confirmation code verifies it wasn't tampered with.</p>
+  function renderQRPath(): void {
+    d.innerHTML = `
+      <div class="modal__form invite-share">
+        <h2 class="modal__title">${escapeHtml(title)}</h2>
 
-      <div class="invite-share__actions">
-        <button class="btn btn--primary" id="invite-copy-link" type="button">Copy Link</button>
-        <button class="btn" id="invite-copy-text" type="button">Copy Invite Text</button>
+        <div class="qr-container">${svgMarkup}</div>
+        <p class="invite-hint">${escapeHtml(scanHint)}</p>
+
+        <div class="modal__actions" style="gap: 0.5rem;">
+          <button class="btn" id="invite-back-btn" type="button">Back</button>
+          <button class="btn" id="invite-close-btn" type="button">Done</button>
+        </div>
       </div>
+    `
+    d.querySelector<HTMLButtonElement>('#invite-back-btn')?.addEventListener('click', renderChooser)
+    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => d.close())
+  }
 
-      <p class="invite-hint">Share via WhatsApp, Signal, email, or any messaging app</p>
+  function renderLinkPath(): void {
+    d.innerHTML = `
+      <div class="modal__form invite-share">
+        <h2 class="modal__title">${escapeHtml(title)}</h2>
 
-      ${showConfirmMemberNote ? `<p class="invite-hint" style="margin-top: 1rem; font-style: italic;">After they join, click <strong>Confirm Member</strong> to verify them — they'll give you a word or token.</p>` : ''}
+        <div class="confirm-code">
+          <span class="confirm-code__label">Confirmation words</span>
+          <span class="confirm-code__value">${confirmCode}</span>
+        </div>
+        <p class="invite-hint">Read these words to the recipient on a phone call — they'll need them to join</p>
 
-      <div class="modal__actions">
-        <button class="btn" id="invite-close-btn" type="button">Done</button>
+        <p class="invite-hint" style="color: var(--duress); font-weight: 500;">Share via a private channel — WhatsApp, Signal, or in person. The confirmation code verifies it wasn't tampered with.</p>
+
+        <div class="invite-share__actions">
+          <button class="btn btn--primary" id="invite-copy-link" type="button">Copy Link</button>
+          <button class="btn" id="invite-copy-text" type="button">Copy Invite Text</button>
+        </div>
+
+        <p class="invite-hint">Share via WhatsApp, Signal, email, or any messaging app</p>
+
+        ${showConfirmMemberNote ? `<p class="invite-hint" style="margin-top: 1rem; font-style: italic;">After they join, click <strong>Confirm Member</strong> to verify them — they'll give you a word or token.</p>` : ''}
+
+        <div class="modal__actions" style="gap: 0.5rem;">
+          <button class="btn" id="invite-back-btn" type="button">Back</button>
+          <button class="btn" id="invite-close-btn" type="button">Done</button>
+        </div>
       </div>
-    </div>
-  `
+    `
+    d.querySelector<HTMLButtonElement>('#invite-back-btn')?.addEventListener('click', renderChooser)
+    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => d.close())
 
-  dialog.addEventListener('click', (e) => {
-    if (e.target === dialog) dialog!.close()
-  })
+    d.querySelector<HTMLButtonElement>('#invite-copy-link')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement
+      try {
+        await navigator.clipboard.writeText(joinUrl)
+        btn.textContent = 'Link Copied!'
+        btn.classList.add('btn--copied')
+        setTimeout(() => { btn.textContent = 'Copy Link'; btn.classList.remove('btn--copied') }, 2000)
+      } catch { /* clipboard may be blocked */ }
+    })
 
-  dialog.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => {
-    dialog!.close()
-  })
+    d.querySelector<HTMLButtonElement>('#invite-copy-text')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement
+      try {
+        await navigator.clipboard.writeText(payload)
+        btn.textContent = 'Text Copied!'
+        btn.classList.add('btn--copied')
+        setTimeout(() => { btn.textContent = 'Copy Invite Text'; btn.classList.remove('btn--copied') }, 2000)
+      } catch { /* clipboard may be blocked */ }
+    })
+  }
 
-  dialog.querySelector<HTMLButtonElement>('#invite-copy-link')?.addEventListener('click', async (e) => {
-    const btn = e.currentTarget as HTMLButtonElement
-    try {
-      await navigator.clipboard.writeText(joinUrl)
-      btn.textContent = 'Link Copied!'
-      btn.classList.add('btn--copied')
-      setTimeout(() => { btn.textContent = 'Copy Link'; btn.classList.remove('btn--copied') }, 2000)
-    } catch { /* clipboard may be blocked */ }
-  })
-
-  dialog.querySelector<HTMLButtonElement>('#invite-copy-text')?.addEventListener('click', async (e) => {
-    const btn = e.currentTarget as HTMLButtonElement
-    try {
-      await navigator.clipboard.writeText(payload)
-      btn.textContent = 'Text Copied!'
-      btn.classList.add('btn--copied')
-      setTimeout(() => { btn.textContent = 'Copy Invite Text'; btn.classList.remove('btn--copied') }, 2000)
-    } catch { /* clipboard may be blocked */ }
-  })
-
+  // Start with the path chooser
+  renderChooser()
   dialog.showModal()
 }
 

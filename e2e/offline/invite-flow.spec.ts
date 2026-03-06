@@ -6,15 +6,32 @@ import {
 } from '../helpers.js'
 
 test.describe('Invite flow (offline)', () => {
-  test('create invite shows QR, confirmation words, and copy buttons', async ({ twoUsers: { pageA } }) => {
+  test('invite modal shows path chooser, QR path shows QR, Link path shows words', async ({ twoUsers: { pageA } }) => {
     await loginOffline(pageA, 'Alice')
     await createGroup(pageA, 'Test Group')
 
     await pageA.click('#hero-invite-btn')
     await expect(pageA.locator('#invite-modal[open]')).toBeVisible()
-    await expect(pageA.locator('.qr-container')).toBeVisible()
 
-    // Confirmation words should be 3 lowercase words separated by spaces
+    // Step 1: path chooser — both options visible, no QR or words yet
+    await expect(pageA.locator('#invite-qr-path')).toBeVisible()
+    await expect(pageA.locator('#invite-link-path')).toBeVisible()
+    await expect(pageA.locator('.qr-container')).not.toBeVisible()
+    await expect(pageA.locator('.confirm-code')).not.toBeVisible()
+
+    // Step 2a: QR path — shows QR, no confirmation words
+    await pageA.click('#invite-qr-path')
+    await expect(pageA.locator('.qr-container')).toBeVisible()
+    await expect(pageA.locator('.confirm-code')).not.toBeVisible()
+
+    // Back returns to chooser
+    await pageA.click('#invite-back-btn')
+    await expect(pageA.locator('#invite-qr-path')).toBeVisible()
+
+    // Step 2b: Link path — shows words and copy buttons, no QR
+    await pageA.click('#invite-link-path')
+    await expect(pageA.locator('.qr-container')).not.toBeVisible()
+
     const confirmText = await pageA.locator('.confirm-code__value').textContent()
     expect(confirmText).toBeTruthy()
     const words = confirmText!.split(' ')
