@@ -57,6 +57,31 @@ test.describe('Verification display (hero panel)', () => {
     expect(wordAfter).not.toBe(wordBefore)
   })
 
+  test('rapid burns advance counter correctly', async ({ cleanPage: page }) => {
+    const word1 = await getDisplayedWord(page)
+
+    // Burn twice rapidly
+    await page.click('#burn-btn')
+    await page.waitForTimeout(150)
+    await page.click('#burn-btn')
+    await page.waitForTimeout(300)
+
+    const word3 = await getDisplayedWord(page)
+    expect(word3).not.toBe(word1)
+  })
+
+  test('burn persists across reload', async ({ cleanPage: page }) => {
+    await page.click('#burn-btn')
+    await page.waitForTimeout(300)
+    const wordAfterBurn = await getDisplayedWord(page)
+
+    await page.reload()
+    await page.waitForSelector('#sidebar', { timeout: 5000 })
+    const wordAfterReload = await getDisplayedWord(page)
+
+    expect(wordAfterReload).toBe(wordAfterBurn)
+  })
+
   test('progress bar is visible', async ({ cleanPage: page }) => {
     await expect(page.locator('#hero-progress-bar')).toBeVisible()
   })

@@ -41,6 +41,18 @@ test.describe('Members panel', () => {
     expect(countAfter).toBe(countBefore - 1)
   })
 
+  test('remove member auto-opens invite modal', async ({ cleanPage: page }) => {
+    await addSimulatedMember(page)
+
+    // Click remove on the added member (last remove button)
+    page.once('dialog', async dialog => await dialog.accept())
+    await page.locator('.member-item__remove').last().click()
+    await page.waitForTimeout(500)
+
+    // The invite/share-state modal should auto-open after member removal
+    await expect(page.locator('#invite-modal[open]')).toBeVisible({ timeout: 3000 })
+  })
+
   test('invite button opens invite modal', async ({ cleanPage: page }) => {
     await page.click('#invite-btn')
     await expect(page.locator('#invite-modal[open]')).toBeVisible()

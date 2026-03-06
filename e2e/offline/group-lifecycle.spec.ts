@@ -52,6 +52,16 @@ test.describe('Group lifecycle', () => {
     await expect(page.locator('.group-list__item')).not.toBeVisible()
   })
 
+  test('decline dissolve keeps group in sidebar', async ({ cleanPage: page }) => {
+    await createGroup(page, 'KeepMe')
+    await openSettings(page)
+    page.once('dialog', async dialog => await dialog.dismiss())
+    await page.click('#dissolve-btn')
+    await page.waitForTimeout(300)
+    const groups = await getGroupNames(page)
+    expect(groups).toContain('KeepMe')
+  })
+
   test('multiple groups: switching updates display', async ({ cleanPage: page }) => {
     await createGroup(page, 'Group Alpha')
     await createGroup(page, 'Group Beta')

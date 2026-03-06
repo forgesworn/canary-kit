@@ -39,6 +39,21 @@ test.describe('Login screen', () => {
     await page.click('#nsec-login-form button[type="submit"]')
   })
 
+  test('can retry login after invalid nsec error', async ({ cleanPage: page }) => {
+    // First attempt with invalid nsec — existing test verifies the alert appears
+    page.once('dialog', async dialog => await dialog.accept())
+    await page.fill('#login-nsec', 'not-a-real-nsec')
+    await page.click('#nsec-login-form button[type="submit"]')
+    await page.waitForTimeout(300)
+
+    // The login screen should still be visible (not crashed)
+    await expect(page.locator('.lock-screen')).toBeVisible()
+
+    // Should be able to use offline login as fallback
+    await loginOffline(page, 'Fallback')
+    await expect(page.locator('#sidebar')).toBeVisible()
+  })
+
   test('demo account button loads correct identity', async ({ cleanPage: page }) => {
     await loginWithDemo(page, 'Alice')
     await expect(page.locator('.identity-badge__name')).toHaveText('Alice')
