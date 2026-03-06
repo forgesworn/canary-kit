@@ -1,4 +1,4 @@
-import { hmacSha256, hexToBytes, concatBytes } from './crypto.js'
+import { hmacSha256, hexToBytes, concatBytes, timingSafeStringEqual } from './crypto.js'
 import { encodeToken, type TokenEncoding, DEFAULT_ENCODING } from './encoding.js'
 
 /**
@@ -189,10 +189,11 @@ export function verifyToken(
   }
   const normalised = input.toLowerCase().trim()
 
-  // 1. Check normal token at exact counter (collision avoidance guarantees no ambiguity here)
-  if (normalised === deriveToken(secret, context, counter, encoding)) {
-    return { status: 'valid' }
-  }
+  // Compute all branches to prevent timing side-channels from revealing
+  // which branch matched (valid vs duress vs invalid).
+
+  // 1. Check normal token at exact counter
+  const exactMatch = timingSafeStringEqual(normalised, deriveToken(secret, context, counter, encoding))
 
   // 2. Check duress tokens for ALL identities across entire tolerance window
   const lo = Math.max(0, counter - tolerance)
@@ -200,25 +201,26 @@ export function verifyToken(
   const matches: string[] = []
   for (const identity of identities) {
     for (let c = lo; c <= hi; c++) {
-      if (normalised === deriveDuressToken(secret, context, identity, c, encoding, tolerance)) {
+      if (timingSafeStringEqual(normalised, deriveDuressToken(secret, context, identity, c, encoding, tolerance))) {
         matches.push(identity)
         break // found match for this identity, move to next
       }
     }
   }
-  if (matches.length > 0) {
-    return { status: 'duress', identities: matches }
-  }
 
   // 3. Check normal token at remaining tolerance window (non-exact counters)
+  let toleranceMatch = false
   for (let c = lo; c <= hi; c++) {
     if (c === counter) continue // already checked in step 1
-    if (normalised === deriveToken(secret, context, c, encoding)) {
-      return { status: 'valid' }
+    if (timingSafeStringEqual(normalised, deriveToken(secret, context, c, encoding))) {
+      toleranceMatch = true
     }
   }
 
-  // 4. No match
+  // Return in priority order (collision avoidance guarantees no ambiguity at exact counter)
+  if (exactMatch) return { status: 'valid' }
+  if (matches.length > 0) return { status: 'duress', identities: matches }
+  if (toleranceMatch) return { status: 'valid' }
   return { status: 'invalid' }
 }
 

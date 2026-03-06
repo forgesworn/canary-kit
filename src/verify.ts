@@ -1,4 +1,5 @@
 import { deriveVerificationWord, deriveDuressWord, deriveVerificationPhrase, deriveDuressPhrase } from './derive.js'
+import { timingSafeStringEqual } from './crypto.js'
 
 export type VerifyStatus = 'verified' | 'duress' | 'stale' | 'failed'
 
@@ -41,40 +42,37 @@ export function verifyWord(
     return deriveDuressPhrase(seed, pubkey, c, wordCount).join(' ')
   }
 
+  // Compute all branches to prevent timing side-channels from revealing
+  // which branch matched (verified vs duress vs stale vs failed).
+
   // 1. Check current verification word
-  if (normalised === verifyPhrase(seedHex, counter)) {
-    return { status: 'verified' }
-  }
+  const currentMatch = timingSafeStringEqual(normalised, verifyPhrase(seedHex, counter))
 
   // 2. Check ALL members' duress words at current counter — collect all matches
-  const currentMatches: string[] = []
+  const currentDuressMatches: string[] = []
   for (const pubkey of memberPubkeys) {
-    if (normalised === duressPhrase(seedHex, pubkey, counter)) {
-      currentMatches.push(pubkey)
+    if (timingSafeStringEqual(normalised, duressPhrase(seedHex, pubkey, counter))) {
+      currentDuressMatches.push(pubkey)
     }
-  }
-  if (currentMatches.length > 0) {
-    return { status: 'duress', members: currentMatches }
   }
 
   // 3. Check duress words at previous counter (stale duress) — collect all matches
+  const staleDuressMatches: string[] = []
   if (counter > 0) {
-    const staleMatches: string[] = []
     for (const pubkey of memberPubkeys) {
-      if (normalised === duressPhrase(seedHex, pubkey, counter - 1)) {
-        staleMatches.push(pubkey)
+      if (timingSafeStringEqual(normalised, duressPhrase(seedHex, pubkey, counter - 1))) {
+        staleDuressMatches.push(pubkey)
       }
-    }
-    if (staleMatches.length > 0) {
-      return { status: 'duress', members: staleMatches }
     }
   }
 
   // 4. Check previous window's verification word (1-window lookback for sync issues)
-  if (counter > 0 && normalised === verifyPhrase(seedHex, counter - 1)) {
-    return { status: 'stale' }
-  }
+  const staleMatch = counter > 0 && timingSafeStringEqual(normalised, verifyPhrase(seedHex, counter - 1))
 
-  // 5. Nothing matched
+  // Return in priority order
+  if (currentMatch) return { status: 'verified' }
+  if (currentDuressMatches.length > 0) return { status: 'duress', members: currentDuressMatches }
+  if (staleDuressMatches.length > 0) return { status: 'duress', members: staleDuressMatches }
+  if (staleMatch) return { status: 'stale' }
   return { status: 'failed' }
 }

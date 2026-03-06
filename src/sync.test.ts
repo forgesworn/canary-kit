@@ -155,7 +155,37 @@ describe('applySyncMessage', () => {
     const futureCounter = group.counter + 5
     const result = applySyncMessage(group, {
       type: 'counter-advance', counter: futureCounter, usageOffset: 2, timestamp: 0,
+    }, undefined, PUBKEY_AAA)
+    expect(result.counter).toBe(futureCounter)
+    expect(result.usageOffset).toBe(2)
+  })
+
+  it('counter-advance rejects non-member sender', () => {
+    const group = makeGroup()
+    const futureCounter = group.counter + 5
+    const nonMember = 'c'.repeat(64)
+    const result = applySyncMessage(group, {
+      type: 'counter-advance', counter: futureCounter, usageOffset: 2, timestamp: 0,
+    }, undefined, nonMember)
+    expect(result.counter).toBe(group.counter) // unchanged
+    expect(result.usageOffset).toBe(group.usageOffset)
+  })
+
+  it('counter-advance rejects when no sender provided', () => {
+    const group = makeGroup()
+    const futureCounter = group.counter + 5
+    const result = applySyncMessage(group, {
+      type: 'counter-advance', counter: futureCounter, usageOffset: 2, timestamp: 0,
     })
+    expect(result.counter).toBe(group.counter) // unchanged
+  })
+
+  it('counter-advance accepts member sender', () => {
+    const group = makeGroup()
+    const futureCounter = group.counter + 5
+    const result = applySyncMessage(group, {
+      type: 'counter-advance', counter: futureCounter, usageOffset: 2, timestamp: 0,
+    }, undefined, PUBKEY_AAA)
     expect(result.counter).toBe(futureCounter)
     expect(result.usageOffset).toBe(2)
   })
@@ -165,11 +195,11 @@ describe('applySyncMessage', () => {
     const futureCounter = group.counter + 5
     const advanced = applySyncMessage(group, {
       type: 'counter-advance', counter: futureCounter, usageOffset: 2, timestamp: 0,
-    })
+    }, undefined, PUBKEY_AAA)
     // Stale: effective = (futureCounter - 3) + 1 < futureCounter + 2
     const stale = applySyncMessage(advanced, {
       type: 'counter-advance', counter: futureCounter - 3, usageOffset: 1, timestamp: 0,
-    })
+    }, undefined, PUBKEY_AAA)
     expect(stale.counter).toBe(futureCounter) // unchanged
     expect(stale.usageOffset).toBe(2)
   })
@@ -803,8 +833,8 @@ describe('full round-trip: encode → decode → apply', () => {
     const futureCounter = group.counter + 10
     const msg1: SyncMessage = { type: 'counter-advance', counter: futureCounter, usageOffset: 2, timestamp: 1 }
     const msg2: SyncMessage = { type: 'counter-advance', counter: futureCounter - 5, usageOffset: 1, timestamp: 2 }
-    let state = applySyncMessage(group, decodeSyncMessage(encodeSyncMessage(msg1)))
-    state = applySyncMessage(state, decodeSyncMessage(encodeSyncMessage(msg2)))
+    let state = applySyncMessage(group, decodeSyncMessage(encodeSyncMessage(msg1)), undefined, PUBKEY_AAA)
+    state = applySyncMessage(state, decodeSyncMessage(encodeSyncMessage(msg2)), undefined, PUBKEY_AAA)
     expect(state.counter).toBe(futureCounter)
     expect(state.usageOffset).toBe(2)
   })

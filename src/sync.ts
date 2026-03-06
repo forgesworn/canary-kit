@@ -15,7 +15,7 @@ export type SyncMessage =
   | { type: 'counter-advance'; counter: number; usageOffset: number; timestamp: number; protocolVersion?: number }
   | { type: 'reseed'; seed: Uint8Array; counter: number; timestamp: number; epoch: number; opId: string; admins: string[]; members: string[]; protocolVersion?: number }
   | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number; opId: string; protocolVersion?: number }
-  | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId: string; protocolVersion?: number }
+  | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId: string; subject?: string; protocolVersion?: number }
   | { type: 'liveness-checkin'; pubkey: string; timestamp: number; opId: string; protocolVersion?: number }
   | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; admins: string[]; epoch: number; opId: string; timestamp: number; prevEpochSeed?: string; protocolVersion?: number }
 
@@ -385,6 +385,9 @@ export function applySyncMessage(
       }
 
     case 'counter-advance': {
+      // Require sender to be a current group member
+      if (!sender || !group.members.includes(sender)) return group
+
       // Monotonic: only advance, never retreat
       const currentEffective = group.counter + group.usageOffset
       const incomingEffective = msg.counter + msg.usageOffset

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { timingSafeEqual, hexToBytes, bytesToHex, readUint16BE, sha256, hmacSha256 } from './crypto.js'
+import { timingSafeEqual, timingSafeStringEqual, hexToBytes, bytesToHex, readUint16BE, sha256, hmacSha256 } from './crypto.js'
 
 describe('timingSafeEqual', () => {
   it('returns true for equal arrays', () => {
@@ -17,6 +17,29 @@ describe('timingSafeEqual', () => {
 
   it('returns true for empty arrays', () => {
     expect(timingSafeEqual(new Uint8Array([]), new Uint8Array([]))).toBe(true)
+  })
+})
+
+describe('timingSafeStringEqual', () => {
+  it('returns true for equal strings', () => {
+    expect(timingSafeStringEqual('falcon', 'falcon')).toBe(true)
+  })
+
+  it('returns false for different strings', () => {
+    expect(timingSafeStringEqual('falcon', 'eagle')).toBe(false)
+  })
+
+  it('returns false for different lengths', () => {
+    expect(timingSafeStringEqual('falcon', 'falcons')).toBe(false)
+  })
+
+  it('returns true for empty strings', () => {
+    expect(timingSafeStringEqual('', '')).toBe(true)
+  })
+
+  it('handles unicode correctly', () => {
+    expect(timingSafeStringEqual('café', 'café')).toBe(true)
+    expect(timingSafeStringEqual('café', 'cafe')).toBe(false)
   })
 })
 

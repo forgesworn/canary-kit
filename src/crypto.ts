@@ -255,3 +255,10 @@ export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i]
   return diff === 0
 }
+
+const stringEncoder = new TextEncoder()
+
+/** Constant-time comparison of two strings (UTF-8 encoded, then byte-compared). */
+export function timingSafeStringEqual(a: string, b: string): boolean {
+  return timingSafeEqual(stringEncoder.encode(a), stringEncoder.encode(b))
+}
