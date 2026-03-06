@@ -687,6 +687,7 @@ async function applyInvite(data: ReturnType<typeof acceptInvite>, myName: string
       broadcastAction(id, {
         type: 'member-join',
         pubkey: identity.pubkey,
+        displayName: myName || identity.displayName || undefined,
         timestamp: Math.floor(Date.now() / 1000),
         epoch: data.epoch,
         opId: crypto.randomUUID(),

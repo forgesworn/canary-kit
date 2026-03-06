@@ -181,10 +181,16 @@ body::after {
   }
 
   .header__hamburger {
-    display: flex;
+    display: none;
   }
 
   .header__nav {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  /* Hide Call Demo tab on mobile — not useful on phones */
+  .header__nav-tab[data-view="call-demo"] {
     display: none;
   }
 
