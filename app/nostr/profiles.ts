@@ -76,7 +76,7 @@ export function fetchProfiles(pubkeys: string[], groupId?: string): void {
           const displayName = profile.display_name || profile.name
           if (displayName && event.pubkey !== selfPubkey && groupId) {
             const group = getState().groups[groupId]
-            if (group && (!group.memberNames?.[event.pubkey] || group.memberNames[event.pubkey].includes('…'))) {
+            if (group && group.memberNames?.[event.pubkey] !== displayName) {
               updateGroup(groupId, {
                 memberNames: { ...group.memberNames, [event.pubkey]: displayName },
               })
