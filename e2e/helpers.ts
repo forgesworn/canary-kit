@@ -102,6 +102,9 @@ export async function createInvite(page: Page): Promise<{ payload: string; confi
 
   await page.waitForSelector('#invite-modal[open]', { timeout: 3000 })
 
+  // Navigate to the Link path to access confirmation words
+  await page.click('#invite-link-path')
+
   const confirmCode = await page.locator('.confirm-code__value').textContent()
   if (!confirmCode) throw new Error('Could not read confirm code from invite modal')
 
