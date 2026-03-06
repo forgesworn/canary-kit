@@ -819,6 +819,39 @@ describe('liveness-checkin', () => {
     expect(updated).toEqual(group)
   })
 
+  it('accepts liveness-checkin when sender is undefined (skips cross-check)', () => {
+    const group = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: ['b'.repeat(64)],
+      rotationInterval: 604800,
+      wordCount: 1 as const,
+      wordlist: 'en-v1',
+      counter: 50,
+      usageOffset: 2,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [],
+      epoch: 0,
+      consumedOps: [],
+    }
+
+    const nowSec = 1700001000
+    const msg: SyncMessage = {
+      type: 'liveness-checkin',
+      pubkey: 'b'.repeat(64),
+      timestamp: nowSec,
+      opId: 'liveness-no-sender',
+    }
+
+    // sender is undefined — cross-check should be skipped, message accepted
+    const result = applySyncMessageWithResult(group, msg, nowSec, undefined)
+    expect(result.applied).toBe(true)
+    // Group state should be unchanged (fire-and-forget message)
+    expect(result.state).toEqual(group)
+  })
+
   it('rejects liveness-checkin where sender does not match pubkey', () => {
     const group = {
       name: 'Test',
