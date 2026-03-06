@@ -1,11 +1,9 @@
 /**
- * Canary Nostr event kinds.
+ * Canary Nostr event kinds (NIP-CANARY).
  *
- * Placeholder values — exact kind numbers will be allocated when the NIP
- * is submitted. Using 38800–38804 range as a proposal.
- *
- * - group + memberUpdate: replaceable (30000–39999)
+ * - group + memberUpdate: parameterised replaceable (30000–39999)
  * - seedDistribution, reseed, wordUsed: ephemeral (20000–29999)
+ * - beacon: ephemeral (20000–29999)
  */
 export const KINDS = {
   group: 38_800,
@@ -28,6 +26,14 @@ function now(): number {
   return Math.floor(Date.now() / 1000)
 }
 
+const HEX_64_RE = /^[0-9a-f]{64}$/
+
+function validatePubkey(pubkey: string, label: string): void {
+  if (!HEX_64_RE.test(pubkey)) {
+    throw new Error(`Invalid ${label}: expected 64 lowercase hex characters, got "${pubkey.length > 80 ? pubkey.slice(0, 20) + '…' : pubkey}"`)
+  }
+}
+
 export interface GroupEventParams {
   groupId: string
   name: string
@@ -40,6 +46,7 @@ export interface GroupEventParams {
 }
 
 export function buildGroupEvent(params: GroupEventParams): UnsignedEvent {
+  for (const m of params.members) validatePubkey(m, 'member pubkey')
   const tags: string[][] = [
     ['d', params.groupId],
     ['name', params.name],
@@ -61,6 +68,7 @@ export interface SeedDistributionParams {
 }
 
 export function buildSeedDistributionEvent(params: SeedDistributionParams): UnsignedEvent {
+  validatePubkey(params.recipientPubkey, 'recipientPubkey')
   return {
     kind: KINDS.seedDistribution,
     content: params.encryptedContent,
@@ -81,6 +89,7 @@ export interface MemberUpdateParams {
 }
 
 export function buildMemberUpdateEvent(params: MemberUpdateParams): UnsignedEvent {
+  validatePubkey(params.memberPubkey, 'memberPubkey')
   return {
     kind: KINDS.memberUpdate,
     content: params.encryptedContent,

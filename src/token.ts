@@ -24,9 +24,14 @@ function counterBe32(counter: number): Uint8Array {
   return buf
 }
 
+const MIN_SECRET_BYTES = 16
+
 function normaliseSecret(secret: Uint8Array | string): Uint8Array {
-  if (typeof secret === 'string') return hexToBytes(secret)
-  return secret
+  const key = typeof secret === 'string' ? hexToBytes(secret) : secret
+  if (key.length < MIN_SECRET_BYTES) {
+    throw new RangeError(`Secret must be at least ${MIN_SECRET_BYTES} bytes, got ${key.length}`)
+  }
+  return key
 }
 
 /**

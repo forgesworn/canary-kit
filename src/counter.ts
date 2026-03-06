@@ -17,6 +17,9 @@ export function getCounter(
  * Same encoding as TOTP (RFC 6238).
  */
 export function counterToBytes(counter: number): Uint8Array {
+  if (!Number.isInteger(counter) || counter < 0 || counter > Number.MAX_SAFE_INTEGER) {
+    throw new RangeError(`Counter must be a non-negative safe integer, got ${counter}`)
+  }
   const buf = new Uint8Array(8)
   const view = new DataView(buf.buffer)
   view.setBigUint64(0, BigInt(counter), false) // false = big-endian

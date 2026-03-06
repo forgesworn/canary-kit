@@ -172,7 +172,15 @@ export async function decryptDuressAlert(
 ): Promise<DuressAlert> {
   const plaintext = await aesGcmDecrypt(key, content)
   const parsed = JSON.parse(new TextDecoder().decode(plaintext))
-  if (parsed.type !== 'duress' || typeof parsed.member !== 'string' || typeof parsed.timestamp !== 'number') {
+  const VALID_SOURCES = new Set(['beacon', 'verifier', 'none'])
+  if (
+    parsed.type !== 'duress' ||
+    typeof parsed.member !== 'string' ||
+    typeof parsed.timestamp !== 'number' ||
+    typeof parsed.geohash !== 'string' ||
+    typeof parsed.precision !== 'number' ||
+    !VALID_SOURCES.has(parsed.locationSource)
+  ) {
     throw new Error('Invalid duress alert payload: missing or malformed required fields')
   }
   return parsed
