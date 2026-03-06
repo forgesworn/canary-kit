@@ -24,6 +24,10 @@ function counterBe32(counter: number): Uint8Array {
   return buf
 }
 
+// 128-bit (16-byte) minimum for the universal token API. The group layer
+// enforces 256-bit (32-byte) seeds per CANARY.md, but the universal API
+// supports contexts beyond group seeds where 128-bit keys may be appropriate
+// (e.g. per-session or per-task handoff secrets).
 const MIN_SECRET_BYTES = 16
 
 function normaliseSecret(secret: Uint8Array | string): Uint8Array {

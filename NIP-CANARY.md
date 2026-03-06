@@ -23,24 +23,28 @@ counters and Nostr public keys as member identities.
 
 ### Group Derivation Scheme
 
-The Nostr group scheme uses 64-bit counter encoding and the group seed directly as the
-HMAC key (without a context string), for simplicity in the single-purpose group setting:
+The Nostr group scheme is a specific instantiation of the universal CANARY protocol
+(see [CANARY.md](CANARY.md)) with the following parameters:
+
+| Parameter     | Value                                                              |
+|---------------|--------------------------------------------------------------------|
+| `secret`      | 32-byte group seed                                                 |
+| `context`     | `"canary:group"`                                                   |
+| `counter`     | `floor(unix_timestamp / rotation_interval)` plus any usage offset  |
+| `identity`    | Member's Nostr public key (64-char lowercase hex)                  |
+| `encoding`    | Word encoding from CANARY-WORDLIST (`uint16_be mod 2048`)          |
 
 #### Verification Word
 
+Derived using **CANARY-DERIVE** (see [CANARY.md §CANARY-DERIVE](CANARY.md)):
+
 ```
-counter_bytes = uint64_be(counter)
-mac           = HMAC-SHA256(key=seed, data=counter_bytes)
-index         = uint16_be(mac[0..2]) mod 2048
-word          = wordlist[index]
+token_bytes = HMAC-SHA256(seed, utf8("canary:group") || counter_be32)
+index       = uint16_be(token_bytes[0:2]) mod 2048
+word        = wordlist[index]
 ```
 
-Where:
-
-- `seed` is the 32-byte group seed
-- `counter` is `floor(unix_timestamp / rotation_interval)` plus any usage offset
-- `uint16_be(mac[0..2])` interprets bytes 0 and 1 of the MAC as a big-endian 16-bit
-  integer
+Where `counter_be32` is a 4-byte big-endian unsigned integer.
 
 #### Verification Phrase
 
@@ -48,32 +52,31 @@ For multi-word phrases (2 or 3 words), each word is derived from a consecutive 2
 slice of the same HMAC digest:
 
 ```
-mac    = HMAC-SHA256(key=seed, data=uint64_be(counter))
-word_1 = wordlist[uint16_be(mac[0..2]) mod 2048]
-word_2 = wordlist[uint16_be(mac[2..4]) mod 2048]
-word_3 = wordlist[uint16_be(mac[4..6]) mod 2048]
+token_bytes = HMAC-SHA256(seed, utf8("canary:group") || counter_be32)
+word_1      = wordlist[uint16_be(token_bytes[0:2]) mod 2048]
+word_2      = wordlist[uint16_be(token_bytes[2:4]) mod 2048]
+word_3      = wordlist[uint16_be(token_bytes[4:6]) mod 2048]
 ```
 
 Different 2-byte slices MAY produce the same index; this is a valid output, not an error.
 
 #### Duress Word
 
-Each member has a distinct duress word derived per the CANARY-DURESS collision avoidance
-algorithm (see [CANARY.md](CANARY.md)). In finite wordlist spaces, two members may
-derive the same duress word — this is handled by multi-match attribution. The member's Nostr public key (32-byte hex) is
-used as the identity parameter, and the group seed is used as the shared secret:
+Derived using **CANARY-DURESS** (see [CANARY.md §CANARY-DURESS](CANARY.md)). Each
+member has a distinct duress word. In finite wordlist spaces, two members may derive
+the same duress word — this is handled by multi-match attribution. The member's Nostr
+public key (64-char lowercase hex) is the identity parameter:
 
 ```
-key   = seed || member_pubkey   (64 bytes: 32-byte seed + 32-byte pubkey)
-mac   = HMAC-SHA256(key=key, data=uint64_be(counter))
-index = uint16_be(mac[0..2]) mod 2048
-word  = wordlist[index]
+duress_bytes = HMAC-SHA256(seed, utf8("canary:group:duress") || 0x00 || utf8(member_pubkey) || counter_be32)
+index        = uint16_be(duress_bytes[0:2]) mod 2048
+word         = wordlist[index]
 ```
 
-If the duress word collides with any verification word within the ±1 counter
-tolerance window (counter−1, counter, counter+1), the deterministic multi-suffix
-retry algorithm from CANARY-DURESS applies (append suffix bytes 0x01..0xFF to the
-key until distinct, error if exhausted).
+If the duress word collides with any verification word within the collision window
+defined by CANARY-DURESS (±2 × maxTolerance counter values), the deterministic
+multi-suffix retry algorithm applies (append suffix bytes 0x01..0xFF to the HMAC
+data until distinct, error if exhausted). See [CANARY.md §Collision Avoidance](CANARY.md).
 
 ### Counter Derivation
 
@@ -87,21 +90,23 @@ advance in step.
 
 ### Verification Algorithm
 
-When verifying a spoken response:
+When verifying a spoken response, implementations MUST follow the priority order
+defined by CANARY-DURESS (see [CANARY.md §Verification Flow](CANARY.md)):
 
-1. If it matches the current verification word (or phrase, when `words > 1`) →
-   identity confirmed.
-2. Derive the duress word (or phrase) for every member at the **current counter**.
-   Collect all matches. Per CANARY-DURESS, the verifier MUST check all members and
-   collect all matches (see [CANARY.md](CANARY.md)).
-3. Derive the duress word (or phrase) for every member at `counter - 1`.
-   Collect all matches. This catches duress signals from members whose counter is
-   one window behind.
-4. If any duress matches from steps 2 or 3 → **DURESS DETECTED**. Act normally,
+1. **Normal token at exact counter:** If the input matches the current verification
+   word (or phrase) → identity confirmed.
+2. **All duress tokens across ±tolerance window:** Derive the duress word (or phrase)
+   for every member at every counter in the tolerance window. Collect all matches.
+   Per CANARY-DURESS, the verifier MUST check all members and collect all matches
+   (see [CANARY.md](CANARY.md)). If any matches → **DURESS DETECTED**. Act normally,
    broadcast silent duress event.
-5. Check the verification word (or phrase) at `counter - 1` (one window lookback
-   for stale counters). If it matches → identity confirmed, member out of sync.
-6. Otherwise → verification failed.
+3. **Normal token at remaining tolerance window:** Check the verification word (or
+   phrase) at non-exact counters within the tolerance window. If it matches →
+   identity confirmed, member out of sync.
+4. **No match** → verification failed.
+
+This ordering ensures that a duress token at the expected counter is never masked
+by a normal token at an adjacent counter (fail-safe).
 
 ### Burn-After-Use
 
@@ -466,31 +471,30 @@ PUBKEY_A = 0000000000000000000000000000000000000000000000000000000000000002
 PUBKEY_B = 0000000000000000000000000000000000000000000000000000000000000003
 ```
 
-**Algorithm:**
+**Algorithm (CANARY-DERIVE and CANARY-DURESS with `context = "canary:group"`):**
 
 ```
-verification:
-  mac   = HMAC-SHA256(key=seed, data=uint64_be(counter))
-  index = uint16_be(mac[0:2]) mod 2048
-  word  = wordlist[index]
+verification (CANARY-DERIVE):
+  token_bytes = HMAC-SHA256(seed, utf8("canary:group") || counter_be32)
+  index       = uint16_be(token_bytes[0:2]) mod 2048
+  word        = wordlist[index]
 
-duress:
-  key   = seed || pubkey  (64 bytes)
-  mac   = HMAC-SHA256(key=key, data=uint64_be(counter))
-  index = uint16_be(mac[0:2]) mod 2048
-  word  = wordlist[index]
+duress (CANARY-DURESS):
+  duress_data = utf8("canary:group:duress") || 0x00 || utf8(pubkey) || counter_be32
+  duress_bytes = HMAC-SHA256(seed, duress_data)
+  index        = uint16_be(duress_bytes[0:2]) mod 2048
+  word         = wordlist[index]
 
-  # Cross-counter collision avoidance: forbidden set is verification
-  # words at counter−1, counter, and counter+1 (clamped at 0).
-  forbidden = { verification_word(max(0, counter-1)),
-                verification_word(counter),
-                verification_word(counter+1) }
+  # Cross-counter collision avoidance per CANARY-DURESS §Collision Avoidance:
+  # forbidden set spans ±(2 × maxTolerance) counter values.
+  forbidden = { verification_word(c) for c in [max(0, counter - 2*tol),
+                                                 ...,
+                                                 counter + 2*tol] }
   if word in forbidden:
     for suffix in 0x01..0xFF:
-      key   = seed || pubkey || byte(suffix)
-      mac   = HMAC-SHA256(key=key, data=uint64_be(counter))
-      index = uint16_be(mac[0:2]) mod 2048
-      word  = wordlist[index]
+      duress_bytes = HMAC-SHA256(seed, duress_data || byte(suffix))
+      index        = uint16_be(duress_bytes[0:2]) mod 2048
+      word         = wordlist[index]
       if word not in forbidden: break
 ```
 
