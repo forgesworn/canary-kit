@@ -3,6 +3,7 @@ import {
   encodeSyncMessage,
   decodeSyncMessage,
   applySyncMessage,
+  applySyncMessageWithResult,
   stableStringify,
   canonicaliseSyncMessage,
   PROTOCOL_VERSION,
@@ -1385,5 +1386,47 @@ describe('fire-and-forget opId serialisation', () => {
   it('rejects a beacon with invalid opId', () => {
     const raw = JSON.stringify({ type: 'beacon', lat: 51.5, lon: -0.1, accuracy: 100, timestamp: 1700000000, opId: '', protocolVersion: PROTOCOL_VERSION })
     expect(() => decodeSyncMessage(raw)).toThrow(/opId/)
+  })
+})
+
+describe('applySyncMessageWithResult', () => {
+  function makeGroup() {
+    return createGroup({ name: 'test', members: [PUBKEY_AAA], preset: 'family', creator: PUBKEY_AAA })
+  }
+
+  it('returns applied: true for accepted member-join', () => {
+    const group = makeGroup()
+    const result = applySyncMessageWithResult(group, {
+      type: 'member-join', pubkey: PUBKEY_BBB, timestamp: 0, epoch: 0, opId: 'join-1',
+    }, undefined, PUBKEY_AAA)
+    expect(result.applied).toBe(true)
+    expect(result.state.members).toContain(PUBKEY_BBB)
+  })
+
+  it('returns applied: false for rejected message (non-admin sender)', () => {
+    const group = makeGroup()
+    const result = applySyncMessageWithResult(group, {
+      type: 'member-join', pubkey: PUBKEY_BBB, timestamp: 0, epoch: 0, opId: 'join-1',
+    }, undefined, PUBKEY_BBB) // BBB is not admin
+    expect(result.applied).toBe(false)
+    expect(result.state).toBe(group) // reference equality — unchanged
+  })
+
+  it('returns applied: true for fresh beacon (fire-and-forget)', () => {
+    const group = makeGroup()
+    const now = Math.floor(Date.now() / 1000)
+    const result = applySyncMessageWithResult(group, {
+      type: 'beacon', lat: 51.5, lon: -0.1, accuracy: 10, timestamp: now, opId: 'b-1',
+    }, now)
+    expect(result.applied).toBe(true)
+  })
+
+  it('returns applied: false for stale beacon (fire-and-forget)', () => {
+    const group = makeGroup()
+    const now = Math.floor(Date.now() / 1000)
+    const result = applySyncMessageWithResult(group, {
+      type: 'beacon', lat: 51.5, lon: -0.1, accuracy: 10, timestamp: now - 600, opId: 'b-1',
+    }, now)
+    expect(result.applied).toBe(false)
   })
 })
