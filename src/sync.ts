@@ -379,6 +379,9 @@ export function applySyncMessage(
     if (elapsed < -MAX_FUTURE_SKEW_SEC) return group             // too far in the future
   }
 
+  // Cross-check: liveness-checkin sender must match the pubkey in the message
+  if (msg.type === 'liveness-checkin' && sender && msg.pubkey !== sender) return group
+
   // Non-privileged member-leave still needs opId replay guard
   if (msg.type === 'member-leave' && !isPrivilegedAction(msg, sender)) {
     const consumedSet = new Set(group.consumedOps)
@@ -526,7 +529,9 @@ export function applySyncMessageWithResult(
   if (msg.type === 'beacon' || msg.type === 'duress-alert' || msg.type === 'liveness-checkin') {
     const elapsed = nowSec - msg.timestamp
     const fresh = elapsed <= FIRE_AND_FORGET_FRESHNESS_SEC && elapsed >= -MAX_FUTURE_SKEW_SEC
-    return { state: result, applied: fresh }
+    // For liveness-checkin, also check sender-pubkey cross-check
+    const senderValid = msg.type !== 'liveness-checkin' || !sender || msg.pubkey === sender
+    return { state: result, applied: fresh && senderValid }
   }
   return { state: result, applied: result !== group }
 }
