@@ -1467,13 +1467,22 @@ describe('applySyncMessageWithResult', () => {
     expect(result.state.members).toContain(PUBKEY_BBB)
   })
 
-  it('returns applied: false for rejected message (non-admin sender)', () => {
+  it('returns applied: true for self-join (non-admin adding themselves)', () => {
     const group = makeGroup()
     const result = applySyncMessageWithResult(group, {
       type: 'member-join', pubkey: PUBKEY_BBB, timestamp: 0, epoch: 0, opId: 'join-1',
-    }, undefined, PUBKEY_BBB) // BBB is not admin
+    }, undefined, PUBKEY_BBB) // BBB is not admin but is adding themselves
+    expect(result.applied).toBe(true)
+    expect(result.state.members).toContain(PUBKEY_BBB)
+  })
+
+  it('returns applied: false when non-admin adds someone else', () => {
+    const group = makeGroup()
+    const result = applySyncMessageWithResult(group, {
+      type: 'member-join', pubkey: PUBKEY_CCC, timestamp: 0, epoch: 0, opId: 'join-2',
+    }, undefined, PUBKEY_BBB) // BBB is not admin, trying to add CCC
     expect(result.applied).toBe(false)
-    expect(result.state).toBe(group) // reference equality — unchanged
+    expect(result.state).toBe(group)
   })
 
   it('returns applied: true for fresh beacon (fire-and-forget)', () => {

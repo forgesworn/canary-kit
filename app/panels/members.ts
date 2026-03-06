@@ -1,7 +1,7 @@
 // app/panels/members.ts — Members panel: list members and generate invites
 
 import { getState, updateGroup } from '../state.js'
-import { removeGroupMember } from '../actions/groups.js'
+import { addGroupMember, removeGroupMember } from '../actions/groups.js'
 import {
   verifyJoinToken,
   startInviteSession, rotateInviteSession, endInviteSession,
@@ -440,11 +440,20 @@ function addConfirmedMember(groupId: string, pubkey: string, displayName: string
   const group = groups[groupId]
   if (!group) return false
   if (!identity?.pubkey || !group.admins.includes(identity.pubkey)) return false
-  if (group.members.includes(pubkey)) return false
 
-  const members = [...group.members, pubkey]
-  const memberNames = { ...group.memberNames, [pubkey]: displayName }
-  updateGroup(groupId, { members, memberNames })
+  if (!group.members.includes(pubkey)) {
+    // addGroupMember broadcasts member-join to the network and re-registers
+    // the relay subscription so the new member's messages are accepted.
+    addGroupMember(groupId, pubkey)
+  }
+
+  // Always update the display name (self-join via relay may have arrived
+  // before the creator confirms, so the member may already be present
+  // but without a friendly name).
+  const updated = getState().groups[groupId]
+  if (updated && displayName) {
+    updateGroup(groupId, { memberNames: { ...updated.memberNames, [pubkey]: displayName } })
+  }
   return true
 }
 

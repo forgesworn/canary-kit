@@ -289,13 +289,16 @@ export function decodeSyncMessage(payload: string): SyncMessage {
 
 /**
  * Determine whether a sync message type is privileged (requires admin sender).
- * member-join is ALWAYS privileged. member-leave is privileged when target !== sender.
+ * member-join is privileged UNLESS the sender is adding themselves (self-join).
+ * Self-join is allowed because decrypting the group envelope proves the sender
+ * received a valid admin-signed invite containing the group key.
+ * member-leave is privileged when target !== sender.
  * Self-leave is NOT privileged — a member can always remove themselves.
  */
 function isPrivilegedAction(msg: SyncMessage, sender?: string): boolean {
   if (msg.type === 'reseed') return true
   if (msg.type === 'state-snapshot') return true
-  if (msg.type === 'member-join') return true
+  if (msg.type === 'member-join' && msg.pubkey !== sender) return true
   if (msg.type === 'member-leave' && msg.pubkey !== sender) return true
   return false
 }

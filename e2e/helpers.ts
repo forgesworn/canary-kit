@@ -137,11 +137,13 @@ export async function acceptInviteViaModal(
   await page.click('#modal-form button[type="submit"]')
   await page.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
 
-  // Dismiss join confirmation modal if it appears (backward compatibility)
+  // Dismiss join confirmation modal if it appears. The modal is created
+  // asynchronously (dynamic imports for token derivation) so it may take
+  // a moment to appear, especially under full-suite load.
   const joinConfirmModal = page.locator('#join-confirm-modal[open]')
-  if (await joinConfirmModal.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await joinConfirmModal.isVisible({ timeout: 5000 }).catch(() => false)) {
     await page.click('#join-confirm-done')
-    await page.waitForSelector('#join-confirm-modal:not([open])', { state: 'attached', timeout: 2000 }).catch(() => {})
+    await page.waitForSelector('#join-confirm-modal:not([open])', { state: 'attached', timeout: 3000 }).catch(() => {})
   }
 }
 
@@ -182,11 +184,13 @@ export async function acceptInviteViaLink(
   await page.click('#modal-form button[type="submit"]')
   await page.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
 
-  // Dismiss join confirmation modal if it appears (backward compatibility)
+  // Dismiss join confirmation modal if it appears. The modal is created
+  // asynchronously (dynamic imports for token derivation) so it may take
+  // a moment to appear, especially under full-suite load.
   const joinConfirmModal = page.locator('#join-confirm-modal[open]')
-  if (await joinConfirmModal.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await joinConfirmModal.isVisible({ timeout: 5000 }).catch(() => false)) {
     await page.click('#join-confirm-done')
-    await page.waitForSelector('#join-confirm-modal:not([open])', { state: 'attached', timeout: 2000 }).catch(() => {})
+    await page.waitForSelector('#join-confirm-modal:not([open])', { state: 'attached', timeout: 3000 }).catch(() => {})
   }
 
   // Clean up dialog handler to avoid interfering with subsequent dialog expectations
