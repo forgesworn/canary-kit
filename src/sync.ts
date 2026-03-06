@@ -495,6 +495,42 @@ export function applySyncMessage(
   }
 }
 
+/** Result of applying a sync message, including whether it was accepted or rejected. */
+export interface SyncApplyResult {
+  /** The resulting group state (unchanged if rejected). */
+  state: GroupState
+  /** Whether the message was applied to the group state. */
+  applied: boolean
+}
+
+/**
+ * Apply a sync message and return a result indicating whether it was accepted.
+ *
+ * Unlike `applySyncMessage` which silently returns unchanged state on rejection,
+ * this function tells the caller whether the message was actually applied —
+ * enabling logging, alerting, and debugging of rejected messages.
+ *
+ * Fire-and-forget messages (beacon, duress-alert, liveness-checkin) always
+ * return `applied: true` when they pass freshness checks, even though they
+ * don't modify group state.
+ */
+export function applySyncMessageWithResult(
+  group: GroupState,
+  msg: SyncMessage,
+  nowSec: number = Math.floor(Date.now() / 1000),
+  sender?: string,
+): SyncApplyResult {
+  const result = applySyncMessage(group, msg, nowSec, sender)
+  // Fire-and-forget messages don't modify state, so reference equality
+  // doesn't distinguish accepted from rejected. Check freshness directly.
+  if (msg.type === 'beacon' || msg.type === 'duress-alert' || msg.type === 'liveness-checkin') {
+    const elapsed = nowSec - msg.timestamp
+    const fresh = elapsed <= FIRE_AND_FORGET_FRESHNESS_SEC && elapsed >= -MAX_FUTURE_SKEW_SEC
+    return { state: result, applied: fresh }
+  }
+  return { state: result, applied: result !== group }
+}
+
 // ── Transport interface ───────────────────────────────────────
 
 /** Minimal interface any sync transport must implement. */

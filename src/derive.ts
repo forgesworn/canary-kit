@@ -2,6 +2,15 @@ import { hmacSha256, hexToBytes, concatBytes, readUint16BE } from './crypto.js'
 import { counterToBytes } from './counter.js'
 import { getWord, WORDLIST_SIZE } from './wordlist.js'
 
+/**
+ * NOTE: This module uses a different derivation scheme from the universal token
+ * API in token.ts. Here the HMAC key is the seed and the data is the counter
+ * (8-byte BE). In token.ts the HMAC key is the secret and the data is
+ * utf8(context) || counter_be32 (4-byte). The two APIs produce different
+ * outputs and are NOT interchangeable. This module is the group-level API;
+ * token.ts is the universal CANARY protocol API.
+ */
+
 /** Parse a hex-encoded seed string to a Uint8Array. */
 function seedToBytes(seedHex: string): Uint8Array {
   if (seedHex.length !== 64) {
