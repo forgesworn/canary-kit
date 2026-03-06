@@ -51,6 +51,26 @@ describe('counterToBytes', () => {
   it('throws on non-integer counter', () => {
     expect(() => counterToBytes(1.5)).toThrow()
   })
+
+  it('throws on negative counter', () => {
+    expect(() => counterToBytes(-1)).toThrow(RangeError)
+  })
+
+  it('throws on NaN', () => {
+    expect(() => counterToBytes(NaN)).toThrow(RangeError)
+  })
+
+  it('throws on Infinity', () => {
+    expect(() => counterToBytes(Infinity)).toThrow(RangeError)
+  })
+
+  it('throws on value beyond MAX_SAFE_INTEGER', () => {
+    expect(() => counterToBytes(Number.MAX_SAFE_INTEGER + 1)).toThrow(RangeError)
+  })
+
+  it('accepts MAX_SAFE_INTEGER', () => {
+    expect(() => counterToBytes(Number.MAX_SAFE_INTEGER)).not.toThrow()
+  })
 })
 
 describe('getCounter with negative timestamp', () => {

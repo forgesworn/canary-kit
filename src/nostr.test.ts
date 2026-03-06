@@ -208,6 +208,42 @@ describe('buildBeaconEvent', () => {
   })
 })
 
+describe('pubkey validation', () => {
+  it('buildGroupEvent rejects invalid member pubkeys', () => {
+    expect(() => buildGroupEvent({
+      groupId: GROUP_D, name: 'Test', members: ['not-hex'],
+      rotationInterval: 604_800, wordCount: 1, wordlist: 'en-v1', encryptedContent: '',
+    })).toThrow(/Invalid member pubkey/)
+  })
+
+  it('buildGroupEvent rejects npub-encoded pubkeys', () => {
+    expect(() => buildGroupEvent({
+      groupId: GROUP_D, name: 'Test', members: ['npub1' + '0'.repeat(59)],
+      rotationInterval: 604_800, wordCount: 1, wordlist: 'en-v1', encryptedContent: '',
+    })).toThrow(/Invalid member pubkey/)
+  })
+
+  it('buildSeedDistributionEvent rejects invalid recipientPubkey', () => {
+    expect(() => buildSeedDistributionEvent({
+      recipientPubkey: 'short', groupEventId: GROUP_EVENT_ID, encryptedContent: '',
+    })).toThrow(/Invalid recipientPubkey/)
+  })
+
+  it('buildMemberUpdateEvent rejects invalid memberPubkey', () => {
+    expect(() => buildMemberUpdateEvent({
+      groupId: GROUP_D, action: 'add', memberPubkey: 'bad',
+      reseed: false, encryptedContent: '',
+    })).toThrow(/Invalid memberPubkey/)
+  })
+
+  it('buildGroupEvent accepts valid 64-char hex pubkeys', () => {
+    expect(() => buildGroupEvent({
+      groupId: GROUP_D, name: 'Test', members: [ALICE, BOB],
+      rotationInterval: 604_800, wordCount: 1, wordlist: 'en-v1', encryptedContent: '',
+    })).not.toThrow()
+  })
+})
+
 describe('expiration edge cases', () => {
   it('buildGroupEvent includes expiration tag for timestamp 0', () => {
     const event = buildGroupEvent({

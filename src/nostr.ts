@@ -141,6 +141,29 @@ export interface BeaconEventParams {
   expiration?: number
 }
 
+// ---------------------------------------------------------------------------
+// Encrypted payload types (plaintext structures before NIP-44 encryption)
+// ---------------------------------------------------------------------------
+
+/** Plaintext payload for kind 28800 (seed distribution). */
+export interface SeedDistributionPayload {
+  seed: string
+  groupId: string
+}
+
+/** Plaintext payload for kind 28801 (reseed notification). */
+export interface ReseedPayload {
+  seed: string
+  reason: 'member_removed' | 'compromise' | 'scheduled' | 'duress'
+}
+
+/** Plaintext payload for kind 28802 (word used / burn-after-use). */
+export interface WordUsedPayload {
+  new_counter: number
+  used_by: string
+  duress: boolean
+}
+
 export function buildBeaconEvent(params: BeaconEventParams): UnsignedEvent {
   const tags: string[][] = [['h', params.groupId]]
   if (params.expiration !== undefined) {

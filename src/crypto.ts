@@ -255,11 +255,16 @@ export function base64ToBytes(base64: string): Uint8Array {
   return bytes
 }
 
-/** Constant-time comparison of two byte arrays. */
+/**
+ * Constant-time comparison of two byte arrays.
+ * Pads the shorter array to the longer length to avoid leaking length via timing.
+ */
 export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i]
+  const len = Math.max(a.length, b.length)
+  let diff = a.length ^ b.length // non-zero if lengths differ
+  for (let i = 0; i < len; i++) {
+    diff |= (a[i] ?? 0) ^ (b[i] ?? 0)
+  }
   return diff === 0
 }
 
