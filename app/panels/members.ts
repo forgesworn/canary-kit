@@ -39,20 +39,24 @@ function memberColourDot(pubkey: string, members: string[], livenessCheckins: Re
 }
 
 /**
- * Format a pubkey for display: "You" for local identity, memberNames, or truncated pubkey.
+ * Format a pubkey for display: profile name (you) for self, memberNames, or truncated pubkey.
  */
 function formatPubkey(pubkey: string, _members: string[], groupId?: string): string {
   const { identity, groups } = getState()
-  if (identity?.pubkey === pubkey) return 'You'
+  const isSelf = identity?.pubkey === pubkey
+
+  // Try all name sources in priority order
+  let name: string | undefined
   if (groupId) {
     const group = groups[groupId]
-    const name = group?.memberNames?.[pubkey]
-    if (name && name !== 'You') return name
+    const mn = group?.memberNames?.[pubkey]
+    if (mn && mn !== 'You') name = mn
   }
-  const demoName = _demoNameByPubkey.get(pubkey)
-  if (demoName) return demoName
-  const profileName = getCachedName(pubkey)
-  if (profileName) return profileName
+  if (!name) name = _demoNameByPubkey.get(pubkey)
+  if (!name) name = getCachedName(pubkey)
+
+  if (isSelf) return name ? `${name} (you)` : 'You'
+  if (name) return name
   return `${pubkey.slice(0, 8)}\u2026${pubkey.slice(-4)}`
 }
 
@@ -433,9 +437,13 @@ export function renderMembers(container: HTMLElement): void {
           .map(
             (pubkey) => {
               const dotColour = memberColourDot(pubkey, group.members, group.livenessCheckins ?? {}, group.livenessInterval)
+              const profile = getCachedProfile(pubkey)
+              const avatarHtml = profile?.picture
+                ? `<img src="${escapeHtml(profile.picture)}" alt="" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid ${dotColour};box-shadow:0 0 6px ${dotColour}80;" />`
+                : `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${dotColour};flex-shrink:0;box-shadow:0 0 6px ${dotColour}80;"></span>`
               return `
           <li class="member-item" data-pubkey="${escapeHtml(pubkey)}">
-            <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${dotColour};flex-shrink:0;box-shadow:0 0 6px ${dotColour}80;"></span>
+            ${avatarHtml}
             <button class="member-item__name-btn" data-pubkey="${escapeHtml(pubkey)}" type="button">${escapeHtml(formatPubkey(pubkey, group.members, activeGroupId))}</button>
             ${isAdmin ? `<button
               class="btn btn--sm member-item__remove"

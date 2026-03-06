@@ -1026,6 +1026,9 @@ async function bootSync(): Promise<void> {
   subscribeToAllGroups()
   showToast(`Syncing via ${allRelays.size} relay(s)`, 'success', 2000)
 
+  // Re-render now that pool is connected — fetchProfiles needs a live pool
+  scheduleRender()
+
   // Start heartbeat AFTER groups are registered (not inside ensureTransport)
   const { startLivenessHeartbeat } = await import('./components/liveness.js')
   startLivenessHeartbeat()

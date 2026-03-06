@@ -47,7 +47,7 @@ export function getCachedProfile(pubkey: string): NostrProfile | undefined {
  */
 export function fetchProfiles(pubkeys: string[], groupId?: string): void {
   const pool = getPool()
-  if (!pool) return
+  if (!pool) { console.warn('[profiles] no pool — skipping'); return }
 
   // Filter to pubkeys we haven't fetched or aren't already fetching
   const now = Date.now()
@@ -57,15 +57,13 @@ export function fetchProfiles(pubkeys: string[], groupId?: string): void {
     if (notFoundAt && (now - notFoundAt) < NOT_FOUND_TTL_MS) return false
     return true
   })
-  if (needed.length === 0) return
-
-  const { identity } = getState()
-  const selfPubkey = identity?.pubkey
+  if (needed.length === 0) { console.warn('[profiles] all cached/pending — nothing to fetch'); return }
 
   for (const pk of needed) _pending.add(pk)
 
   // Get relay URLs from group or state
   const relays = getGroupRelays(groupId)
+  console.warn('[profiles] fetching', needed.length, 'profiles from', relays, 'for group', groupId?.slice(0, 8))
   if (relays.length === 0) {
     for (const pk of needed) _pending.delete(pk)
     return
@@ -74,17 +72,18 @@ export function fetchProfiles(pubkeys: string[], groupId?: string): void {
   // Subscribe to kind 0 for all needed pubkeys
   const sub = pool.subscribeMany(
     relays,
-    [{ kinds: [0], authors: needed }],
+    { kinds: [0], authors: needed } as any,
     {
       onevent(event) {
         try {
           const profile: NostrProfile = JSON.parse(event.content)
+          console.warn('[profiles] got profile for', event.pubkey.slice(0, 8), profile.display_name || profile.name || '(no name)')
           _cache.set(event.pubkey, profile)
           _pending.delete(event.pubkey)
 
           // Update memberNames in the group if we got a name and it's not our own key
           const displayName = profile.display_name || profile.name
-          if (displayName && event.pubkey !== selfPubkey && groupId) {
+          if (displayName && groupId) {
             const group = getState().groups[groupId]
             if (group && group.memberNames?.[event.pubkey] !== displayName) {
               updateGroup(groupId, {
@@ -98,6 +97,7 @@ export function fetchProfiles(pubkeys: string[], groupId?: string): void {
         }
       },
       oneose() {
+        console.warn('[profiles] EOSE — found:', needed.filter(pk => _cache.has(pk)).length, 'missing:', needed.filter(pk => !_cache.has(pk)).length)
         for (const pk of needed) {
           if (!_cache.has(pk)) _notFound.set(pk, Date.now())
           _pending.delete(pk)
