@@ -477,7 +477,17 @@ function checkInviteFragment(): void {
 
 // ── Join confirmation modal ─────────────────────────────────────
 
-function showJoinConfirmation(groupName: string, joinTokenEncoded: string, currentWord: string): void {
+function showJoinConfirmation(
+  groupName: string,
+  joinTokenEncoded: string,
+  currentWord: string,
+  channel: 'qr' | 'link' = 'link',
+): void {
+  if (channel === 'qr') {
+    showToast(`You've joined ${groupName}`, 'success')
+    return
+  }
+
   const base = window.location.href.split('#')[0]
   const ackUrl = `${base}#ack/${encodeURIComponent(joinTokenEncoded)}`
 
