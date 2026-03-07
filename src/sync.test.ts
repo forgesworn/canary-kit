@@ -269,7 +269,7 @@ describe('state-snapshot', () => {
     expect(decoded).toEqual(msg)
   })
 
-  it('admin-signed snapshot replaces group state', () => {
+  it('higher-epoch admin-signed snapshot is rejected (recovery disabled)', () => {
     const group: GroupState = {
       name: 'Test',
       seed: 'a'.repeat(64),
@@ -300,13 +300,7 @@ describe('state-snapshot', () => {
     }
 
     const updated = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
-    expect(updated.seed).toBe('c'.repeat(64))
-    expect(updated.counter).toBe(200)
-    expect(updated.usageOffset).toBe(5)
-    expect(updated.members).toEqual([PUBKEY_AAA, PUBKEY_BBB, 'd'.repeat(64)])
-    expect(updated.admins).toEqual([PUBKEY_AAA])
-    expect(updated.epoch).toBe(5)
-    expect(updated.consumedOps).toEqual(['snap-1'])
+    expect(updated).toBe(group)
   })
 
   it('snapshot from non-admin is rejected', () => {
@@ -657,7 +651,7 @@ describe('state-snapshot', () => {
     expect((updated as Record<string, unknown>).prevEpochSeed).toBeUndefined()
   })
 
-  it('state-snapshot with correct prevEpochSeed is accepted', () => {
+  it('higher-epoch snapshot with correct prevEpochSeed is now rejected', () => {
     const group: GroupState = {
       name: 'Test',
       seed: 'a'.repeat(64),
@@ -687,8 +681,7 @@ describe('state-snapshot', () => {
       prevEpochSeed: group.seed,
     }
     const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
-    expect(result.epoch).toBe(1)
-    expect(result.seed).toBe('b'.repeat(64))
+    expect(result).toBe(group)
   })
 
   it('state-snapshot with wrong prevEpochSeed is rejected', () => {
@@ -724,7 +717,7 @@ describe('state-snapshot', () => {
     expect(result).toBe(group)
   })
 
-  it('state-snapshot without prevEpochSeed is still accepted (optional field)', () => {
+  it('higher-epoch snapshot without prevEpochSeed is rejected', () => {
     const group: GroupState = {
       name: 'Test',
       seed: 'a'.repeat(64),
@@ -753,7 +746,104 @@ describe('state-snapshot', () => {
       timestamp: 0,
     }
     const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
-    expect(result.epoch).toBe(1)
+    expect(result).toBe(group)
+  })
+
+  it('higher-epoch snapshot is rejected (recovery disabled)', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 0,
+      usageOffset: 0,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      consumedOps: [],
+    }
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'b'.repeat(64),
+      counter: 0,
+      usageOffset: 0,
+      members: [PUBKEY_AAA],
+      admins: [PUBKEY_AAA],
+      epoch: 5,
+      opId: 'snap-higher-epoch',
+      timestamp: 0,
+    }
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('higher-epoch snapshot with prevEpochSeed is still rejected', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 0,
+      usageOffset: 0,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 0,
+      consumedOps: [],
+    }
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'b'.repeat(64),
+      counter: 0,
+      usageOffset: 0,
+      members: [PUBKEY_AAA],
+      admins: [PUBKEY_AAA],
+      epoch: 1,
+      opId: 'snap-higher-prev',
+      timestamp: 0,
+      prevEpochSeed: group.seed,
+    }
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(result).toBe(group)
+  })
+
+  it('epoch+1 snapshot is rejected (not just epoch+2)', () => {
+    const group: GroupState = {
+      name: 'Test',
+      seed: 'a'.repeat(64),
+      members: [PUBKEY_AAA],
+      rotationInterval: 604800,
+      wordCount: 1,
+      wordlist: 'en-v1',
+      counter: 0,
+      usageOffset: 0,
+      createdAt: 1700000000,
+      beaconInterval: 300,
+      beaconPrecision: 6,
+      admins: [PUBKEY_AAA],
+      epoch: 3,
+      consumedOps: [],
+    }
+    const snapshot: SyncMessage = {
+      type: 'state-snapshot',
+      seed: 'b'.repeat(64),
+      counter: 0,
+      usageOffset: 0,
+      members: [PUBKEY_AAA],
+      admins: [PUBKEY_AAA],
+      epoch: 4,
+      opId: 'snap-epoch-plus-one',
+      timestamp: 0,
+    }
+    const result = applySyncMessage(group, snapshot, undefined, PUBKEY_AAA)
+    expect(result).toBe(group)
   })
 
   it('decode ignores unknown extra fields on state-snapshot', () => {

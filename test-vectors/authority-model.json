@@ -538,7 +538,7 @@
     {
       "id": "I5-snapshot-from-admin",
       "invariant": "I5",
-      "description": "State-snapshot from admin with epoch >= local is accepted",
+      "description": "Higher-epoch state-snapshot from admin is rejected (recovery disabled)",
       "initialGroup": {
         "name": "test",
         "seed": "0000000000000000000000000000000000000000000000000000000000000001",
@@ -578,22 +578,8 @@
         "timestamp": 1700001000
       },
       "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "expected": "accept",
-      "expectedState": {
-        "seed": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        "counter": 200,
-        "usageOffset": 5,
-        "epoch": 7,
-        "consumedOps": ["snap-1"],
-        "members": [
-          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-        ],
-        "admins": [
-          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        ]
-      }
+      "expected": "reject",
+      "note": "Higher-epoch snapshots are now rejected. Members who miss reseeds must be re-invited."
     },
     {
       "id": "I5-snapshot-from-non-admin",

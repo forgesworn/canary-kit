@@ -476,22 +476,11 @@ export function applySyncMessage(
           ...snapOps,
         }
       }
-      // ── Higher-epoch recovery: full state replacement ──
-      // If prevEpochSeed is provided, verify it matches our current seed
-      // (proves the sender knew the previous epoch's secret)
-      if (msg.prevEpochSeed !== undefined && msg.prevEpochSeed !== group.seed) {
-        return group  // continuity proof failed — reject
-      }
-      return {
-        ...group,
-        seed: msg.seed,
-        counter: msg.counter,
-        usageOffset: msg.usageOffset,
-        members: [...msg.members],
-        admins: [...msg.admins],
-        epoch: msg.epoch,
-        consumedOps: [msg.opId],
-      }
+      // ── Higher-epoch recovery: DISABLED ──
+      // Higher-epoch snapshots are rejected. Members who miss reseeds
+      // must be re-invited. This eliminates the stale-admin hijack
+      // attack surface entirely.
+      return group
     }
 
     case 'beacon':
