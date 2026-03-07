@@ -5,16 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CANARY — Deepfake-proof Verification</title>
     <meta name="description" content="Deepfake-proof identity verification. Open protocol, zero dependencies. CANARY protocol demo." />
-
-    <!-- Inline script: restore theme before first paint to avoid flash -->
-    <script>
-      (function () {
-        try {
-          var s = localStorage.getItem('canary:settings')
-          if (s && JSON.parse(s).theme === 'light') document.documentElement.setAttribute('data-theme', 'light')
-        } catch (_) {}
-      })()
-    </script>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss:; worker-src 'self' blob:">
+    <!-- Restore theme before first paint to avoid flash -->
+    <script src="./theme-init.js"></script>
   </head>
   <body>
     <div id="app"></div>
