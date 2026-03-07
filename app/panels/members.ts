@@ -118,11 +118,7 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
     const base = window.location.href.split('#')[0]
     return `${base}#scan/${encodeURIComponent(session.payload)}`
   }
-  function currentLinkUrl(): string {
-    const base = window.location.href.split('#')[0]
-    const prefix = options?.hashPrefix ?? 'join'
-    return `${base}#${prefix}/${encodeURIComponent(session.payload)}`
-  }
+  // currentLinkUrl removed — seed-bearing links replaced by remote invite flow
 
   let dialog = document.getElementById('invite-modal') as HTMLDialogElement | null
   if (!dialog) {
@@ -224,87 +220,7 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
     d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => { removeJoinHandler(); endInviteSession(); d.close() })
   }
 
-  function renderLinkPath(): void {
-    const linkUrl = currentLinkUrl()
-    d.innerHTML = `
-      <div class="modal__form invite-share">
-        <h2 class="modal__title">${escapeHtml(title)}</h2>
-
-        <div class="confirm-code">
-          <span class="confirm-code__label">Confirmation words</span>
-          <span class="confirm-code__value">${session.confirmCode}</span>
-        </div>
-        <p class="invite-hint">Read these words to the recipient on a phone call — they'll need them to join</p>
-
-        <p class="invite-hint" style="color: var(--duress); font-weight: 500;">Share via a private channel — WhatsApp, Signal, or in person. The confirmation code verifies it wasn't tampered with.</p>
-
-        <div class="invite-share__actions" style="flex-direction: column; gap: 0.5rem;">
-          <div style="display: flex; gap: 0.75rem; justify-content: center;">
-            <button class="btn btn--primary" id="invite-copy-link" type="button">Copy Link</button>
-            <button class="btn" id="invite-copy-text" type="button">Copy Invite Text</button>
-          </div>
-          <button class="btn" id="invite-save-qr" type="button">Save QR Image</button>
-        </div>
-
-        <p class="invite-hint">Share via WhatsApp, Signal, email, or any messaging app</p>
-
-        ${showConfirmMemberNote ? `<p class="invite-hint" style="margin-top: 1rem; font-style: italic;">After they join, click <strong>Confirm Member</strong> to verify them — they'll give you a word or token.</p>` : ''}
-
-        <div class="modal__actions" style="gap: 0.5rem;">
-          <button class="btn" id="invite-back-btn" type="button">Back</button>
-          <button class="btn" id="invite-close-btn" type="button">Done</button>
-        </div>
-      </div>
-    `
-    d.querySelector<HTMLButtonElement>('#invite-back-btn')?.addEventListener('click', renderChooser)
-    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => { endInviteSession(); d.close() })
-
-    d.querySelector<HTMLButtonElement>('#invite-copy-link')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget as HTMLButtonElement
-      try {
-        await navigator.clipboard.writeText(linkUrl)
-        btn.textContent = 'Link Copied!'
-        btn.classList.add('btn--copied')
-        setTimeout(() => { btn.textContent = 'Copy Link'; btn.classList.remove('btn--copied') }, 2000)
-      } catch { /* clipboard may be blocked */ }
-    })
-
-    d.querySelector<HTMLButtonElement>('#invite-copy-text')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget as HTMLButtonElement
-      try {
-        await navigator.clipboard.writeText(session.payload)
-        btn.textContent = 'Text Copied!'
-        btn.classList.add('btn--copied')
-        setTimeout(() => { btn.textContent = 'Copy Invite Text'; btn.classList.remove('btn--copied') }, 2000)
-      } catch { /* clipboard may be blocked */ }
-    })
-
-    d.querySelector<HTMLButtonElement>('#invite-save-qr')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget as HTMLButtonElement
-      try {
-        const linkQrSvg = generateQR(currentLinkUrl())
-        const blob = await svgToBlob(linkQrSvg)
-        if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-          btn.textContent = 'QR Copied!'
-          btn.classList.add('btn--copied')
-        } else {
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = 'canary-invite.png'
-          a.click()
-          URL.revokeObjectURL(url)
-          btn.textContent = 'QR Downloaded!'
-          btn.classList.add('btn--copied')
-        }
-        setTimeout(() => { btn.textContent = 'Save QR Image'; btn.classList.remove('btn--copied') }, 2000)
-      } catch {
-        btn.textContent = 'Failed'
-        setTimeout(() => { btn.textContent = 'Save QR Image' }, 2000)
-      }
-    })
-  }
+  // renderLinkPath removed — seed-bearing links replaced by renderRemotePath
 
   function renderRemotePath(): void {
     const remoteSession = startRemoteInviteSession(group)
