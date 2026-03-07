@@ -292,7 +292,7 @@ Lines 58-61 use `===` (non-constant-time) for the exact vs stale distinction. Th
 | F-018 | Info | Verify | `===` in verify.ts:58–61 is post-verification, no security impact | Verified |
 | F-019 | Info | Token | `break` in verifyToken duress loop is inner-loop only, accepted timing | Verified |
 | F-020 | High | App | Invite payload carries live group seed in URL hashes, QR codes, clipboard | Fixed — seedless remote invite flow with NIP-44 encrypted welcome envelope |
-| F-021 | High | App | localStorage stores seeds/keys; PIN-encrypted after unlock, plaintext when PIN disabled | Fixed — CSP meta tag added, inline scripts removed; browser storage limitation documented |
+| F-021 | High | App | localStorage stores seeds/keys; PIN-encrypted after unlock, plaintext when PIN disabled | Mitigated — CSP meta tag added, inline scripts removed, PIN enabled by default; secrets are decrypted into JS memory after unlock (architectural limitation of browser custody — production deployments MUST use platform secure storage) |
 | F-022 | Medium | Sync | Higher-epoch snapshot accepted from single admin; stale-admin fabrication possible | Fixed — higher-epoch recovery disabled; members who miss reseeds must be re-invited |
 | F-023 | Low | App | No CSP or Trusted Types hardening in demo app HTML | Fixed — CSP meta tag with strict policy added to index.html |
 
@@ -340,7 +340,7 @@ The protocol is cryptographically sound. The implementation faithfully follows t
 |------|----------|------------|
 | Symmetric key design: device compromise = full access until reseed | By design | `removeMemberAndReseed()`, prompt reseed |
 | Invite payload transports live seed (F-020) | ~~High~~ Fixed | Remote invites use seedless token + NIP-44 encrypted welcome envelope; in-person QR still carries seed (acceptable risk) |
-| Browser localStorage stores secrets (F-021) | ~~High~~ Mitigated | CSP meta tag blocks XSS vectors; PIN uses PBKDF2 600k / AES-256-GCM; production should use platform secure storage |
+| Browser localStorage stores secrets (F-021) | ~~High~~ Mitigated | CSP meta tag blocks XSS vectors; PIN enabled by default with PBKDF2 600k / AES-256-GCM; after unlock secrets are in JS memory (browser architectural limitation — production MUST use platform secure storage such as iOS Keychain, Android Keystore, or OS credential manager) |
 | State-snapshot epoch hijack by stale admin (F-022) | ~~Medium~~ Fixed | Higher-epoch recovery disabled; members who miss reseeds must be re-invited |
 | Nostr metadata exposure (p-tags) | Low | Protocol limitation; relay access controls |
 | 1/2048 word guess probability | Low | Use 2+ words for high-security groups |

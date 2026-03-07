@@ -141,9 +141,12 @@ function resolveActiveGroupId(validGroups: Record<string, unknown>): string | nu
 export async function persistState(): Promise<void> {
   const state = getState()
 
-  // Fail closed when PIN protection is enabled but no unlock key is loaded.
-  // This happens while locked; writing any state here would persist secrets in plaintext.
-  if (state.settings.pinEnabled && _pinKey === null) {
+  // Fail closed when PIN protection is enabled, the user has actually configured
+  // a PIN (salt exists), but the unlock key hasn't been loaded yet.
+  // Without the salt check, fresh installs with pinEnabled=true as default would
+  // silently drop all writes because no key can exist before first PIN setup.
+  const pinConfigured = !!getStoredPinSalt()
+  if (state.settings.pinEnabled && pinConfigured && _pinKey === null) {
     console.error('[canary:storage] PIN enabled but key not loaded — state NOT persisted.')
     return
   }
