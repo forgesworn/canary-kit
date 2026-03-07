@@ -115,7 +115,7 @@ getCurrentWord(group)  // "falcon"
 | Cloudflare Workers | Yes | Web Crypto API available |
 | React Native | Via polyfill | Needs `crypto.subtle` polyfill |
 
-ESM-only. Seven subpath exports for tree-shaking:
+ESM-only. Eight subpath exports for tree-shaking:
 
 ```typescript
 import { createSession } from 'canary-kit/session'    // just sessions
@@ -124,6 +124,7 @@ import { encodeAsWords } from 'canary-kit/encoding'    // just encoding
 import { WORDLIST } from 'canary-kit/wordlist'          // just the wordlist
 import { buildGroupEvent } from 'canary-kit/nostr'     // just Nostr
 import { encryptBeacon } from 'canary-kit/beacon'      // just beacons
+import { applySyncMessage } from 'canary-kit/sync'     // just sync protocol
 ```
 
 ## Security
@@ -131,7 +132,7 @@ import { encryptBeacon } from 'canary-kit/beacon'      // just beacons
 - **Zero runtime dependencies** — the published package contains only our code
 - **Automated publishing** — GitHub Actions with OIDC trusted publishing, no stored tokens
 - **Provenance signed** — npm provenance attestation enabled
-- **Protocol-grade test vectors** — 12 frozen canonical vectors; any conformant implementation must produce identical results
+- **Protocol-grade test vectors** — frozen canonical vectors in both CANARY.md and NIP-CANARY.md; any conformant implementation must produce identical results
 - **Timing-safe byte compare** — `timingSafeEqual()` utility provided for constant-time byte operations
 - **Bounded tolerance** — `MAX_TOLERANCE` cap prevents pathological iteration
 
@@ -352,6 +353,36 @@ import {
 } from 'canary-kit/beacon'
 ```
 
+### Sync Protocol
+
+```typescript
+import {
+  applySyncMessage,
+  decodeSyncMessage,
+  encodeSyncMessage,
+  deriveGroupKey,
+  deriveGroupSigningKey,
+  hashGroupTag,
+  encryptEnvelope,
+  decryptEnvelope,
+  type SyncMessage,
+  type SyncResult,
+} from 'canary-kit/sync'
+```
+
+Transport-agnostic state synchronisation for group membership, counter advancement, reseeds, beacons, and duress alerts. Messages are validated against an authority model with 6 invariants (admin checks, epoch ordering, replay protection, counter bounds).
+
+| Message type | Description |
+|---|---|
+| `member-join` | Add a member (admin-only) |
+| `member-leave` | Remove a member or self-leave |
+| `counter-advance` | Advance the group counter (burn-after-use) |
+| `reseed` | Distribute a new seed with epoch bump |
+| `beacon` | Encrypted location heartbeat |
+| `duress-alert` | Silent duress location alert |
+| `liveness-checkin` | Dead man's switch heartbeat |
+| `state-snapshot` | Full state sync for new/rejoining members |
+
 ## Protocol
 
 The full protocol specification is in [CANARY.md](CANARY.md). The Nostr binding is in [NIP-CANARY.md](NIP-CANARY.md). The integration guide for finance/enterprise is in [INTEGRATION.md](INTEGRATION.md).
@@ -365,14 +396,21 @@ The full protocol specification is in [CANARY.md](CANARY.md). The Nostr binding 
 | Word used | `28802` | Ephemeral |
 | Encrypted location beacon | `20800` | Ephemeral |
 
-All kind numbers above are provisional — pending final NIP allocation.
-
 Content is encrypted with **NIP-44**. Events may carry a **NIP-40** `expiration` tag.
 
 ## For AI Assistants
 
 - [llms.txt](llms.txt) — concise API summary
 - [llms-full.txt](llms-full.txt) — complete reference with all type signatures
+
+## Support
+
+For issues and feature requests, see [GitHub Issues](https://github.com/TheCryptoDonkey/canary-kit/issues).
+
+If you find canary-kit useful, consider sending a tip:
+
+- **Lightning:** `thedonkey@strike.me`
+- **Nostr zaps:** `npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2`
 
 ## Licence
 

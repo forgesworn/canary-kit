@@ -40,6 +40,7 @@ import { createSession, generateSeed, deriveSeed, SESSION_PRESETS } from 'canary
 import { WORDLIST, WORDLIST_SIZE, getWord, indexOf } from 'canary-kit/wordlist'
 import { KINDS, buildGroupEvent, buildSeedDistributionEvent, buildMemberUpdateEvent, buildReseedEvent, buildWordUsedEvent, buildBeaconEvent } from 'canary-kit/nostr'
 import { deriveBeaconKey, encryptBeacon, decryptBeacon, buildDuressAlert, encryptDuressAlert, decryptDuressAlert } from 'canary-kit/beacon'
+import { applySyncMessage, decodeSyncMessage, encodeSyncMessage, deriveGroupKey, deriveGroupSigningKey, hashGroupTag, encryptEnvelope, decryptEnvelope } from 'canary-kit/sync'
 ```
 
 ---
@@ -1128,6 +1129,70 @@ Encrypted location beacons and duress alerts for canary groups.
 Key derivation is synchronous (HMAC-SHA256). Encryption is asynchronous (AES-256-GCM via `crypto.subtle`). The IV is a random 12-byte prefix prepended to the ciphertext; the combined value is base64-encoded.
 
 All functions from the main barrel (`deriveBeaconKey`, `encryptBeacon`, `decryptBeacon`, `buildDuressAlert`, `encryptDuressAlert`, `decryptDuressAlert`) are documented in the main section above.
+
+---
+
+## canary-kit/sync
+
+Transport-agnostic group state synchronisation with authority model and replay protection.
+
+### Types
+
+```typescript
+/** A typed, serialisable description of a group state change. */
+type SyncMessage =
+  | { type: 'member-join'; pubkey: string; displayName?: string; timestamp: number; epoch: number; opId: string }
+  | { type: 'member-leave'; pubkey: string; timestamp: number; epoch: number; opId: string }
+  | { type: 'counter-advance'; counter: number; usageOffset: number; timestamp: number }
+  | { type: 'reseed'; seed: Uint8Array; counter: number; timestamp: number; epoch: number; opId: string; admins: string[]; members: string[] }
+  | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number; opId: string }
+  | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId: string; subject?: string }
+  | { type: 'liveness-checkin'; pubkey: string; timestamp: number; opId: string }
+  | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; admins: string[]; epoch: number; opId: string; timestamp: number; prevEpochSeed?: string }
+
+interface SyncResult {
+  state: GroupState
+  applied: boolean
+  reason?: string
+}
+```
+
+### Functions
+
+```typescript
+decodeSyncMessage(json: string): SyncMessage        // Parse and validate a JSON sync message
+encodeSyncMessage(msg: SyncMessage): string          // Serialise a sync message to JSON
+applySyncMessage(state: GroupState, msg: SyncMessage, sender?: string): SyncResult  // Apply a validated message to group state
+```
+
+### Envelope Encryption
+
+```typescript
+deriveGroupKey(seed: string): Uint8Array             // Derive AES-256-GCM group key from seed
+deriveGroupSigningKey(seed: string): Uint8Array      // Derive HMAC signing key from seed
+hashGroupTag(groupId: string): string                // Privacy-preserving group tag hash
+encryptEnvelope(key: Uint8Array, plaintext: string): Promise<string>  // AES-256-GCM encrypt
+decryptEnvelope(key: Uint8Array, ciphertext: string): Promise<string> // AES-256-GCM decrypt
+```
+
+### Authority Invariants
+
+| ID | Rule |
+|---|---|
+| I1 | Sender must be admin for privileged actions (member-join, member-leave of others) |
+| I2 | opId replay guard within epoch (consumedOps set) |
+| I3 | Non-reseed privileged ops: epoch must match local epoch |
+| I4 | Reseed: epoch must equal local epoch + 1 |
+| I5 | Snapshot: epoch >= local epoch, anti-rollback for same-epoch |
+| I6 | Stale epoch rejection for all privileged ops |
+
+### Constants
+
+```typescript
+FIRE_AND_FORGET_FRESHNESS_SEC = 300  // Max age for fire-and-forget messages
+MAX_FUTURE_SKEW_SEC = 60             // Max future timestamp skew
+PROTOCOL_VERSION = 2                  // Current sync protocol version
+```
 
 ---
 
