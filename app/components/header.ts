@@ -58,6 +58,7 @@ export function renderHeader(container: HTMLElement): void {
     </nav>
     <div class="header__actions">
       <button class="header__identity-btn" id="identity-btn" title="Identity">
+        <img class="header__identity-avatar" id="identity-avatar" alt="" hidden>
         <span class="header__identity-dot" id="identity-dot"></span>
         <span class="header__identity-label" id="identity-label">...</span>
       </button>
@@ -164,12 +165,14 @@ export function flashSyncing(): void {
 export function updateIdentityDisplay(): void {
   const dot = document.getElementById('identity-dot')
   const label = document.getElementById('identity-label')
+  const avatar = document.getElementById('identity-avatar') as HTMLImageElement | null
   if (!dot || !label) return
 
   const { identity } = getState()
   if (!identity?.pubkey) {
     label.textContent = 'No identity'
     dot.className = 'header__identity-dot header__identity-dot--none'
+    if (avatar) avatar.hidden = true
     return
   }
 
@@ -179,9 +182,19 @@ export function updateIdentityDisplay(): void {
     : shortPk
 
   label.textContent = name
-  dot.className = identity.signerType === 'nip07'
-    ? 'header__identity-dot header__identity-dot--extension'
-    : 'header__identity-dot header__identity-dot--local'
+
+  // Show avatar if available, hide dot when avatar is shown
+  if (avatar && identity.picture) {
+    avatar.src = identity.picture
+    avatar.hidden = false
+    dot.hidden = true
+  } else {
+    if (avatar) avatar.hidden = true
+    dot.hidden = false
+    dot.className = identity.signerType === 'nip07'
+      ? 'header__identity-dot header__identity-dot--extension'
+      : 'header__identity-dot header__identity-dot--local'
+  }
 }
 
 /** Convert a Uint8Array to hex string. */

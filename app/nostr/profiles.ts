@@ -1,7 +1,7 @@
 // app/nostr/profiles.ts — Fetch and cache Nostr kind 0 profile metadata
 
 import { getPool } from './connect.js'
-import { getState, updateGroup } from '../state.js'
+import { getState, update, updateGroup } from '../state.js'
 
 export interface NostrProfile {
   name?: string
@@ -102,6 +102,60 @@ export function fetchProfiles(pubkeys: string[], groupId?: string): void {
           if (!_cache.has(pk)) _notFound.set(pk, Date.now())
           _pending.delete(pk)
         }
+        sub.close()
+      },
+    },
+  )
+}
+
+/**
+ * Fetch the local user's own kind 0 profile and update identity state.
+ * Called once after relay pool connects. Updates displayName and picture.
+ */
+export function fetchOwnProfile(): void {
+  const pool = getPool()
+  const { identity, settings } = getState()
+  if (!pool || !identity?.pubkey) return
+
+  const pk = identity.pubkey
+  if (_cache.has(pk) || _pending.has(pk)) return
+
+  _pending.add(pk)
+
+  const relays = settings?.defaultRelays?.length ? settings.defaultRelays : []
+  if (relays.length === 0) { _pending.delete(pk); return }
+
+  const sub = pool.subscribeMany(
+    relays,
+    { kinds: [0], authors: [pk] } as any,
+    {
+      onevent(event) {
+        try {
+          const profile: NostrProfile = JSON.parse(event.content)
+          _cache.set(event.pubkey, profile)
+          _pending.delete(event.pubkey)
+
+          const displayName = profile.display_name || profile.name
+          const picture = profile.picture
+          const { identity: current } = getState()
+          if (current && current.pubkey === event.pubkey) {
+            const updates: Partial<typeof current> = {}
+            if (displayName && current.displayName !== displayName) {
+              updates.displayName = displayName
+            }
+            if (picture && current.picture !== picture) {
+              updates.picture = picture
+            }
+            if (Object.keys(updates).length > 0) {
+              update({ identity: { ...current, ...updates } })
+            }
+          }
+        } catch {
+          _pending.delete(event.pubkey)
+        }
+      },
+      oneose() {
+        _pending.delete(pk)
         sub.close()
       },
     },

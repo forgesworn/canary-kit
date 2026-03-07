@@ -46,6 +46,7 @@ export interface AppIdentity {
   privkey?: string          // hex, stored locally when no NIP-07 extension
   nsec?: string
   displayName?: string
+  picture?: string           // kind 0 profile picture URL
   signerType: 'nip07' | 'local'
 }
 

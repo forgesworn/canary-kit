@@ -735,19 +735,23 @@ async function ensureLocalIdentity(): Promise<void> {
 // ── Relay sync boot ────────────────────────────────────────────
 
 async function bootSync(): Promise<void> {
-  const { groups, identity } = getState()
+  const { groups, identity, settings } = getState()
 
   const groupCount = Object.keys(groups).length
   const hasPrivkey = !!identity?.privkey
   if (import.meta.env.DEV) console.warn('[canary:boot] bootSync — groups:', groupCount, 'identity:', identity?.pubkey?.slice(0, 8) ?? 'none', 'privkey:', hasPrivkey ? 'yes' : 'NO')
 
-  // Collect unique relays from all groups
+  // Collect unique relays from all groups + default relays
   const allRelays = new Set<string>()
   for (const group of Object.values(groups)) {
     if (import.meta.env.DEV) console.warn('[canary:boot]   group', group.id.slice(0, 8), 'mode:', groupMode(group), 'relays:', JSON.stringify(group.relays), 'members:', group.members.length)
     for (const relay of group.relays) {
       allRelays.add(relay)
     }
+  }
+  // Include default relays so profile fetch works even with no groups
+  for (const relay of settings.defaultRelays) {
+    allRelays.add(relay)
   }
   if (allRelays.size === 0) {
     console.warn('[canary:boot] No relays found — sync disabled')
@@ -767,6 +771,10 @@ async function bootSync(): Promise<void> {
   await ensureTransport(Array.from(allRelays))
   subscribeToAllGroups()
   showToast(`Syncing via ${allRelays.size} relay(s)`, 'success', 2000)
+
+  // Fetch the user's own kind 0 profile (name + avatar)
+  const { fetchOwnProfile } = await import('./nostr/profiles.js')
+  fetchOwnProfile()
 
   // Re-render now that pool is connected — fetchProfiles needs a live pool
   scheduleRender()

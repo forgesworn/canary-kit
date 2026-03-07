@@ -153,6 +153,14 @@ button {
   border-color: var(--border-amber);
 }
 
+.header__identity-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
 .header__identity-dot {
   width: 8px;
   height: 8px;
