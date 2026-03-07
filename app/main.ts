@@ -45,7 +45,7 @@ import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } 
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
 import { escapeHtml } from './utils/escape.js'
-import { base64ToJson } from './utils/base64.js'
+import { base64ToJson, base64urlToJson } from './utils/base64.js'
 import type { AppIdentity } from './types.js'
 
 /** Allow wss:// relays, plus ws:// only for localhost development. */
@@ -460,13 +460,13 @@ function checkInviteFragment(): void {
       new CustomEvent('canary:confirm-member', { detail: { token } }),
     )
   } else if (hash.startsWith('#remote/')) {
-    let tokenPayload: string
+    // Token is base64url-encoded (URL-safe, no percent-encoding needed).
+    // Also try decodeURIComponent for backwards compat with older percent-encoded links.
+    let tokenPayload = hash.slice(8)
     try {
-      tokenPayload = decodeURIComponent(hash.slice(8))
+      tokenPayload = decodeURIComponent(tokenPayload)
     } catch {
-      console.warn('[canary] Malformed remote invite fragment — ignoring.')
-      window.location.hash = ''
-      return
+      // Already decoded or base64url — use as-is
     }
     window.location.hash = ''
     showRemoteJoinScreen(tokenPayload)
@@ -557,9 +557,14 @@ function showRemoteJoinScreen(tokenPayload: string): void {
   try {
     let parsed: unknown
     try {
-      parsed = base64ToJson(tokenPayload)
+      // Try base64url first (new format), fall back to standard base64 (legacy)
+      parsed = base64urlToJson(tokenPayload)
     } catch {
-      throw new Error('Invalid invite — could not decode token.')
+      try {
+        parsed = base64ToJson(tokenPayload)
+      } catch {
+        throw new Error('Invalid invite — could not decode token.')
+      }
     }
 
     assertRemoteInviteToken(parsed)
@@ -572,7 +577,9 @@ function showRemoteJoinScreen(tokenPayload: string): void {
     }
 
     const shortAdmin = `${token.adminPubkey.slice(0, 8)}\u2026${token.adminPubkey.slice(-4)}`
-    const relays = settings.defaultRelays
+    // Use relays from the token (admin's relays) so both sides connect to the same relay.
+    // Fall back to local defaults if the token has no relays (legacy tokens).
+    const relays = token.relays?.length ? token.relays : settings.defaultRelays
 
     let dialog = document.getElementById('remote-join-modal') as HTMLDialogElement | null
     if (!dialog) {

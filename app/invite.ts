@@ -8,7 +8,7 @@ import { PROTOCOL_VERSION } from 'canary-kit/sync'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { getState, updateGroup } from './state.js'
 import type { AppGroup } from './types.js'
-import { jsonToBase64, base64ToJson } from './utils/base64.js'
+import { jsonToBase64, base64ToJson, jsonToBase64url } from './utils/base64.js'
 
 /** Allow wss:// relays, plus ws:// only for localhost development. */
 function isAllowedRelayUrl(url: string): boolean {
@@ -600,14 +600,17 @@ export function startRemoteInviteSession(group: AppGroup): RemoteInviteSession {
     throw new Error(`Not authorised — you are not an admin of "${group.name}".`)
   }
 
+  const relays = group.relays?.length ? [...group.relays] : [...getState().settings.defaultRelays]
+
   const token = createRemoteInviteToken({
     groupName: group.name,
     groupId: group.id,
     adminPubkey: identity.pubkey,
     adminPrivkey: identity.privkey,
+    relays,
   })
 
-  const tokenPayload = jsonToBase64(token)
+  const tokenPayload = jsonToBase64url(token)
 
   _activeRemoteSession = {
     groupId: group.id,
