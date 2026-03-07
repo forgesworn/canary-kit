@@ -38,8 +38,9 @@ import { assertRemoteInviteToken, decryptWelcomeEnvelope } from './crypto/remote
 import { sendJoinRequest } from './nostr/invite-relay.js'
 import { resolveSigner, hasNip07 } from './nostr/signer.js'
 import { DEMO_ACCOUNTS } from './demo-accounts.js'
-import { decode as nip19decode } from 'nostr-tools/nip19'
+import { decode as nip19decode, nsecEncode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
+import { hexToBytes } from 'canary-kit/crypto'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
@@ -841,6 +842,45 @@ function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+function showNsecBackupModal(privkeyHex: string): void {
+  const nsec = nsecEncode(hexToBytes(privkeyHex))
+
+  let dialog = document.getElementById('nsec-backup-modal') as HTMLDialogElement | null
+  if (!dialog) {
+    dialog = document.createElement('dialog')
+    dialog.id = 'nsec-backup-modal'
+    dialog.className = 'modal'
+    document.body.appendChild(dialog)
+  }
+
+  const d = dialog
+  d.innerHTML = `
+    <div class="modal__form" style="max-width: 400px;">
+      <h2 class="modal__title">Back up your secret key</h2>
+      <p class="invite-hint">We created a Nostr keypair for you. Save your <strong>nsec</strong> somewhere safe — it's the only way to log back in on another device or if you clear your browser.</p>
+      <code style="font-size: 0.7rem; word-break: break-all; display: block; background: var(--bg); padding: 0.75rem; border-radius: 4px; border: 1px solid var(--border); margin: 1rem 0; user-select: all;">${escapeHtml(nsec)}</code>
+      <p class="invite-hint" style="color: var(--duress); font-weight: 500;">Do not share this with anyone.</p>
+      <div class="modal__actions" style="gap: 0.5rem;">
+        <button class="btn btn--primary" id="nsec-backup-copy" type="button">Copy nsec</button>
+        <button class="btn" id="nsec-backup-done" type="button">I've saved it</button>
+      </div>
+    </div>
+  `
+
+  d.querySelector('#nsec-backup-copy')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement
+    try {
+      await navigator.clipboard.writeText(nsec)
+      btn.textContent = 'Copied!'
+      setTimeout(() => { btn.textContent = 'Copy nsec' }, 2000)
+    } catch { /* clipboard may be blocked */ }
+  })
+
+  d.querySelector('#nsec-backup-done')?.addEventListener('click', () => d.close())
+
+  d.showModal()
+}
+
 function showLoginScreen(): void {
   const app = document.getElementById('app')!
 
@@ -922,6 +962,11 @@ function showLoginScreen(): void {
     const { identity } = getState()
     if (identity) update({ identity: { ...identity, displayName: name } })
     await bootApp()
+
+    // Show backup prompt for newly created keys
+    if (identity?.privkey) {
+      showNsecBackupModal(identity.privkey)
+    }
   })
 
   // nsec form submit

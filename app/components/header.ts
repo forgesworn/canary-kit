@@ -6,8 +6,9 @@ import { teardownSync } from '../sync.js'
 import { isConnected, getRelayCount } from '../nostr/connect.js'
 import { DEMO_ACCOUNTS } from '../demo-accounts.js'
 import type { AppIdentity } from '../types.js'
-import { decode as nip19decode } from 'nostr-tools/nip19'
+import { decode as nip19decode, nsecEncode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
+import { hexToBytes } from 'canary-kit/crypto'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -279,6 +280,17 @@ function showIdentityPopover(anchor: HTMLElement): void {
       <button class="btn btn--sm" id="nip07-disconnect-btn" type="button" style="width: 100%;">Use Local Key</button>
     ` : ''}
 
+    ${identity?.privkey ? `
+      <div class="identity-popover__divider"></div>
+      <div class="identity-popover__section">
+        <span class="identity-popover__label">Your secret key</span>
+        <p style="font-size: 0.6875rem; color: var(--text-muted); margin: 0.25rem 0;">Back this up — it's the only way to recover your account.</p>
+        <div id="nsec-reveal-area" style="margin-top: 0.375rem;">
+          <button class="btn btn--sm" id="nsec-reveal-btn" type="button" style="width: 100%;">Show nsec</button>
+        </div>
+      </div>
+    ` : ''}
+
     <div class="identity-popover__divider"></div>
 
     <div class="identity-popover__section">
@@ -300,6 +312,25 @@ function showIdentityPopover(anchor: HTMLElement): void {
     update({ identity: null, groups: {}, activeGroupId: null })
     popover.remove()
     window.location.reload()
+  })
+
+  // Reveal nsec
+  popover.querySelector('#nsec-reveal-btn')?.addEventListener('click', () => {
+    const area = popover.querySelector('#nsec-reveal-area')
+    if (!area || !identity?.privkey) return
+    const nsec = nsecEncode(hexToBytes(identity.privkey))
+    area.innerHTML = `
+      <code style="font-size: 0.65rem; word-break: break-all; display: block; background: var(--bg); padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border); user-select: all;">${nsec}</code>
+      <button class="btn btn--sm" id="nsec-copy-btn" type="button" style="width: 100%; margin-top: 0.375rem;">Copy nsec</button>
+    `
+    area.querySelector('#nsec-copy-btn')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement
+      try {
+        await navigator.clipboard.writeText(nsec)
+        btn.textContent = 'Copied!'
+        setTimeout(() => { btn.textContent = 'Copy nsec' }, 2000)
+      } catch { /* clipboard may be blocked */ }
+    })
   })
 
   // nsec login via form submit (avoids "password not in form" warning)
