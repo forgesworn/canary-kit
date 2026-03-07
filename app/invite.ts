@@ -622,8 +622,12 @@ export function createRemoteWelcomeEnvelope(group: AppGroup, joinerPubkey: strin
   if (!identity?.privkey) {
     throw new Error('No local identity — cannot create welcome envelope.')
   }
+  if (!_activeRemoteSession) {
+    throw new Error('No active remote invite session — cannot create welcome envelope.')
+  }
 
   const welcome: WelcomePayload = {
+    inviteId: _activeRemoteSession.inviteId,
     seed: group.seed,
     counter: group.counter,
     usageOffset: group.usageOffset,

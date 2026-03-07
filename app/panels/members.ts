@@ -4,7 +4,6 @@ import { getState, updateGroup } from '../state.js'
 import { addGroupMember, removeGroupMember } from '../actions/groups.js'
 import {
   verifyJoinToken,
-  startInviteSession, rotateInviteSession, endInviteSession,
   startRemoteInviteSession, createRemoteWelcomeEnvelope, endRemoteInviteSession,
 } from '../invite.js'
 import { groupMode } from '../types.js'
@@ -102,8 +101,6 @@ interface InviteModalOptions {
   title?: string
   scanHint?: string
   showConfirmMemberNote?: boolean
-  /** Hash fragment prefix for the link, e.g. 'join' or 'sync'. Defaults to 'join'. */
-  hashPrefix?: string
 }
 
 export function showInviteModal(group: import('../types.js').AppGroup, options?: InviteModalOptions): void {
@@ -112,13 +109,6 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
   const showConfirmMemberNote = options?.showConfirmMemberNote ?? true
 
   const isOnline = groupMode(group) === 'online'
-  let session = startInviteSession(group)
-
-  function currentScanUrl(): string {
-    const base = window.location.href.split('#')[0]
-    return `${base}#scan/${encodeURIComponent(session.payload)}`
-  }
-  // currentLinkUrl removed — seed-bearing links replaced by remote invite flow
 
   let dialog = document.getElementById('invite-modal') as HTMLDialogElement | null
   if (!dialog) {
@@ -126,13 +116,10 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
     dialog.id = 'invite-modal'
     dialog.className = 'modal'
     document.body.appendChild(dialog)
-    // Attach backdrop-close once — never leaks handlers on innerHTML replacement
     dialog.addEventListener('click', (e) => {
-      if (e.target === dialog) { endInviteSession(); dialog!.close() }
+      if (e.target === dialog) { endRemoteInviteSession(); dialog!.close() }
     })
   }
-
-  dialog.dataset.payload = session.payload
 
   // ── Inner renderers ──────────────────────────────────────
   const d = dialog // stable reference for closures
@@ -155,17 +142,14 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
     `
     d.querySelector<HTMLButtonElement>('#invite-qr-path')?.addEventListener('click', renderQRPath)
     d.querySelector<HTMLButtonElement>('#invite-link-path')?.addEventListener('click', renderRemotePath)
-    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => { endInviteSession(); d.close() })
+    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => { endRemoteInviteSession(); d.close() })
   }
 
   function renderQRPath(): void {
-    const svgMarkup = generateQR(currentScanUrl())
-    const joinCountHtml = session.joinCount > 0
-      ? `<p class="invite-hint" style="color: var(--success);">${session.joinCount} joined so far</p>`
-      : ''
-    const actionHtml = isOnline
-      ? '<p class="invite-hint" id="invite-waiting-status">Waiting for scan...</p>'
-      : '<button class="btn" id="invite-next-btn" type="button">Next</button>'
+    const qrSession = startRemoteInviteSession(group)
+    const base = window.location.href.split('#')[0]
+    const qrUrl = `${base}#remote/${encodeURIComponent(qrSession.tokenPayload)}`
+    const svgMarkup = generateQR(qrUrl)
 
     d.innerHTML = `
       <div class="modal__form invite-share">
@@ -173,8 +157,7 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
 
         <div class="qr-container">${svgMarkup}</div>
         <p class="invite-hint">${escapeHtml(scanHint)}</p>
-        ${joinCountHtml}
-        ${actionHtml}
+        <p class="invite-hint" style="color: var(--duress); font-weight: 500;">Seedless — group secret is sent encrypted after scan.</p>
 
         <div class="modal__actions" style="gap: 0.5rem;">
           <button class="btn" id="invite-back-btn" type="button">Back</button>
@@ -183,44 +166,9 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
       </div>
     `
 
-    // Offline: "Next" rotates to a fresh invite for the next person
-    d.querySelector<HTMLButtonElement>('#invite-next-btn')?.addEventListener('click', () => {
-      const currentGroup = getState().groups[group.id]
-      if (currentGroup) {
-        const rotated = rotateInviteSession(currentGroup)
-        if (rotated) {
-          session = rotated
-          d.dataset.payload = session.payload
-          renderQRPath()
-        }
-      }
-    })
-
-    // Online: listen for member-joined events to auto-rotate
-    const joinHandler = (evt: Event) => {
-      const detail = (evt as CustomEvent).detail
-      if (detail.groupId !== group.id) return
-      // Toast is handled by sync.ts — just rotate the QR
-      const currentGroup = getState().groups[group.id]
-      if (currentGroup) {
-        const rotated = rotateInviteSession(currentGroup)
-        if (rotated) {
-          session = rotated
-          d.dataset.payload = session.payload
-          renderQRPath()
-        }
-      }
-    }
-    if (isOnline) {
-      document.addEventListener('canary:member-joined', joinHandler)
-    }
-    const removeJoinHandler = () => document.removeEventListener('canary:member-joined', joinHandler)
-
-    d.querySelector<HTMLButtonElement>('#invite-back-btn')?.addEventListener('click', () => { removeJoinHandler(); renderChooser() })
-    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => { removeJoinHandler(); endInviteSession(); d.close() })
+    d.querySelector<HTMLButtonElement>('#invite-back-btn')?.addEventListener('click', () => { endRemoteInviteSession(); renderChooser() })
+    d.querySelector<HTMLButtonElement>('#invite-close-btn')?.addEventListener('click', () => { endRemoteInviteSession(); d.close() })
   }
-
-  // renderLinkPath removed — seed-bearing links replaced by renderRemotePath
 
   function renderRemotePath(): void {
     const remoteSession = startRemoteInviteSession(group)
@@ -339,7 +287,6 @@ export function showShareStateModal(group: import('../types.js').AppGroup): void
     title: 'Share Group State',
     scanHint: 'Share with existing members to sync the latest group state.',
     showConfirmMemberNote: false,
-    hashPrefix: 'sync',
   })
 }
 
@@ -488,9 +435,6 @@ export function renderMembers(container: HTMLElement): void {
         <button class="btn btn--sm" id="share-state-btn" type="button">Share State</button>
         <button class="btn btn--sm" id="confirm-member-btn" type="button">Confirm Member</button>
       </div>` : ''}
-      <div class="members-sync">
-        <button class="btn btn--sm" id="sync-state-btn" type="button">${isAdmin ? 'Sync State' : 'Update Group'}</button>
-      </div>
     </section>
   `
 
@@ -558,11 +502,6 @@ export function renderMembers(container: HTMLElement): void {
     showConfirmMemberModal()
   })
 
-  // ── Sync state button (all members) ──────────────────────────
-
-  container.querySelector<HTMLButtonElement>('#sync-state-btn')?.addEventListener('click', () => {
-    document.dispatchEvent(new CustomEvent('canary:sync-state'))
-  })
 }
 
 // ── Confirm member helpers ──────────────────────────────────────

@@ -37,7 +37,7 @@ export function isPinKeyLoaded(): boolean {
 
 const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
-  pinEnabled: false,
+  pinEnabled: true,
   autoLockMinutes: 5,
   defaultRelays: [],
 }

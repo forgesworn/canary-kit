@@ -31,6 +31,7 @@ export interface RemoteInviteToken {
 
 /** Message 3: the group state sent encrypted to joiner. */
 export interface WelcomePayload {
+  inviteId: string    // must match the RemoteInviteToken.inviteId
   seed: string
   counter: number
   usageOffset: number
@@ -181,17 +182,26 @@ export interface DecryptWelcomeEnvelopeOpts {
   envelope: string
   joinerPrivkey: string
   adminPubkey: string
+  expectedInviteId: string  // must match WelcomePayload.inviteId
 }
 
 /**
  * Decrypt a welcome envelope and return the WelcomePayload.
- * Validates that seed is 64-char hex and groupId is present.
+ * Validates inviteId binding, seed format, and groupId presence.
  */
 export function decryptWelcomeEnvelope(opts: DecryptWelcomeEnvelopeOpts): WelcomePayload {
-  const { envelope, joinerPrivkey, adminPubkey } = opts
+  const { envelope, joinerPrivkey, adminPubkey, expectedInviteId } = opts
   const conversationKey = getConversationKey(hexToBytes(joinerPrivkey), adminPubkey)
   const plaintext = nip44decrypt(envelope, conversationKey)
   const payload = JSON.parse(plaintext) as WelcomePayload
+
+  // Validate inviteId binding — prevents replay of stale welcome envelopes
+  if (typeof payload.inviteId !== 'string' || !HEX_32_RE.test(payload.inviteId)) {
+    throw new Error('Welcome payload must include a valid inviteId')
+  }
+  if (payload.inviteId !== expectedInviteId) {
+    throw new Error('Welcome payload inviteId does not match the pending invite')
+  }
 
   // Validate critical fields
   if (typeof payload.seed !== 'string' || !HEX_64_RE.test(payload.seed)) {

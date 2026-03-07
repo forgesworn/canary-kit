@@ -22,8 +22,11 @@ const JOINER_PUBKEY = bytesToHex(schnorr.getPublicKey(hexToBytes(JOINER_PRIVKEY)
 // A third party — used to test decryption with the wrong key
 const WRONG_PRIVKEY = '0000000000000000000000000000000000000000000000000000000000000003'
 
+const TEST_INVITE_ID = 'ab'.repeat(16)
+
 function makeWelcomePayload(overrides: Partial<WelcomePayload> = {}): WelcomePayload {
   return {
+    inviteId: TEST_INVITE_ID,
     seed: 'a'.repeat(64),
     counter: 42,
     usageOffset: 0,
@@ -125,8 +128,10 @@ describe('welcome envelope', () => {
       envelope,
       joinerPrivkey: JOINER_PRIVKEY,
       adminPubkey: ADMIN_PUBKEY,
+      expectedInviteId: TEST_INVITE_ID,
     })
 
+    expect(decrypted.inviteId).toBe(TEST_INVITE_ID)
     expect(decrypted.seed).toBe(welcome.seed)
     expect(decrypted.counter).toBe(welcome.counter)
     expect(decrypted.epoch).toBe(welcome.epoch)
@@ -151,7 +156,48 @@ describe('welcome envelope', () => {
         envelope,
         joinerPrivkey: WRONG_PRIVKEY,
         adminPubkey: ADMIN_PUBKEY,
+        expectedInviteId: TEST_INVITE_ID,
       }),
     ).toThrow()
+  })
+
+  it('rejects welcome with mismatched inviteId', () => {
+    const welcome = makeWelcomePayload({ inviteId: 'cd'.repeat(16) })
+
+    const envelope = createWelcomeEnvelope({
+      welcome,
+      adminPrivkey: ADMIN_PRIVKEY,
+      joinerPubkey: JOINER_PUBKEY,
+    })
+
+    expect(() =>
+      decryptWelcomeEnvelope({
+        envelope,
+        joinerPrivkey: JOINER_PRIVKEY,
+        adminPubkey: ADMIN_PUBKEY,
+        expectedInviteId: TEST_INVITE_ID, // different from 'cd'.repeat(16)
+      }),
+    ).toThrow(/inviteId/)
+  })
+
+  it('rejects welcome without inviteId', () => {
+    // Manually create an envelope without inviteId
+    const welcome = makeWelcomePayload()
+    const { inviteId: _, ...withoutId } = welcome
+
+    const envelope = createWelcomeEnvelope({
+      welcome: withoutId as WelcomePayload,
+      adminPrivkey: ADMIN_PRIVKEY,
+      joinerPubkey: JOINER_PUBKEY,
+    })
+
+    expect(() =>
+      decryptWelcomeEnvelope({
+        envelope,
+        joinerPrivkey: JOINER_PRIVKEY,
+        adminPubkey: ADMIN_PUBKEY,
+        expectedInviteId: TEST_INVITE_ID,
+      }),
+    ).toThrow(/inviteId/)
   })
 })
