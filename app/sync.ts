@@ -52,7 +52,8 @@ export function getTransport(): SyncTransport | null {
 
 /**
  * Ensure a sync transport is active for the given relays.
- * Creates one if none exists, then subscribes to the specified group.
+ * Creates one if none exists; updates relay URLs if it does.
+ * Subscribes to the specified group if provided.
  * Used by settings panel, invite acceptance, and startup.
  */
 export async function ensureTransport(relays: string[], groupId?: string): Promise<void> {
@@ -64,6 +65,9 @@ export async function ensureTransport(relays: string[], groupId?: string): Promi
 
     if (!_transport) {
       initSync(new NostrSyncTransport(relays, identity.pubkey, identity.privkey))
+    } else if (_transport instanceof NostrSyncTransport) {
+      // Keep the transport's relay URLs in sync with the pool
+      _transport.updateRelays(relays)
     }
 
     if (groupId) {
@@ -78,7 +82,8 @@ export async function ensureTransport(relays: string[], groupId?: string): Promi
       }
     }
 
-    updateRelayStatus(isConnected(), getRelayCount())
+    // Delay status update slightly so verifyConnection() has time to run
+    setTimeout(() => updateRelayStatus(isConnected(), getRelayCount()), 1000)
   } catch (err) {
     console.warn('[canary:sync] ensureTransport failed:', err)
     updateRelayStatus(false, 0)

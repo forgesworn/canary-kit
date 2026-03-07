@@ -77,6 +77,11 @@ export class NostrSyncTransport implements SyncTransport {
     private personalPrivkey: string,
   ) {}
 
+  /** Update the relay URLs used for publishing and subscribing. */
+  updateRelays(relays: string[]): void {
+    this.relays = [...relays]
+  }
+
   /** Register a group's seed so we can encrypt/decrypt and sign for it. */
   registerGroup(groupId: string, seedHex: string, signer: EventSignerLike, members: string[], options?: GroupRegistrationOptions): void {
     const tagHash = hashGroupTag(groupId)

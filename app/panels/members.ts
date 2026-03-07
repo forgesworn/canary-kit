@@ -13,6 +13,7 @@ import { escapeHtml } from '../utils/escape.js'
 import { showModal } from '../components/modal.js'
 import { showToast } from '../components/toast.js'
 import { listenForJoinRequests, sendWelcomeOverRelay } from '../nostr/invite-relay.js'
+import { ensureTransport } from '../sync.js'
 import { deriveToken } from 'canary-kit/token'
 import { GROUP_CONTEXT, toTokenEncoding } from '../utils/encoding.js'
 import { fetchProfiles, getCachedName, getCachedProfile } from '../nostr/profiles.js'
@@ -262,42 +263,44 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
     // Auto-listen for join requests over the relay
     let cleanupListener = () => {}
     if (relays.length > 0) {
-      cleanupListener = listenForJoinRequests({
-        inviteId: qrSession.inviteId,
-        relays,
-        onJoinRequest(joinerPubkey) {
-          cleanupListener()
-          try {
-            const currentGroup = getState().groups[group.id]
-            if (!currentGroup) return
-            const envelope = createRemoteWelcomeEnvelope(currentGroup, joinerPubkey)
+      // Ensure pool is connected before subscribing — don't assume bootSync pool still exists
+      void ensureTransport(relays).then(() => {
+        cleanupListener = listenForJoinRequests({
+          inviteId: qrSession.inviteId,
+          relays,
+          onJoinRequest(joinerPubkey) {
+            cleanupListener()
+            try {
+              const currentGroup = getState().groups[group.id]
+              if (!currentGroup) return
+              const envelope = createRemoteWelcomeEnvelope(currentGroup, joinerPubkey)
 
-            // Send welcome back over relay
-            sendWelcomeOverRelay({
-              inviteId: qrSession.inviteId,
-              joinerPubkey,
-              envelope,
-              relays,
-            })
+              // Send welcome back over relay
+              sendWelcomeOverRelay({
+                inviteId: qrSession.inviteId,
+                joinerPubkey,
+                envelope,
+                relays,
+              })
 
-            // Add member to group
-            if (!currentGroup.members.includes(joinerPubkey)) {
-              addGroupMember(group.id, joinerPubkey)
+              // Add member to group
+              if (!currentGroup.members.includes(joinerPubkey)) {
+                addGroupMember(group.id, joinerPubkey)
+              }
+
+              endRemoteInviteSession()
+              endInviteSession()
+              d.close()
+              showToast('Member joined via relay', 'success')
+            } catch (err) {
+              showToast(err instanceof Error ? err.message : 'Failed to send welcome', 'error')
             }
-
-            endRemoteInviteSession()
-            endInviteSession()
-            d.close()
-            showToast('Member joined via relay', 'success')
-          } catch (err) {
-            showToast(err instanceof Error ? err.message : 'Failed to send welcome', 'error')
-          }
-        },
-        onError() {
-          // Timeout — user can still use manual flow
-          const statusEl = d.querySelector('#qr-relay-status')
-          if (statusEl) statusEl.textContent = 'No relay response — use manual flow below.'
-        },
+          },
+          onError(msg) {
+            const statusEl = d.querySelector('#qr-relay-status')
+            if (statusEl) statusEl.textContent = msg || 'No relay response — use manual flow below.'
+          },
+        })
       })
     }
 

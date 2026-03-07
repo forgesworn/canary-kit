@@ -11,9 +11,15 @@ let _relayUrls: string[] = []
 
 /**
  * Connect to the given relay URLs using a SimplePool.
- * Idempotent: if already connected, closes the old pool first.
+ * Idempotent: if already connected to the same relay set, returns immediately.
+ * Closes the old pool when relay URLs change.
  */
 export function connectRelays(relayUrls: string[]): void {
+  // Skip if already connected to the exact same relay set
+  if (_pool && _relayUrls.length === relayUrls.length && relayUrls.every(u => _relayUrls.includes(u))) {
+    return
+  }
+
   if (_pool) {
     _pool.close(_relayUrls)
     _pool = null
@@ -25,9 +31,45 @@ export function connectRelays(relayUrls: string[]): void {
   if (relayUrls.length === 0) return
 
   _pool = new SimplePool()
-  _connected = true
-  _relayCount = relayUrls.length
   _relayUrls = [...relayUrls]
+  _relayCount = relayUrls.length
+  // _connected stays false until verifyConnection() confirms a WebSocket opened
+  _connected = false
+
+  // Eagerly open connections so the pool is ready for publish/subscribe.
+  // SimplePool.ensureRelay returns a connected Relay instance or throws.
+  void verifyConnection()
+}
+
+/**
+ * Attempt to connect to each relay and update _connected status.
+ * Runs in the background — callers don't need to await.
+ */
+async function verifyConnection(): Promise<void> {
+  if (!_pool || _relayUrls.length === 0) return
+  const pool = _pool
+  const urls = _relayUrls
+
+  let connectedCount = 0
+  for (const url of urls) {
+    try {
+      await pool.ensureRelay(url, { connectionTimeout: 5000 })
+      connectedCount++
+    } catch (err) {
+      console.warn(`[canary:relay] Failed to connect to ${url}:`, err)
+    }
+  }
+
+  // Only update if pool hasn't been replaced while we were connecting
+  if (_pool === pool) {
+    _connected = connectedCount > 0
+    _relayCount = connectedCount
+    if (!_connected) {
+      console.error('[canary:relay] Could not connect to any relay:', urls)
+    } else {
+      console.info(`[canary:relay] Connected to ${connectedCount}/${urls.length} relay(s)`)
+    }
+  }
 }
 
 /** Disconnect and destroy the relay pool. */
@@ -46,3 +88,4 @@ export function disconnectRelays(): void {
 export function getPool(): SimplePool | null { return _pool }
 export function isConnected(): boolean { return _connected }
 export function getRelayCount(): number { return _relayCount }
+export function getRelayUrls(): string[] { return [..._relayUrls] }
