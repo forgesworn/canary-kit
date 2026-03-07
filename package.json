@@ -48,7 +48,10 @@
     "LICENSE",
     "CANARY.md",
     "NIP-CANARY.md",
-    "INTEGRATION.md"
+    "INTEGRATION.md",
+    "SECURITY.md",
+    "llms.txt",
+    "llms-full.txt"
   ],
   "scripts": {
     "build": "tsc",
