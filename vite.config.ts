@@ -29,7 +29,7 @@ export default defineConfig({
     // Output into docs/ so GitHub Pages can serve it from the repo root
     outDir: resolve(__dirname, 'docs'),
 
-    // Clean the output directory on each build — old demo files are gone.
-    emptyOutDir: true,
+    // Don't wipe docs/ — it contains docs/record/ (demo recording scripts).
+    emptyOutDir: false,
   },
 })
