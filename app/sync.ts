@@ -55,19 +55,24 @@ export function getTransport(): SyncTransport | null {
  * Creates one if none exists; updates relay URLs if it does.
  * Subscribes to the specified group if provided.
  * Used by settings panel, invite acceptance, and startup.
+ *
+ * @param readRelays - Relay URLs for subscriptions (reading).
+ * @param writeRelays - Relay URLs for publishing. Defaults to readRelays if omitted.
+ * @param groupId - Optional group to subscribe to after connecting.
  */
-export async function ensureTransport(relays: string[], groupId?: string): Promise<void> {
+export async function ensureTransport(readRelays: string[], writeRelays?: string[], groupId?: string): Promise<void> {
   const { identity } = getState()
-  if (!identity || !identity.privkey || relays.length === 0) return
+  const effectiveWrite = writeRelays ?? readRelays
+  if (!identity || !identity.privkey || (readRelays.length === 0 && effectiveWrite.length === 0)) return
 
   try {
-    connectRelays(relays)
+    connectRelays(readRelays, effectiveWrite)
 
     if (!_transport) {
-      initSync(new NostrSyncTransport(relays, identity.pubkey, identity.privkey))
+      initSync(new NostrSyncTransport(readRelays, effectiveWrite, identity.pubkey, identity.privkey))
     } else if (_transport instanceof NostrSyncTransport) {
       // Keep the transport's relay URLs in sync with the pool
-      _transport.updateRelays(relays)
+      _transport.updateRelays(readRelays, effectiveWrite)
     }
 
     if (groupId) {

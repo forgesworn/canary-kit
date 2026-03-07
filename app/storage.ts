@@ -1,6 +1,7 @@
 // app/storage.ts — localStorage persistence layer with optional PIN encryption
 
 import type { AppState, AppGroup, AppIdentity, AppSettings } from './types.js'
+import { WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY } from './types.js'
 import { getState, loadState, subscribe } from './state.js'
 import { deriveKey, encrypt, decrypt, generateSalt, encodeSalt, decodeSalt } from './crypto/pin.js'
 
@@ -39,7 +40,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   pinEnabled: true,
   autoLockMinutes: 5,
-  defaultRelays: ['wss://relay.trotters.cc'],
+  defaultRelays: [DEFAULT_WRITE_RELAY],
+  defaultReadRelays: [...WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY],
+  defaultWriteRelays: [DEFAULT_WRITE_RELAY],
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -132,7 +135,7 @@ function resolveActiveGroupId(validGroups: Record<string, unknown>): string | nu
 }
 
 /**
- * Merge persisted settings with defaults, backfilling defaultRelays
+ * Merge persisted settings with defaults, backfilling relay fields
  * when the persisted value is empty (migration for existing users).
  */
 function mergeSettings(raw: Partial<AppSettings> | null): AppSettings {
@@ -142,7 +145,38 @@ function mergeSettings(raw: Partial<AppSettings> | null): AppSettings {
   if (!merged.defaultRelays?.length) {
     merged.defaultRelays = [...DEFAULT_SETTINGS.defaultRelays]
   }
+  // Migration: backfill read/write relay fields from legacy defaultRelays
+  if (!merged.defaultReadRelays?.length) {
+    merged.defaultReadRelays = [...DEFAULT_SETTINGS.defaultReadRelays]
+  }
+  if (!merged.defaultWriteRelays?.length) {
+    merged.defaultWriteRelays = [...DEFAULT_SETTINGS.defaultWriteRelays]
+  }
   return merged
+}
+
+/**
+ * Migrate a group's relay config from the legacy flat `relays` array to the
+ * new read/write split. If the group already has readRelays/writeRelays, those
+ * are preserved. Otherwise, legacy relays are treated as write relays and
+ * well-known public relays are added for reading.
+ */
+function migrateGroupRelays(group: Partial<AppGroup>): Pick<AppGroup, 'readRelays' | 'writeRelays'> {
+  if (group.readRelays?.length || group.writeRelays?.length) {
+    return {
+      readRelays: group.readRelays ?? [],
+      writeRelays: group.writeRelays ?? [],
+    }
+  }
+  // Legacy migration: relays were used for both read and write.
+  // Move them to writeRelays and add well-known relays for reading.
+  const legacyRelays = group.relays ?? []
+  const writeRelays = legacyRelays.length > 0 ? legacyRelays : [DEFAULT_WRITE_RELAY]
+  const readSet = new Set<string>([...WELL_KNOWN_READ_RELAYS, ...writeRelays])
+  return {
+    readRelays: Array.from(readSet),
+    writeRelays,
+  }
 }
 
 // ── Public API ─────────────────────────────────────────────────
@@ -266,6 +300,7 @@ export async function unlockAndRestoreState(pin: string): Promise<void> {
         usedInvites: Array.isArray(group.usedInvites) ? group.usedInvites : [],
         latestInviteIssuedAt: typeof group.latestInviteIssuedAt === 'number' ? group.latestInviteIssuedAt : 0,
         tolerance: group.tolerance ?? 1,
+        ...migrateGroupRelays(group),
       }
     }
   }
@@ -303,6 +338,7 @@ export function restoreState(): void {
         usedInvites: Array.isArray(group.usedInvites) ? group.usedInvites : [],
         latestInviteIssuedAt: typeof group.latestInviteIssuedAt === 'number' ? group.latestInviteIssuedAt : 0,
         tolerance: group.tolerance ?? 1,
+        ...migrateGroupRelays(group),
       }
     }
   }

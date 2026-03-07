@@ -23,7 +23,7 @@ import { renderHeader } from './components/header.js'
 import { renderSidebar } from './components/sidebar.js'
 import { showModal } from './components/modal.js'
 import { createNewGroup } from './actions/groups.js'
-import { groupMode } from './types.js'
+import { groupMode, allRelaysForGroup, WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY } from './types.js'
 import { renderWelcome } from './panels/welcome.js'
 import { renderHero } from './panels/hero.js'
 import { renderDuress } from './panels/duress.js'
@@ -418,8 +418,8 @@ function showCreateGroupModal(): void {
       }
     }
     const newGroup = getState().groups[groupId]
-    if (newGroup && groupMode(newGroup) === 'online' && newGroup.relays?.length) {
-      void ensureTransport(newGroup.relays, groupId)
+    if (newGroup && groupMode(newGroup) === 'online' && allRelaysForGroup(newGroup).length > 0) {
+      void ensureTransport(newGroup.readRelays ?? [], newGroup.writeRelays ?? [], groupId)
     }
   })
 
@@ -500,8 +500,12 @@ function acceptWelcomeEnvelope(
     memberNames[identity.pubkey] = identity.displayName
   }
 
-  const relays = [...(welcome.relays ?? [])]
-  const hasRelays = relays.length > 0
+  const legacyRelays = [...(welcome.relays ?? [])]
+  // Incoming relays from the admin are treated as write relays.
+  // Add well-known public relays for reading.
+  const writeRelays = legacyRelays.length > 0 ? legacyRelays : [DEFAULT_WRITE_RELAY]
+  const readRelays = Array.from(new Set([...WELL_KNOWN_READ_RELAYS, ...writeRelays]))
+  const hasRelays = writeRelays.length > 0
 
   const appGroup = {
     id,
@@ -510,7 +514,9 @@ function acceptWelcomeEnvelope(
     members: Array.from(members),
     memberNames,
     nostrEnabled: hasRelays,
-    relays,
+    relays: legacyRelays,
+    readRelays,
+    writeRelays,
     wordlist: welcome.wordlist,
     wordCount: welcome.wordCount,
     counter: welcome.counter,
@@ -537,7 +543,7 @@ function acceptWelcomeEnvelope(
 
   // Boot relay sync and announce
   if (hasRelays && identity) {
-    void ensureTransport(relays, id).then(() => {
+    void ensureTransport(readRelays, writeRelays, id).then(() => {
       broadcastAction(id, {
         type: 'member-join',
         pubkey: identity.pubkey,
@@ -577,9 +583,12 @@ function showRemoteJoinScreen(tokenPayload: string): void {
     }
 
     const shortAdmin = `${token.adminPubkey.slice(0, 8)}\u2026${token.adminPubkey.slice(-4)}`
-    // Use relays from the token (admin's relays) so both sides connect to the same relay.
-    // Fall back to local defaults if the token has no relays (legacy tokens).
-    const relays = token.relays?.length ? token.relays : settings.defaultRelays
+    // Use relays from the token (admin's relays) as write relays so both sides publish to the same relay.
+    // Add well-known relays for reading. Fall back to local defaults if the token has no relays (legacy).
+    const tokenRelays = token.relays?.length ? token.relays : settings.defaultWriteRelays
+    const writeRelays = tokenRelays
+    const readRelays = Array.from(new Set([...WELL_KNOWN_READ_RELAYS, ...tokenRelays]))
+    const relays = Array.from(new Set([...readRelays, ...writeRelays]))
 
     let dialog = document.getElementById('remote-join-modal') as HTMLDialogElement | null
     if (!dialog) {
@@ -625,14 +634,15 @@ function showRemoteJoinScreen(tokenPayload: string): void {
 
     // Auto-exchange over relay if relays are available
     if (relays.length > 0) {
-      void ensureTransport(relays).then(() => {
+      void ensureTransport(readRelays, writeRelays).then(() => {
         const statusEl = d.querySelector('#remote-join-relay-status')
         if (statusEl) statusEl.textContent = 'Waiting for admin to send group key...'
 
         cleanupRelay = sendJoinRequest({
           inviteId: token.inviteId,
           adminPubkey: token.adminPubkey,
-          relays,
+          readRelays,
+          writeRelays,
           onWelcome(envelope) {
             try {
               acceptWelcomeEnvelope(envelope, token, d)
@@ -800,19 +810,28 @@ async function bootSync(): Promise<void> {
   const hasPrivkey = !!identity?.privkey
   if (import.meta.env.DEV) console.warn('[canary:boot] bootSync — groups:', groupCount, 'identity:', identity?.pubkey?.slice(0, 8) ?? 'none', 'privkey:', hasPrivkey ? 'yes' : 'NO')
 
-  // Collect unique relays from all groups + default relays
-  const allRelays = new Set<string>()
+  // Collect unique read and write relays from all groups + defaults
+  const allReadRelays = new Set<string>()
+  const allWriteRelays = new Set<string>()
   for (const group of Object.values(groups)) {
-    if (import.meta.env.DEV) console.warn('[canary:boot]   group', group.id.slice(0, 8), 'mode:', groupMode(group), 'relays:', JSON.stringify(group.relays), 'members:', group.members.length)
-    for (const relay of group.relays) {
-      allRelays.add(relay)
+    if (import.meta.env.DEV) console.warn('[canary:boot]   group', group.id.slice(0, 8), 'mode:', groupMode(group), 'read:', JSON.stringify(group.readRelays), 'write:', JSON.stringify(group.writeRelays), 'members:', group.members.length)
+    for (const relay of group.readRelays ?? []) allReadRelays.add(relay)
+    for (const relay of group.writeRelays ?? []) allWriteRelays.add(relay)
+    // Migration fallback: include legacy relays
+    for (const relay of group.relays ?? []) {
+      allReadRelays.add(relay)
+      allWriteRelays.add(relay)
     }
   }
   // Include default relays so profile fetch works even with no groups
-  for (const relay of settings.defaultRelays) {
-    allRelays.add(relay)
+  for (const relay of settings.defaultReadRelays ?? settings.defaultRelays) {
+    allReadRelays.add(relay)
   }
-  if (allRelays.size === 0) {
+  for (const relay of settings.defaultWriteRelays ?? settings.defaultRelays) {
+    allWriteRelays.add(relay)
+  }
+  const totalRelays = new Set([...allReadRelays, ...allWriteRelays]).size
+  if (totalRelays === 0) {
     console.warn('[canary:boot] No relays found — sync disabled')
     if (groupCount > 0) {
       showToast(`Sync disabled — ${groupCount} group(s), no relays configured`, 'warning', 5000)
@@ -826,10 +845,10 @@ async function bootSync(): Promise<void> {
     return
   }
 
-  console.warn('[canary:boot] Connecting to relays:', Array.from(allRelays))
-  await ensureTransport(Array.from(allRelays))
+  console.warn('[canary:boot] Read relays:', Array.from(allReadRelays), 'Write relays:', Array.from(allWriteRelays))
+  await ensureTransport(Array.from(allReadRelays), Array.from(allWriteRelays))
   subscribeToAllGroups()
-  showToast(`Syncing via ${allRelays.size} relay(s)`, 'success', 2000)
+  showToast(`Syncing via ${totalRelays} relay(s)`, 'success', 2000)
 
   // Fetch the user's own kind 0 profile (name + avatar)
   const { fetchOwnProfile } = await import('./nostr/profiles.js')
@@ -929,8 +948,9 @@ function showLoginScreen(): void {
           <details style="margin-top: 0.75rem;">
             <summary class="settings-hint" style="cursor: pointer; user-select: none;">Relays</summary>
             <div style="margin-top: 0.375rem;">
+              <p class="settings-hint" style="font-size: 0.7rem; margin: 0 0 0.25rem 0;">Write relay (publishing)</p>
               <ul id="login-relay-list" style="list-style: none; padding: 0; margin: 0 0 0.375rem 0;">
-                ${getState().settings.defaultRelays.map((url, i) => `
+                ${(getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays).map((url, i) => `
                   <li style="display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.25rem;">
                     <span class="settings-hint" style="flex: 1; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0;">${escapeHtml(url)}</span>
                     <button class="btn btn--ghost btn--sm login-relay-remove" data-relay-index="${i}" type="button" style="padding: 0 0.25rem; font-size: 0.7rem;">✕</button>
@@ -941,6 +961,7 @@ function showLoginScreen(): void {
                 <input class="input" type="url" id="login-relay-input" placeholder="wss://relay.example.com" style="flex: 1; font-size: 0.75rem; padding: 0.375rem;" />
                 <button class="btn btn--ghost btn--sm" id="login-relay-add" type="button">Add</button>
               </div>
+              <p class="settings-hint" style="font-size: 0.7rem; margin: 0.5rem 0 0 0;">Read relays: ${WELL_KNOWN_READ_RELAYS.map(r => escapeHtml(r.replace('wss://', ''))).join(', ')} + write relay(s)</p>
             </div>
           </details>
         </div>
@@ -1016,11 +1037,11 @@ function showLoginScreen(): void {
     } catch { alert('Extension rejected the request.') }
   })
 
-  // ── Relay list editor on login screen ─────────────────────────
+  // ── Relay list editor on login screen (manages defaultWriteRelays) ───
   function rerenderRelayList(): void {
     const list = app.querySelector<HTMLUListElement>('#login-relay-list')
     if (!list) return
-    const relays = getState().settings.defaultRelays
+    const relays = getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays
     list.innerHTML = relays.map((url, i) => `
       <li style="display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.25rem;">
         <span class="settings-hint" style="flex: 1; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0;">${escapeHtml(url)}</span>
@@ -1034,9 +1055,9 @@ function showLoginScreen(): void {
     app.querySelectorAll<HTMLButtonElement>('.login-relay-remove').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = Number(btn.dataset.relayIndex)
-        const relays = [...getState().settings.defaultRelays]
-        relays.splice(idx, 1)
-        update({ settings: { ...getState().settings, defaultRelays: relays } })
+        const writeRelays = [...(getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays)]
+        writeRelays.splice(idx, 1)
+        update({ settings: { ...getState().settings, defaultWriteRelays: writeRelays, defaultRelays: writeRelays } })
         rerenderRelayList()
       })
     })
@@ -1048,10 +1069,10 @@ function showLoginScreen(): void {
     const input = app.querySelector<HTMLInputElement>('#login-relay-input')
     const url = input?.value.trim()
     if (!url || !isAllowedRelayUrl(url)) return
-    const relays = [...getState().settings.defaultRelays]
-    if (!relays.includes(url)) {
-      relays.push(url)
-      update({ settings: { ...getState().settings, defaultRelays: relays } })
+    const writeRelays = [...(getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays)]
+    if (!writeRelays.includes(url)) {
+      writeRelays.push(url)
+      update({ settings: { ...getState().settings, defaultWriteRelays: writeRelays, defaultRelays: writeRelays } })
       rerenderRelayList()
     }
     if (input) input.value = ''

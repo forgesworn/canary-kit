@@ -1,6 +1,7 @@
 // app/state.ts — Observable application state with subscriber pattern
 
 import type { AppState } from './types.js'
+import { WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY } from './types.js'
 
 // ── Default state ──────────────────────────────────────────────
 
@@ -13,7 +14,9 @@ const DEFAULT_STATE: AppState = {
     theme: 'dark',
     pinEnabled: false,
     autoLockMinutes: 5,
-    defaultRelays: ['wss://relay.trotters.cc'],
+    defaultRelays: [DEFAULT_WRITE_RELAY],
+    defaultReadRelays: [...WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY],
+    defaultWriteRelays: [DEFAULT_WRITE_RELAY],
   },
 }
 

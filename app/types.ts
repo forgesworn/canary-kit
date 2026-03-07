@@ -2,6 +2,16 @@
 
 import type { GroupState } from 'canary-kit'
 
+/** Well-known public relays used for reading (discovery, profiles, subscriptions). */
+export const WELL_KNOWN_READ_RELAYS: readonly string[] = [
+  'wss://relay.damus.io',
+  'wss://nos.lol',
+  'wss://relay.nostr.band',
+]
+
+/** The sole relay used for writing (publishing events). */
+export const DEFAULT_WRITE_RELAY = 'wss://relay.trotters.cc'
+
 /** A CANARY group with UI-specific persistence fields layered on top of GroupState. */
 export interface AppGroup extends GroupState {
   /** Unique local identifier, generated with crypto.randomUUID(). */
@@ -10,8 +20,12 @@ export interface AppGroup extends GroupState {
   mode?: 'offline' | 'online'
   /** Whether Nostr relay publishing is enabled for this group. */
   nostrEnabled: boolean
-  /** List of Nostr relay WebSocket URLs for this group. */
+  /** @deprecated Unified relay list — use readRelays/writeRelays instead. Kept for migration. */
   relays: string[]
+  /** Relay URLs used for reading (subscriptions, discovery). Includes well-known public relays. */
+  readRelays: string[]
+  /** Relay URLs used for writing (publishing events). Constrained to trusted relays. */
+  writeRelays: string[]
   /** Preferred output encoding for token display. */
   encodingFormat: 'words' | 'pin' | 'hex'
   /** Nonces of invites that have already been consumed. */
@@ -36,8 +50,19 @@ export interface AppGroup extends GroupState {
 }
 
 /** Derive the effective mode from group relay config. */
-export function groupMode(group: Pick<AppGroup, 'relays'>): 'offline' | 'online' {
-  return group.relays?.length > 0 ? 'online' : 'offline'
+export function groupMode(group: Pick<AppGroup, 'relays' | 'readRelays' | 'writeRelays'>): 'offline' | 'online' {
+  const hasRelays = (group.readRelays?.length > 0) || (group.writeRelays?.length > 0) || (group.relays?.length > 0)
+  return hasRelays ? 'online' : 'offline'
+}
+
+/** Get all unique relay URLs for a group (read + write combined). */
+export function allRelaysForGroup(group: Pick<AppGroup, 'relays' | 'readRelays' | 'writeRelays'>): string[] {
+  const set = new Set<string>()
+  for (const url of group.readRelays ?? []) set.add(url)
+  for (const url of group.writeRelays ?? []) set.add(url)
+  // Migration fallback: include legacy `relays` field
+  for (const url of group.relays ?? []) set.add(url)
+  return Array.from(set)
 }
 
 /** The local identity (Nostr keypair) for this device. */
@@ -55,8 +80,12 @@ export interface AppSettings {
   theme: 'dark' | 'light'
   pinEnabled: boolean
   autoLockMinutes: number
-  /** Default Nostr relay URLs for new online groups. */
+  /** @deprecated Use defaultReadRelays/defaultWriteRelays instead. Kept for migration. */
   defaultRelays: string[]
+  /** Default read relay URLs for new online groups and profile discovery. */
+  defaultReadRelays: string[]
+  /** Default write relay URLs for publishing events. */
+  defaultWriteRelays: string[]
 }
 
 /** Root application state. */

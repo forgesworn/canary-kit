@@ -22,7 +22,12 @@ const HANDSHAKE_KIND = 25519
 export interface JoinRequestOpts {
   inviteId: string
   adminPubkey: string
-  relays: string[]
+  /** Read relays for subscribing to the welcome response. */
+  readRelays: string[]
+  /** Write relays for publishing the join request. */
+  writeRelays: string[]
+  /** @deprecated Use readRelays/writeRelays. Kept for compat. */
+  relays?: string[]
   /** Called when the welcome envelope arrives (NIP-44 ciphertext). */
   onWelcome: (envelope: string) => void
   /** Called on error. */
@@ -41,9 +46,12 @@ export function sendJoinRequest(opts: JoinRequestOpts): () => void {
     return () => {}
   }
 
-  const { inviteId, adminPubkey, relays, onWelcome, onError } = opts
+  const { inviteId, adminPubkey, readRelays, writeRelays, onWelcome, onError } = opts
   const joinerPrivkey = identity.privkey
   const joinerPubkey = identity.pubkey
+
+  // Combine read + write for subscription coverage
+  const allRelays = Array.from(new Set([...readRelays, ...writeRelays]))
 
   // Encrypt join request to admin
   const convKey = getConversationKey(hexToBytes(joinerPrivkey), adminPubkey)
@@ -58,12 +66,12 @@ export function sendJoinRequest(opts: JoinRequestOpts): () => void {
     content: encrypted,
   }, hexToBytes(joinerPrivkey))
 
-  // Publish to all relays
-  Promise.allSettled(pool.publish(relays, event as any)).catch(() => {})
+  // Publish to write relays only
+  Promise.allSettled(pool.publish(writeRelays, event as any)).catch(() => {})
 
-  // Subscribe for welcome response
+  // Subscribe for welcome response on all relays
   const sub = pool.subscribeMany(
-    relays,
+    allRelays,
     { kinds: [HANDSHAKE_KIND], '#d': [inviteId], authors: [adminPubkey] } as any,
     {
       onevent(ev) {
@@ -100,7 +108,12 @@ export function sendJoinRequest(opts: JoinRequestOpts): () => void {
 
 export interface ListenForJoinOpts {
   inviteId: string
-  relays: string[]
+  /** Read relays for subscribing to join requests. */
+  readRelays: string[]
+  /** Write relays for publishing (used by sendWelcomeOverRelay). */
+  writeRelays: string[]
+  /** @deprecated Use readRelays/writeRelays. Kept for compat. */
+  relays?: string[]
   /** Called when a join request arrives with the joiner's pubkey. */
   onJoinRequest: (joinerPubkey: string) => void
   /** Called on error. */
@@ -119,11 +132,14 @@ export function listenForJoinRequests(opts: ListenForJoinOpts): () => void {
     return () => {}
   }
 
-  const { inviteId, relays, onJoinRequest, onError } = opts
+  const { inviteId, readRelays, writeRelays, onJoinRequest, onError } = opts
   const adminPrivkey = identity.privkey
 
+  // Subscribe on all relays (read + write) for full coverage
+  const allRelays = Array.from(new Set([...readRelays, ...writeRelays]))
+
   const sub = pool.subscribeMany(
-    relays,
+    allRelays,
     { kinds: [HANDSHAKE_KIND], '#d': [inviteId], '#p': [identity.pubkey] } as any,
     {
       onevent(ev) {
@@ -160,7 +176,10 @@ export interface SendWelcomeOpts {
   inviteId: string
   joinerPubkey: string
   envelope: string  // NIP-44 encrypted welcome payload
-  relays: string[]
+  /** Write relays for publishing the welcome event. */
+  writeRelays: string[]
+  /** @deprecated Use writeRelays. Kept for compat. */
+  relays?: string[]
 }
 
 /**
@@ -171,7 +190,7 @@ export function sendWelcomeOverRelay(opts: SendWelcomeOpts): void {
   const { identity } = getState()
   if (!pool || !identity?.privkey) return
 
-  const { inviteId, joinerPubkey, envelope, relays } = opts
+  const { inviteId, joinerPubkey, envelope, writeRelays } = opts
 
   const convKey = getConversationKey(hexToBytes(identity.privkey), joinerPubkey)
   const payload = JSON.stringify({ type: 'welcome', inviteId, envelope })
@@ -184,5 +203,5 @@ export function sendWelcomeOverRelay(opts: SendWelcomeOpts): void {
     content: encrypted,
   }, hexToBytes(identity.privkey))
 
-  Promise.allSettled(pool.publish(relays, event as any)).catch(() => {})
+  Promise.allSettled(pool.publish(writeRelays, event as any)).catch(() => {})
 }
