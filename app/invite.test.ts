@@ -40,7 +40,7 @@ function makeValidPayload(overrides: Partial<InvitePayload> = {}): InvitePayload
     issuedAt: 1700000000,
     members: [ADMIN_PUBKEY],
     nonce: 'b'.repeat(32),
-    protocolVersion: 1,
+    protocolVersion: 2,
     relays: ['wss://relay.example.com'],
     rotationInterval: 604800,
     seed: 'a'.repeat(64),

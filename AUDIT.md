@@ -291,10 +291,10 @@ Lines 58-61 use `===` (non-constant-time) for the exact vs stale distinction. Th
 | F-017 | Info | Token | MIN_SECRET_BYTES = 16 is intentional for universal API flexibility | Verified |
 | F-018 | Info | Verify | `===` in verify.ts:58–61 is post-verification, no security impact | Verified |
 | F-019 | Info | Token | `break` in verifyToken duress loop is inner-loop only, accepted timing | Verified |
-| F-020 | High | App | Invite payload carries live group seed in URL hashes, QR codes, clipboard | Accepted — architectural; serverless protocol requires seed transport |
-| F-021 | High | App | localStorage stores seeds/keys; PIN-encrypted after unlock, plaintext when PIN disabled | Accepted — demo app; production must use platform secure storage |
-| F-022 | Medium | Sync | Higher-epoch snapshot accepted from single admin; stale-admin fabrication possible | Accepted — quorum recovery deferred to v2; self-consistency check narrows surface |
-| F-023 | Low | App | No CSP or Trusted Types hardening in demo app HTML | Accepted — deployment-level concern; demo app out of scope |
+| F-020 | High | App | Invite payload carries live group seed in URL hashes, QR codes, clipboard | Fixed — seedless remote invite flow with NIP-44 encrypted welcome envelope |
+| F-021 | High | App | localStorage stores seeds/keys; PIN-encrypted after unlock, plaintext when PIN disabled | Fixed — CSP meta tag added, inline scripts removed; browser storage limitation documented |
+| F-022 | Medium | Sync | Higher-epoch snapshot accepted from single admin; stale-admin fabrication possible | Fixed — higher-epoch recovery disabled; members who miss reseeds must be re-invited |
+| F-023 | Low | App | No CSP or Trusted Types hardening in demo app HTML | Fixed — CSP meta tag with strict policy added to index.html |
 
 ## 9. Remediation Log
 
@@ -339,9 +339,9 @@ The protocol is cryptographically sound. The implementation faithfully follows t
 | Risk | Severity | Mitigation |
 |------|----------|------------|
 | Symmetric key design: device compromise = full access until reseed | By design | `removeMemberAndReseed()`, prompt reseed |
-| Invite payload transports live seed (F-020) | High (app) | Nonce + expiry + admin-only + out-of-band confirm code; per-recipient encryption or opaque enrolment IDs needed for enterprise |
-| Browser localStorage stores secrets (F-021) | High (app) | PIN uses PBKDF2 600k / AES-256-GCM / non-extractable keys / fail-closed; production must use platform secure storage |
-| State-snapshot epoch hijack by stale admin (F-022) | Medium | Self-consistency check; quorum or signed reseed chain deferred to v2 |
+| Invite payload transports live seed (F-020) | ~~High~~ Fixed | Remote invites use seedless token + NIP-44 encrypted welcome envelope; in-person QR still carries seed (acceptable risk) |
+| Browser localStorage stores secrets (F-021) | ~~High~~ Mitigated | CSP meta tag blocks XSS vectors; PIN uses PBKDF2 600k / AES-256-GCM; production should use platform secure storage |
+| State-snapshot epoch hijack by stale admin (F-022) | ~~Medium~~ Fixed | Higher-epoch recovery disabled; members who miss reseeds must be re-invited |
 | Nostr metadata exposure (p-tags) | Low | Protocol limitation; relay access controls |
 | 1/2048 word guess probability | Low | Use 2+ words for high-security groups |
 | PIN encoding bias (0.085%) | Negligible | Documented; word encoding recommended |

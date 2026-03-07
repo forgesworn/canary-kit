@@ -55,7 +55,7 @@ function appendConsumedOp(ops: string[], opId: string, timestamp: number, curren
 }
 
 /** Current protocol version. Bump on any breaking wire format change. */
-export const PROTOCOL_VERSION = 1
+export const PROTOCOL_VERSION = 2
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)

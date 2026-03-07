@@ -1,6 +1,6 @@
 {
-  "description": "Sync-layer authority model conformance vectors for CANARY protocol v1",
-  "version": 1,
+  "description": "Sync-layer authority model conformance vectors for CANARY protocol v2",
+  "version": 2,
   "vectors": [
     {
       "id": "I1-reseed-from-admin",
@@ -406,7 +406,7 @@
       "id": "F1-duress-alert-missing-opId",
       "invariant": "F1",
       "description": "Fire-and-forget duress-alert without opId is rejected at decode",
-      "rawMessage": "{\"type\":\"duress-alert\",\"lat\":51.5,\"lon\":-0.1,\"timestamp\":1700000000,\"protocolVersion\":1}",
+      "rawMessage": "{\"type\":\"duress-alert\",\"lat\":51.5,\"lon\":-0.1,\"timestamp\":1700000000,\"protocolVersion\":2}",
       "expected": "decode-error",
       "expectedError": "opId"
     },
@@ -414,7 +414,7 @@
       "id": "F1-beacon-missing-opId",
       "invariant": "F1",
       "description": "Fire-and-forget beacon without opId is rejected at decode",
-      "rawMessage": "{\"type\":\"beacon\",\"lat\":51.5,\"lon\":-0.1,\"accuracy\":100,\"timestamp\":1700000000,\"protocolVersion\":1}",
+      "rawMessage": "{\"type\":\"beacon\",\"lat\":51.5,\"lon\":-0.1,\"accuracy\":100,\"timestamp\":1700000000,\"protocolVersion\":2}",
       "expected": "decode-error",
       "expectedError": "opId"
     },
@@ -422,7 +422,7 @@
       "id": "F1-liveness-checkin-missing-opId",
       "invariant": "F1",
       "description": "Fire-and-forget liveness-checkin without opId is rejected at decode",
-      "rawMessage": "{\"type\":\"liveness-checkin\",\"pubkey\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"timestamp\":1700000000,\"protocolVersion\":1}",
+      "rawMessage": "{\"type\":\"liveness-checkin\",\"pubkey\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"timestamp\":1700000000,\"protocolVersion\":2}",
       "expected": "decode-error",
       "expectedError": "opId"
     },
@@ -430,7 +430,7 @@
       "id": "F1-duress-alert-empty-opId",
       "invariant": "F1",
       "description": "Fire-and-forget duress-alert with empty opId is rejected at decode",
-      "rawMessage": "{\"type\":\"duress-alert\",\"lat\":51.5,\"lon\":-0.1,\"timestamp\":1700000000,\"opId\":\"\",\"protocolVersion\":1}",
+      "rawMessage": "{\"type\":\"duress-alert\",\"lat\":51.5,\"lon\":-0.1,\"timestamp\":1700000000,\"opId\":\"\",\"protocolVersion\":2}",
       "expected": "decode-error",
       "expectedError": "opId"
     },
@@ -460,7 +460,7 @@
         "lon": -0.1,
         "timestamp": 1699999699,
         "opId": "stale-duress",
-        "protocolVersion": 1
+        "protocolVersion": 2
       },
       "nowSec": 1700000000,
       "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -494,7 +494,7 @@
         "accuracy": 100,
         "timestamp": 1700000061,
         "opId": "future-beacon",
-        "protocolVersion": 1
+        "protocolVersion": 2
       },
       "nowSec": 1700000000,
       "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -527,7 +527,7 @@
         "lon": -0.1,
         "timestamp": 1699999800,
         "opId": "fresh-duress",
-        "protocolVersion": 1
+        "protocolVersion": 2
       },
       "nowSec": 1700000000,
       "sender": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

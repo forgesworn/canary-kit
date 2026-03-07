@@ -158,7 +158,7 @@ describe('integration: encrypt sync message → decrypt → apply', () => {
       counter: 100,
       usageOffset: 5,
       timestamp: Math.floor(Date.now() / 1000),
-      protocolVersion: 1,
+      protocolVersion: 2,
     }
 
     const encoded = encodeSyncMessage(msg)
@@ -183,7 +183,7 @@ describe('integration: encrypt sync message → decrypt → apply', () => {
       epoch: 5,
       opId: 'snap-crypto-1',
       timestamp: Math.floor(Date.now() / 1000),
-      protocolVersion: 1,
+      protocolVersion: 2,
     }
 
     const encoded = encodeSyncMessage(msg)
@@ -221,7 +221,7 @@ describe('integration: encrypt sync message → decrypt → apply', () => {
       timestamp: Math.floor(Date.now() / 1000),
       epoch: 0,
       opId: 'test-join-crypto-1',
-      protocolVersion: 1,
+      protocolVersion: 2,
     }
 
     const encoded = encodeSyncMessage(msg)
@@ -242,7 +242,7 @@ describe('integration: encrypt sync message → decrypt → apply', () => {
       lon: -0.1278,
       timestamp: Math.floor(Date.now() / 1000),
       opId: 'test-duress-1',
-      protocolVersion: 1,
+      protocolVersion: 2,
     }
 
     const encoded = encodeSyncMessage(msg)
