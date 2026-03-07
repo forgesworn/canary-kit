@@ -545,7 +545,7 @@ function showRemoteJoinScreen(tokenPayload: string): void {
     d.querySelector<HTMLButtonElement>('#remote-join-accept')?.addEventListener('click', async () => {
       const input = d.querySelector<HTMLInputElement>('#remote-join-welcome-input')
       const errorEl = d.querySelector<HTMLElement>('#remote-join-error')
-      const envelope = input?.value.trim() ?? ''
+      const envelope = (input?.value ?? '').replace(/[^A-Za-z0-9=+/]/g, '')
 
       if (!envelope) {
         if (errorEl) { errorEl.textContent = 'Please paste the welcome message.'; errorEl.style.display = '' }
