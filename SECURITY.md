@@ -65,6 +65,20 @@ CANARY's security rests on the secrecy of the shared seed and the properties of 
 - **HMAC-SHA256 is synchronous.** The core derivation uses a pure JavaScript SHA-256 implementation rather than Web Crypto API, because derivation must be synchronous (called frequently, deterministic, offline). The implementation follows FIPS 180-4.
 - **AES-256-GCM is async.** Beacon encryption uses `crypto.subtle` (Web Crypto API) and is the only async operation in the library.
 
+### Browser Storage
+
+The demo/alpha browser application stores group seeds and private keys in `localStorage`:
+
+- **Without PIN:** Secrets are stored in plaintext. Any script running on the page origin can read them.
+- **With PIN:** Secrets are encrypted with AES-256-GCM via a PBKDF2-derived key (600,000 iterations, non-extractable `CryptoKey`). Secrets are only readable in memory while the app is unlocked.
+
+**This is NOT suitable for enterprise or high-security deployments.** Production implementations on native platforms MUST use platform secure storage (iOS Keychain, Android Keystore, OS credential manager).
+
+The browser app mitigates this with:
+- A strict `Content-Security-Policy` (`script-src 'self'`) blocking injected scripts
+- Zero third-party runtime dependencies in the production bundle
+- Auto-lock after configurable inactivity period (default: 5 minutes)
+
 ### Supply Chain
 
 - **Zero runtime dependencies.** The published package contains only our code.
