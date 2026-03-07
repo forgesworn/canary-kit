@@ -56,6 +56,7 @@ describe('createRemoteInviteToken', () => {
       groupId: 'test-group-1',
       adminPubkey: ADMIN_PUBKEY,
       adminPrivkey: ADMIN_PRIVKEY,
+      relays: ['wss://relay.example.com'],
     })
 
     // All fields present
@@ -63,6 +64,7 @@ describe('createRemoteInviteToken', () => {
     expect(token.groupId).toBe('test-group-1')
     expect(token.adminPubkey).toBe(ADMIN_PUBKEY)
     expect(token.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000))
+    expect(token.relays).toEqual(['wss://relay.example.com'])
 
     // inviteId is 32-char hex (16 bytes)
     expect(token.inviteId).toMatch(/^[0-9a-f]{32}$/)
@@ -91,6 +93,7 @@ describe('assertRemoteInviteToken', () => {
       groupId: 'test-group-1',
       adminPubkey: ADMIN_PUBKEY,
       adminPrivkey: ADMIN_PRIVKEY,
+      relays: ['wss://relay.example.com'],
       expiresInSec: -1,
     })
     expect(() => assertRemoteInviteToken(token)).toThrow(/expired/i)
@@ -102,6 +105,7 @@ describe('assertRemoteInviteToken', () => {
       groupId: 'test-group-1',
       adminPubkey: ADMIN_PUBKEY,
       adminPrivkey: ADMIN_PRIVKEY,
+      relays: ['wss://relay.example.com'],
     })
     // Tamper with the signature
     token.adminSig = 'f'.repeat(128)

@@ -218,11 +218,15 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
     })
     d.querySelector<HTMLButtonElement>('#remote-done')?.addEventListener('click', () => {
       // Add the joiner to the group now that the welcome has been generated
-      const currentGroup = getState().groups[group.id]
-      if (currentGroup && !currentGroup.members.includes(joinerPubkey)) {
-        const displayName = d.querySelector<HTMLInputElement>('#remote-joiner-name')?.value.trim() ?? ''
-        addGroupMember(group.id, joinerPubkey, displayName)
-        showToast(displayName ? `${displayName} added to group` : 'Member added to group', 'success')
+      try {
+        const currentGroup = getState().groups[group.id]
+        if (currentGroup && !currentGroup.members.includes(joinerPubkey)) {
+          const displayName = d.querySelector<HTMLInputElement>('#remote-joiner-name')?.value.trim() ?? ''
+          addGroupMember(group.id, joinerPubkey, displayName)
+          showToast(displayName ? `${displayName} added to group` : 'Member added to group', 'success')
+        }
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Failed to add member', 'error')
       }
       endRemoteInviteSession()
       endInviteSession()
@@ -235,7 +239,7 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
   function renderQRPath(): void {
     const qrSession = startRemoteInviteSession(group)
     const base = window.location.href.split('#')[0]
-    const qrUrl = `${base}#remote/${encodeURIComponent(qrSession.tokenPayload)}`
+    const qrUrl = `${base}#remote/${qrSession.tokenPayload}`
     const svgMarkup = generateQR(qrUrl)
     const relays = group.relays?.length ? group.relays : getState().settings.defaultRelays
 
@@ -306,7 +310,7 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
   function renderRemotePath(): void {
     const remoteSession = startRemoteInviteSession(group)
     const base = window.location.href.split('#')[0]
-    const remoteUrl = `${base}#remote/${encodeURIComponent(remoteSession.tokenPayload)}`
+    const remoteUrl = `${base}#remote/${remoteSession.tokenPayload}`
 
     function renderStep1(): void {
       d.innerHTML = `

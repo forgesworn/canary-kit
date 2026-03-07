@@ -26,6 +26,7 @@ export interface RemoteInviteToken {
   adminPubkey: string
   inviteId: string      // 16-byte random hex nonce
   expiresAt: number     // unix seconds
+  relays: string[]      // relay URLs so the joiner connects to the same relays
   adminSig: string      // Schnorr sig over SHA-256(canonical JSON of other fields)
 }
 
@@ -73,6 +74,7 @@ export interface CreateRemoteInviteOpts {
   groupId: string
   adminPubkey: string
   adminPrivkey: string
+  relays: string[]
   expiresInSec?: number
 }
 
@@ -86,6 +88,7 @@ export function createRemoteInviteToken(opts: CreateRemoteInviteOpts): RemoteInv
     groupId,
     adminPubkey,
     adminPrivkey,
+    relays,
     expiresInSec = 86400,
   } = opts
 
@@ -100,6 +103,7 @@ export function createRemoteInviteToken(opts: CreateRemoteInviteOpts): RemoteInv
     adminPubkey,
     inviteId,
     expiresAt: Math.floor(Date.now() / 1000) + expiresInSec,
+    relays: [...relays],
     adminSig: '', // placeholder — will be replaced after signing
   }
 
@@ -139,6 +143,9 @@ export function assertRemoteInviteToken(raw: unknown): asserts raw is RemoteInvi
   }
   if (typeof t.adminSig !== 'string' || !HEX_128_RE.test(t.adminSig)) {
     throw new Error('adminSig must be a 128-character hex string')
+  }
+  if (!Array.isArray(t.relays) || !t.relays.every((r: unknown) => typeof r === 'string')) {
+    throw new Error('relays must be an array of strings')
   }
 
   // Expiry
