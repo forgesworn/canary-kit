@@ -179,7 +179,7 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
         const currentGroup = getState().groups[group.id]
         if (!currentGroup) throw new Error('Group not found.')
         const envelope = createRemoteWelcomeEnvelope(currentGroup, joinerPubkey)
-        renderStep3(envelope)
+        renderStep3(envelope, joinerPubkey)
       } catch (err) {
         if (errorEl) {
           errorEl.textContent = err instanceof Error ? err.message : 'Failed to create welcome envelope.'
@@ -189,7 +189,7 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
     })
   }
 
-  function renderStep3(envelope: string): void {
+  function renderStep3(envelope: string, joinerPubkey: string): void {
     d.innerHTML = `
       <div class="modal__form invite-share">
         <h2 class="modal__title">Step 3 of 3: Send Welcome</h2>
@@ -198,8 +198,11 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
         <div class="invite-share__actions" style="flex-direction: column; gap: 0.5rem;">
           <button class="btn btn--primary" id="remote-copy-welcome" type="button">Copy Welcome Message</button>
         </div>
+        <label class="input-label" style="margin-top: 0.5rem;">Member name (optional)
+          <input class="input" id="remote-joiner-name" type="text" placeholder="e.g. Alice" autocomplete="off">
+        </label>
         <div class="modal__actions" style="gap: 0.5rem;">
-          <button class="btn" id="remote-done" type="button">Done</button>
+          <button class="btn btn--primary" id="remote-done" type="button">Done</button>
         </div>
       </div>
     `
@@ -212,7 +215,18 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
         setTimeout(() => { btn.textContent = 'Copy Welcome Message'; btn.classList.remove('btn--copied') }, 2000)
       } catch { /* clipboard may be blocked */ }
     })
-    d.querySelector<HTMLButtonElement>('#remote-done')?.addEventListener('click', () => { endRemoteInviteSession(); endInviteSession(); d.close() })
+    d.querySelector<HTMLButtonElement>('#remote-done')?.addEventListener('click', () => {
+      // Add the joiner to the group now that the welcome has been generated
+      const currentGroup = getState().groups[group.id]
+      if (currentGroup && !currentGroup.members.includes(joinerPubkey)) {
+        const displayName = d.querySelector<HTMLInputElement>('#remote-joiner-name')?.value.trim() ?? ''
+        addGroupMember(group.id, joinerPubkey, displayName)
+        showToast(displayName ? `${displayName} added to group` : 'Member added to group', 'success')
+      }
+      endRemoteInviteSession()
+      endInviteSession()
+      d.close()
+    })
   }
 
   // ── QR path ──────────────────────────────────────────────────

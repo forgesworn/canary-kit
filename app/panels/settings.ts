@@ -112,8 +112,8 @@ export function renderSettings(container: HTMLElement): void {
           <p class="settings-hint">Immediate alerts members now. Dead drop records silently for later retrieval.</p>
         </div>
 
-        <!-- Nostr Sync Toggle (online mode only) -->
-        <div class="settings-section"${groupMode(group) === 'offline' ? ' hidden' : ''}>
+        <!-- Nostr Sync Toggle -->
+        <div class="settings-section">
           <label class="toggle-label">
             <input type="checkbox" id="nostr-toggle" ${group.nostrEnabled ? 'checked' : ''}>
             <span>Nostr Sync</span>
