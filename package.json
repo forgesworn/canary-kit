@@ -67,7 +67,11 @@
     "test:e2e:offline": "playwright test --config e2e/playwright.config.ts --project=offline",
     "test:e2e:online": "playwright test --config e2e/playwright.config.ts --project=online",
     "test:e2e:protocol": "playwright test --config e2e/playwright.config.ts --project=protocol",
-    "test:e2e:ui": "playwright test --config e2e/playwright.config.ts --ui"
+    "test:e2e:ui": "playwright test --config e2e/playwright.config.ts --ui",
+    "record": "node docs/record/record.js",
+    "record:short": "node docs/record/record.js short",
+    "record:extended": "node docs/record/record.js extended",
+    "record:silent": "node docs/record/record.js --no-voice"
   },
   "keywords": [
     "canary",

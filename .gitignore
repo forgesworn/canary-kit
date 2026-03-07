@@ -13,3 +13,6 @@ docs/plans/
 test-results/
 playwright-report/
 .worktrees/
+
+# Recording output
+docs/record/output/
