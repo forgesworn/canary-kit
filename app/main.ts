@@ -703,6 +703,9 @@ function wireGlobalEvents(): void {
       showDuressAlert(duressPubkey, groupId, message.lat != null ? { lat: message.lat, lon: message.lon } : undefined, message.timestamp)
     }
   })
+
+  // Re-sync when identity changes (e.g. nsec login from header popover)
+  document.addEventListener('canary:resync', () => void bootSync())
 }
 
 // ── Local identity ────────────────────────────────────────────

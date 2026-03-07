@@ -223,6 +223,8 @@ function loginWithNsec(nsec: string, displayName?: string): boolean {
     teardownSync()
     update({ identity: newIdentity, groups: {}, activeGroupId: null })
     updateIdentityDisplay()
+    // Re-connect relays and fetch kind 0 profile for the new identity
+    document.dispatchEvent(new CustomEvent('canary:resync'))
     return true
   } catch {
     alert('Invalid nsec format.')
@@ -329,6 +331,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
       }
       update({ identity: newIdentity, groups: {}, activeGroupId: null })
       updateIdentityDisplay()
+      document.dispatchEvent(new CustomEvent('canary:resync'))
       popover.remove()
     } catch {
       alert('Extension rejected the request.')

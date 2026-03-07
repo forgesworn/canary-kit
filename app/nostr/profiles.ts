@@ -111,6 +111,7 @@ export function fetchProfiles(pubkeys: string[], groupId?: string): void {
 /**
  * Fetch the local user's own kind 0 profile and update identity state.
  * Called once after relay pool connects. Updates displayName and picture.
+ * Forces a fresh fetch (ignores cache) so switching identities always works.
  */
 export function fetchOwnProfile(): void {
   const pool = getPool()
@@ -118,7 +119,10 @@ export function fetchOwnProfile(): void {
   if (!pool || !identity?.pubkey) return
 
   const pk = identity.pubkey
-  if (_cache.has(pk) || _pending.has(pk)) return
+  if (_pending.has(pk)) return
+  // Clear cache so we always get a fresh profile after login/switch
+  _cache.delete(pk)
+  _notFound.delete(pk)
 
   _pending.add(pk)
 
