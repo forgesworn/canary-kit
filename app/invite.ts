@@ -8,6 +8,7 @@ import { PROTOCOL_VERSION } from 'canary-kit/sync'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { getState, updateGroup } from './state.js'
 import type { AppGroup } from './types.js'
+import { jsonToBase64, base64ToJson } from './utils/base64.js'
 
 /** Allow wss:// relays, plus ws:// only for localhost development. */
 function isAllowedRelayUrl(url: string): boolean {
@@ -287,7 +288,7 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
 
   invitePayload.inviterSig = signInvite(invitePayload, identity.privkey)
 
-  const payload = btoa(JSON.stringify(invitePayload))
+  const payload = jsonToBase64(invitePayload)
   const confirmCode = confirmCodeFromPayload(invitePayload)
 
   return { payload, confirmCode }
@@ -303,7 +304,7 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
 export function acceptInvite(payload: string, confirmCode?: string): InvitePayload {
   let raw: unknown
   try {
-    raw = JSON.parse(atob(payload))
+    raw = base64ToJson(payload)
   } catch {
     throw new Error('Invalid invite payload — could not decode.')
   }
@@ -449,7 +450,7 @@ export function createJoinToken(opts: {
   }
   const hash = sha256(joinTokenCanonicalBytes(token))
   const sig = bytesToHex(schnorr.sign(hash, hexToBytes(opts.privkey)))
-  return btoa(JSON.stringify({ ...token, s: sig }))
+  return jsonToBase64({ ...token, s: sig })
 }
 
 /**
@@ -461,7 +462,7 @@ export function verifyJoinToken(
 ): JoinTokenResult {
   let raw: JoinToken
   try {
-    raw = JSON.parse(atob(encoded))
+    raw = base64ToJson(encoded) as JoinToken
   } catch {
     return { valid: false, error: 'Invalid join token — could not decode.' }
   }
@@ -539,7 +540,7 @@ let _activeSession: InviteSession | null = null
  */
 export function startInviteSession(group: AppGroup): InviteSession {
   const { payload, confirmCode } = createInvite(group)
-  const decoded: InvitePayload = JSON.parse(atob(payload))
+  const decoded = base64ToJson(payload) as InvitePayload
   _activeSession = {
     groupId: group.id,
     payload,
@@ -606,7 +607,7 @@ export function startRemoteInviteSession(group: AppGroup): RemoteInviteSession {
     adminPrivkey: identity.privkey,
   })
 
-  const tokenPayload = btoa(JSON.stringify(token))
+  const tokenPayload = jsonToBase64(token)
 
   _activeRemoteSession = {
     groupId: group.id,

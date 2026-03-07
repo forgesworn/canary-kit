@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { sha256, bytesToHex, hexToBytes } from 'canary-kit/crypto'
+import { jsonToBase64, base64ToJson } from './utils/base64.js'
 import { indexOf } from 'canary-kit/wordlist'
 import { deriveToken } from 'canary-kit/token'
 import {
@@ -244,9 +245,9 @@ describe('join token', () => {
       currentWord: 'sparrow',
     })
     // Tamper with the token
-    const parsed = JSON.parse(atob(token))
+    const parsed = base64ToJson(token) as Record<string, unknown>
     parsed.n = 'Eve'
-    const tampered = btoa(JSON.stringify(parsed))
+    const tampered = jsonToBase64(parsed)
     const result = verifyJoinToken(tampered, { groupId, groupSeed, counter: 0, context: 'canary:group' })
     expect(result.valid).toBe(false)
     expect(result.error).toMatch(/signature/i)
