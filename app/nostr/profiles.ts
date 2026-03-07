@@ -1,6 +1,6 @@
 // app/nostr/profiles.ts — Fetch and cache Nostr kind 0 profile metadata
 
-import { getPool } from './connect.js'
+import { getPool, waitForConnection } from './connect.js'
 import { getState, update, updateGroup } from '../state.js'
 
 export interface NostrProfile {
@@ -61,8 +61,9 @@ export function fetchProfiles(pubkeys: string[], groupId?: string): void {
 
   for (const pk of needed) _pending.add(pk)
 
-  // Get relay URLs from group or state
-  const relays = getGroupRelays(groupId)
+  // Get relay URLs from group or state, plus well-known fallbacks
+  const groupRelays = getGroupRelays(groupId)
+  const relays = [...new Set([...groupRelays, ...PROFILE_FALLBACK_RELAYS])]
   console.warn('[profiles] fetching', needed.length, 'profiles from', relays, 'for group', groupId?.slice(0, 8))
   if (relays.length === 0) {
     for (const pk of needed) _pending.delete(pk)
@@ -108,12 +109,23 @@ export function fetchProfiles(pubkeys: string[], groupId?: string): void {
   )
 }
 
+/** Well-known public relays to query for kind 0 profiles as fallback. */
+const PROFILE_FALLBACK_RELAYS = [
+  'wss://purplepag.es',
+  'wss://relay.damus.io',
+  'wss://nos.lol',
+]
+
 /**
  * Fetch the local user's own kind 0 profile and update identity state.
  * Called once after relay pool connects. Updates displayName and picture.
  * Forces a fresh fetch (ignores cache) so switching identities always works.
+ * Queries both configured relays and well-known public relays.
  */
-export function fetchOwnProfile(): void {
+export async function fetchOwnProfile(): Promise<void> {
+  // Wait for relay connections to be established before subscribing
+  await waitForConnection()
+
   const pool = getPool()
   const { identity, settings } = getState()
   if (!pool || !identity?.pubkey) return
@@ -126,8 +138,12 @@ export function fetchOwnProfile(): void {
 
   _pending.add(pk)
 
-  const relays = settings?.defaultRelays?.length ? settings.defaultRelays : []
+  // Merge configured relays with well-known public relays (deduplicated)
+  const configured = settings?.defaultRelays?.length ? settings.defaultRelays : []
+  const relays = [...new Set([...configured, ...PROFILE_FALLBACK_RELAYS])]
   if (relays.length === 0) { _pending.delete(pk); return }
+
+  console.warn('[profiles] fetching own kind 0 from', relays)
 
   const sub = pool.subscribeMany(
     relays,
@@ -136,6 +152,7 @@ export function fetchOwnProfile(): void {
       onevent(event) {
         try {
           const profile: NostrProfile = JSON.parse(event.content)
+          console.warn('[profiles] got own profile from relay:', profile.display_name || profile.name || '(no name)')
           _cache.set(event.pubkey, profile)
           _pending.delete(event.pubkey)
 

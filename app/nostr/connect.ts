@@ -9,6 +9,9 @@ let _relayUrls: string[] = []
 
 // ── Pool management ────────────────────────────────────────────
 
+/** Promise that resolves once the current connection attempt completes. */
+let _connectPromise: Promise<void> = Promise.resolve()
+
 /**
  * Connect to the given relay URLs using a SimplePool.
  * Idempotent: if already connected to the same relay set, returns immediately.
@@ -38,7 +41,12 @@ export function connectRelays(relayUrls: string[]): void {
 
   // Eagerly open connections so the pool is ready for publish/subscribe.
   // SimplePool.ensureRelay returns a connected Relay instance or throws.
-  void verifyConnection()
+  _connectPromise = verifyConnection()
+}
+
+/** Wait for the current relay connection attempt to complete. */
+export function waitForConnection(): Promise<void> {
+  return _connectPromise
 }
 
 /**
