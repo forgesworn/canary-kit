@@ -43,6 +43,7 @@ import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } 
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
 import { escapeHtml } from './utils/escape.js'
+import { base64ToJson } from './utils/base64.js'
 import type { AppIdentity } from './types.js'
 
 /** Allow wss:// relays, plus ws:// only for localhost development. */
@@ -476,7 +477,7 @@ function showRemoteJoinScreen(tokenPayload: string): void {
   try {
     let parsed: unknown
     try {
-      parsed = JSON.parse(atob(tokenPayload))
+      parsed = base64ToJson(tokenPayload)
     } catch {
       throw new Error('Invalid invite — could not decode token.')
     }
