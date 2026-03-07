@@ -5,7 +5,7 @@
 Interactive demo: https://thecryptodonkey.github.io/canary-kit/
 GitHub: https://github.com/TheCryptoDonkey/canary-kit
 
-ESM-only. Seven subpath exports: `canary-kit` (main), `canary-kit/token`, `canary-kit/encoding`, `canary-kit/session`, `canary-kit/wordlist`, `canary-kit/nostr`, `canary-kit/beacon`.
+ESM-only. Eight subpath exports: `canary-kit` (main), `canary-kit/token`, `canary-kit/encoding`, `canary-kit/session`, `canary-kit/wordlist`, `canary-kit/nostr`, `canary-kit/beacon`, `canary-kit/sync`.
 
 ## Install
 
@@ -122,6 +122,21 @@ AES-256-GCM encrypted location beacons and duress alerts for Nostr kind 20800 ev
 - decryptDuressAlert(key, content) → Promise\<DuressAlert\>
 
 Types: BeaconPayload ({ geohash, precision, timestamp }), DuressAlert ({ type, member, geohash, precision, locationSource, timestamp }), DuressLocation ({ geohash, precision, locationSource })
+
+### canary-kit/sync
+
+Transport-agnostic group state synchronisation. Authority model with 6 invariants, replay protection, epoch boundaries.
+
+- decodeSyncMessage(json) → SyncMessage (validates and parses)
+- encodeSyncMessage(msg) → string (serialises to JSON)
+- applySyncMessage(state, msg, sender?) → SyncResult ({ state, applied, reason? })
+- deriveGroupKey(seed) → Uint8Array (AES-256-GCM group key)
+- deriveGroupSigningKey(seed) → Uint8Array (HMAC signing key)
+- hashGroupTag(groupId) → string (privacy-preserving group tag)
+- encryptEnvelope(key, plaintext) → Promise<string> (AES-256-GCM)
+- decryptEnvelope(key, ciphertext) → Promise<string> (AES-256-GCM)
+
+Message types: member-join, member-leave, counter-advance, reseed, beacon, duress-alert, liveness-checkin, state-snapshot
 
 ## Quick Examples
 
