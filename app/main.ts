@@ -35,14 +35,17 @@ import { renderSettings } from './panels/settings.js'
 import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
 import { showCallVerify } from './components/call-verify.js'
 import { assertRemoteInviteToken, decryptWelcomeEnvelope } from './crypto/remote-invite.js'
+import { sendJoinRequest } from './nostr/invite-relay.js'
 import { resolveSigner, hasNip07 } from './nostr/signer.js'
 import { DEMO_ACCOUNTS } from './demo-accounts.js'
-import { decode as nip19decode } from 'nostr-tools/nip19'
+import { decode as nip19decode, nsecEncode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
+import { hexToBytes } from 'canary-kit/crypto'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
 import { escapeHtml } from './utils/escape.js'
+import { base64ToJson } from './utils/base64.js'
 import type { AppIdentity } from './types.js'
 
 /** Allow wss:// relays, plus ws:// only for localhost development. */
@@ -472,11 +475,89 @@ function checkInviteFragment(): void {
 
 // ── Remote join screen (joiner side) ────────────────────────────
 
+function acceptWelcomeEnvelope(
+  envelope: string,
+  token: { adminPubkey: string; inviteId: string },
+  dialog: HTMLDialogElement,
+): void {
+  const { identity } = getState()
+  if (!identity?.pubkey || !identity?.privkey) return
+
+  const welcome = decryptWelcomeEnvelope({
+    envelope,
+    joinerPrivkey: identity.privkey,
+    adminPubkey: token.adminPubkey,
+    expectedInviteId: token.inviteId,
+  })
+
+  // Build AppGroup from welcome payload
+  const id = welcome.groupId
+  const { groups: existingGroups } = getState()
+  const members = new Set<string>(welcome.members)
+  members.add(identity.pubkey)
+  const memberNames: Record<string, string> = { ...(welcome.memberNames ?? {}) }
+  if (identity.displayName && identity.displayName !== 'You') {
+    memberNames[identity.pubkey] = identity.displayName
+  }
+
+  const relays = [...(welcome.relays ?? [])]
+  const hasRelays = relays.length > 0
+
+  const appGroup = {
+    id,
+    name: welcome.groupName,
+    seed: welcome.seed,
+    members: Array.from(members),
+    memberNames,
+    nostrEnabled: hasRelays,
+    relays,
+    wordlist: welcome.wordlist,
+    wordCount: welcome.wordCount,
+    counter: welcome.counter,
+    usageOffset: welcome.usageOffset,
+    rotationInterval: welcome.rotationInterval,
+    encodingFormat: welcome.encodingFormat,
+    usedInvites: [] as string[],
+    latestInviteIssuedAt: 0,
+    beaconInterval: welcome.beaconInterval,
+    beaconPrecision: welcome.beaconPrecision,
+    duressMode: 'immediate' as const,
+    livenessInterval: welcome.rotationInterval,
+    livenessCheckins: {} as Record<string, number>,
+    tolerance: welcome.tolerance,
+    createdAt: Math.floor(Date.now() / 1000),
+    admins: [...welcome.admins],
+    epoch: welcome.epoch,
+    consumedOps: [] as string[],
+  }
+
+  const groups = { ...existingGroups, [id]: appGroup }
+  update({ groups, activeGroupId: id })
+  flushPersist()
+
+  // Boot relay sync and announce
+  if (hasRelays && identity) {
+    void ensureTransport(relays, id).then(() => {
+      broadcastAction(id, {
+        type: 'member-join',
+        pubkey: identity.pubkey,
+        displayName: identity.displayName && identity.displayName !== 'You' ? identity.displayName : undefined,
+        timestamp: Math.floor(Date.now() / 1000),
+        epoch: welcome.epoch,
+        opId: crypto.randomUUID(),
+      })
+    })
+  }
+
+  dialog.close()
+  showToast(`Joined ${welcome.groupName}`, 'success')
+}
+
 function showRemoteJoinScreen(tokenPayload: string): void {
   try {
     let parsed: unknown
     try {
-      parsed = JSON.parse(atob(tokenPayload))
+      parsed = base64ToJson(tokenPayload)
     } catch {
       throw new Error('Invalid invite — could not decode token.')
     }
@@ -484,13 +565,14 @@ function showRemoteJoinScreen(tokenPayload: string): void {
     assertRemoteInviteToken(parsed)
 
     const token = parsed
-    const { identity } = getState()
+    const { identity, settings } = getState()
     if (!identity?.pubkey || !identity?.privkey) {
       showToast('No local identity — create or import one first.', 'error')
       return
     }
 
     const shortAdmin = `${token.adminPubkey.slice(0, 8)}\u2026${token.adminPubkey.slice(-4)}`
+    const relays = settings.defaultRelays
 
     let dialog = document.getElementById('remote-join-modal') as HTMLDialogElement | null
     if (!dialog) {
@@ -504,14 +586,17 @@ function showRemoteJoinScreen(tokenPayload: string): void {
     }
 
     const d = dialog
+    let cleanupRelay = () => {}
 
     d.innerHTML = `
       <div class="modal__form invite-share">
         <h2 class="modal__title">Remote Invite</h2>
         <p class="invite-hint">You've been invited to <strong>${escapeHtml(token.groupName)}</strong> by <code>${escapeHtml(shortAdmin)}</code></p>
 
+        <p class="invite-hint" id="remote-join-relay-status" style="color: var(--verified); font-weight: 500;">${relays.length > 0 ? 'Connecting to relay...' : ''}</p>
+
         <div style="margin: 1rem 0;">
-          <p class="invite-hint" style="font-weight: 500;">Send this join code back to the person who invited you:</p>
+          <p class="invite-hint" style="font-weight: 500;">Or send this join code manually:</p>
           <div style="display: flex; align-items: center; gap: 0.5rem; justify-content: center; margin: 0.5rem 0;">
             <code style="font-size: 0.75rem; word-break: break-all; max-width: 80%;">${escapeHtml(identity.pubkey)}</code>
             <button class="btn btn--sm" id="remote-join-copy-pubkey" type="button">Copy</button>
@@ -531,6 +616,36 @@ function showRemoteJoinScreen(tokenPayload: string): void {
       </div>
     `
 
+    // Auto-exchange over relay if relays are available
+    if (relays.length > 0) {
+      void ensureTransport(relays).then(() => {
+        const statusEl = d.querySelector('#remote-join-relay-status')
+        if (statusEl) statusEl.textContent = 'Waiting for admin to send group key...'
+
+        cleanupRelay = sendJoinRequest({
+          inviteId: token.inviteId,
+          adminPubkey: token.adminPubkey,
+          relays,
+          onWelcome(envelope) {
+            try {
+              acceptWelcomeEnvelope(envelope, token, d)
+            } catch (err) {
+              if (statusEl) {
+                statusEl.textContent = 'Auto-join failed — paste welcome message manually.'
+                statusEl.style.color = 'var(--duress)'
+              }
+            }
+          },
+          onError(msg) {
+            if (statusEl) {
+              statusEl.textContent = msg
+              statusEl.style.color = 'var(--duress)'
+            }
+          },
+        })
+      })
+    }
+
     d.querySelector<HTMLButtonElement>('#remote-join-copy-pubkey')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget as HTMLButtonElement
       try {
@@ -540,7 +655,7 @@ function showRemoteJoinScreen(tokenPayload: string): void {
       } catch { /* clipboard may be blocked */ }
     })
 
-    d.querySelector<HTMLButtonElement>('#remote-join-cancel')?.addEventListener('click', () => d.close())
+    d.querySelector<HTMLButtonElement>('#remote-join-cancel')?.addEventListener('click', () => { cleanupRelay(); d.close() })
 
     d.querySelector<HTMLButtonElement>('#remote-join-accept')?.addEventListener('click', async () => {
       const input = d.querySelector<HTMLInputElement>('#remote-join-welcome-input')
@@ -553,74 +668,8 @@ function showRemoteJoinScreen(tokenPayload: string): void {
       }
 
       try {
-        const welcome = decryptWelcomeEnvelope({
-          envelope,
-          joinerPrivkey: identity.privkey!,
-          adminPubkey: token.adminPubkey,
-          expectedInviteId: token.inviteId,
-        })
-
-        // Build AppGroup from welcome payload
-        const id = welcome.groupId
-        const { groups: existingGroups } = getState()
-        const members = new Set<string>(welcome.members)
-        members.add(identity.pubkey)
-        const memberNames: Record<string, string> = { ...(welcome.memberNames ?? {}) }
-        if (identity.displayName && identity.displayName !== 'You') {
-          memberNames[identity.pubkey] = identity.displayName
-        }
-
-        const relays = [...(welcome.relays ?? [])]
-        const hasRelays = relays.length > 0
-
-        const appGroup = {
-          id,
-          name: welcome.groupName,
-          seed: welcome.seed,
-          members: Array.from(members),
-          memberNames,
-          nostrEnabled: hasRelays,
-          relays,
-          wordlist: welcome.wordlist,
-          wordCount: welcome.wordCount,
-          counter: welcome.counter,
-          usageOffset: welcome.usageOffset,
-          rotationInterval: welcome.rotationInterval,
-          encodingFormat: welcome.encodingFormat,
-          usedInvites: [] as string[],
-          latestInviteIssuedAt: 0,
-          beaconInterval: welcome.beaconInterval,
-          beaconPrecision: welcome.beaconPrecision,
-          duressMode: 'immediate' as const,
-          livenessInterval: welcome.rotationInterval,
-          livenessCheckins: {} as Record<string, number>,
-          tolerance: welcome.tolerance,
-          createdAt: Math.floor(Date.now() / 1000),
-          admins: [...welcome.admins],
-          epoch: welcome.epoch,
-          consumedOps: [] as string[],
-        }
-
-        const groups = { ...existingGroups, [id]: appGroup }
-        update({ groups, activeGroupId: id })
-        flushPersist()
-
-        // Boot relay sync and announce
-        if (hasRelays && identity) {
-          void ensureTransport(relays, id).then(() => {
-            broadcastAction(id, {
-              type: 'member-join',
-              pubkey: identity.pubkey,
-              displayName: identity.displayName && identity.displayName !== 'You' ? identity.displayName : undefined,
-              timestamp: Math.floor(Date.now() / 1000),
-              epoch: welcome.epoch,
-              opId: crypto.randomUUID(),
-            })
-          })
-        }
-
-        d.close()
-        showToast(`Joined ${welcome.groupName}`, 'success')
+        cleanupRelay()
+        acceptWelcomeEnvelope(envelope, token, d)
       } catch (err) {
         if (errorEl) {
           errorEl.textContent = err instanceof Error ? err.message : 'Failed to decrypt welcome message.'
@@ -703,6 +752,9 @@ function wireGlobalEvents(): void {
       showDuressAlert(duressPubkey, groupId, message.lat != null ? { lat: message.lat, lon: message.lon } : undefined, message.timestamp)
     }
   })
+
+  // Re-sync when identity changes (e.g. nsec login from header popover)
+  document.addEventListener('canary:resync', () => void bootSync())
 }
 
 // ── Local identity ────────────────────────────────────────────
@@ -790,6 +842,45 @@ function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+function showNsecBackupModal(privkeyHex: string): void {
+  const nsec = nsecEncode(hexToBytes(privkeyHex))
+
+  let dialog = document.getElementById('nsec-backup-modal') as HTMLDialogElement | null
+  if (!dialog) {
+    dialog = document.createElement('dialog')
+    dialog.id = 'nsec-backup-modal'
+    dialog.className = 'modal'
+    document.body.appendChild(dialog)
+  }
+
+  const d = dialog
+  d.innerHTML = `
+    <div class="modal__form" style="max-width: 400px;">
+      <h2 class="modal__title">Back up your secret key</h2>
+      <p class="invite-hint">We created a Nostr keypair for you. Save your <strong>nsec</strong> somewhere safe — it's the only way to log back in on another device or if you clear your browser.</p>
+      <code style="font-size: 0.7rem; word-break: break-all; display: block; background: var(--bg); padding: 0.75rem; border-radius: 4px; border: 1px solid var(--border); margin: 1rem 0; user-select: all;">${escapeHtml(nsec)}</code>
+      <p class="invite-hint" style="color: var(--duress); font-weight: 500;">Do not share this with anyone.</p>
+      <div class="modal__actions" style="gap: 0.5rem;">
+        <button class="btn btn--primary" id="nsec-backup-copy" type="button">Copy nsec</button>
+        <button class="btn" id="nsec-backup-done" type="button">I've saved it</button>
+      </div>
+    </div>
+  `
+
+  d.querySelector('#nsec-backup-copy')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement
+    try {
+      await navigator.clipboard.writeText(nsec)
+      btn.textContent = 'Copied!'
+      setTimeout(() => { btn.textContent = 'Copy nsec' }, 2000)
+    } catch { /* clipboard may be blocked */ }
+  })
+
+  d.querySelector('#nsec-backup-done')?.addEventListener('click', () => d.close())
+
+  d.showModal()
+}
+
 function showLoginScreen(): void {
   const app = document.getElementById('app')!
 
@@ -807,11 +898,11 @@ function showLoginScreen(): void {
       <div style="width: 100%; max-width: 360px; margin-top: 1.5rem;">
 
         <div style="background: var(--bg-raised); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem;">
-          <p class="input-label__text" style="margin-bottom: 0.5rem;">Use Offline</p>
-          <p class="settings-hint" style="margin-bottom: 0.5rem;">No account needed. Everything stays on this device.</p>
+          <p class="input-label__text" style="margin-bottom: 0.5rem;">Quick Start</p>
+          <p class="settings-hint" style="margin-bottom: 0.5rem;">No Nostr account needed. Enter your name to get started.</p>
           <form id="offline-form" autocomplete="off" style="display: flex; gap: 0.375rem;">
-            <input class="input" type="text" id="offline-name" placeholder="Your name" style="flex: 1; font-size: 0.875rem; padding: 0.5rem;" />
-            <button class="btn btn--primary" type="submit">Start</button>
+            <input class="input" type="text" id="offline-name" placeholder="Enter your name" required style="flex: 1; font-size: 0.875rem; padding: 0.5rem;" />
+            <button class="btn btn--primary" type="submit">Go</button>
           </form>
         </div>
 
@@ -858,14 +949,24 @@ function showLoginScreen(): void {
     </div>
   `
 
-  // Offline — generate key silently, just ask for a name
+  // Quick Start — generate key silently, just ask for a name
   app.querySelector<HTMLFormElement>('#offline-form')?.addEventListener('submit', async (e) => {
     e.preventDefault()
-    const name = app.querySelector<HTMLInputElement>('#offline-name')?.value.trim() || 'You'
+    const input = app.querySelector<HTMLInputElement>('#offline-name')
+    const name = input?.value.trim()
+    if (!name) {
+      input?.focus()
+      return
+    }
     await ensureLocalIdentity()
     const { identity } = getState()
     if (identity) update({ identity: { ...identity, displayName: name } })
     await bootApp()
+
+    // Show backup prompt for newly created keys
+    if (identity?.privkey) {
+      showNsecBackupModal(identity.privkey)
+    }
   })
 
   // nsec form submit
