@@ -273,7 +273,7 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
     beaconInterval: group.beaconInterval,
     beaconPrecision: group.beaconPrecision,
     members: [...group.members],
-    relays: [...(group.relays ?? [])],
+    relays: [...(group.writeRelays ?? group.relays ?? [])],
     encodingFormat: group.encodingFormat ?? 'words',
     tolerance: group.tolerance ?? 1,
     issuedAt,
@@ -600,7 +600,7 @@ export function startRemoteInviteSession(group: AppGroup): RemoteInviteSession {
     throw new Error(`Not authorised — you are not an admin of "${group.name}".`)
   }
 
-  const relays = group.relays?.length ? [...group.relays] : [...getState().settings.defaultRelays]
+  const relays = group.writeRelays?.length ? [...group.writeRelays] : [...(getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays)]
 
   const token = createRemoteInviteToken({
     groupName: group.name,
@@ -647,7 +647,7 @@ export function createRemoteWelcomeEnvelope(group: AppGroup, joinerPubkey: strin
     tolerance: group.tolerance ?? 1,
     members: [...group.members],
     admins: [...(group.admins ?? [])],
-    relays: [...(group.relays ?? [])],
+    relays: [...(group.writeRelays ?? group.relays ?? [])],
     memberNames: group.memberNames ? { ...group.memberNames } : undefined,
   }
 

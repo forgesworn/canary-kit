@@ -1,7 +1,7 @@
 // app/panels/settings.ts — Group settings drawer
 
 import { getState, updateGroup, update } from '../state.js'
-import { groupMode } from '../types.js'
+import { groupMode, allRelaysForGroup, WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY } from '../types.js'
 import { deleteGroup, reseedGroup, compromiseReseed, validateGroupImport } from '../actions/groups.js'
 import { showToast } from '../components/toast.js'
 import { disconnectRelays, isConnected, getRelayCount } from '../nostr/connect.js'
@@ -124,25 +124,47 @@ export function renderSettings(container: HTMLElement): void {
               <span class="settings-hint">Loading identity…</span>
             </div>
 
-            <!-- Relay list -->
+            <!-- Write relays (publishing) -->
             <div class="nostr-relays">
-              <span class="input-label">Relays</span>
-              <ul class="relay-list" id="relay-list">
-                ${(group.relays ?? []).map((url, i) => `
+              <span class="input-label">Write Relays <span class="settings-hint" style="font-weight:normal;">(publishing)</span></span>
+              <ul class="relay-list" id="write-relay-list">
+                ${(group.writeRelays ?? []).map((url, i) => `
                   <li class="relay-item">
                     <span class="relay-url">${escapeHtml(url)}</span>
-                    <button class="btn btn--ghost btn--sm relay-remove" data-relay-index="${i}" aria-label="Remove relay">✕</button>
+                    <button class="btn btn--ghost btn--sm write-relay-remove" data-relay-index="${i}" aria-label="Remove write relay">✕</button>
                   </li>
                 `).join('')}
               </ul>
               <div class="relay-add-row">
                 <input
                   class="input relay-add-input"
-                  id="relay-add-input"
+                  id="write-relay-add-input"
                   type="url"
                   placeholder="wss://relay.example.com"
                 >
-                <button class="btn btn--ghost btn--sm" id="relay-add-btn">Add</button>
+                <button class="btn btn--ghost btn--sm" id="write-relay-add-btn">Add</button>
+              </div>
+            </div>
+
+            <!-- Read relays (subscriptions/discovery) -->
+            <div class="nostr-relays" style="margin-top: 0.5rem;">
+              <span class="input-label">Read Relays <span class="settings-hint" style="font-weight:normal;">(subscriptions)</span></span>
+              <ul class="relay-list" id="read-relay-list">
+                ${(group.readRelays ?? []).map((url, i) => `
+                  <li class="relay-item">
+                    <span class="relay-url">${escapeHtml(url)}</span>
+                    <button class="btn btn--ghost btn--sm read-relay-remove" data-relay-index="${i}" aria-label="Remove read relay">✕</button>
+                  </li>
+                `).join('')}
+              </ul>
+              <div class="relay-add-row">
+                <input
+                  class="input relay-add-input"
+                  id="read-relay-add-input"
+                  type="url"
+                  placeholder="wss://relay.example.com"
+                >
+                <button class="btn btn--ghost btn--sm" id="read-relay-add-btn">Add</button>
               </div>
             </div>
 
@@ -233,8 +255,10 @@ export function renderSettings(container: HTMLElement): void {
     nostrPanel.hidden = !enabled
 
     if (enabled) {
-      const relays = getState().groups[activeGroupId!]?.relays ?? []
-      void ensureTransport(relays, activeGroupId!).then(() => {
+      const g = getState().groups[activeGroupId!]
+      const readRelays = g?.readRelays ?? []
+      const writeRelays = g?.writeRelays ?? []
+      void ensureTransport(readRelays, writeRelays, activeGroupId!).then(() => {
         updateNostrConnectionStatus()
       })
       void populateNostrIdentity()
@@ -248,46 +272,74 @@ export function renderSettings(container: HTMLElement): void {
 
   // ── Relay management ──────────────────────────────────────────
 
-  // Remove a relay by index.
-  container.querySelectorAll<HTMLButtonElement>('.relay-remove').forEach(btn => {
+  /** Reconnect with current read/write relay config if Nostr is enabled. */
+  function reconnectIfNeeded(): void {
+    const g = getState().groups[activeGroupId!]
+    if (g?.nostrEnabled) {
+      void ensureTransport(g.readRelays ?? [], g.writeRelays ?? [], activeGroupId!)
+    }
+  }
+
+  // Remove a write relay by index.
+  container.querySelectorAll<HTMLButtonElement>('.write-relay-remove').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = Number(btn.dataset.relayIndex)
-      const relays = [...(getState().groups[activeGroupId!]?.relays ?? [])]
-      relays.splice(idx, 1)
-      updateGroup(activeGroupId!, { relays })
-      // Reconnect with updated relay list if Nostr is enabled.
-      if (getState().groups[activeGroupId!]?.nostrEnabled) {
-        void ensureTransport(relays, activeGroupId!)
-      }
+      const writeRelays = [...(getState().groups[activeGroupId!]?.writeRelays ?? [])]
+      writeRelays.splice(idx, 1)
+      updateGroup(activeGroupId!, { writeRelays })
+      reconnectIfNeeded()
     })
   })
 
-  // Add a relay.
-  document.getElementById('relay-add-btn')!.addEventListener('click', () => {
-    const input = document.getElementById('relay-add-input') as HTMLInputElement
+  // Remove a read relay by index.
+  container.querySelectorAll<HTMLButtonElement>('.read-relay-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.relayIndex)
+      const readRelays = [...(getState().groups[activeGroupId!]?.readRelays ?? [])]
+      readRelays.splice(idx, 1)
+      updateGroup(activeGroupId!, { readRelays })
+      reconnectIfNeeded()
+    })
+  })
+
+  // Add a write relay.
+  document.getElementById('write-relay-add-btn')!.addEventListener('click', () => {
+    const input = document.getElementById('write-relay-add-input') as HTMLInputElement
     const url = input.value.trim()
-    if (!isAllowedRelayUrl(url)) {
-      input.focus()
-      return
-    }
-    const relays = [...(getState().groups[activeGroupId!]?.relays ?? [])]
-    if (!relays.includes(url)) {
-      relays.push(url)
-      updateGroup(activeGroupId!, { relays })
+    if (!isAllowedRelayUrl(url)) { input.focus(); return }
+    const writeRelays = [...(getState().groups[activeGroupId!]?.writeRelays ?? [])]
+    if (!writeRelays.includes(url)) {
+      writeRelays.push(url)
+      updateGroup(activeGroupId!, { writeRelays })
       input.value = ''
-      if (getState().groups[activeGroupId!]?.nostrEnabled) {
-        void ensureTransport(relays, activeGroupId!)
-      }
+      reconnectIfNeeded()
+    } else {
+      input.value = ''
+    }
+  })
+
+  // Add a read relay.
+  document.getElementById('read-relay-add-btn')!.addEventListener('click', () => {
+    const input = document.getElementById('read-relay-add-input') as HTMLInputElement
+    const url = input.value.trim()
+    if (!isAllowedRelayUrl(url)) { input.focus(); return }
+    const readRelays = [...(getState().groups[activeGroupId!]?.readRelays ?? [])]
+    if (!readRelays.includes(url)) {
+      readRelays.push(url)
+      updateGroup(activeGroupId!, { readRelays })
+      input.value = ''
+      reconnectIfNeeded()
     } else {
       input.value = ''
     }
   })
 
   // Allow adding via Enter key.
-  document.getElementById('relay-add-input')!.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      document.getElementById('relay-add-btn')!.click()
-    }
+  document.getElementById('write-relay-add-input')!.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('write-relay-add-btn')!.click()
+  })
+  document.getElementById('read-relay-add-input')!.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('read-relay-add-btn')!.click()
   })
 
   // ── Populate NIP-07 identity on load ─────────────────────────

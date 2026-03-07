@@ -242,7 +242,9 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
     const base = window.location.href.split('#')[0]
     const qrUrl = `${base}#remote/${qrSession.tokenPayload}`
     const svgMarkup = generateQR(qrUrl)
-    const relays = group.relays?.length ? group.relays : getState().settings.defaultRelays
+    const readRelays = group.readRelays?.length ? group.readRelays : getState().settings.defaultReadRelays
+    const writeRelays = group.writeRelays?.length ? group.writeRelays : getState().settings.defaultWriteRelays
+    const relays = Array.from(new Set([...readRelays, ...writeRelays]))
 
     d.innerHTML = `
       <div class="modal__form invite-share">
@@ -264,10 +266,11 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
     let cleanupListener = () => {}
     if (relays.length > 0) {
       // Ensure pool is connected before subscribing — don't assume bootSync pool still exists
-      void ensureTransport(relays).then(() => {
+      void ensureTransport(readRelays, writeRelays).then(() => {
         cleanupListener = listenForJoinRequests({
           inviteId: qrSession.inviteId,
-          relays,
+          readRelays,
+          writeRelays,
           onJoinRequest(joinerPubkey) {
             cleanupListener()
             try {
@@ -275,12 +278,12 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
               if (!currentGroup) return
               const envelope = createRemoteWelcomeEnvelope(currentGroup, joinerPubkey)
 
-              // Send welcome back over relay
+              // Send welcome back over relay (write relays only)
               sendWelcomeOverRelay({
                 inviteId: qrSession.inviteId,
                 joinerPubkey,
                 envelope,
-                relays,
+                writeRelays,
               })
 
               // Add member to group

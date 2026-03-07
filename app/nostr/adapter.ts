@@ -4,7 +4,7 @@ import type { SyncTransport, SyncMessage } from 'canary-kit/sync'
 import { encodeSyncMessage, decodeSyncMessage, hashGroupTag, encryptEnvelope, decryptEnvelope, deriveGroupKey, canonicaliseSyncMessage, PROTOCOL_VERSION } from 'canary-kit/sync'
 import { bytesToHex, hexToBytes, sha256 } from 'canary-kit/crypto'
 import { schnorr } from '@noble/curves/secp256k1.js'
-import { getPool, isConnected, connectRelays } from './connect.js'
+import { getPool, isConnected, connectRelays, getReadRelayUrls, getWriteRelayUrls } from './connect.js'
 import { verifyEvent, finalizeEvent } from 'nostr-tools/pure'
 import { encrypt as nip44Encrypt, decrypt as nip44Decrypt, getConversationKey } from 'nostr-tools/nip44'
 
@@ -71,15 +71,31 @@ export class NostrSyncTransport implements SyncTransport {
   private recoveryPending = new Map<string, number>()
   private recoverySub: { close(): void } | null = null
 
+  /** Read relays for subscriptions. */
+  private readRelays: string[]
+  /** Write relays for publishing. */
+  private writeRelays: string[]
+
   constructor(
-    private relays: string[],
+    readRelays: string[],
+    writeRelays: string[],
     private personalPubkey: string,
     private personalPrivkey: string,
-  ) {}
+  ) {
+    this.readRelays = [...readRelays]
+    this.writeRelays = [...writeRelays]
+  }
 
   /** Update the relay URLs used for publishing and subscribing. */
-  updateRelays(relays: string[]): void {
-    this.relays = [...relays]
+  updateRelays(readRelays: string[], writeRelays?: string[]): void {
+    this.readRelays = [...readRelays]
+    this.writeRelays = writeRelays ? [...writeRelays] : [...readRelays]
+  }
+
+  /** All unique relay URLs (read + write) for subscriptions that need full coverage. */
+  private get allRelays(): string[] {
+    const set = new Set<string>([...this.readRelays, ...this.writeRelays])
+    return Array.from(set)
   }
 
   /** Register a group's seed so we can encrypt/decrypt and sign for it. */
@@ -108,7 +124,7 @@ export class NostrSyncTransport implements SyncTransport {
   }
 
   async send(groupId: string, message: SyncMessage, _recipients?: string[]): Promise<void> {
-    if (!isConnected()) connectRelays(this.relays)
+    if (!isConnected()) connectRelays(this.readRelays, this.writeRelays)
     const pool = getPool()
     if (!pool) return
 
@@ -137,8 +153,8 @@ export class NostrSyncTransport implements SyncTransport {
 
     try {
       const signed = await groupInfo.signer.sign(unsigned)
-      console.info('[canary:sync] Publishing', message.type, 'to', groupId.slice(0, 8), '→ d-tag:', groupInfo.tagHash.slice(0, 12))
-      await pool.publish(this.relays, signed as any)
+      console.info('[canary:sync] Publishing', message.type, 'to', groupId.slice(0, 8), '→ d-tag:', groupInfo.tagHash.slice(0, 12), '(write relays only)')
+      await pool.publish(this.writeRelays, signed as any)
       console.info('[canary:sync] Published OK')
     } catch (err) {
       console.error('[canary:sync] Publish failed:', err)
@@ -170,7 +186,7 @@ export class NostrSyncTransport implements SyncTransport {
     console.info('[canary:sync] Subscribing to', groupId.slice(0, 8), '→ filter:', JSON.stringify(filter))
 
     const sub = pool.subscribeMany(
-      this.relays,
+      this.allRelays,
       filter as any,
       {
         onevent: async (event: any) => {
@@ -317,7 +333,7 @@ export class NostrSyncTransport implements SyncTransport {
         }
 
         const signed = finalizeEvent(unsigned, privkeyBytes)
-        await pool.publish(this.relays, signed as any)
+        await pool.publish(this.writeRelays, signed as any)
       } catch (err) {
         console.warn('[canary:sync] Recovery request to', adminPubkey.slice(0, 8), 'failed:', err)
       }
@@ -337,7 +353,7 @@ export class NostrSyncTransport implements SyncTransport {
     }
 
     this.recoverySub = pool.subscribeMany(
-      this.relays,
+      this.allRelays,
       filter as any,
       {
         onevent: async (event: any) => {
@@ -422,7 +438,7 @@ export class NostrSyncTransport implements SyncTransport {
     }
 
     const signed = finalizeEvent(unsigned, privkeyBytes)
-    await pool.publish(this.relays, signed as any)
+    await pool.publish(this.writeRelays, signed as any)
     console.info('[canary:sync] Sent recovery response to', requesterPubkey.slice(0, 8))
   }
 

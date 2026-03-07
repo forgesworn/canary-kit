@@ -62,6 +62,8 @@ function makeGroup(overrides: Partial<AppGroup> = {}): AppGroup {
     consumedOps: [],
     nostrEnabled: false,
     relays: ['wss://relay.example.com'],
+    readRelays: ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band', 'wss://relay.example.com'],
+    writeRelays: ['wss://relay.example.com'],
     encodingFormat: 'words',
     usedInvites: [],
     latestInviteIssuedAt: 0,

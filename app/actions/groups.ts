@@ -58,7 +58,9 @@ export function createNewGroup(name: string, preset: PresetName, memberPubkey?: 
   const members: string[] = memberPubkey ? [memberPubkey] : []
   const sdkGroup = createGroup({ name, members, preset, creator: memberPubkey })
 
-  const relays = [...getState().settings.defaultRelays]
+  const settings = getState().settings
+  const readRelays = [...(settings.defaultReadRelays ?? settings.defaultRelays)]
+  const writeRelays = [...(settings.defaultWriteRelays ?? settings.defaultRelays)]
 
   const PRESET_ENCODING: Record<string, 'words' | 'pin' | 'hex'> = {
     family: 'words',
@@ -70,8 +72,10 @@ export function createNewGroup(name: string, preset: PresetName, memberPubkey?: 
   const appGroup: AppGroup = {
     ...sdkGroup,
     id,
-    nostrEnabled: relays.length > 0,
-    relays,
+    nostrEnabled: writeRelays.length > 0 || readRelays.length > 0,
+    relays: writeRelays,
+    readRelays,
+    writeRelays,
     encodingFormat: PRESET_ENCODING[preset] ?? 'words',
     usedInvites: [],
     latestInviteIssuedAt: 0,

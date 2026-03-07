@@ -45,6 +45,8 @@ function freshState(overrides: Partial<AppState> = {}): AppState {
         members: [],
         admins: [],
         relays: [],
+        readRelays: [],
+        writeRelays: [],
       },
     },
     activeGroupId: 'test-group',
@@ -54,6 +56,8 @@ function freshState(overrides: Partial<AppState> = {}): AppState {
       pinEnabled: true,
       autoLockMinutes: 5,
       defaultRelays: [],
+      defaultReadRelays: [],
+      defaultWriteRelays: [],
     },
     ...overrides,
   }
@@ -110,6 +114,8 @@ describe('persistState — clean-install PIN regression', () => {
         pinEnabled: false,
         autoLockMinutes: 5,
         defaultRelays: [],
+        defaultReadRelays: [],
+        defaultWriteRelays: [],
       },
     })
     loadState(state)
