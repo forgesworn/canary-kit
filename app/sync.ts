@@ -144,18 +144,8 @@ function _recoveryOptions(groupId: string) {
       const group = groups[groupId]
       if (!group) return
 
-      // User confirmation for higher-epoch recovery (stale-admin mitigation)
-      if (snapshot.type === 'state-snapshot' && snapshot.epoch > group.epoch) {
-        const senderShort = adminPubkey.slice(0, 8) + '...'
-        const accepted = confirm(
-          `Admin ${senderShort} proposes group recovery to epoch ${snapshot.epoch} (you are on epoch ${group.epoch}). Accept?`
-        )
-        if (!accepted) {
-          console.info('[canary:sync] User rejected recovery snapshot from', senderShort)
-          return
-        }
-      }
-
+      // Higher-epoch recovery is disabled in applySyncMessage — only same-epoch
+      // snapshots are accepted. The confirm() dialog is removed.
       const updated = applySyncMessage(group, snapshot, undefined, adminPubkey)
       if (updated !== group) {
         updateGroup(groupId, updated)

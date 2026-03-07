@@ -474,10 +474,8 @@ export class NostrSyncTransport implements SyncTransport {
     }
 
     // Self-consistency: sender must be in the snapshot's own admins list.
-    // Prevents a removed admin (still in stale local cache) from sending a
-    // snapshot that doesn't even claim they're admin. A removed admin who
-    // fabricates a snapshot including themselves remains a residual risk that
-    // requires reseed-chain verification for full mitigation.
+    // Higher-epoch recovery is disabled in applySyncMessage — only same-epoch
+    // snapshots are accepted. This check remains as defence-in-depth.
     if (!msg.admins.includes(adminPubkey)) {
       console.warn('[canary:sync] Recovery response sender not in snapshot admins')
       return
