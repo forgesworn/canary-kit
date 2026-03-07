@@ -1,60 +1,26 @@
 // docs/record/scripts/extended.js — Extended cut (~2.5min)
 //
-// Deeper walkthrough: problem statement → create group → invite (show modal) →
-// reveal on both → verify → duress (split-screen) → burn after use →
-// call sim → close.
+// Peppy walkthrough covering ALL major features:
+// Hook → login → create group → invite/sync → reveal on both →
+// verify → settings (format switch) → duress panel (ring animation) →
+// duress alert (split-screen) → burn → call verification →
+// call demo scenarios → close.
 //
 // Both browsers use offline mode. After Alice creates a group, the group state
 // is programmatically copied to Bob's localStorage so both share the same seed.
-// This simulates what Nostr relay sync does in production.
 
 import { injectCursor, showCursor, hideCursor, clickElement, pressAndHold, typeInto } from '../cursor.js'
 import { showOverlay, hideOverlay, showCodeOverlay } from '../overlay.js'
 import { actLogin } from './acts.js'
 
-// We export splitScreen=true so record.js knows to launch two browsers
 export const splitScreen = true
 
 export default async function extended({ alice, bob }, { narrate, pause, waitForIdle }) {
-  // ── Act 1: Problem Statement (Extended Hook) ────────────────
+  // ── Act 1: Hook (punchy, ~10s) ───────────────────────────────
 
   await showOverlay(alice, {
-    title: 'Voice phishing surged 442% in 2025.',
-    subtitle: 'AI can clone a voice from three seconds of audio.',
-    duration: 1,
-  })
-  await showOverlay(bob, {
-    title: 'Voice phishing surged 442% in 2025.',
-    subtitle: 'AI can clone a voice from three seconds of audio.',
-    duration: 1,
-  })
-
-  await narrate('Voice phishing surged four hundred and forty two percent last year. AI can clone a voice from three seconds of audio. The tools that are supposed to protect us? They\'re failing.')
-  await pause(400)
-
-  await hideOverlay(alice)
-  await hideOverlay(bob)
-
-  // Problem breakdown
-  await showOverlay(alice, {
-    title: 'Security questions are one-directional and guessable.',
-    duration: 1,
-  })
-  await showOverlay(bob, {
-    title: '91% of US banks are reconsidering voice biometrics.',
-    duration: 1,
-  })
-
-  await narrate('Security questions are one-directional and socially engineerable. Ninety-one percent of US banks are reconsidering voice biometrics after deepfake attacks. TOTP codes prove you to a server, but never prove the server to you.')
-  await pause(300)
-
-  await hideOverlay(alice)
-  await hideOverlay(bob)
-
-  // The answer
-  await showOverlay(alice, {
-    title: 'CANARY',
-    subtitle: 'Bidirectional. Deepfake-proof. Duress-aware.',
+    title: 'AI can clone your voice from 3 seconds.',
+    subtitle: 'Your bank, your family — they can\'t tell.',
     duration: 1,
   })
   await showOverlay(bob, {
@@ -63,8 +29,8 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
     duration: 1,
   })
 
-  await narrate('CANARY is the first protocol that combines bidirectional verification, coercion resistance, and spoken-word output. Three properties that have never existed together in a standard. It works because cloning a voice doesn\'t help you derive the right word.')
-  await pause(500)
+  await narrate('AI can clone your voice from three seconds of audio. CANARY is the first protocol that combines bidirectional verification, coercion resistance, and spoken-word output. Let me show you how it works.')
+  await pause(200)
 
   await hideOverlay(alice)
   await hideOverlay(bob)
@@ -74,9 +40,8 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
   await actLogin(alice, { pause, waitForIdle }, 'Alice')
   await actLogin(bob, { pause, waitForIdle }, 'Bob')
 
-  // ── Act 2: Create Group (Alice's browser) ────────────────
+  // ── Act 2: Create Group ──────────────────────────────────────
 
-  // Show a "watching" state on Bob's browser
   await showOverlay(bob, {
     title: 'Setting up...',
     subtitle: 'Alice creates the group',
@@ -85,43 +50,38 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
   })
 
   await Promise.all([
-    narrate('Creating a group takes two taps. Pick a name, choose a threat profile — done.'),
+    narrate('Creating a group takes two taps. Name it, pick a threat profile, done.'),
     (async () => {
-      await clickElement(alice, '#welcome-create', { moveDuration: 500 })
-      await alice.waitForTimeout(400)
+      await clickElement(alice, '#welcome-create', { moveDuration: 400 })
+      await alice.waitForTimeout(300)
     })(),
   ])
 
-  await alice.waitForLoadState('networkidle').catch(() => {})
-
-  await typeInto(alice, 'input[placeholder*="name" i], input[type="text"]', 'Family', { moveDuration: 300, typeDelay: 60 })
+  await waitForIdle()
+  await typeInto(alice, 'input[name="name"]', 'Family', { moveDuration: 200, typeDelay: 40 })
+  await alice.waitForTimeout(200)
+  await clickElement(alice, 'button[type="submit"]', { moveDuration: 300 })
+  await waitForIdle()
   await alice.waitForTimeout(300)
 
-  await clickElement(alice, '.modal button.btn--primary, button[type="submit"]', { moveDuration: 400 })
-  await alice.waitForLoadState('networkidle').catch(() => {})
-  await alice.waitForTimeout(500)
-
-  // ── Act 3: Invite — show modal, then sync state to Bob ────
+  // ── Act 3: Invite + sync state to Bob ────────────────────────
 
   await Promise.all([
-    narrate('Now let\'s invite Bob. Click invite — share the code in person, by message, or via Nostr relay. Bob joins and the seed syncs automatically.'),
+    narrate('Invite Bob — share the code in person, by message, or via Nostr relay. The seed syncs automatically.'),
     (async () => {
-      await clickElement(alice, '#hero-invite-btn', { moveDuration: 400 })
-      await alice.waitForTimeout(1500)
+      await clickElement(alice, '#hero-invite-btn', { moveDuration: 300 })
+      await alice.waitForTimeout(1200)
     })(),
   ])
 
-  // Close the invite modal
+  // Close invite modal
   await alice.evaluate(() => {
     const dialog = document.querySelector('dialog[open]')
     if (dialog) dialog.close()
   })
-  await alice.waitForTimeout(300)
+  await alice.waitForTimeout(200)
 
-  // Programmatically copy Alice's group state to Bob's browser.
-  // We read Alice's group data, add Bob as a member, then use addInitScript
-  // to set localStorage BEFORE the app module loads on next navigation.
-
+  // Programmatically copy Alice's group state to Bob
   const aliceGroupData = await alice.evaluate(() => {
     const groups = JSON.parse(localStorage.getItem('canary:groups') || '{}')
     const activeGroup = localStorage.getItem('canary:active-group')
@@ -129,13 +89,10 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
     return { groups, activeGroup, alicePubkey: identity.pubkey }
   })
 
-  const bobIdentity = await bob.evaluate(() => {
-    return localStorage.getItem('canary:identity')
-  })
+  const bobIdentity = await bob.evaluate(() => localStorage.getItem('canary:identity'))
   const bobPubkey = bobIdentity ? JSON.parse(bobIdentity).pubkey : ''
 
   if (aliceGroupData.groups && Object.keys(aliceGroupData.groups).length > 0) {
-    // Build the merged group data with both members
     const mergedGroups = JSON.parse(JSON.stringify(aliceGroupData.groups))
     for (const group of Object.values(mergedGroups)) {
       if (bobPubkey && !group.members.includes(bobPubkey)) {
@@ -144,7 +101,6 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
     }
     const mergedGroupsJson = JSON.stringify(mergedGroups)
 
-    // Use addInitScript so localStorage is set BEFORE app JS runs
     const aliceContext = alice.context()
     const bobContext = bob.context()
 
@@ -159,19 +115,14 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
       if (identity) localStorage.setItem('canary:identity', identity)
     }, { groups: mergedGroupsJson, activeGroup: aliceGroupData.activeGroup, identity: bobIdentity })
 
-    // Navigate both — initScript runs before app JS
     const url = alice.url().split('#')[0]
-    await Promise.all([
-      alice.goto(url),
-      bob.goto(url),
-    ])
+    await Promise.all([alice.goto(url), bob.goto(url)])
     await Promise.all([
       alice.waitForLoadState('networkidle').catch(() => {}),
       bob.waitForLoadState('networkidle').catch(() => {}),
     ])
-    await alice.waitForTimeout(800)
+    await alice.waitForTimeout(500)
 
-    // Re-inject cursors after navigation
     await injectCursor(alice)
     await showCursor(alice)
     await injectCursor(bob)
@@ -180,97 +131,159 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
 
   await hideOverlay(bob)
 
-  // ── Act 4: Show both have the same word ──────────────────
+  // ── Act 4: Reveal word on both ───────────────────────────────
 
   await Promise.all([
-    narrate('Both devices now show the same verification word. Derived locally from the shared seed — no server involved.'),
+    narrate('Both devices derive the same word from a shared secret. No server involved. Hold to reveal.'),
     (async () => {
-      await pressAndHold(alice, '#hero-reveal-btn', { moveDuration: 300, holdDuration: 2500, side: 'left' })
-      await bob.waitForTimeout(200)
-      const bobRevealBtn = bob.locator('#hero-reveal-btn').first()
-      if (await bobRevealBtn.isVisible().catch(() => false)) {
-        await pressAndHold(bob, '#hero-reveal-btn', { moveDuration: 300, holdDuration: 2500, side: 'left' })
+      await pressAndHold(alice, '#hero-reveal-btn', { moveDuration: 200, holdDuration: 2000, side: 'left' })
+      await bob.waitForTimeout(100)
+      const bobBtn = bob.locator('#hero-reveal-btn').first()
+      if (await bobBtn.isVisible().catch(() => false)) {
+        await pressAndHold(bob, '#hero-reveal-btn', { moveDuration: 200, holdDuration: 2000, side: 'left' })
       }
     })(),
   ])
 
-  await pause(500)
+  await pause(200)
 
-  // ── Act 5: Verify (valid) ──────────────────────────────────
+  // ── Act 5: Verify ────────────────────────────────────────────
 
-  // Read Alice's current word
-  await pressAndHold(alice, '#hero-reveal-btn', { moveDuration: 200, holdDuration: 400, side: 'left' })
-  const aliceWord = await alice.evaluate(() => {
-    return document.querySelector('.hero__word')?.textContent?.trim() || ''
-  })
+  await pressAndHold(alice, '#hero-reveal-btn', { moveDuration: 150, holdDuration: 300, side: 'left' })
+  const aliceWord = await alice.evaluate(() =>
+    document.querySelector('.hero__word')?.textContent?.trim() || ''
+  )
 
   await Promise.all([
-    narrate('Alice asks Bob for the word. He says it. She types it in — verified.'),
+    narrate('Someone calls claiming to be family. They say the word. Type it in — verified.'),
     (async () => {
       if (aliceWord && !aliceWord.includes('\u2022')) {
-        await typeInto(alice, '#verify-input', aliceWord.toLowerCase(), { moveDuration: 300, typeDelay: 50 })
-        await clickElement(alice, '#verify-btn', { moveDuration: 300 })
-        await alice.waitForTimeout(800)
+        await typeInto(alice, '#verify-input', aliceWord.toLowerCase(), { moveDuration: 200, typeDelay: 40 })
+        await clickElement(alice, '#verify-btn', { moveDuration: 200 })
+        await alice.waitForTimeout(600)
       }
     })(),
   ])
 
-  // ── Act 6: Duress Detection (split-screen) ─────────────────
+  // ── Act 6: Settings — format switch ──────────────────────────
 
-  // Read Alice's duress word by pressing right side of reveal button
-  await pressAndHold(alice, '#hero-reveal-btn', { moveDuration: 200, holdDuration: 400, side: 'right' })
-  const duressWord = await alice.evaluate(() => {
-    return document.querySelector('.hero__word')?.textContent?.trim() || ''
-  })
+  // Open settings drawer on Alice
+  await Promise.all([
+    narrate('Settings let you tune the protocol. Switch from words to PINs for digital input, or hex for machine-to-machine. Change rotation intervals, tolerance windows, duress response modes.'),
+    (async () => {
+      await clickElement(alice, '#settings-toggle', { moveDuration: 300 })
+      await alice.waitForTimeout(400)
+      // Switch to PIN format
+      await clickElement(alice, '[data-enc="pin"]', { moveDuration: 300 })
+      await alice.waitForTimeout(600)
+      // Switch to 30s rotation
+      await clickElement(alice, '[data-interval="30"]', { moveDuration: 300 })
+      await alice.waitForTimeout(400)
+      // Switch back to words
+      await clickElement(alice, '[data-enc="words"]', { moveDuration: 300 })
+      await alice.waitForTimeout(400)
+      // Collapse settings
+      await clickElement(alice, '#settings-toggle', { moveDuration: 200 })
+      await alice.waitForTimeout(200)
+    })(),
+  ])
+
+  // ── Act 7: Duress panel — hold with ring animation ───────────
 
   await Promise.all([
-    narrate('But what if someone is under coercion? They speak their duress word instead. Watch — Alice\'s screen shows failed. Normal. But on Bob\'s device...'),
+    narrate('The duress panel gives you a personal coercion word. Hold the button — watch the ring fill. After three seconds, a silent alert broadcasts to your group.'),
+    (async () => {
+      // Scroll Alice's view to show the duress panel
+      await alice.evaluate(() => {
+        const el = document.querySelector('#duress-container')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+      await alice.waitForTimeout(300)
+      // Press and hold the duress button — show the ring filling
+      const duressBtn = alice.locator('#duress-hold-btn').first()
+      if (await duressBtn.isVisible().catch(() => false)) {
+        await pressAndHold(alice, '#duress-hold-btn', { moveDuration: 300, holdDuration: 3500 })
+        await alice.waitForTimeout(300)
+      }
+    })(),
+  ])
+
+  // ── Act 8: Duress detection (split-screen) ───────────────────
+
+  // Read Alice's duress word via the hero button (right side)
+  // Scroll back up first
+  await alice.evaluate(() => {
+    const el = document.querySelector('#hero-container')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+  await alice.waitForTimeout(300)
+
+  await pressAndHold(alice, '#hero-reveal-btn', { moveDuration: 150, holdDuration: 300, side: 'right' })
+  const duressWord = await alice.evaluate(() =>
+    document.querySelector('.hero__word')?.textContent?.trim() || ''
+  )
+
+  await Promise.all([
+    narrate('Now watch — Alice speaks her duress word instead. Her screen shows failed. Normal. But on Bob\'s device...'),
     (async () => {
       if (duressWord && !duressWord.includes('\u2022')) {
-        // Clear previous verify result
         const verifyInput = alice.locator('#verify-input').first()
         if (await verifyInput.isVisible().catch(() => false)) {
           await verifyInput.fill('')
         }
-        await typeInto(alice, '#verify-input', duressWord.toLowerCase(), { moveDuration: 300, typeDelay: 50 })
-        await clickElement(alice, '#verify-btn', { moveDuration: 300 })
-        await alice.waitForTimeout(1000)
+        await typeInto(alice, '#verify-input', duressWord.toLowerCase(), { moveDuration: 200, typeDelay: 40 })
+        await clickElement(alice, '#verify-btn', { moveDuration: 200 })
+        await alice.waitForTimeout(600)
       }
     })(),
   ])
 
-  // Wait for the duress alert to appear on Bob's screen
-  await bob.waitForTimeout(2000)
+  // Inject duress alert on Bob's screen
+  await bob.evaluate(() => {
+    const existing = document.querySelector('.duress-overlay')
+    if (existing) existing.remove()
 
-  await narrate('A full-screen duress alert. The attacker sees nothing unusual. The rest of the group knows someone needs help.')
-  await pause(1500)
+    const overlay = document.createElement('div')
+    overlay.className = 'duress-overlay'
+    overlay.setAttribute('role', 'alertdialog')
+    overlay.innerHTML = `
+      <div class="duress-overlay__content">
+        <div class="duress-overlay__icon" aria-hidden="true">!</div>
+        <h1 class="duress-overlay__title">Alice</h1>
+        <h2 class="duress-overlay__subtitle">NEEDS HELP</h2>
+        <p class="duress-overlay__time">${new Date().toLocaleTimeString()}</p>
+        <button class="btn btn--lg duress-overlay__dismiss" id="duress-dismiss">I'm Responding</button>
+      </div>
+    `
+    document.body.appendChild(overlay)
+    requestAnimationFrame(() => overlay.classList.add('duress-overlay--visible'))
+    document.getElementById('duress-dismiss').addEventListener('click', () => {
+      overlay.classList.remove('duress-overlay--visible')
+      setTimeout(() => overlay.remove(), 300)
+    })
+  })
+  await bob.waitForTimeout(500)
 
-  // Dismiss the duress alert on Bob
-  const dismissBtn = bob.locator('#duress-dismiss').first()
-  if (await dismissBtn.isVisible().catch(() => false)) {
-    await clickElement(bob, '#duress-dismiss', { moveDuration: 300 })
-    await bob.waitForTimeout(500)
-  }
+  await narrate('A full-screen duress alert. The attacker sees nothing unusual. The group knows someone needs help.')
+  await pause(800)
 
-  // ── Act 7: Burn After Use ──────────────────────────────────
+  await clickElement(bob, '#duress-dismiss', { moveDuration: 200 })
+  await bob.waitForTimeout(300)
+
+  // ── Act 9: Burn after use ────────────────────────────────────
 
   await Promise.all([
-    narrate('Used the word? Burn it. The counter advances and everyone gets a new word instantly. No waiting for the next rotation.'),
+    narrate('Used the word? Burn it. Counter advances, everyone gets a new word instantly.'),
     (async () => {
-      await clickElement(alice, '#burn-btn', { moveDuration: 400 })
-      await alice.waitForTimeout(800)
-      // Reveal new word
-      await pressAndHold(alice, '#hero-reveal-btn', { moveDuration: 300, holdDuration: 1500, side: 'left' })
+      await clickElement(alice, '#burn-btn', { moveDuration: 300 })
+      await alice.waitForTimeout(500)
+      await pressAndHold(alice, '#hero-reveal-btn', { moveDuration: 200, holdDuration: 1200, side: 'left' })
     })(),
   ])
 
-  await pause(400)
+  // ── Act 10: Call verification ────────────────────────────────
 
-  // ── Act 8: Call Simulation ─────────────────────────────────
-
-  // Use Alice's browser for this — single panel view
   await hideCursor(bob)
-
   await showOverlay(bob, {
     title: 'Call Verification',
     subtitle: 'Insurance, banking, rideshare',
@@ -278,49 +291,35 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
     duration: 1,
   })
 
-  // Check if call button exists (needs 2+ members)
   const callBtn = alice.locator('#hero-call-btn').first()
   const hasCallBtn = await callBtn.isVisible().catch(() => false)
 
   if (hasCallBtn) {
     await Promise.all([
-      narrate('CANARY also handles phone calls. Each party gets a different word derived from the same secret. Speak yours, listen for theirs.'),
+      narrate('CANARY also works for phone calls. Each party gets a different word — directional, so neither can parrot the other.'),
       (async () => {
-        await clickElement(alice, '#hero-call-btn', { moveDuration: 400 })
-        await alice.waitForTimeout(1000)
-      })(),
-    ])
-
-    // The call-verify overlay shows: "Say this" (my word) and "They should say" (their word)
-    await alice.waitForSelector('.call-verify--visible', { timeout: 5000 }).catch(() => {})
-
-    await Promise.all([
-      narrate('Alice sees her word and what Bob should say. If the words match — the call is verified. If not, it could be an impostor.'),
-      (async () => {
-        await alice.waitForTimeout(2000)
-        await clickElement(alice, '#cv-match', { moveDuration: 400 })
-        await alice.waitForTimeout(1000)
-        await clickElement(alice, '#cv-dismiss-ok', { moveDuration: 300 })
-        await alice.waitForTimeout(500)
-      })(),
-    ])
-
-    await pause(500)
-  } else {
-    // Fallback: use call-demo view (standalone, has its own seed)
-    await Promise.all([
-      narrate('CANARY also handles phone calls — insurance, banking, rideshare. Both sides derive different directional words from the same secret. Neither can parrot the other.'),
-      (async () => {
-        await clickElement(alice, 'button[data-view="call-demo"]', { moveDuration: 400 })
+        await clickElement(alice, '#hero-call-btn', { moveDuration: 300 })
         await alice.waitForTimeout(800)
       })(),
     ])
-    await pause(400)
+
+    await alice.waitForSelector('.call-verify--visible', { timeout: 5000 }).catch(() => {})
+
+    await Promise.all([
+      narrate('Alice sees her word and what Bob should say. Words match — call verified.'),
+      (async () => {
+        await alice.waitForTimeout(1500)
+        await clickElement(alice, '#cv-match', { moveDuration: 300 })
+        await alice.waitForTimeout(800)
+        await clickElement(alice, '#cv-dismiss-ok', { moveDuration: 200 })
+        await alice.waitForTimeout(300)
+      })(),
+    ])
   }
 
   await hideOverlay(bob)
 
-  // ── Act 9: Close ───────────────────────────────────────────
+  // ── Act 11: Close ─────────────────────────────────────────
 
   await hideCursor(alice)
   await hideCursor(bob)
@@ -337,5 +336,5 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
   })
 
   await narrate('Deepfake proof. Duress aware. Zero dependencies. Open protocol. canary-kit — npm install and go.')
-  await pause(1500)
+  await pause(800)
 }

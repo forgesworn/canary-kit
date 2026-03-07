@@ -17,6 +17,8 @@ const clips = []
 let clipIndex = 0
 let outputDir = ''
 let noVoice = false
+/** Composition timeline cursor — tracks when the last clip finishes playing (ms from recording start) */
+let timelineCursorMs = 0
 
 /**
  * Initialise the narration module.
@@ -28,6 +30,7 @@ export async function initNarration(dir, opts = {}) {
   noVoice = opts.noVoice || false
   clips.length = 0
   clipIndex = 0
+  timelineCursorMs = 0
   await mkdir(outputDir, { recursive: true })
 }
 
@@ -48,7 +51,14 @@ export async function generateClip(text, recordingStartMs) {
     // Estimate ~150 wpm for pacing without actual audio
     const words = text.split(/\s+/).length
     const estimatedMs = (words / 150) * 60 * 1000 / SPEED
-    clips.push({ file: '', timestamp: Date.now() - recordingStartMs, duration: estimatedMs })
+    const compositionMs = Date.now() - recordingStartMs
+    const timestamp = Math.max(compositionMs, timelineCursorMs)
+    timelineCursorMs = timestamp + estimatedMs
+    clips.push({ file: '', timestamp, duration: estimatedMs })
+    // Wait until this clip would finish playing in the composition timeline
+    const waitUntil = recordingStartMs + timelineCursorMs
+    const waitMs = waitUntil - Date.now()
+    if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs))
     return estimatedMs
   }
 
@@ -76,8 +86,10 @@ export async function generateClip(text, recordingStartMs) {
     throw new Error(`TTS API error ${response.status}: ${err}`)
   }
 
-  // Record timestamp AFTER the API call returns
-  const timestamp = Date.now() - recordingStartMs
+  // Record timestamp AFTER the API call returns, but ensure it doesn't
+  // overlap with the previous clip in the composition timeline.
+  const compositionMs = Date.now() - recordingStartMs
+  const timestamp = Math.max(compositionMs, timelineCursorMs)
 
   const buffer = Buffer.from(await response.arrayBuffer())
   const file = join(outputDir, `clip-${String(index).padStart(3, '0')}.mp3`)
@@ -85,18 +97,17 @@ export async function generateClip(text, recordingStartMs) {
 
   // Measure actual duration with ffprobe
   const duration = measureDuration(file)
+  timelineCursorMs = timestamp + duration
   clips.push({ file, timestamp, duration })
 
-  console.log(`  [narrate] clip ${index}: ${duration.toFixed(0)}ms — "${text.slice(0, 50)}..."`)
+  console.log(`  [narrate] clip ${index}: ${duration.toFixed(0)}ms @ ${(timestamp / 1000).toFixed(1)}s — "${text.slice(0, 50)}..."`)
 
-  // Wait for the clip's duration to elapse (minus the time spent on the API call).
-  // This prevents the next narration from overlapping with this one.
-  // When used in Promise.all([narrate(), action()]), the narrate resolves only
-  // after the clip would have finished playing, keeping audio sequential.
-  const elapsed = Date.now() - clipStartMs
-  const remaining = duration - elapsed
-  if (remaining > 0) {
-    await new Promise(resolve => setTimeout(resolve, remaining))
+  // Wait until this clip would finish playing in the composition timeline.
+  // This prevents the next narration from starting before this one ends.
+  const waitUntil = recordingStartMs + timelineCursorMs
+  const waitMs = waitUntil - Date.now()
+  if (waitMs > 0) {
+    await new Promise(resolve => setTimeout(resolve, waitMs))
   }
 
   return duration
