@@ -12,6 +12,7 @@ import { generateQR } from '../components/qr.js'
 import { escapeHtml } from '../utils/escape.js'
 import { showModal } from '../components/modal.js'
 import { showToast } from '../components/toast.js'
+import { listenForJoinRequests, sendWelcomeOverRelay } from '../nostr/invite-relay.js'
 import { deriveToken } from 'canary-kit/token'
 import { GROUP_CONTEXT, toTokenEncoding } from '../utils/encoding.js'
 import { fetchProfiles, getCachedName, getCachedProfile } from '../nostr/profiles.js'
@@ -236,6 +237,7 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
     const base = window.location.href.split('#')[0]
     const qrUrl = `${base}#remote/${encodeURIComponent(qrSession.tokenPayload)}`
     const svgMarkup = generateQR(qrUrl)
+    const relays = group.relays?.length ? group.relays : getState().settings.defaultRelays
 
     d.innerHTML = `
       <div class="modal__form invite-share">
@@ -244,16 +246,59 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
         <div class="qr-container">${svgMarkup}</div>
         <p class="invite-hint">${escapeHtml(scanHint)}</p>
         <p class="invite-hint" style="color: var(--duress); font-weight: 500;">Seedless — group secret is sent encrypted after scan.</p>
+        <p class="invite-hint" id="qr-relay-status" style="color: var(--text-muted);">${relays.length > 0 ? 'Waiting for them to scan...' : ''}</p>
 
         <div class="modal__actions" style="gap: 0.5rem;">
           <button class="btn" id="invite-back-btn" type="button">Back</button>
-          <button class="btn btn--primary" id="invite-next-btn" type="button">Next</button>
+          <button class="btn btn--primary" id="invite-next-btn" type="button">Next (manual)</button>
         </div>
       </div>
     `
 
-    d.querySelector<HTMLButtonElement>('#invite-back-btn')?.addEventListener('click', () => { endRemoteInviteSession(); renderChooser() })
-    d.querySelector<HTMLButtonElement>('#invite-next-btn')?.addEventListener('click', () => renderStep2(renderQRPath))
+    // Auto-listen for join requests over the relay
+    let cleanupListener = () => {}
+    if (relays.length > 0) {
+      cleanupListener = listenForJoinRequests({
+        inviteId: qrSession.inviteId,
+        relays,
+        onJoinRequest(joinerPubkey) {
+          cleanupListener()
+          try {
+            const currentGroup = getState().groups[group.id]
+            if (!currentGroup) return
+            const envelope = createRemoteWelcomeEnvelope(currentGroup, joinerPubkey)
+
+            // Send welcome back over relay
+            sendWelcomeOverRelay({
+              inviteId: qrSession.inviteId,
+              joinerPubkey,
+              envelope,
+              relays,
+            })
+
+            // Add member to group
+            if (!currentGroup.members.includes(joinerPubkey)) {
+              addGroupMember(group.id, joinerPubkey)
+            }
+
+            endRemoteInviteSession()
+            endInviteSession()
+            d.close()
+            showToast('Member joined via relay', 'success')
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : 'Failed to send welcome', 'error')
+          }
+        },
+        onError() {
+          // Timeout — user can still use manual flow
+          const statusEl = d.querySelector('#qr-relay-status')
+          if (statusEl) statusEl.textContent = 'No relay response — use manual flow below.'
+        },
+      })
+    }
+
+    d.querySelector<HTMLButtonElement>('#invite-back-btn')?.addEventListener('click', () => { cleanupListener(); endRemoteInviteSession(); renderChooser() })
+    d.querySelector<HTMLButtonElement>('#invite-next-btn')?.addEventListener('click', () => { cleanupListener(); renderStep2(renderQRPath) })
   }
 
   // ── Secure Channel path ──────────────────────────────────────
