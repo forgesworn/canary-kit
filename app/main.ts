@@ -38,9 +38,8 @@ import { assertRemoteInviteToken, decryptWelcomeEnvelope } from './crypto/remote
 import { sendJoinRequest, fetchInviteToken } from './nostr/invite-relay.js'
 import { resolveSigner, hasNip07 } from './nostr/signer.js'
 import { DEMO_ACCOUNTS } from './demo-accounts.js'
-import { decode as nip19decode, nsecEncode } from 'nostr-tools/nip19'
+import { decode as nip19decode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
-import { hexToBytes } from 'canary-kit/crypto'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
@@ -1128,41 +1127,83 @@ function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-function showNsecBackupModal(privkeyHex: string): void {
-  const nsec = nsecEncode(hexToBytes(privkeyHex))
+function showRecoveryPhraseModal(mnemonic: string): void {
+  const words = mnemonic.split(' ')
 
-  let dialog = document.getElementById('nsec-backup-modal') as HTMLDialogElement | null
+  let dialog = document.getElementById('recovery-phrase-modal') as HTMLDialogElement | null
   if (!dialog) {
     dialog = document.createElement('dialog')
-    dialog.id = 'nsec-backup-modal'
+    dialog.id = 'recovery-phrase-modal'
     dialog.className = 'modal'
     document.body.appendChild(dialog)
   }
 
   const d = dialog
-  d.innerHTML = `
-    <div class="modal__form" style="max-width: 400px;">
-      <h2 class="modal__title">Back up your secret key</h2>
-      <p class="invite-hint">We created a Nostr keypair for you. Save your <strong>nsec</strong> somewhere safe — it's the only way to log back in on another device or if you clear your browser.</p>
-      <code style="font-size: 0.7rem; word-break: break-all; display: block; background: var(--bg); padding: 0.75rem; border-radius: 4px; border: 1px solid var(--border); margin: 1rem 0; user-select: all;">${escapeHtml(nsec)}</code>
-      <p class="invite-hint" style="color: var(--duress); font-weight: 500;">Do not share this with anyone.</p>
-      <div class="modal__actions" style="gap: 0.5rem;">
-        <button class="btn btn--primary" id="nsec-backup-copy" type="button">Copy nsec</button>
-        <button class="btn" id="nsec-backup-done" type="button">I've saved it</button>
-      </div>
-    </div>
-  `
+  d.textContent = ''
 
-  d.querySelector('#nsec-backup-copy')?.addEventListener('click', async (e) => {
-    const btn = e.currentTarget as HTMLButtonElement
+  const form = document.createElement('div')
+  form.className = 'modal__form'
+  form.style.maxWidth = '420px'
+
+  const title = document.createElement('h2')
+  title.className = 'modal__title'
+  title.textContent = 'Back up your recovery phrase'
+  form.appendChild(title)
+
+  const hint = document.createElement('p')
+  hint.className = 'invite-hint'
+  hint.textContent = "Write these words down in order. They're the only way to recover your account."
+  form.appendChild(hint)
+
+  const grid = document.createElement('div')
+  grid.className = 'recovery-grid'
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin:1rem 0;'
+
+  words.forEach((word, i) => {
+    const cell = document.createElement('div')
+    cell.style.cssText = 'border:1px solid var(--border);border-radius:4px;padding:0.5rem;text-align:center;font-family:var(--font-mono,monospace);font-size:0.8rem;'
+    const num = document.createElement('span')
+    num.style.cssText = 'color:var(--text-muted);font-size:0.7rem;'
+    num.textContent = `${i + 1}. `
+    const w = document.createElement('span')
+    w.style.fontWeight = '500'
+    w.textContent = word
+    cell.append(num, w)
+    grid.appendChild(cell)
+  })
+  form.appendChild(grid)
+
+  const warning = document.createElement('p')
+  warning.className = 'invite-hint'
+  warning.style.cssText = 'color:var(--duress);font-weight:500;'
+  warning.textContent = 'Do not share these words with anyone.'
+  form.appendChild(warning)
+
+  const actions = document.createElement('div')
+  actions.className = 'modal__actions'
+  actions.style.gap = '0.5rem'
+
+  const copyBtn = document.createElement('button')
+  copyBtn.className = 'btn btn--primary'
+  copyBtn.type = 'button'
+  copyBtn.textContent = 'Copy words'
+  copyBtn.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(nsec)
-      btn.textContent = 'Copied!'
-      setTimeout(() => { btn.textContent = 'Copy nsec' }, 2000)
+      await navigator.clipboard.writeText(mnemonic)
+      copyBtn.textContent = 'Copied!'
+      setTimeout(() => { copyBtn.textContent = 'Copy words' }, 2000)
     } catch { /* clipboard may be blocked */ }
   })
 
-  d.querySelector('#nsec-backup-done')?.addEventListener('click', () => d.close())
+  const skipBtn = document.createElement('button')
+  skipBtn.className = 'btn'
+  skipBtn.type = 'button'
+  skipBtn.textContent = 'Skip for now'
+  skipBtn.addEventListener('click', () => d.close())
+
+  actions.append(copyBtn, skipBtn)
+  form.appendChild(actions)
+  d.appendChild(form)
 
   d.showModal()
 }
@@ -1238,6 +1279,7 @@ function showLoginScreen(): void {
   `
 
   // Quick Start — generate key silently, just ask for a name
+  // Quick Start — generate mnemonic, derive keypair, show backup
   app.querySelector<HTMLFormElement>('#offline-form')?.addEventListener('submit', async (e) => {
     e.preventDefault()
     const input = app.querySelector<HTMLInputElement>('#offline-name')
@@ -1246,15 +1288,23 @@ function showLoginScreen(): void {
       input?.focus()
       return
     }
-    await ensureLocalIdentity()
-    const { identity } = getState()
-    if (identity) update({ identity: { ...identity, displayName: name } })
+
+    // Generate mnemonic and derive keypair (NIP-06)
+    const { generateMnemonic, mnemonicToKeypair } = await import('./mnemonic.js')
+    const mnemonic = generateMnemonic()
+    const { pubkey, privkey } = mnemonicToKeypair(mnemonic)
+
+    update({
+      identity: { pubkey, privkey, signerType: 'local', displayName: name },
+    })
+
+    // Store mnemonic for later retrieval via identity popover
+    localStorage.setItem('canary:mnemonic', mnemonic)
+
     await bootApp()
 
-    // Show backup prompt for newly created keys
-    if (identity?.privkey) {
-      showNsecBackupModal(identity.privkey)
-    }
+    // Show recovery phrase backup modal
+    showRecoveryPhraseModal(mnemonic)
   })
 
   // nsec form submit

@@ -29,6 +29,9 @@ export async function actLogin(page, { pause, waitForIdle }, name = 'Alice') {
   await injectCursor(page)
   await showCursor(page)
 
+  // Suppress backup modals so they don't appear during recording
+  await page.addStyleTag({ content: '#nsec-backup-modal, #recovery-phrase-modal { display: none !important; }' })
+
   // Type name into the offline name field
   await typeInto(page, '#offline-name', name, { moveDuration: 300, typeDelay: 50 })
   await pause(200)
@@ -37,6 +40,12 @@ export async function actLogin(page, { pause, waitForIdle }, name = 'Alice') {
   await clickElement(page, '#offline-form button[type="submit"]', { moveDuration: 300 })
   await waitForIdle()
   await pause(500)
+
+  // Close any backup dialog that may have opened
+  await page.evaluate(() => {
+    const dialog = document.querySelector('#nsec-backup-modal') || document.querySelector('#recovery-phrase-modal')
+    if (dialog && dialog.open) dialog.close()
+  })
 }
 
 // ── Act 1.5b: Login (demo account) ───────────────────────────
