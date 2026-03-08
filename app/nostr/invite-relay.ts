@@ -14,6 +14,7 @@ import { getState } from '../state.js'
 import { finalizeEvent } from 'nostr-tools/pure'
 import { encrypt as nip44encrypt, decrypt as nip44decrypt, getConversationKey } from 'nostr-tools/nip44'
 import { hexToBytes } from 'canary-kit/crypto'
+import type { RemoteInviteToken } from '../crypto/remote-invite.js'
 
 const HANDSHAKE_KIND = 25519
 
@@ -204,4 +205,94 @@ export function sendWelcomeOverRelay(opts: SendWelcomeOpts): void {
   }, hexToBytes(identity.privkey))
 
   Promise.allSettled(pool.publish(writeRelays, event as any)).catch(() => {})
+}
+
+// ── Relay-based invite discovery ──────────────────────────────
+
+const INVITE_PUBLISH_KIND = 25520
+
+/**
+ * Publish a seedless invite token to the relay so joiners can
+ * discover it by inviteId via a short URL.
+ * Content is unencrypted JSON (token is seedless, inviteId is 128-bit capability).
+ */
+export function publishInviteToken(opts: {
+  token: RemoteInviteToken
+  writeRelays: string[]
+}): void {
+  const pool = getPool()
+  const { identity } = getState()
+  if (!pool || !identity?.privkey) return
+
+  const { token, writeRelays } = opts
+  const content = JSON.stringify(token)
+
+  const event = finalizeEvent({
+    kind: INVITE_PUBLISH_KIND,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [['d', token.inviteId]],
+    content,
+  }, hexToBytes(identity.privkey))
+
+  Promise.allSettled(pool.publish(writeRelays, event as any)).catch(() => {})
+}
+
+/**
+ * Fetch a seedless invite token from the relay by inviteId.
+ * Returns the token via onToken callback, or calls onError.
+ * Returns a cleanup function to cancel the subscription.
+ */
+export function fetchInviteToken(opts: {
+  inviteId: string
+  readRelays: string[]
+  onToken: (token: RemoteInviteToken) => void
+  onError: (msg: string) => void
+}): () => void {
+  const pool = getPool()
+  if (!pool) {
+    opts.onError('No relay pool available.')
+    return () => {}
+  }
+
+  const { inviteId, readRelays, onToken, onError } = opts
+  let found = false
+
+  const sub = pool.subscribeMany(
+    readRelays,
+    { kinds: [INVITE_PUBLISH_KIND], '#d': [inviteId] } as any,
+    {
+      onevent(ev) {
+        if (found) return
+        try {
+          const token = JSON.parse(ev.content) as RemoteInviteToken
+          if (token.inviteId === inviteId) {
+            found = true
+            onToken(token)
+            sub.close()
+          }
+        } catch {
+          // Malformed — ignore
+        }
+      },
+      oneose() {
+        if (!found) {
+          sub.close()
+          onError('Invite not found on relay — it may have expired.')
+        }
+      },
+    },
+  )
+
+  // Timeout after 15 seconds
+  const timer = setTimeout(() => {
+    if (!found) {
+      sub.close()
+      onError('Timed out looking for invite on relay.')
+    }
+  }, 15_000)
+
+  return () => {
+    clearTimeout(timer)
+    sub.close()
+  }
 }
