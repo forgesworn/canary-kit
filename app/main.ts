@@ -35,7 +35,7 @@ import { renderSettings } from './panels/settings.js'
 import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
 import { showCallVerify } from './components/call-verify.js'
 import { assertRemoteInviteToken, decryptWelcomeEnvelope } from './crypto/remote-invite.js'
-import { sendJoinRequest } from './nostr/invite-relay.js'
+import { sendJoinRequest, fetchInviteToken } from './nostr/invite-relay.js'
 import { resolveSigner, hasNip07 } from './nostr/signer.js'
 import { DEMO_ACCOUNTS } from './demo-accounts.js'
 import { decode as nip19decode, nsecEncode } from 'nostr-tools/nip19'
@@ -465,6 +465,14 @@ function checkInviteFragment(): void {
     const b64url = hash.slice(5)
     window.location.hash = ''
     showBinaryJoinScreen(b64url)
+  } else if (hash.startsWith('#j/')) {
+    const inviteId = hash.slice(3)
+    window.location.hash = ''
+    if (/^[0-9a-f]{32}$/.test(inviteId)) {
+      showRelayJoinScreen(inviteId)
+    } else {
+      showToast('Invalid invite link.', 'error')
+    }
   } else if (hash.startsWith('#remote/')) {
     // Token is base64url-encoded (URL-safe, no percent-encoding needed).
     // Also try decodeURIComponent for backwards compat with older percent-encoded links.
@@ -697,6 +705,112 @@ function acceptWelcomeEnvelope(
 
   dialog.close()
   showToast(`Joined ${welcome.groupName}`, 'success')
+}
+
+// ── Relay-based online join screen (joiner side, #j/<inviteId>) ──
+
+function showRelayJoinScreen(inviteId: string): void {
+  const { identity, settings } = getState()
+  if (!identity?.pubkey || !identity?.privkey) {
+    showToast('No local identity — create or import one first.', 'error')
+    return
+  }
+
+  const readRelays = Array.from(new Set([...WELL_KNOWN_READ_RELAYS, ...(settings.defaultWriteRelays ?? [])]))
+  const writeRelays = settings.defaultWriteRelays ?? [DEFAULT_WRITE_RELAY]
+
+  let dialog = document.getElementById('relay-join-modal') as HTMLDialogElement | null
+  if (!dialog) {
+    dialog = document.createElement('dialog')
+    dialog.id = 'relay-join-modal'
+    dialog.className = 'modal'
+    document.body.appendChild(dialog)
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog!.close()
+    })
+  }
+
+  const d = dialog
+  d.innerHTML = `
+    <div class="modal__form invite-share">
+      <h2 class="modal__title">Joining...</h2>
+      <p class="invite-hint" id="relay-join-status">Looking for invite on relay...</p>
+      <div class="modal__actions">
+        <button class="btn" id="relay-join-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+  `
+
+  let cleanupFetch = () => {}
+  let cleanupJoin = () => {}
+
+  d.querySelector<HTMLButtonElement>('#relay-join-cancel')?.addEventListener('click', () => {
+    cleanupFetch()
+    cleanupJoin()
+    d.close()
+  })
+
+  d.showModal()
+
+  // Fetch the invite token from relay
+  void ensureTransport(readRelays, writeRelays).then(() => {
+    cleanupFetch = fetchInviteToken({
+      inviteId,
+      readRelays,
+      onToken(token) {
+        try {
+          assertRemoteInviteToken(token)
+        } catch (err) {
+          const statusEl = d.querySelector('#relay-join-status')
+          if (statusEl) {
+            statusEl.textContent = err instanceof Error ? err.message : 'Invalid invite token.'
+            ;(statusEl as HTMLElement).style.color = 'var(--duress)'
+          }
+          return
+        }
+
+        // Token found — proceed with relay handshake
+        const tokenRelays = token.relays?.length ? token.relays : writeRelays
+        const joinWriteRelays = tokenRelays
+        const joinReadRelays = Array.from(new Set([...WELL_KNOWN_READ_RELAYS, ...tokenRelays]))
+
+        const statusEl = d.querySelector('#relay-join-status')
+        if (statusEl) statusEl.textContent = `Joining ${token.groupName}...`
+
+        void ensureTransport(joinReadRelays, joinWriteRelays).then(() => {
+          cleanupJoin = sendJoinRequest({
+            inviteId: token.inviteId,
+            adminPubkey: token.adminPubkey,
+            readRelays: joinReadRelays,
+            writeRelays: joinWriteRelays,
+            onWelcome(envelope) {
+              try {
+                acceptWelcomeEnvelope(envelope, token, d)
+              } catch {
+                if (statusEl) {
+                  statusEl.textContent = 'Failed to join — welcome message could not be decrypted.'
+                  ;(statusEl as HTMLElement).style.color = 'var(--duress)'
+                }
+              }
+            },
+            onError(msg) {
+              if (statusEl) {
+                statusEl.textContent = msg
+                ;(statusEl as HTMLElement).style.color = 'var(--duress)'
+              }
+            },
+          })
+        })
+      },
+      onError(msg) {
+        const statusEl = d.querySelector('#relay-join-status')
+        if (statusEl) {
+          statusEl.textContent = msg
+          ;(statusEl as HTMLElement).style.color = 'var(--duress)'
+        }
+      },
+    })
+  })
 }
 
 function showRemoteJoinScreen(tokenPayload: string): void {
