@@ -283,11 +283,19 @@ function showIdentityPopover(anchor: HTMLElement): void {
     ${identity?.privkey ? `
       <div class="identity-popover__divider"></div>
       <div class="identity-popover__section">
-        <span class="identity-popover__label">Your secret key</span>
+        <span class="identity-popover__label">Recovery phrase</span>
         <p style="font-size: 0.6875rem; color: var(--text-muted); margin: 0.25rem 0;">Back this up — it's the only way to recover your account.</p>
-        <div id="nsec-reveal-area" style="margin-top: 0.375rem;">
-          <button class="btn btn--sm" id="nsec-reveal-btn" type="button" style="width: 100%;">Show nsec</button>
+        <div id="recovery-reveal-area" style="margin-top: 0.375rem;">
+          <button class="btn btn--sm" id="recovery-reveal-btn" type="button" style="width: 100%;">Show recovery phrase</button>
         </div>
+      </div>
+      <div class="identity-popover__section" style="padding-top: 0;">
+        <details style="font-size: 0.75rem;">
+          <summary style="cursor: pointer; color: var(--text-muted);">Advanced: show nsec</summary>
+          <div id="nsec-reveal-area" style="margin-top: 0.375rem;">
+            <button class="btn btn--sm" id="nsec-reveal-btn" type="button" style="width: 100%;">Show nsec</button>
+          </div>
+        </details>
       </div>
     ` : ''}
 
@@ -312,6 +320,53 @@ function showIdentityPopover(anchor: HTMLElement): void {
     update({ identity: null, groups: {}, activeGroupId: null })
     popover.remove()
     window.location.reload()
+  })
+
+  // Reveal recovery phrase
+  popover.querySelector('#recovery-reveal-btn')?.addEventListener('click', () => {
+    const area = popover.querySelector('#recovery-reveal-area')
+    if (!area) return
+    const mnemonic = localStorage.getItem('canary:mnemonic')
+    if (!mnemonic) {
+      area.textContent = ''
+      const msg = document.createElement('p')
+      msg.style.cssText = 'font-size:0.75rem;color:var(--text-muted);'
+      msg.textContent = 'No recovery phrase stored (key was imported via nsec).'
+      area.appendChild(msg)
+      return
+    }
+    const words = mnemonic.split(' ')
+    area.textContent = ''
+
+    const grid = document.createElement('div')
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:0.375rem;margin:0.375rem 0;'
+
+    words.forEach((w, i) => {
+      const cell = document.createElement('div')
+      cell.style.cssText = 'border:1px solid var(--border);border-radius:3px;padding:0.25rem;text-align:center;font-family:var(--font-mono,monospace);font-size:0.7rem;'
+      const num = document.createElement('span')
+      num.style.color = 'var(--text-muted)'
+      num.textContent = `${i + 1}. `
+      const word = document.createElement('span')
+      word.textContent = w
+      cell.append(num, word)
+      grid.appendChild(cell)
+    })
+    area.appendChild(grid)
+
+    const copyBtn = document.createElement('button')
+    copyBtn.className = 'btn btn--sm'
+    copyBtn.type = 'button'
+    copyBtn.style.cssText = 'width:100%;margin-top:0.375rem;'
+    copyBtn.textContent = 'Copy words'
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(mnemonic)
+        copyBtn.textContent = 'Copied!'
+        setTimeout(() => { copyBtn.textContent = 'Copy words' }, 2000)
+      } catch {}
+    })
+    area.appendChild(copyBtn)
   })
 
   // Reveal nsec
