@@ -46,6 +46,7 @@ export async function actLogin(page, { pause, waitForIdle }, name = 'Alice') {
     const dialog = document.querySelector('#nsec-backup-modal') || document.querySelector('#recovery-phrase-modal')
     if (dialog && dialog.open) dialog.close()
   })
+  await page.waitForTimeout(200)
 }
 
 // ── Act 1.5b: Login (demo account) ───────────────────────────
@@ -256,4 +257,115 @@ export async function actClose(page, { narrate, pause }) {
 
   await narrate('Deepfake proof. Duress aware. Zero dependencies. canary-kit. npm install and go.')
   await pause(1000)
+}
+
+// ── Act: Cold Open (duress alert) ──────────────────────────
+
+export async function actColdOpen({ alice, bob }, { narrate, pause }) {
+  // Cover Alice's screen — only Bob's alert should be visible
+  await showOverlay(alice, {
+    title: '',
+    subtitle: '',
+    background: 'rgba(0, 0, 0, 1)',
+    duration: 1,
+  })
+
+  await bob.evaluate(() => {
+    const overlay = document.createElement('div')
+    overlay.className = 'duress-overlay'
+    overlay.setAttribute('role', 'alertdialog')
+    const content = document.createElement('div')
+    content.className = 'duress-overlay__content'
+    const icon = document.createElement('div')
+    icon.className = 'duress-overlay__icon'
+    icon.setAttribute('aria-hidden', 'true')
+    icon.textContent = '!'
+    const title = document.createElement('h1')
+    title.className = 'duress-overlay__title'
+    title.textContent = 'Alice'
+    const subtitle = document.createElement('h2')
+    subtitle.className = 'duress-overlay__subtitle'
+    subtitle.textContent = 'NEEDS HELP'
+    const time = document.createElement('p')
+    time.className = 'duress-overlay__time'
+    time.textContent = new Date().toLocaleTimeString()
+    content.append(icon, title, subtitle, time)
+    overlay.appendChild(content)
+    document.body.appendChild(overlay)
+    requestAnimationFrame(() => overlay.classList.add('duress-overlay--visible'))
+  })
+
+  await narrate('This alert just saved Alice\'s life.')
+  await pause(400)
+
+  await bob.evaluate(() => {
+    const overlay = document.querySelector('.duress-overlay')
+    if (overlay) {
+      overlay.classList.remove('duress-overlay--visible')
+      setTimeout(() => overlay.remove(), 300)
+    }
+  })
+  await hideOverlay(alice)
+  await pause(200)
+}
+
+// ── Act: Beacons ───────────────────────────────────────────
+
+export async function actBeacons(page, { narrate, pause }) {
+  await Promise.all([
+    narrate('Beacons let you share encrypted locations with your group. AES-256 encrypted, ephemeral — they expire automatically. Only your group can decrypt them.'),
+    (async () => {
+      await page.evaluate(() => {
+        const el = document.getElementById('beacon-container')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+      await page.waitForTimeout(400)
+      const toggleBtn = page.locator('#beacon-toggle-btn').first()
+      if (await toggleBtn.isVisible().catch(() => false)) {
+        await clickElement(page, '#beacon-toggle-btn', { moveDuration: 300 })
+        await page.waitForTimeout(1500)
+      }
+    })(),
+  ])
+  await page.waitForTimeout(800)
+}
+
+// ── Act: Liveness ──────────────────────────────────────────
+
+export async function actLiveness(page, { narrate, pause }) {
+  await Promise.all([
+    narrate('Dead man\'s switch. Miss a check-in and your group gets notified. For journalists, activists, field teams — silence IS the signal.'),
+    (async () => {
+      await page.evaluate(() => {
+        const el = document.getElementById('liveness-container')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+      await page.waitForTimeout(400)
+      const checkinBtn = page.locator('#checkin-btn').first()
+      if (await checkinBtn.isVisible().catch(() => false)) {
+        await clickElement(page, '#checkin-btn', { moveDuration: 300 })
+        await page.waitForTimeout(600)
+      }
+    })(),
+  ])
+  await pause(200)
+}
+
+// ── Act: Rewind ────────────────────────────────────────────
+
+export async function actRewind({ alice, bob }, { pause }) {
+  await showOverlay(alice, {
+    title: '10 minutes earlier',
+    subtitle: '',
+    duration: 1,
+  })
+  await showOverlay(bob, {
+    title: '10 minutes earlier',
+    subtitle: '',
+    duration: 1,
+  })
+  await pause(2500)
+  await hideOverlay(alice)
+  await hideOverlay(bob)
+  await pause(200)
 }

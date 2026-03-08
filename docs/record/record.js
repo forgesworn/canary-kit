@@ -129,12 +129,16 @@ async function recordSplitScreen(scriptModule, name) {
     viewport: SPLIT_VIEWPORT,
     recordVideo: { dir: aliceDir, size: SPLIT_VIEWPORT },
     colorScheme: 'dark',
+    geolocation: { latitude: 51.5074, longitude: -0.1278 },
+    permissions: ['geolocation'],
   })
 
   const bobContext = await browser.newContext({
     viewport: SPLIT_VIEWPORT,
     recordVideo: { dir: bobDir, size: SPLIT_VIEWPORT },
     colorScheme: 'dark',
+    geolocation: { latitude: 51.5131, longitude: -0.1372 },
+    permissions: ['geolocation'],
   })
 
   const alice = await aliceContext.newPage()
