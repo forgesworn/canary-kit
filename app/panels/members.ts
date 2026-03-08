@@ -9,13 +9,14 @@ import {
   endInviteSession,
 } from '../invite.js'
 import { packInvite } from '../utils/binary-invite.js'
-import { bytesToBase64url } from '../utils/base64.js'
+import { base64urlToJson, bytesToBase64url } from '../utils/base64.js'
 import { groupMode } from '../types.js'
 import { generateQR } from '../components/qr.js'
 import { escapeHtml } from '../utils/escape.js'
 import { showModal } from '../components/modal.js'
 import { showToast } from '../components/toast.js'
-import { listenForJoinRequests, sendWelcomeOverRelay } from '../nostr/invite-relay.js'
+import { listenForJoinRequests, publishInviteToken, sendWelcomeOverRelay } from '../nostr/invite-relay.js'
+import type { RemoteInviteToken } from '../crypto/remote-invite.js'
 import { ensureTransport } from '../sync.js'
 import { deriveToken } from 'canary-kit/token'
 import { GROUP_CONTEXT, toTokenEncoding } from '../utils/encoding.js'
@@ -279,37 +280,107 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
   function renderRemotePath(): void {
     const remoteSession = startRemoteInviteSession(group)
     const base = window.location.href.split('#')[0]
-    const remoteUrl = `${base}#remote/${remoteSession.tokenPayload}`
+    const shortUrl = `${base}#j/${remoteSession.inviteId}`
 
-    function renderStep1(): void {
-      d.innerHTML = `
-        <div class="modal__form invite-share">
-          <h2 class="modal__title">Step 1 of 3: Send Invite</h2>
-          <p class="invite-hint">Copy this and send it via Signal, WhatsApp, or any secure channel.</p>
-          <p class="invite-hint" style="color: var(--duress); font-weight: 500;">This invite does NOT contain the group secret — it's safe to send.</p>
-          <div class="invite-share__actions" style="flex-direction: column; gap: 0.5rem;">
-            <button class="btn btn--primary" id="remote-copy-token" type="button">Copy Invite</button>
-          </div>
-          <div class="modal__actions" style="gap: 0.5rem;">
-            <button class="btn" id="remote-back-btn" type="button">Back</button>
-            <button class="btn btn--primary" id="remote-next-1" type="button">Next</button>
-          </div>
-        </div>
-      `
-      d.querySelector<HTMLButtonElement>('#remote-copy-token')?.addEventListener('click', async (e) => {
-        const btn = e.currentTarget as HTMLButtonElement
-        try {
-          await navigator.clipboard.writeText(remoteUrl)
-          btn.textContent = 'Copied!'
-          btn.classList.add('btn--copied')
-          setTimeout(() => { btn.textContent = 'Copy Invite'; btn.classList.remove('btn--copied') }, 2000)
-        } catch { /* clipboard may be blocked */ }
+    const readRelays = group.readRelays?.length ? group.readRelays : getState().settings.defaultReadRelays
+    const writeRelays = group.writeRelays?.length ? group.writeRelays : getState().settings.defaultWriteRelays
+
+    // Publish the full token to relay for joiner discovery
+    void ensureTransport(readRelays, writeRelays).then(() => {
+      publishInviteToken({
+        token: base64urlToJson(remoteSession.tokenPayload) as RemoteInviteToken,
+        writeRelays,
       })
-      d.querySelector<HTMLButtonElement>('#remote-back-btn')?.addEventListener('click', () => { endRemoteInviteSession(); renderChooser() })
-      d.querySelector<HTMLButtonElement>('#remote-next-1')?.addEventListener('click', () => renderStep2(renderStep1))
-    }
+    })
 
-    renderStep1()
+    let cleanupListener = () => {}
+
+    d.innerHTML = `
+      <div class="modal__form invite-share">
+        <h2 class="modal__title">Send Invite Link</h2>
+        <p class="invite-hint">Copy this link and send it via Signal, WhatsApp, or any secure channel.</p>
+        <p class="invite-hint" style="color: var(--duress); font-weight: 500;">This link does NOT contain the group secret — it's safe to send.</p>
+
+        <div class="invite-share__actions" style="flex-direction: column; gap: 0.5rem;">
+          <button class="btn btn--primary" id="remote-copy-link" type="button">Copy Link</button>
+        </div>
+
+        <p class="invite-hint" id="remote-relay-status" style="color: var(--text-muted); margin-top: 1rem;">Waiting for them to open the link...</p>
+
+        <details style="margin-top: 1rem;">
+          <summary class="invite-hint" style="cursor: pointer; color: var(--text-muted);">Manual fallback (if relay is unavailable)</summary>
+          <div style="margin-top: 0.5rem;">
+            <button class="btn btn--sm" id="remote-manual-fallback" type="button">Switch to manual steps</button>
+          </div>
+        </details>
+
+        <div class="modal__actions" style="gap: 0.5rem;">
+          <button class="btn" id="remote-back-btn" type="button">Back</button>
+        </div>
+      </div>
+    `
+
+    // Copy short URL
+    d.querySelector<HTMLButtonElement>('#remote-copy-link')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement
+      try {
+        await navigator.clipboard.writeText(shortUrl)
+        btn.textContent = 'Copied!'
+        btn.classList.add('btn--copied')
+        setTimeout(() => { btn.textContent = 'Copy Link'; btn.classList.remove('btn--copied') }, 2000)
+      } catch { /* clipboard may be blocked */ }
+    })
+
+    // Listen for relay join requests
+    void ensureTransport(readRelays, writeRelays).then(() => {
+      cleanupListener = listenForJoinRequests({
+        inviteId: remoteSession.inviteId,
+        readRelays,
+        writeRelays,
+        onJoinRequest(joinerPubkey) {
+          cleanupListener()
+          try {
+            const currentGroup = getState().groups[group.id]
+            if (!currentGroup) return
+            const envelope = createRemoteWelcomeEnvelope(currentGroup, joinerPubkey)
+
+            sendWelcomeOverRelay({
+              inviteId: remoteSession.inviteId,
+              joinerPubkey,
+              envelope,
+              writeRelays,
+            })
+
+            if (!currentGroup.members.includes(joinerPubkey)) {
+              addGroupMember(group.id, joinerPubkey)
+            }
+
+            endRemoteInviteSession()
+            endInviteSession()
+            d.close()
+            showToast('Member joined via relay', 'success')
+          } catch (err) {
+            showToast(err instanceof Error ? err.message : 'Failed to send welcome', 'error')
+          }
+        },
+        onError(msg) {
+          const statusEl = d.querySelector('#remote-relay-status')
+          if (statusEl) statusEl.textContent = msg || 'Relay unavailable — use manual fallback below.'
+        },
+      })
+    })
+
+    // Manual fallback — falls back to old step 2/3 flow
+    d.querySelector<HTMLButtonElement>('#remote-manual-fallback')?.addEventListener('click', () => {
+      cleanupListener()
+      renderStep2(() => { cleanupListener = () => {}; renderRemotePath() })
+    })
+
+    d.querySelector<HTMLButtonElement>('#remote-back-btn')?.addEventListener('click', () => {
+      cleanupListener()
+      endRemoteInviteSession()
+      renderChooser()
+    })
   }
 
   // Start with the path chooser
