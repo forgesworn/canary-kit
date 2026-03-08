@@ -44,7 +44,7 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
     })(),
   ])
 
-  await waitForIdle()
+  await alice.waitForSelector('input[name="name"]', { timeout: 5000 })
   await typeInto(alice, 'input[name="name"]', 'Family', { moveDuration: 150, typeDelay: 30 })
   await alice.waitForTimeout(150)
   await clickElement(alice, 'button[type="submit"]', { moveDuration: 200 })
