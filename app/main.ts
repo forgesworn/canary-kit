@@ -45,7 +45,9 @@ import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } 
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
 import { escapeHtml } from './utils/escape.js'
-import { base64ToJson, base64urlToJson } from './utils/base64.js'
+import { base64ToJson, base64urlToJson, base64urlToBytes, jsonToBase64 } from './utils/base64.js'
+import { unpackInvite } from './utils/binary-invite.js'
+import { acceptInvite } from './invite.js'
 import type { AppIdentity } from './types.js'
 
 /** Allow wss:// relays, plus ws:// only for localhost development. */
@@ -459,6 +461,10 @@ function checkInviteFragment(): void {
     document.dispatchEvent(
       new CustomEvent('canary:confirm-member', { detail: { token } }),
     )
+  } else if (hash.startsWith('#inv/')) {
+    const b64url = hash.slice(5)
+    window.location.hash = ''
+    showBinaryJoinScreen(b64url)
   } else if (hash.startsWith('#remote/')) {
     // Token is base64url-encoded (URL-safe, no percent-encoding needed).
     // Also try decodeURIComponent for backwards compat with older percent-encoded links.
@@ -470,6 +476,140 @@ function checkInviteFragment(): void {
     }
     window.location.hash = ''
     showRemoteJoinScreen(tokenPayload)
+  }
+}
+
+// ── Binary QR join screen (joiner side) ─────────────────────────
+
+function showBinaryJoinScreen(b64url: string): void {
+  try {
+    const bytes = base64urlToBytes(b64url)
+    const invite = unpackInvite(bytes)
+
+    const { identity } = getState()
+    if (!identity?.pubkey) {
+      showToast('No local identity — create or import one first.', 'error')
+      return
+    }
+
+    let dialog = document.getElementById('binary-join-modal') as HTMLDialogElement | null
+    if (!dialog) {
+      dialog = document.createElement('dialog')
+      dialog.id = 'binary-join-modal'
+      dialog.className = 'modal'
+      document.body.appendChild(dialog)
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) dialog!.close()
+      })
+    }
+
+    const d = dialog
+    d.innerHTML = `
+      <div class="modal__form invite-share">
+        <h2 class="modal__title">Join ${escapeHtml(invite.groupName)}</h2>
+        <p class="invite-hint">Invited by <code>${escapeHtml(invite.inviterPubkey.slice(0, 8))}\u2026</code></p>
+        <p class="invite-hint">Ask the admin to read you the 3 confirmation words.</p>
+
+        <label class="input-label">Confirmation words
+          <input class="input" id="binary-join-confirm" type="text" placeholder="e.g. apple river castle" autocomplete="off">
+        </label>
+        <p class="invite-hint" id="binary-join-error" style="color: var(--duress); display: none;"></p>
+
+        <div class="modal__actions" style="gap: 0.5rem;">
+          <button class="btn" id="binary-join-cancel" type="button">Cancel</button>
+          <button class="btn btn--primary" id="binary-join-accept" type="button">Join</button>
+        </div>
+      </div>
+    `
+
+    d.querySelector<HTMLButtonElement>('#binary-join-cancel')?.addEventListener('click', () => d.close())
+    d.querySelector<HTMLButtonElement>('#binary-join-accept')?.addEventListener('click', () => {
+      const confirmInput = d.querySelector<HTMLInputElement>('#binary-join-confirm')
+      const errorEl = d.querySelector<HTMLElement>('#binary-join-error')
+      const words = confirmInput?.value.trim() ?? ''
+
+      if (!words) {
+        if (errorEl) { errorEl.textContent = 'Please enter the confirmation words.'; errorEl.style.display = '' }
+        return
+      }
+
+      try {
+        // acceptInvite validates confirmation code, signature, and expiry.
+        // Re-encode to base64 since acceptInvite expects that format.
+        const payload = jsonToBase64(invite)
+        const validated = acceptInvite(payload, words)
+
+        // Build AppGroup from the validated invite
+        const id = validated.groupId
+        const { groups: existingGroups } = getState()
+        const members = new Set(validated.members)
+        members.add(identity!.pubkey)
+
+        const writeRelays = validated.relays.length > 0 ? validated.relays : [DEFAULT_WRITE_RELAY]
+        const readRelays = Array.from(new Set([...WELL_KNOWN_READ_RELAYS, ...writeRelays]))
+        const hasRelays = writeRelays.length > 0
+
+        const appGroup = {
+          id,
+          name: validated.groupName,
+          seed: validated.seed,
+          members: Array.from(members),
+          memberNames: validated.memberNames ?? {},
+          nostrEnabled: hasRelays,
+          relays: validated.relays,
+          readRelays,
+          writeRelays,
+          wordlist: validated.wordlist,
+          wordCount: validated.wordCount,
+          counter: validated.counter,
+          usageOffset: validated.usageOffset,
+          rotationInterval: validated.rotationInterval,
+          encodingFormat: validated.encodingFormat,
+          usedInvites: [validated.nonce],
+          latestInviteIssuedAt: validated.issuedAt,
+          beaconInterval: validated.beaconInterval,
+          beaconPrecision: validated.beaconPrecision,
+          duressMode: 'immediate' as const,
+          livenessInterval: validated.rotationInterval,
+          livenessCheckins: {} as Record<string, number>,
+          tolerance: validated.tolerance,
+          createdAt: Math.floor(Date.now() / 1000),
+          admins: [...validated.admins],
+          epoch: validated.epoch,
+          consumedOps: [] as string[],
+        }
+
+        const groups = { ...existingGroups, [id]: appGroup }
+        update({ groups, activeGroupId: id })
+        flushPersist()
+
+        // Boot relay sync if available
+        if (hasRelays && identity) {
+          void ensureTransport(readRelays, writeRelays, id).then(() => {
+            broadcastAction(id, {
+              type: 'member-join',
+              pubkey: identity!.pubkey,
+              displayName: identity!.displayName && identity!.displayName !== 'You' ? identity!.displayName : undefined,
+              timestamp: Math.floor(Date.now() / 1000),
+              epoch: validated.epoch,
+              opId: crypto.randomUUID(),
+            })
+          })
+        }
+
+        d.close()
+        showToast(`Joined ${validated.groupName}`, 'success')
+      } catch (err) {
+        if (errorEl) {
+          errorEl.textContent = err instanceof Error ? err.message : 'Failed to join group.'
+          errorEl.style.display = ''
+        }
+      }
+    })
+
+    d.showModal()
+  } catch (err) {
+    showToast(err instanceof Error ? err.message : 'Invalid QR invite.', 'error')
   }
 }
 
