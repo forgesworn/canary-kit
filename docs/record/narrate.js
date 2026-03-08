@@ -10,7 +10,7 @@ const VOICE = process.env.TTS_VOICE || 'shimmer'
 const MODEL = process.env.TTS_MODEL || 'gpt-4o-mini-tts'
 const SPEED = parseFloat(process.env.TTS_SPEED) || 1.25
 const INSTRUCTIONS = process.env.TTS_INSTRUCTIONS ||
-  'Warm, conversational British English accent. Natural filler words like "so", "now", "right". Brisk pace, not rushed. Confident and friendly — like showing a colleague something cool.'
+  'Urgent, confident British narrator. Like a BBC technology documentary — authoritative but human. Short punchy sentences. No filler words. Let the visuals breathe.'
 
 /** @type {{ file: string, timestamp: number, duration: number }[]} */
 const clips = []
