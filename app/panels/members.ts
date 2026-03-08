@@ -252,7 +252,7 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
       <div class="modal__form invite-share">
         <h2 class="modal__title">${escapeHtml(title)}</h2>
 
-        <div class="qr-container">${svgMarkup}</div>
+        <div class="qr-container" data-url="${escapeHtml(qrUrl)}">${svgMarkup}</div>
         <p class="invite-hint">${escapeHtml(scanHint)}</p>
         <p class="invite-hint" style="color: var(--duress); font-weight: 500;">Contains the group key &mdash; only share in person.</p>
 

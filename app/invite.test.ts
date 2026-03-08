@@ -111,13 +111,16 @@ describe('inviteCanonicalBytes', () => {
     expect(canonical).not.toContain('inviterSig')
   })
 
-  it('includes all other fields in sorted order', () => {
+  it('includes transport-agnostic fields in sorted order', () => {
     const payload = makeValidPayload()
     const canonical = new TextDecoder().decode(inviteCanonicalBytes(payload))
     const parsed = JSON.parse(canonical)
     const keys = Object.keys(parsed)
     expect(keys).toEqual([...keys].sort())
+    // Excluded: inviterSig (being verified), relays & memberNames (stripped by binary format)
     expect(keys).not.toContain('inviterSig')
+    expect(keys).not.toContain('relays')
+    expect(keys).not.toContain('memberNames')
     expect(keys).toContain('inviterPubkey')
     expect(keys).toContain('seed')
   })

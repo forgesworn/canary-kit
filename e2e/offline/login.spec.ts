@@ -59,14 +59,15 @@ test.describe('Login screen', () => {
     await expect(page.locator('.identity-badge__name')).toHaveText('Alice')
   })
 
-  test('preserves #join/ hash through offline login flow', async ({ cleanPage: page }) => {
-    // Navigate to a URL with an invite hash
-    await page.goto('/#join/dGVzdA==')
+  test('preserves #inv/ hash through offline login flow', async ({ cleanPage: page }) => {
+    // Navigate to a URL with a binary invite hash (fake payload — too short to decode)
+    await page.goto('/#inv/dGVzdA==')
     // Should show login screen (no identity yet)
     await expect(page.locator('.lock-screen')).toBeVisible()
     // Login
     await loginOffline(page, 'Invitee')
-    // After login, the join modal should appear (hash was preserved)
-    await expect(page.locator('#app-modal[open]')).toBeVisible({ timeout: 5000 })
+    // After login, checkInviteFragment should process the hash (and clear it).
+    // The hash is cleared by checkInviteFragment regardless of whether the invite is valid.
+    await page.waitForFunction(() => !window.location.hash.startsWith('#inv/'), { timeout: 5000 })
   })
 })

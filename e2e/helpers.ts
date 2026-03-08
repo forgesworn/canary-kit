@@ -8,6 +8,7 @@ export async function loginOffline(page: Page, name: string): Promise<void> {
   await page.fill('#offline-name', name)
   await page.click('#offline-form button[type="submit"]')
   await page.waitForSelector('#sidebar', { timeout: 5000 })
+  await dismissNsecBackup(page)
 }
 
 /** Login with an nsec key. */
@@ -21,6 +22,15 @@ export async function loginWithNsec(page: Page, nsec: string): Promise<void> {
 export async function loginWithDemo(page: Page, name: string): Promise<void> {
   await page.click(`.login-screen__demo[data-name="${name}"]`)
   await page.waitForSelector('#sidebar', { timeout: 5000 })
+}
+
+/** Dismiss the nsec backup modal if it appears after login. */
+async function dismissNsecBackup(page: Page): Promise<void> {
+  const doneBtn = page.locator('#nsec-backup-done')
+  if (await doneBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await doneBtn.click()
+    await page.waitForSelector('#nsec-backup-modal:not([open])', { state: 'attached', timeout: 2000 }).catch(() => {})
+  }
 }
 
 // ── Group lifecycle ──────────────────────────────────────────
@@ -37,11 +47,13 @@ export async function createGroup(
 ): Promise<void> {
   // Set relay mode BEFORE opening modal so the app's in-memory state is correct
   if (options?.mode === 'offline') {
-    // Clear relays to force offline mode (overrides the hardcoded default)
+    // Clear all relay fields to force offline mode
     await page.addInitScript(() => {
       const raw = localStorage.getItem('canary:settings')
       const settings = raw ? JSON.parse(raw) : {}
       settings.defaultRelays = []
+      settings.defaultReadRelays = []
+      settings.defaultWriteRelays = []
       localStorage.setItem('canary:settings', JSON.stringify(settings))
     })
     await page.reload()
@@ -94,8 +106,8 @@ export async function getGroupNames(page: Page): Promise<string[]> {
 
 // ── Invite flow ──────────────────────────────────────────────
 
-/** Click the Invite button and extract payload + confirm code from the modal. */
-export async function createInvite(page: Page): Promise<{ payload: string; confirmCode: string }> {
+/** Click the Invite button and extract the binary invite URL + confirm code via the QR path. */
+export async function createInvite(page: Page): Promise<{ inviteUrl: string; confirmCode: string }> {
   const heroInvite = page.locator('#hero-invite-btn')
   const membersInvite = page.locator('#invite-btn')
 
@@ -107,55 +119,42 @@ export async function createInvite(page: Page): Promise<{ payload: string; confi
 
   await page.waitForSelector('#invite-modal[open]', { timeout: 3000 })
 
-  // Navigate to the Link path to access confirmation words
-  await page.click('#invite-link-path')
+  // Use the QR path which embeds the full payload + confirm code
+  await page.click('#invite-qr-path')
+  await page.waitForSelector('.qr-container', { timeout: 3000 })
 
-  const confirmCode = await page.locator('.confirm-code__value').textContent()
+  // Read the invite URL from the data-url attribute on the QR container
+  const inviteUrl = await page.locator('.qr-container').getAttribute('data-url')
+  if (!inviteUrl) throw new Error('Could not extract invite URL from QR container data-url')
+
+  // Read the confirm code (shown as plain text below the QR)
+  const confirmCode = await page.evaluate(() => {
+    const modal = document.getElementById('invite-modal')
+    if (!modal) return ''
+    const paragraphs = modal.querySelectorAll('p')
+    for (const p of paragraphs) {
+      const text = p.textContent?.trim() ?? ''
+      // Confirm code is space-separated words, all lowercase
+      if (/^[a-z]+(?: [a-z]+)*$/.test(text) && text.split(' ').length >= 2) return text
+    }
+    return ''
+  })
   if (!confirmCode) throw new Error('Could not read confirm code from invite modal')
 
-  // Read payload from data attribute (more reliable than clipboard)
-  const payload = await page.locator('#invite-modal').getAttribute('data-payload')
-  if (!payload) throw new Error('Could not read invite payload from modal')
-
-  await page.click('#invite-close-btn')
-  return { payload, confirmCode }
+  await page.click('#invite-done-btn').catch(() => page.click('#invite-close-btn'))
+  return { inviteUrl, confirmCode }
 }
 
-/** Accept an invite via the join modal (not via URL). */
-export async function acceptInviteViaModal(
-  page: Page,
-  payload: string,
-  confirmCode: string,
-): Promise<void> {
-  await page.evaluate(() => {
-    document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
-  })
-  await page.waitForSelector('#app-modal[open]', { timeout: 3000 })
-
-  await page.fill('[name="payload"]', payload)
-  await page.fill('[name="code"]', confirmCode)
-  await page.click('#modal-form button[type="submit"]')
-  await page.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
-
-  // Dismiss join confirmation modal if it appears. The modal is created
-  // asynchronously (dynamic imports for token derivation) so it may take
-  // a moment to appear, especially under full-suite load.
-  const joinConfirmModal = page.locator('#join-confirm-modal[open]')
-  if (await joinConfirmModal.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await page.click('#join-confirm-done')
-    await page.waitForSelector('#join-confirm-modal:not([open])', { state: 'attached', timeout: 3000 }).catch(() => {})
-  }
-}
-
-/** Accept an invite by navigating to the invite URL hash. */
+/**
+ * Accept an invite by navigating to its #inv/ URL (binary invite).
+ * The joiner sees a `#binary-join-modal` where they enter the confirmation words.
+ */
 export async function acceptInviteViaLink(
   page: Page,
-  payload: string,
+  inviteUrl: string,
   confirmCode: string,
   loginName?: string,
 ): Promise<void> {
-  const encodedPayload = encodeURIComponent(payload)
-
   // Capture any alert dialogs (e.g. from validation errors)
   let alertMessage = ''
   const dialogHandler = async (dialog: import('@playwright/test').Dialog) => {
@@ -164,7 +163,9 @@ export async function acceptInviteViaLink(
   }
   page.on('dialog', dialogHandler)
 
-  await page.goto(`/#join/${encodedPayload}`)
+  // Navigate to the invite URL (contains #inv/<base64url>)
+  const hash = new URL(inviteUrl).hash
+  await page.goto(`/${hash}`)
 
   // If not logged in, the login screen appears first
   const loginScreen = page.locator('.lock-screen')
@@ -172,28 +173,14 @@ export async function acceptInviteViaLink(
     await loginOffline(page, loginName ?? 'Invitee')
   }
 
-  // The join modal should appear with payload pre-filled
-  await page.waitForSelector('#app-modal[open]', { timeout: 5000 })
-  await page.fill('[name="code"]', confirmCode)
+  // The binary join modal should appear
+  await page.waitForSelector('#binary-join-modal[open]', { timeout: 5000 })
+  await page.fill('#binary-join-confirm', confirmCode)
+  await page.click('#binary-join-accept')
 
-  const nameInput = page.locator('#app-modal [name="myname"]')
-  if (await nameInput.isVisible().catch(() => false)) {
-    await nameInput.fill(loginName ?? 'Invitee')
-  }
+  // Wait for modal to close (successful join)
+  await page.waitForSelector('#binary-join-modal:not([open])', { state: 'attached', timeout: 5000 })
 
-  await page.click('#modal-form button[type="submit"]')
-  await page.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
-
-  // Dismiss join confirmation modal if it appears. The modal is created
-  // asynchronously (dynamic imports for token derivation) so it may take
-  // a moment to appear, especially under full-suite load.
-  const joinConfirmModal = page.locator('#join-confirm-modal[open]')
-  if (await joinConfirmModal.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await page.click('#join-confirm-done')
-    await page.waitForSelector('#join-confirm-modal:not([open])', { state: 'attached', timeout: 3000 }).catch(() => {})
-  }
-
-  // Clean up dialog handler to avoid interfering with subsequent dialog expectations
   page.off('dialog', dialogHandler)
 
   if (alertMessage) {
@@ -202,56 +189,16 @@ export async function acceptInviteViaLink(
 }
 
 /**
- * Simulate scanning a QR code invite (in-person path).
- * The QR code generates `#scan/<payload>` URLs, not `#join/`.
- *
- * QR path auto-derives the confirmation code (physical presence IS
- * the verification). If the user already has a name, the app joins
- * immediately with no modal. Otherwise a minimal name-only modal appears.
+ * Accept an invite by navigating to its #inv/ URL (simulates QR scan).
+ * Same as acceptInviteViaLink since both use the binary invite format now.
  */
 export async function acceptInviteViaQR(
   page: Page,
-  payload: string,
-  _confirmCode?: string, // kept for backward compat — no longer needed
+  inviteUrl: string,
+  confirmCode: string,
   loginName?: string,
 ): Promise<void> {
-  const encodedPayload = encodeURIComponent(payload)
-
-  let alertMessage = ''
-  const dialogHandler = async (dialog: import('@playwright/test').Dialog) => {
-    alertMessage = dialog.message()
-    await dialog.accept()
-  }
-  page.on('dialog', dialogHandler)
-
-  await page.goto(`/#scan/${encodedPayload}`)
-
-  const loginScreen = page.locator('.lock-screen')
-  if (await loginScreen.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await loginOffline(page, loginName ?? 'Invitee')
-  }
-
-  // QR path: if user already has a name, auto-joins with no modal.
-  // If name is needed, a minimal name-only modal appears.
-  const modal = page.locator('#app-modal[open]')
-  if (await modal.isVisible({ timeout: 2000 }).catch(() => false)) {
-    const nameInput = page.locator('#app-modal [name="myname"]')
-    if (await nameInput.isVisible().catch(() => false)) {
-      await nameInput.fill(loginName ?? 'Invitee')
-    }
-    await page.click('#modal-form button[type="submit"]')
-    await page.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
-  }
-
-  // QR scan path shows a toast instead of a confirmation modal
-  // Wait briefly for toast to appear and join to complete
-  await page.waitForTimeout(500)
-
-  page.off('dialog', dialogHandler)
-
-  if (alertMessage) {
-    throw new Error(`QR invite acceptance failed: ${alertMessage}`)
-  }
+  return acceptInviteViaLink(page, inviteUrl, confirmCode, loginName)
 }
 
 /**
@@ -333,14 +280,25 @@ export async function acceptInviteAndGetToken(
 
 /** Hold the reveal button and read the verification word. */
 export async function getDisplayedWord(page: Page): Promise<string> {
-  const revealBtn = page.locator('#hero-reveal-btn')
-  await revealBtn.dispatchEvent('pointerdown')
-  await page.waitForTimeout(100)
-
-  const word = await page.locator('#hero-word').textContent()
-
-  await revealBtn.dispatchEvent('pointerup')
-  return word?.trim() ?? ''
+  // Use evaluate to dispatch a proper PointerEvent with clientX set to
+  // the left side of the button (normal word, not duress).
+  const word = await page.evaluate(() => {
+    const btn = document.getElementById('hero-reveal-btn')
+    if (!btn) return ''
+    const rect = btn.getBoundingClientRect()
+    // Dispatch pointerdown on the left quarter (normal word)
+    btn.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true,
+      clientX: rect.left + rect.width * 0.25,
+      clientY: rect.top + rect.height / 2,
+      isPrimary: true,
+    }))
+    const wordEl = document.getElementById('hero-word')
+    const text = wordEl?.textContent?.trim() ?? ''
+    btn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }))
+    return text
+  })
+  return word
 }
 
 /** Type a word in the verify panel and click Verify. Returns the result status. */
@@ -446,6 +404,8 @@ export async function setEncodingFormat(
 ): Promise<void> {
   await openSettings(page)
   await page.click(`[data-enc="${format}"]`)
+  // Wait for the active state to update on the button (confirms re-render)
+  await page.waitForSelector(`[data-enc="${format}"].segmented__btn--active`, { timeout: 2000 })
 }
 
 // ── Sync ─────────────────────────────────────────────────────

@@ -181,7 +181,9 @@ export function assertInvitePayload(raw: unknown): asserts raw is InvitePayload 
  */
 /** @internal Exported for contract testing — not part of the public API. */
 export function inviteCanonicalBytes(payload: InvitePayload): Uint8Array {
-  const { inviterSig: _sig, memberNames: _names, ...rest } = payload
+  // Exclude inviterSig (being verified), memberNames (advisory), and relays
+  // (stripped by binary QR format) to ensure transport-agnostic signatures.
+  const { inviterSig: _sig, memberNames: _names, relays: _relays, ...rest } = payload
   const sorted = Object.keys(rest).sort().reduce((acc, key) => {
     acc[key] = (rest as Record<string, unknown>)[key]
     return acc
@@ -223,7 +225,11 @@ export function verifyInviteSig(payload: InvitePayload): boolean {
  */
 /** @internal Exported for contract testing — not part of the public API. */
 export function confirmCodeFromPayload(payload: InvitePayload): string {
-  const { nonce, ...rest } = payload
+  // Exclude nonce (used as HMAC key), relays, and memberNames from the hash.
+  // relays and memberNames are stripped by the binary QR format, so the confirm
+  // code must be transport-agnostic to match across JSON and binary invites.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { nonce, relays: _r, memberNames: _mn, ...rest } = payload
   const data = JSON.stringify(rest)
   const encoder = new TextEncoder()
   const mac = hmacSha256(hexToBytes(nonce), encoder.encode(data))

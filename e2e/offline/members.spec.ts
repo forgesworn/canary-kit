@@ -9,7 +9,8 @@ test.describe('Members panel', () => {
   })
 
   test('shows "You" for local identity', async ({ cleanPage: page }) => {
-    await expect(page.locator('.member-item__pubkey:text("You")')).toBeVisible()
+    // formatPubkey renders "Name (you)" or "You" via .member-item__name-btn
+    await expect(page.locator('.member-item__name-btn', { hasText: /you/i })).toBeVisible()
   })
 
   test('admin sees remove buttons', async ({ cleanPage: page }) => {

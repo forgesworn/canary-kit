@@ -254,7 +254,7 @@ test.describe('Settings panel', () => {
     await page.click('#reseed-btn')
 
     // Toast should confirm
-    await expect(page.locator('.toast')).toContainText('Key rotated')
+    await expect(page.locator('.toast', { hasText: 'Key rotated' })).toBeVisible()
 
     // Word should change (new seed)
     const wordAfter = await getDisplayedWord(page)
@@ -286,7 +286,7 @@ test.describe('Settings panel', () => {
     })
     await page.click('#compromise-reseed-btn')
 
-    await expect(page.locator('.toast')).toContainText('Emergency reseed')
+    await expect(page.locator('.toast', { hasText: 'Emergency reseed' })).toBeVisible()
     await page.waitForTimeout(300)
 
     const stateAfter = await getGroupState(page)

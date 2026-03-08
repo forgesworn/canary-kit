@@ -21,7 +21,7 @@ test.describe('Online sync: reseed', () => {
     // Wait for Alice's relay connection to be established
     await expect(pageA.locator('#relay-status')).toBeVisible({ timeout: 5000 })
 
-    const { payload, confirmCode } = await createInvite(pageA)
+    const { inviteUrl, confirmCode } = await createInvite(pageA)
 
     const ctxB = await browser.newContext({ baseURL })
     const pageB = await ctxB.newPage()
@@ -29,25 +29,13 @@ test.describe('Online sync: reseed', () => {
     await pageB.goto('/')
     await loginWithNsec(pageB, BOB_NSEC)
 
-    // Capture any errors from invite acceptance
-    let alertMessage = ''
-    pageB.on('dialog', async (dialog) => {
-      alertMessage = dialog.message()
-      await dialog.accept()
-    })
-
-    await pageB.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
-    })
-    await pageB.waitForSelector('#app-modal[open]')
-    await pageB.fill('[name="payload"]', payload)
-    await pageB.fill('[name="code"]', confirmCode)
-    await pageB.click('#modal-form button[type="submit"]')
-    await pageB.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
-
-    if (alertMessage) {
-      throw new Error(`Invite acceptance failed: ${alertMessage}`)
-    }
+    // Accept invite via binary join URL
+    const hash = new URL(inviteUrl).hash
+    await pageB.goto(`http://localhost:5173/${hash}`)
+    await pageB.waitForSelector('#binary-join-modal[open]', { timeout: 5000 })
+    await pageB.fill('#binary-join-confirm', confirmCode)
+    await pageB.click('#binary-join-accept')
+    await pageB.waitForSelector('#binary-join-modal:not([open])', { state: 'attached', timeout: 5000 })
 
     // Wait for Bob's relay connection to be fully established
     await expect(pageB.locator('#relay-status')).toBeVisible({ timeout: 5000 })

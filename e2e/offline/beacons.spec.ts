@@ -1,12 +1,13 @@
-// e2e/offline/beacons.spec.ts — Beacon panel tests (online mode group, no actual relay)
+// e2e/offline/beacons.spec.ts — Beacon panel tests
 import { test, expect } from '../fixtures.js'
 import { loginOffline, createGroup } from '../helpers.js'
 
 test.describe('Beacons panel', () => {
-  test('beacon panel hidden for offline groups', async ({ cleanPage: page }) => {
+  test('beacon panel shows "Map unavailable offline" without relay connection', async ({ cleanPage: page }) => {
     await loginOffline(page, 'Tester')
     await createGroup(page, 'Offline Group', { mode: 'offline' })
-    await expect(page.locator('#beacon-container')).toBeHidden()
+    // Beacon panel is always rendered but shows offline message when relay is unreachable
+    await expect(page.locator('#beacon-container')).toContainText('Map unavailable offline')
   })
 
   test('beacon panel visible for online groups', async ({ cleanPage: page }) => {

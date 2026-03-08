@@ -26,7 +26,7 @@ test.describe('Online sync: join', () => {
     await pageA.waitForTimeout(1000)
 
     // User A creates invite
-    const { payload, confirmCode } = await createInvite(pageA)
+    const { inviteUrl, confirmCode } = await createInvite(pageA)
 
     // User B: create context, seed relay, login, accept invite
     const ctxB = await browser.newContext({ baseURL })
@@ -35,27 +35,13 @@ test.describe('Online sync: join', () => {
     await pageB.goto('/')
     await loginWithNsec(pageB, BOB_NSEC)
 
-    // Capture any errors from invite acceptance
-    let alertMessage = ''
-    pageB.on('dialog', async (dialog) => {
-      alertMessage = dialog.message()
-      await dialog.accept()
-    })
-
-    // Accept invite via modal
-    await pageB.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
-    })
-    await pageB.waitForSelector('#app-modal[open]')
-    await pageB.fill('[name="payload"]', payload)
-    await pageB.fill('[name="code"]', confirmCode)
-    await pageB.click('#modal-form button[type="submit"]')
-    await pageB.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
-
-    // Fail fast if invite acceptance showed an error
-    if (alertMessage) {
-      throw new Error(`Invite acceptance failed: ${alertMessage}`)
-    }
+    // Accept invite via binary join URL
+    const hash = new URL(inviteUrl).hash
+    await pageB.goto(`http://localhost:5173/${hash}`)
+    await pageB.waitForSelector('#binary-join-modal[open]', { timeout: 5000 })
+    await pageB.fill('#binary-join-confirm', confirmCode)
+    await pageB.click('#binary-join-accept')
+    await pageB.waitForSelector('#binary-join-modal:not([open])', { state: 'attached', timeout: 5000 })
 
     // Both should see the group
     await expect(pageB.locator('.group-list__name')).toHaveText('Synced Team')

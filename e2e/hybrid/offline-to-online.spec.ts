@@ -3,24 +3,25 @@ import { test, expect } from '../fixtures.js'
 import { loginOffline, createGroup, seedRelayUrl } from '../helpers.js'
 
 test.describe('Hybrid: offline to online', () => {
-  test('group created without relay works offline, gains online features when relay added', async ({
+  test('group created without relay shows offline message, gains online features when relay added', async ({
     cleanPage: page,
     mockRelay,
   }) => {
     await loginOffline(page, 'Alice')
-    await createGroup(page, 'Hybrid Group', { mode: 'offline' })
+    await createGroup(page, 'Hybrid Group')
 
-    // Verify offline — beacon container hidden
-    await expect(page.locator('#beacon-container')).toBeHidden()
-    await expect(page.locator('#liveness-container')).toBeHidden()
+    // Beacon panel shows but with offline message (relay not connected)
+    await expect(page.locator('#beacon-container')).toContainText('Map unavailable', { timeout: 5000 })
 
-    // Add relay to the group's relays array (not just settings) and reload
+    // Add relay to the group's relays array and reload
     await page.addInitScript((relayUrl: string) => {
       const raw = localStorage.getItem('canary:groups')
       if (!raw) return
       const groups = JSON.parse(raw)
-      for (const g of Object.values(groups) as Array<{ relays?: string[] }>) {
+      for (const g of Object.values(groups) as Array<{ relays?: string[]; readRelays?: string[]; writeRelays?: string[] }>) {
         g.relays = [relayUrl]
+        g.readRelays = [relayUrl]
+        g.writeRelays = [relayUrl]
       }
       localStorage.setItem('canary:groups', JSON.stringify(groups))
     }, mockRelay.url)

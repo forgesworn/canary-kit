@@ -47,7 +47,7 @@ import { showDuressAlert } from './components/duress-alert.js'
 import { escapeHtml } from './utils/escape.js'
 import { base64ToJson, base64urlToJson, base64urlToBytes, jsonToBase64 } from './utils/base64.js'
 import { unpackInvite } from './utils/binary-invite.js'
-import { acceptInvite } from './invite.js'
+import { acceptInvite, isInviteConsumed, consumeInvite } from './invite.js'
 import type { AppIdentity } from './types.js'
 
 /** Allow wss:// relays, plus ws:// only for localhost development. */
@@ -547,6 +547,11 @@ function showBinaryJoinScreen(b64url: string): void {
         const payload = jsonToBase64(invite)
         const validated = acceptInvite(payload, words)
 
+        // Replay protection — reject already-consumed nonces
+        if (isInviteConsumed(validated.groupId, validated.nonce)) {
+          throw new Error('This invite has already been used.')
+        }
+
         // Build AppGroup from the validated invite
         const id = validated.groupId
         const { groups: existingGroups } = getState()
@@ -589,6 +594,7 @@ function showBinaryJoinScreen(b64url: string): void {
 
         const groups = { ...existingGroups, [id]: appGroup }
         update({ groups, activeGroupId: id })
+        consumeInvite(id, validated.nonce)
         flushPersist()
 
         // Boot relay sync if available

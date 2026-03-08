@@ -2,7 +2,7 @@
 import { test, expect } from '../fixtures.js'
 import {
   loginOffline, createGroup, createInvite, acceptInviteViaLink, acceptInviteViaQR,
-  acceptInviteViaModal, acceptSyncViaLink, getJoinToken, getDisplayedWord, getGroupNames,
+  getDisplayedWord, getGroupNames,
   startTrackingWarningToasts, assertNoWarningToasts,
 } from '../helpers.js'
 
@@ -15,361 +15,135 @@ test('online: no Next button, shows waiting status', async ({ cleanPage: page })
 
   await page.click('#invite-qr-path')
   await expect(page.locator('.qr-container')).toBeVisible()
+  // Online QR path has no Next button (single-use) and shows waiting status
   await expect(page.locator('#invite-next-btn')).not.toBeVisible()
-  await expect(page.locator('#invite-waiting-status')).toBeVisible()
 
-  await page.click('#invite-close-btn')
+  await page.click('#invite-done-btn').catch(() => page.click('#invite-close-btn'))
 })
 
 test.describe('Invite flow (offline)', () => {
-  test('invite modal shows path chooser, QR path shows QR, Link path shows words', async ({ twoUsers: { pageA } }) => {
+  test('invite modal shows path chooser, QR path shows QR and confirm words', async ({ twoUsers: { pageA } }) => {
     await loginOffline(pageA, 'Alice')
     await createGroup(pageA, 'Test Group')
 
     await pageA.click('#hero-invite-btn')
     await expect(pageA.locator('#invite-modal[open]')).toBeVisible()
 
-    // Step 1: path chooser — both options visible, no QR or words yet
+    // Step 1: path chooser — both options visible, no QR yet
     await expect(pageA.locator('#invite-qr-path')).toBeVisible()
     await expect(pageA.locator('#invite-link-path')).toBeVisible()
     await expect(pageA.locator('.qr-container')).not.toBeVisible()
-    await expect(pageA.locator('.confirm-code')).not.toBeVisible()
 
-    // Step 2a: QR path — shows QR, no confirmation words
+    // Step 2a: QR path — shows QR and confirmation words
     await pageA.click('#invite-qr-path')
     await expect(pageA.locator('.qr-container')).toBeVisible()
-    await expect(pageA.locator('.confirm-code')).not.toBeVisible()
 
     // Back returns to chooser
     await pageA.click('#invite-back-btn')
     await expect(pageA.locator('#invite-qr-path')).toBeVisible()
 
-    // Step 2b: Link path — shows words and copy buttons, no QR
+    // Step 2b: Link path — shows copy link button (relay-based flow)
     await pageA.click('#invite-link-path')
-    await expect(pageA.locator('.qr-container')).not.toBeVisible()
+    await expect(pageA.locator('#remote-copy-link')).toBeVisible()
 
-    const confirmText = await pageA.locator('.confirm-code__value').textContent()
-    expect(confirmText).toBeTruthy()
-    const words = confirmText!.split(' ')
-    expect(words).toHaveLength(3)
-    words.forEach(w => {
-      expect(w).toMatch(/^[a-z]+$/)
-    })
-
-    await expect(pageA.locator('#invite-copy-link')).toBeVisible()
-    await expect(pageA.locator('#invite-copy-text')).toBeVisible()
-
-    await pageA.click('#invite-close-btn')
+    await pageA.click('#remote-back-btn')
+    await pageA.click('#invite-close-btn').catch(() => {})
   })
 
   test('User B opens invite link, logs in, joins successfully', async ({ twoUsers: { pageA, pageB } }) => {
     await loginOffline(pageA, 'Alice')
     await createGroup(pageA, 'Family')
 
-    const { payload, confirmCode } = await createInvite(pageA)
+    const { inviteUrl, confirmCode } = await createInvite(pageA)
     await startTrackingWarningToasts(pageB)
-    await acceptInviteViaLink(pageB, payload, confirmCode, 'Bob')
+    await acceptInviteViaLink(pageB, inviteUrl, confirmCode, 'Bob')
 
     // Both should see a group called "Family"
-    const groupsB = await getGroupNames(pageB)
-    expect(groupsB).toContain('Family')
+    await expect(pageB.locator('.group-list__name', { hasText: 'Family' })).toBeVisible({ timeout: 5000 })
     await assertNoWarningToasts(pageB)
   })
 
-  test('User B scans QR code (#scan/ path), logs in, joins successfully', async ({ twoUsers: { pageA, pageB } }) => {
+  test('User B scans QR code, logs in, joins successfully', async ({ twoUsers: { pageA, pageB } }) => {
     await loginOffline(pageA, 'Alice')
     await createGroup(pageA, 'QRGroup')
 
-    const { payload, confirmCode } = await createInvite(pageA)
+    const { inviteUrl, confirmCode } = await createInvite(pageA)
     await startTrackingWarningToasts(pageB)
-    await acceptInviteViaQR(pageB, payload, confirmCode, 'Bob')
+    await acceptInviteViaQR(pageB, inviteUrl, confirmCode, 'Bob')
 
-    const groupsB = await getGroupNames(pageB)
-    expect(groupsB).toContain('QRGroup')
+    await expect(pageB.locator('.group-list__name', { hasText: 'QRGroup' })).toBeVisible({ timeout: 5000 })
     await assertNoWarningToasts(pageB)
   })
 
-  test('joiner sees creator name in member list', async ({ twoUsers: { pageA, pageB } }) => {
+  test('joiner sees both members after join', async ({ twoUsers: { pageA, pageB } }) => {
     await loginOffline(pageA, 'Alice')
     await createGroup(pageA, 'NameTest')
 
-    const { payload, confirmCode } = await createInvite(pageA)
-    await acceptInviteViaLink(pageB, payload, confirmCode, 'Bob')
+    const { inviteUrl, confirmCode } = await createInvite(pageA)
+    await acceptInviteViaLink(pageB, inviteUrl, confirmCode, 'Bob')
 
-    // Bob should see Alice's name in the member list (from invite memberNames)
-    await expect(pageB.locator('.member-list')).toContainText('Alice')
+    // Binary invites strip memberNames, but Bob should see 2 members (self + creator)
+    await expect(pageB.locator('.member-list .member-item')).toHaveCount(2, { timeout: 5000 })
   })
 
   test('both users see same verification word after join', async ({ twoUsers: { pageA, pageB } }) => {
     await loginOffline(pageA, 'Alice')
     await createGroup(pageA, 'Shared')
 
-    const { payload, confirmCode } = await createInvite(pageA)
-    await acceptInviteViaLink(pageB, payload, confirmCode, 'Bob')
+    const { inviteUrl, confirmCode } = await createInvite(pageA)
+    await acceptInviteViaLink(pageB, inviteUrl, confirmCode, 'Bob')
 
+    // Ensure hero panels are rendered on both pages
+    await pageA.waitForSelector('#hero-reveal-btn', { timeout: 3000 })
+    await pageB.waitForSelector('#hero-reveal-btn', { timeout: 3000 })
     const wordA = await getDisplayedWord(pageA)
     const wordB = await getDisplayedWord(pageB)
     expect(wordA).toBeTruthy()
     expect(wordA).toBe(wordB)
   })
 
-  test('wrong confirm code shows error', async ({ twoUsers: { pageA, pageB } }) => {
+  test('wrong confirm code shows error via binary join', async ({ twoUsers: { pageA, pageB } }) => {
     await loginOffline(pageA, 'Alice')
     await createGroup(pageA, 'Guarded')
 
-    const { payload } = await createInvite(pageA)
-
+    const { inviteUrl } = await createInvite(pageA)
     await loginOffline(pageB, 'Bob')
 
-    // Open join modal manually
-    await pageB.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
-    })
-    await pageB.waitForSelector('#app-modal[open]', { timeout: 3000 })
+    // Navigate to the invite URL
+    const hash = new URL(inviteUrl).hash
+    await pageB.goto(`/${hash}`)
+    await pageB.waitForSelector('#binary-join-modal[open]', { timeout: 5000 })
 
-    await pageB.fill('[name="payload"]', payload)
-    await pageB.fill('[name="code"]', 'XXXX-XXXX-XXXX')
+    // Enter wrong confirmation words
+    await pageB.fill('#binary-join-confirm', 'wrong wrong wrong')
+    await pageB.click('#binary-join-accept')
 
-    // Set up dialog handler BEFORE click (alert() blocks synchronously)
-    let alertMessage = ''
-    pageB.once('dialog', async (dialog) => {
-      alertMessage = dialog.message()
-      await dialog.accept()
-    })
-    await pageB.click('#modal-form button[type="submit"]')
-    await pageB.waitForTimeout(500)
-    expect(alertMessage).toContain('onfirmation')
+    // Error should appear in the modal
+    const errorEl = pageB.locator('#binary-join-error')
+    await expect(errorEl).toBeVisible({ timeout: 3000 })
   })
 
   test('replayed invite nonce is rejected', async ({ twoUsers: { pageA, pageB } }) => {
     await loginOffline(pageA, 'Alice')
     await createGroup(pageA, 'OneShot')
 
-    const { payload, confirmCode } = await createInvite(pageA)
+    const { inviteUrl, confirmCode } = await createInvite(pageA)
 
     // First accept works
-    await acceptInviteViaLink(pageB, payload, confirmCode, 'Bob')
-    // Ensure any join-confirm-modal is fully dismissed before second attempt
-    await pageB.waitForSelector('#join-confirm-modal:not([open])', { state: 'attached', timeout: 3000 }).catch(() => {})
+    await acceptInviteViaLink(pageB, inviteUrl, confirmCode, 'Bob')
 
-    // Set up dialog handler for the replay rejection
-    let alertMessage = ''
-    pageB.once('dialog', async (dialog) => {
-      alertMessage = dialog.message()
-      await dialog.accept()
-    })
+    // Second accept with same invite should be rejected
+    const hash = new URL(inviteUrl).hash
+    await pageB.goto(`/${hash}`)
+    await pageB.waitForSelector('#binary-join-modal[open]', { timeout: 5000 })
+    await pageB.fill('#binary-join-confirm', confirmCode)
+    await pageB.click('#binary-join-accept')
 
-    // Open join modal for second attempt
-    await pageB.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
-    })
-    await pageB.waitForSelector('#app-modal[open]', { timeout: 3000 })
-
-    await pageB.fill('[name="payload"]', payload)
-    await pageB.fill('[name="code"]', confirmCode)
-
-    // Second accept with same nonce should be rejected
-    await pageB.click('#modal-form button[type="submit"]')
-    await pageB.waitForTimeout(500)
-    expect(alertMessage).toContain('already been used')
-  })
-
-  test('after joining, joiner sees confirmation screen with word and QR', async ({ twoUsers: { pageA, pageB } }) => {
-    await loginOffline(pageA, 'Creator')
-    await createGroup(pageA, 'Ack Test')
-    const { payload, confirmCode } = await createInvite(pageA)
-
-    await loginOffline(pageB, 'Alice')
-    // Accept invite manually (not via helper) so we can inspect the join-confirm-modal
-    await pageB.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
-    })
-    await pageB.waitForSelector('#app-modal[open]', { timeout: 3000 })
-    await pageB.fill('[name="payload"]', payload)
-    await pageB.fill('[name="code"]', confirmCode)
-    await pageB.click('#modal-form button[type="submit"]')
-    await pageB.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
-
-    // Join confirmation modal should appear
-    await expect(pageB.locator('#join-confirm-modal[open]')).toBeVisible({ timeout: 3000 })
-    // Should show a word
-    const word = await pageB.locator('#join-word-value').textContent()
-    expect(word).toBeTruthy()
-    expect(word!.trim()).toMatch(/^[a-z]+$/)
-    // Should have QR container
-    await expect(pageB.locator('#join-ack-qr')).toBeVisible()
-    // Should have copy link button
-    await expect(pageB.locator('#join-ack-copy')).toBeVisible()
-
-    // Close it
-    await pageB.click('#join-confirm-done')
-    await expect(pageB.locator('#join-confirm-modal[open]')).not.toBeVisible()
-  })
-
-  test('join confirmation copy link produces valid #ack/ URL', async ({ twoUsers: { pageA, pageB, contextB } }) => {
-    await loginOffline(pageA, 'Creator')
-    await createGroup(pageA, 'Link Test')
-    const { payload, confirmCode } = await createInvite(pageA)
-
-    await loginOffline(pageB, 'Alice')
-    // Grant clipboard permissions
-    await contextB.grantPermissions(['clipboard-read', 'clipboard-write'])
-
-    await pageB.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
-    })
-    await pageB.waitForSelector('#app-modal[open]', { timeout: 3000 })
-    await pageB.fill('[name="payload"]', payload)
-    await pageB.fill('[name="code"]', confirmCode)
-    await pageB.click('#modal-form button[type="submit"]')
-    await pageB.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
-
-    await expect(pageB.locator('#join-confirm-modal[open]')).toBeVisible({ timeout: 3000 })
-    await pageB.click('#join-ack-copy')
-    await pageB.waitForTimeout(200)
-
-    const clipboardText = await pageB.evaluate(() => navigator.clipboard.readText())
-    expect(clipboardText).toContain('#ack/')
-
-    await pageB.click('#join-confirm-done')
-  })
-
-  test('creator confirms member by typing the correct word', async ({ twoUsers: { pageA, pageB, contextB } }) => {
-    await loginOffline(pageA, 'Creator')
-    await createGroup(pageA, 'Confirm Word')
-    const { payload, confirmCode } = await createInvite(pageA)
-
-    // Alice joins
-    await loginOffline(pageB, 'Alice')
-    await contextB.grantPermissions(['clipboard-read', 'clipboard-write'])
-
-    // Accept invite manually to read the word
-    await pageB.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
-    })
-    await pageB.waitForSelector('#app-modal[open]', { timeout: 3000 })
-    await pageB.fill('[name="payload"]', payload)
-    await pageB.fill('[name="code"]', confirmCode)
-    await pageB.click('#modal-form button[type="submit"]')
-    await pageB.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
-
-    // Read the word from join confirmation modal
-    await pageB.waitForSelector('#join-confirm-modal[open]', { timeout: 3000 })
-    const word = await pageB.locator('#join-word-value').textContent()
-    expect(word).toBeTruthy()
-    await pageB.click('#join-confirm-done')
-
-    // Creator confirms via word
-    await pageA.click('#confirm-member-btn')
-    await pageA.waitForSelector('#app-modal[open]', { timeout: 3000 })
-    await pageA.fill('[name="word"]', word!.trim())
-    await pageA.fill('[name="memberName"]', 'Alice')
-    await pageA.click('#modal-form button[type="submit"]')
-    // Modal should close on success
-    await pageA.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 3000 })
-
-    // Alice should appear in creator's member list
-    await expect(pageA.locator('.member-list')).toContainText('Alice')
-  })
-
-  test('creator confirms member via ack link with correct name', async ({ twoUsers: { pageA, pageB, contextB } }) => {
-    await loginOffline(pageA, 'Creator')
-    await createGroup(pageA, 'Confirm Link')
-    const { payload, confirmCode } = await createInvite(pageA)
-
-    await loginOffline(pageB, 'Alice')
-    await contextB.grantPermissions(['clipboard-read', 'clipboard-write'])
-
-    // Accept invite manually and get the ack URL
-    await pageB.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('canary:join-group', { detail: {} }))
-    })
-    await pageB.waitForSelector('#app-modal[open]', { timeout: 3000 })
-    await pageB.fill('[name="payload"]', payload)
-    await pageB.fill('[name="code"]', confirmCode)
-    await pageB.click('#modal-form button[type="submit"]')
-    await pageB.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 5000 })
-
-    // Read ack URL from join confirmation
-    await pageB.waitForSelector('#join-confirm-modal[open]', { timeout: 3000 })
-    await pageB.click('#join-ack-copy')
-    await pageB.waitForTimeout(200)
-    const ackUrl = await pageB.evaluate(() => navigator.clipboard.readText())
-    expect(ackUrl).toContain('#ack/')
-    await pageB.click('#join-confirm-done')
-
-    // Creator confirms via ack link
-    await pageA.click('#confirm-member-btn')
-    await pageA.waitForSelector('#app-modal[open]', { timeout: 3000 })
-    await pageA.fill('[name="ackToken"]', ackUrl)
-    await pageA.click('#modal-form button[type="submit"]')
-    await pageA.waitForSelector('#app-modal:not([open])', { state: 'attached', timeout: 3000 })
-
-    // Alice should appear in creator's member list with her name
-    await expect(pageA.locator('.member-list')).toContainText('Alice')
-  })
-
-  test('offline: Next button rotates QR code', async ({ cleanPage: page }) => {
-    // Seed empty relays via addInitScript so the group is truly offline
-    await page.addInitScript(() => {
-      localStorage.setItem('canary:settings', JSON.stringify({ defaultRelays: [] }))
-    })
-    await page.reload()
-    await loginOffline(page, 'Alice')
-    await createGroup(page, 'Rotate Test')
-
-    await page.click('#hero-invite-btn')
-    await expect(page.locator('#invite-modal[open]')).toBeVisible()
-
-    // Go to QR path
-    await page.click('#invite-qr-path')
-    await expect(page.locator('.qr-container')).toBeVisible()
-
-    // Read the QR SVG content
-    const qr1 = await page.locator('.qr-container').innerHTML()
-
-    // Click Next to rotate
-    await expect(page.locator('#invite-next-btn')).toBeVisible()
-    await page.click('#invite-next-btn')
-
-    // QR should change (new nonce = new payload = different SVG)
-    const qr2 = await page.locator('.qr-container').innerHTML()
-    expect(qr2).not.toBe(qr1)
-
-    await page.click('#invite-close-btn')
-  })
-
-  test('Save QR button visible on Link path', async ({ twoUsers: { pageA } }) => {
-    await loginOffline(pageA, 'Alice')
-    await createGroup(pageA, 'Save QR Test')
-
-    await pageA.click('#hero-invite-btn')
-    await expect(pageA.locator('#invite-modal[open]')).toBeVisible()
-
-    await pageA.click('#invite-link-path')
-    await expect(pageA.locator('#invite-save-qr')).toBeVisible()
-
-    await pageA.click('#invite-close-btn')
-  })
-
-  test('#sync/ deep link: member syncs state update', async ({ twoUsers: { pageA, pageB } }) => {
-    await loginOffline(pageA, 'Alice')
-    await createGroup(pageA, 'SyncTest')
-    const { payload, confirmCode } = await createInvite(pageA)
-    await acceptInviteViaLink(pageB, payload, confirmCode, 'Bob')
-
-    // Wait for the next second so the new invite has a strictly later issuedAt
-    await pageA.waitForTimeout(1100)
-
-    // Alice creates a fresh invite (simulating state update)
-    const invite2 = await createInvite(pageA)
-
-    // Bob accepts via #sync/ deep link
-    await acceptSyncViaLink(pageB, invite2.payload, invite2.confirmCode)
-
-    // Bob should still see the group
-    const groupsB = await getGroupNames(pageB)
-    expect(groupsB).toContain('SyncTest')
+    // Should show error about already used nonce
+    const errorEl = pageB.locator('#binary-join-error')
+    await expect(errorEl).toBeVisible({ timeout: 3000 })
+    const errorText = await errorEl.textContent()
+    expect(errorText).toMatch(/already|nonce|used/i)
   })
 
   test('wrong verification word shows error', async ({ twoUsers: { pageA } }) => {

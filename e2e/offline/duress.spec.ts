@@ -19,30 +19,31 @@ test.describe('Duress panel', () => {
   })
 
   test('hold-to-reveal shows duress word', async ({ cleanPage: page }) => {
-    const holdBtn = page.locator('#duress-hold-btn')
-    await holdBtn.dispatchEvent('pointerdown')
-    await page.waitForTimeout(600) // duress reveal has a delay
-
-    const duressWord = page.locator('#duress-word')
-    await expect(duressWord).not.toHaveClass(/duress-word--masked/)
-    const text = await duressWord.textContent()
+    // Dispatch pointerdown and immediately read text (before any re-render can mask it)
+    const text = await page.evaluate(() => {
+      const btn = document.getElementById('duress-hold-btn')
+      btn?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, isPrimary: true }))
+      const wordText = document.getElementById('duress-word')?.textContent?.trim() ?? ''
+      btn?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }))
+      return wordText
+    })
     expect(text).toBeTruthy()
     expect(text).not.toMatch(/^[•]+$/)
-
-    await holdBtn.dispatchEvent('pointerup')
   })
 
   test('duress word differs from verification word', async ({ cleanPage: page }) => {
     const verificationWord = await getDisplayedWord(page)
 
-    // Reveal duress word
-    const holdBtn = page.locator('#duress-hold-btn')
-    await holdBtn.dispatchEvent('pointerdown')
-    await page.waitForTimeout(600)
-    const duressWord = await page.locator('#duress-word').textContent()
-    await holdBtn.dispatchEvent('pointerup')
+    // Reveal duress word via proper PointerEvent
+    const duressWord = await page.evaluate(() => {
+      const btn = document.getElementById('duress-hold-btn')
+      btn?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, isPrimary: true }))
+      const text = document.getElementById('duress-word')?.textContent?.trim() ?? ''
+      btn?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }))
+      return text
+    })
 
     expect(duressWord).toBeTruthy()
-    expect(duressWord!.trim()).not.toBe(verificationWord)
+    expect(duressWord).not.toBe(verificationWord)
   })
 })
