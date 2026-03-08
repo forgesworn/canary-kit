@@ -37,7 +37,7 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
   })
 
   await Promise.all([
-    narrate('CANARY is a verification protocol. Create a group. Name it. Two taps.'),
+    narrate('CANARY is a verification protocol. Create a group, name it, pick a preset, and go.'),
     (async () => {
       await clickElement(alice, '#welcome-create', { moveDuration: 300 })
       await alice.waitForTimeout(200)
@@ -84,6 +84,15 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
     for (const group of Object.values(mergedGroups)) {
       if (bobPubkey && !group.members.includes(bobPubkey)) {
         group.members.push(bobPubkey)
+      }
+      // Ensure both members have human-readable names for call verify UI
+      if (bobPubkey) {
+        group.memberNames = group.memberNames || {}
+        group.memberNames[bobPubkey] = 'Bob'
+      }
+      if (aliceGroupData.alicePubkey) {
+        group.memberNames = group.memberNames || {}
+        group.memberNames[aliceGroupData.alicePubkey] = group.memberNames[aliceGroupData.alicePubkey] || 'Alice'
       }
     }
     const mergedGroupsJson = JSON.stringify(mergedGroups)
@@ -152,33 +161,15 @@ export default async function extended({ alice, bob }, { narrate, pause, waitFor
     })(),
   ])
 
-  // ── Act 6: Duress build-up (~12s) ──────────────────────────
+  // ── Act 6: Duress (~20s) ────────────────────────────────────
+  // No duress panel shown — that would reveal the duress word, defeating the
+  // purpose. Instead we narrate the concept, then silently read the duress word
+  // via a quick right-side reveal and type it into verify.
 
-  await Promise.all([
-    narrate('Now here\'s what no other protocol does. Every member gets a personal duress word. If someone forces you to verify — you speak the duress word instead. Hold for three seconds to arm it.'),
-    (async () => {
-      await alice.evaluate(() => {
-        const el = document.querySelector('#duress-container')
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      })
-      await alice.waitForTimeout(200)
-      const duressBtn = alice.locator('#duress-hold-btn').first()
-      if (await duressBtn.isVisible().catch(() => false)) {
-        await pressAndHold(alice, '#duress-hold-btn', { moveDuration: 200, holdDuration: 3500 })
-        await alice.waitForTimeout(200)
-      }
-    })(),
-  ])
+  await narrate('Now here\'s what no other protocol does. Every member has a personal duress word — derived from the same secret, but different from the verification word. If someone forces you to verify, you speak the duress word instead.')
+  await pause(200)
 
-  // ── Act 7: Duress payoff (~12s) ────────────────────────────
-
-  // Scroll back up and read Alice's duress word
-  await alice.evaluate(() => {
-    const el = document.querySelector('#hero-container')
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  })
-  await alice.waitForTimeout(200)
-
+  // Briefly reveal duress word (right side) — too quick for viewer to read
   await pressAndHold(alice, '#hero-reveal-btn', { moveDuration: 100, holdDuration: 250, side: 'right' })
   const duressWord = await alice.evaluate(() =>
     document.querySelector('.hero__word')?.textContent?.trim() || ''

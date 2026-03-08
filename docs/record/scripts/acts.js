@@ -46,6 +46,7 @@ export async function actLogin(page, { pause, waitForIdle }, name = 'Alice') {
     const dialog = document.querySelector('#nsec-backup-modal') || document.querySelector('#recovery-phrase-modal')
     if (dialog && dialog.open) dialog.close()
   })
+  await page.waitForTimeout(200)
 }
 
 // ── Act 1.5b: Login (demo account) ───────────────────────────
@@ -261,6 +262,14 @@ export async function actClose(page, { narrate, pause }) {
 // ── Act: Cold Open (duress alert) ──────────────────────────
 
 export async function actColdOpen({ alice, bob }, { narrate, pause }) {
+  // Cover Alice's screen — only Bob's alert should be visible
+  await showOverlay(alice, {
+    title: '',
+    subtitle: '',
+    background: 'rgba(0, 0, 0, 1)',
+    duration: 1,
+  })
+
   await bob.evaluate(() => {
     const overlay = document.createElement('div')
     overlay.className = 'duress-overlay'
@@ -296,6 +305,7 @@ export async function actColdOpen({ alice, bob }, { narrate, pause }) {
       setTimeout(() => overlay.remove(), 300)
     }
   })
+  await hideOverlay(alice)
   await pause(200)
 }
 
