@@ -118,5 +118,9 @@
     "vite-plugin-singlefile": "^2.3.0",
     "vitest": "^3.0.0",
     "ws": "^8.19.0"
+  },
+  "dependencies": {
+    "@scure/bip32": "^2.0.1",
+    "@scure/bip39": "^2.0.1"
   }
 }
