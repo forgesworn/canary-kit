@@ -26,7 +26,6 @@ import { createNewGroup } from './actions/groups.js'
 import { groupMode, allRelaysForGroup, WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY } from './types.js'
 import { renderWelcome } from './panels/welcome.js'
 import { renderHero } from './panels/hero.js'
-import { renderDuress } from './panels/duress.js'
 import { renderVerify } from './panels/verify.js'
 import { renderMembers, showInviteModal } from './panels/members.js'
 import { renderBeacons, handleIncomingBeacon } from './panels/beacons.js'
@@ -86,7 +85,7 @@ function resetAutoLockTimer(): void {
   }
 
   const { settings } = getState()
-  if (!settings.pinEnabled || settings.autoLockMinutes <= 0) return
+  if (!settings.pinEnabled || settings.autoLockMinutes <= 0 || !hasPinSalt()) return
 
   _autoLockTimer = setTimeout(() => {
     clearPinKey()
@@ -219,12 +218,9 @@ function buildShell(): void {
       <main class="content" id="content">
         <div id="welcome-container"></div>
         <div id="hero-container"></div>
-        <div id="duress-container"></div>
         <div id="duress-alert-banner" hidden></div>
-        <div class="panels-grid">
-          <div id="verify-container"></div>
-          <div id="members-container"></div>
-        </div>
+        <div id="members-container"></div>
+        <div id="verify-container"></div>
         <div id="beacon-container"></div>
         <div id="liveness-container"></div>
         <div id="settings-container"></div>
@@ -319,9 +315,6 @@ function render(): void {
 
     const hero = document.getElementById('hero-container')
     if (hero) renderHero(hero)
-
-    const duress = document.getElementById('duress-container')
-    if (duress) renderDuress(duress)
 
     const verify = document.getElementById('verify-container')
     if (verify) renderVerify(verify)

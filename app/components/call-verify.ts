@@ -3,6 +3,7 @@
 import { createSession, SESSION_PRESETS } from 'canary-kit/session'
 import { getState } from '../state.js'
 import { escapeHtml } from '../utils/escape.js'
+import { getCachedProfile } from '../nostr/profiles.js'
 
 /** Cleanup function for the current overlay (timer + keydown listener). */
 let activeCleanup: (() => void) | null = null
@@ -35,6 +36,7 @@ export function showCallVerify(groupId: string, theirPubkey: string): void {
 
   const myPubkey = identity.pubkey
   const theirName = memberName(theirPubkey, groupId)
+  const theirProfile = getCachedProfile(theirPubkey)
 
   // Create directional session: roles sorted for determinism
   const roles: [string, string] = myPubkey < theirPubkey
@@ -59,6 +61,7 @@ export function showCallVerify(groupId: string, theirPubkey: string): void {
 
   overlay.innerHTML = `
     <div class="call-verify__content">
+      ${theirProfile?.picture ? `<img class="call-verify__avatar" src="${escapeHtml(theirProfile.picture)}" alt="" />` : ''}
       <h2 class="call-verify__title">Call with ${escapeHtml(theirName)}</h2>
       <p class="call-verify__instruction">Speak your word. Listen for theirs. If it matches, the call is verified.</p>
 

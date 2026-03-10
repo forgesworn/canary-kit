@@ -631,6 +631,13 @@ select.input option {
   font-family: var(--font-mono);
 }
 
+.hero__hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0.75rem 0 0;
+  text-align: center;
+}
+
 /* ── .hero__encoding ─────────────────────────────────────── */
 
 .hero__encoding {
@@ -2158,6 +2165,14 @@ select.input option {
   max-width: 400px;
   padding: 2rem;
   width: 100%;
+}
+
+.call-verify__avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 0.75rem;
 }
 
 .call-verify__title {

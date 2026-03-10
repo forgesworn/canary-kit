@@ -3,7 +3,7 @@
 import type { SyncTransport, SyncMessage } from 'canary-kit/sync'
 import { applySyncMessage, FIRE_AND_FORGET_FRESHNESS_SEC } from 'canary-kit/sync'
 import { getState, updateGroup } from './state.js'
-import { connectRelays, isConnected, getRelayCount } from './nostr/connect.js'
+import { connectRelays, isConnected, getRelayCount, waitForConnection } from './nostr/connect.js'
 import { GroupSigner } from './nostr/signer.js'
 import { NostrSyncTransport } from './nostr/adapter.js'
 import { updateRelayStatus, flashSyncing } from './components/header.js'
@@ -87,8 +87,8 @@ export async function ensureTransport(readRelays: string[], writeRelays?: string
       }
     }
 
-    // Delay status update slightly so verifyConnection() has time to run
-    setTimeout(() => updateRelayStatus(isConnected(), getRelayCount()), 1000)
+    // Wait for relay connections to establish before updating status
+    waitForConnection().then(() => updateRelayStatus(isConnected(), getRelayCount()))
   } catch (err) {
     console.warn('[canary:sync] ensureTransport failed:', err)
     updateRelayStatus(false, 0)

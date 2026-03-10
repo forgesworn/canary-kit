@@ -38,9 +38,9 @@ function memberHue(pubkey: string, members: string[]): number {
 function memberColourDot(pubkey: string, members: string[], livenessCheckins: Record<string, number>, livenessInterval: number): string {
   const hue = memberHue(pubkey, members)
   const lastCheckin = livenessCheckins[pubkey] ?? 0
-  if (lastCheckin === 0) return `hsl(${hue}, 20%, 50%)` // desaturated — never checked in
+  if (lastCheckin === 0) return `hsl(${hue}, 55%, 55%)` // no checkin data — show neutral member colour
   const elapsed = Math.floor(Date.now() / 1000) - lastCheckin
-  if (elapsed <= livenessInterval) return `hsl(${hue}, 70%, 55%)` // vibrant
+  if (elapsed <= livenessInterval) return `hsl(${hue}, 70%, 55%)` // vibrant — active
   if (elapsed <= livenessInterval * 1.25) return `hsl(${hue}, 40%, 50%)` // fading
   return '#94a3b8' // grey — missed
 }
