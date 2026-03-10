@@ -1255,9 +1255,7 @@ function showLoginScreen(): void {
             <button class="btn btn--primary" type="submit">Login with nsec</button>
           </form>
 
-          ${hasNip07() ? `
-            <button class="btn" id="login-nip07" type="button" style="width: 100%; margin-top: 0.5rem;">Use Browser Extension</button>
-          ` : ''}
+          <button class="btn" id="login-nip07" type="button" style="width: 100%; margin-top: 0.5rem;">Use Browser Extension (NIP-07)</button>
 
           <details style="margin-top: 0.75rem;">
             <summary class="settings-hint" style="cursor: pointer; user-select: none;">Relays</summary>
@@ -1387,6 +1385,10 @@ function showLoginScreen(): void {
 
   // NIP-07 extension
   app.querySelector('#login-nip07')?.addEventListener('click', async () => {
+    if (!hasNip07()) {
+      alert('No Nostr extension found. Install Alby, nos2x, or another NIP-07 extension and reload.')
+      return
+    }
     try {
       const pubkey = await (window as any).nostr.getPublicKey()
       update({ identity: { pubkey, signerType: 'nip07', displayName: 'You' } })

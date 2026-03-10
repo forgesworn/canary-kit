@@ -241,8 +241,6 @@ function showIdentityPopover(anchor: HTMLElement): void {
   const pk = identity?.pubkey ?? ''
   const shortPk = pk ? `${pk.slice(0, 8)}\u2026${pk.slice(-8)}` : 'None'
   const signerLabel = identity?.signerType === 'nip07' ? 'Extension (NIP-07)' : 'Local key'
-  const extensionAvailable = hasNip07()
-
   const demoAccountsHtml = DEMO_ACCOUNTS.map(a => `
     <button class="btn btn--sm identity-popover__demo" data-nsec="${a.nsec}" data-name="${a.name}" type="button">
       <strong>${a.name}</strong> <span class="identity-popover__label">${a.bio}</span>
@@ -272,9 +270,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
       </form>
     </div>
 
-    ${extensionAvailable ? `
-      <button class="btn btn--sm" id="nip07-connect-btn" type="button" style="width: 100%;">Use Browser Extension</button>
-    ` : ''}
+    <button class="btn btn--sm" id="nip07-connect-btn" type="button" style="width: 100%;">Use Browser Extension (NIP-07)</button>
 
     ${identity?.signerType === 'nip07' ? `
       <button class="btn btn--sm" id="nip07-disconnect-btn" type="button" style="width: 100%;">Use Local Key</button>
@@ -407,6 +403,10 @@ function showIdentityPopover(anchor: HTMLElement): void {
 
   // Connect NIP-07
   popover.querySelector('#nip07-connect-btn')?.addEventListener('click', async () => {
+    if (!hasNip07()) {
+      alert('No Nostr extension found. Install Alby, nos2x, or another NIP-07 extension and reload.')
+      return
+    }
     try {
       teardownSync()
       const pubkey = await (window as any).nostr.getPublicKey()
