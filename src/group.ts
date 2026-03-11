@@ -243,6 +243,28 @@ export function removeMemberAndReseed(state: GroupState, pubkey: string): GroupS
   return reseed(removed)
 }
 
+/**
+ * Dissolve a group, zeroing the seed and clearing all members.
+ * Per CANARY spec §Seed Storage: seed MUST be wiped on group dissolution.
+ * Preserves name and timestamps for audit trail.
+ *
+ * Note: zeroing the seed string prevents further token derivation. Full
+ * memory erasure of prior string values is not possible in JS — platform-level
+ * secure storage should handle that concern.
+ *
+ * Returns new state — does not mutate the input.
+ */
+export function dissolveGroup(state: GroupState): GroupState {
+  return {
+    ...state,
+    seed: '0'.repeat(64),
+    members: [],
+    admins: [],
+    usageOffset: 0,
+    consumedOps: [],
+  }
+}
+
 /** Refresh the counter to the current time window. Call after loading persisted state.
  * Enforces monotonicity: the counter never regresses, preventing clock rollback attacks. */
 export function syncCounter(

@@ -38,6 +38,7 @@ export {
   removeMember,
   removeMemberAndReseed,
   syncCounter,
+  dissolveGroup,
   type GroupConfig,
   type GroupState,
 } from './group.js'

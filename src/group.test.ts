@@ -9,6 +9,7 @@ import {
   removeMember,
   removeMemberAndReseed,
   syncCounter,
+  dissolveGroup,
   type GroupConfig,
   type GroupState,
 } from './group.js'
@@ -320,6 +321,23 @@ describe('authority model fields', () => {
     const reseeded = reseed(group)
     expect(reseeded.admins).toEqual(group.admins)
     expect(reseeded.epoch).toBe(group.epoch)
+  })
+})
+
+describe('dissolveGroup', () => {
+  it('returns state with zeroed seed, empty members, and empty admins', () => {
+    const state = createGroup({ name: 'dissolve-test', members: [ALICE, BOB] })
+    const dissolved = dissolveGroup(state)
+    expect(dissolved.seed).toBe('0'.repeat(64))
+    expect(dissolved.members).toEqual([])
+    expect(dissolved.admins).toEqual([])
+  })
+
+  it('preserves name and metadata for audit trail', () => {
+    const state = createGroup({ name: 'audit-trail', members: [ALICE] })
+    const dissolved = dissolveGroup(state)
+    expect(dissolved.name).toBe('audit-trail')
+    expect(dissolved.createdAt).toBe(state.createdAt)
   })
 })
 
