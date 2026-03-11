@@ -792,12 +792,18 @@ Liveness monitoring parameters are application-defined:
 
 **DMS trigger actions** are implementation-specific:
 
-| Implementation | Action on DMS trigger                               |
-|----------------|-----------------------------------------------------|
-| Canary-kit     | Alert the group with last known location            |
-| Key management | Lock signing keys, broadcast revocation             |
-| Dispatch       | Escalate to dispatch, freeze escrow                 |
-| Banking        | Freeze account, alert fraud team                    |
+| Implementation | Action on DMS trigger                                              |
+|----------------|--------------------------------------------------------------------|
+| Canary-kit     | Derive liveness token; monitoring and alerting are application-layer |
+| Key management | Lock signing keys, broadcast revocation                            |
+| Dispatch       | Escalate to dispatch, freeze escrow                                |
+| Banking        | Freeze account, alert fraud team                                   |
+
+The CANARY protocol defines liveness token derivation. The monitoring loop
+(tracking heartbeat intervals, detecting missed check-ins, triggering alerts)
+is application-defined. Libraries SHOULD provide the `deriveLivenessToken()`
+primitive. Applications SHOULD implement heartbeat tracking with configurable
+`heartbeat_interval` and `grace_period`.
 
 ---
 
