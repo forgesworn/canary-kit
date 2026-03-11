@@ -6,6 +6,7 @@ import { getCounter } from 'canary-kit'
 import { broadcastAction } from '../sync.js'
 import { showToast } from '../components/toast.js'
 import { sendLocationPing } from './beacons.js'
+import { escapeHtml } from '../utils/escape.js'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ export function renderLiveness(container: HTMLElement): void {
     return `
       <li class="liveness-item liveness-item--${status}">
         <span class="liveness-dot liveness-dot--${status}"></span>
-        <span class="liveness-name">${name}</span>
+        <span class="liveness-name">${escapeHtml(name)}</span>
         <span class="liveness-time">${hasCheckedIn ? formatElapsed(elapsed, lastCheckin) : 'awaiting first check-in'}</span>
         <div class="liveness-bar">
           <div class="liveness-bar__fill liveness-bar__fill--${status}" style="width: ${healthPct}%"></div>

@@ -22,6 +22,8 @@ jobs:
       - run: npm run build
       - run: npm run build:app
       - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:protocol
 
   release:
     needs: test

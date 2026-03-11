@@ -46,7 +46,7 @@ import { escapeHtml } from './utils/escape.js'
 import { base64ToJson, base64urlToJson, base64urlToBytes, jsonToBase64 } from './utils/base64.js'
 import { unpackInvite } from './utils/binary-invite.js'
 import { acceptInvite, isInviteConsumed, consumeInvite } from './invite.js'
-import type { AppIdentity } from './types.js'
+import type { AppGroup, AppIdentity } from './types.js'
 
 /** Allow wss:// relays, plus ws:// only for localhost development. */
 function isAllowedRelayUrl(url: string): boolean {
@@ -58,6 +58,43 @@ function isAllowedRelayUrl(url: string): boolean {
     } catch { return false }
   }
   return false
+}
+
+function preserveMnemonic(nextIdentity: AppIdentity, previousIdentity: AppIdentity | null | undefined): AppIdentity {
+  if (previousIdentity?.pubkey === nextIdentity.pubkey && previousIdentity.mnemonic) {
+    return { ...nextIdentity, mnemonic: previousIdentity.mnemonic }
+  }
+  return nextIdentity
+}
+
+function staleGroupStateError(
+  existingGroup: AppGroup | undefined,
+  incoming: { epoch?: number; counter?: number; latestInviteIssuedAt?: number },
+): string | null {
+  if (!existingGroup) return null
+
+  if (typeof incoming.epoch === 'number' && incoming.epoch < existingGroup.epoch) {
+    return 'This invite is older than the group state already stored on this device.'
+  }
+
+  if (
+    typeof incoming.latestInviteIssuedAt === 'number'
+    && existingGroup.latestInviteIssuedAt > 0
+    && incoming.latestInviteIssuedAt < existingGroup.latestInviteIssuedAt
+  ) {
+    return 'A newer invite has already been accepted for this group on this device.'
+  }
+
+  if (
+    typeof incoming.epoch === 'number'
+    && incoming.epoch === existingGroup.epoch
+    && typeof incoming.counter === 'number'
+    && incoming.counter < existingGroup.counter
+  ) {
+    return 'This invite would roll the group back to an older counter.'
+  }
+
+  return null
 }
 
 // ── Storage bootstrap ──────────────────────────────────────────
@@ -547,6 +584,14 @@ function showBinaryJoinScreen(b64url: string): void {
         // Build AppGroup from the validated invite
         const id = validated.groupId
         const { groups: existingGroups } = getState()
+        const staleError = staleGroupStateError(existingGroups[id], {
+          epoch: validated.epoch,
+          counter: validated.counter,
+          latestInviteIssuedAt: validated.issuedAt,
+        })
+        if (staleError) {
+          throw new Error(staleError)
+        }
         const members = new Set(validated.members)
         members.add(identity!.pubkey)
 
@@ -639,6 +684,13 @@ function acceptWelcomeEnvelope(
   // Build AppGroup from welcome payload
   const id = welcome.groupId
   const { groups: existingGroups } = getState()
+  const staleError = staleGroupStateError(existingGroups[id], {
+    epoch: welcome.epoch,
+    counter: welcome.counter,
+  })
+  if (staleError) {
+    throw new Error(staleError)
+  }
   const members = new Set<string>(welcome.members)
   members.add(identity.pubkey)
   const memberNames: Record<string, string> = { ...(welcome.memberNames ?? {}) }
@@ -1045,7 +1097,7 @@ async function ensureLocalIdentity(): Promise<void> {
   }
 
   if (!identity || identity.pubkey !== newIdentity.pubkey) {
-    update({ identity: newIdentity })
+    update({ identity: preserveMnemonic(newIdentity, identity) })
   }
 
   // Boot-time auto-insertion of local identity into groups was removed.
@@ -1188,6 +1240,7 @@ function showRecoveryPhraseModal(mnemonic: string): void {
   actions.style.gap = '0.5rem'
 
   const copyBtn = document.createElement('button')
+  copyBtn.id = 'recovery-phrase-copy'
   copyBtn.className = 'btn btn--primary'
   copyBtn.type = 'button'
   copyBtn.textContent = 'Copy words'
@@ -1200,6 +1253,7 @@ function showRecoveryPhraseModal(mnemonic: string): void {
   })
 
   const skipBtn = document.createElement('button')
+  skipBtn.id = 'recovery-phrase-skip'
   skipBtn.className = 'btn'
   skipBtn.type = 'button'
   skipBtn.textContent = 'Skip for now'
@@ -1306,11 +1360,8 @@ function showLoginScreen(): void {
     const { pubkey, privkey } = mnemonicToKeypair(mnemonic)
 
     update({
-      identity: { pubkey, privkey, signerType: 'local', displayName: name },
+      identity: { pubkey, privkey, mnemonic, signerType: 'local', displayName: name },
     })
-
-    // Store mnemonic for later retrieval via identity popover
-    localStorage.setItem('canary:mnemonic', mnemonic)
 
     await bootApp()
 
@@ -1340,11 +1391,8 @@ function showLoginScreen(): void {
 
       const { pubkey, privkey } = mnemonicToKeypair(phrase)
       update({
-        identity: { pubkey, privkey, signerType: 'local', displayName: 'You' },
+        identity: { pubkey, privkey, mnemonic: phrase, signerType: 'local', displayName: 'You' },
       })
-
-      // Store mnemonic for later retrieval
-      localStorage.setItem('canary:mnemonic', phrase)
 
       await bootApp()
     } catch {
@@ -1359,12 +1407,13 @@ function showLoginScreen(): void {
     const nsec = input?.value.trim()
     if (!nsec) return
     try {
+      const currentIdentity = getState().identity
       const decoded = nip19decode(nsec)
       if (decoded.type !== 'nsec') { alert('Not a valid nsec.'); return }
       const privkeyBytes = decoded.data as Uint8Array
       const privkey = bytesToHex(privkeyBytes)
       const pubkey = getPublicKey(privkeyBytes)
-      update({ identity: { pubkey, privkey, signerType: 'local', displayName: 'You' } })
+      update({ identity: preserveMnemonic({ pubkey, privkey, signerType: 'local', displayName: 'You' }, currentIdentity) })
       await bootApp()
     } catch { alert('Invalid nsec format.') }
   })
@@ -1372,13 +1421,14 @@ function showLoginScreen(): void {
   // Demo account buttons
   app.querySelectorAll<HTMLButtonElement>('.login-screen__demo').forEach(btn => {
     btn.addEventListener('click', async () => {
+      const currentIdentity = getState().identity
       const nsec = btn.dataset.nsec!
       const name = btn.dataset.name!
       const decoded = nip19decode(nsec)
       const privkeyBytes = (decoded.data as Uint8Array)
       const privkey = bytesToHex(privkeyBytes)
       const pubkey = getPublicKey(privkeyBytes)
-      update({ identity: { pubkey, privkey, signerType: 'local', displayName: name } })
+      update({ identity: preserveMnemonic({ pubkey, privkey, signerType: 'local', displayName: name }, currentIdentity) })
       await bootApp()
     })
   })
@@ -1390,8 +1440,9 @@ function showLoginScreen(): void {
       return
     }
     try {
+      const currentIdentity = getState().identity
       const pubkey = await (window as any).nostr.getPublicKey()
-      update({ identity: { pubkey, signerType: 'nip07', displayName: 'You' } })
+      update({ identity: preserveMnemonic({ pubkey, signerType: 'nip07', displayName: 'You' }, currentIdentity) })
       await bootApp()
     } catch { alert('Extension rejected the request.') }
   })

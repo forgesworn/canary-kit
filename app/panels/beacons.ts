@@ -5,6 +5,7 @@ import { broadcastAction } from '../sync.js'
 import { deriveBeaconKey, encryptBeacon } from 'canary-kit'
 import { encode, decode, precisionToRadius } from 'geohash-kit'
 import { getCachedName, getCachedProfile } from '../nostr/profiles.js'
+import { escapeHtml } from '../utils/escape.js'
 
 let map: any = null
 let maplibregl: typeof import('maplibre-gl') | null = null
@@ -475,14 +476,14 @@ function updateBeaconList(): void {
     const age = Math.floor(Date.now() / 1000) - pos.timestamp
     const ageLabel = age < 60 ? 'just now' : age < 3600 ? `${Math.floor(age / 60)}m ago` : `${Math.floor(age / 3600)}h ago`
     const dotHtml = prof?.picture
-      ? `<img src="${prof.picture}" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid ${colour};" />`
+      ? `<img src="${escapeHtml(prof.picture)}" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid ${colour};" />`
       : `<span style="width:8px;height:8px;border-radius:50%;background:${colour};flex-shrink:0;"></span>`
     return `
       <div class="beacon-entry" style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0;">
         ${dotHtml}
-        <span class="beacon-member" style="font-weight:500;">${name}</span>
-        <span class="beacon-geohash" style="color:var(--text-muted);font-size:0.8rem;">${pos.geohash}</span>
-        <span style="color:var(--text-muted);font-size:0.75rem;margin-left:auto;">${ageLabel}</span>
+        <span class="beacon-member" style="font-weight:500;">${escapeHtml(name)}</span>
+        <span class="beacon-geohash" style="color:var(--text-muted);font-size:0.8rem;">${escapeHtml(pos.geohash)}</span>
+        <span style="color:var(--text-muted);font-size:0.75rem;margin-left:auto;">${escapeHtml(ageLabel)}</span>
       </div>
     `
   }).join('')

@@ -17,9 +17,10 @@ const localStorageMock = {
 vi.stubGlobal('localStorage', localStorageMock)
 
 // ── Import after mock ────────────────────────────────────────
-import { persistState, clearPinKey, getStoredPinSalt } from './storage.js'
+import { persistState, clearPinKey, clearPinSalt, enablePin, getStoredPinSalt, restoreState } from './storage.js'
 import { loadState, getState } from './state.js'
 import type { AppState } from './types.js'
+import { mnemonicToKeypair } from './mnemonic.js'
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -69,6 +70,9 @@ describe('persistState — clean-install PIN regression', () => {
   beforeEach(() => {
     store.clear()
     clearPinKey()
+    clearPinSalt()
+    localStorageMock.setItem.mockClear()
+    localStorageMock.removeItem.mockClear()
   })
 
   it('persists state on fresh install when pinEnabled=true but no salt exists', async () => {
@@ -125,5 +129,58 @@ describe('persistState — clean-install PIN regression', () => {
     const writtenGroups = store.get('canary:groups')
     expect(writtenGroups).toBeDefined()
     expect(JSON.parse(writtenGroups!)).toHaveProperty('test-group')
+  })
+
+  it('encrypts groups, identity, and active group when PIN is enabled', async () => {
+    const mnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+    const { pubkey, privkey } = mnemonicToKeypair(mnemonic)
+
+    loadState(freshState({
+      identity: {
+        pubkey,
+        privkey,
+        mnemonic,
+        signerType: 'local',
+        displayName: 'Tester',
+      },
+      settings: {
+        theme: 'dark',
+        pinEnabled: false,
+        autoLockMinutes: 5,
+        defaultRelays: [],
+        defaultReadRelays: [],
+        defaultWriteRelays: [],
+      },
+    }))
+
+    await enablePin('123456')
+
+    const groups = JSON.parse(store.get('canary:groups')!)
+    const identity = JSON.parse(store.get('canary:identity')!)
+    const activeGroupId = JSON.parse(store.get('canary:active-group')!)
+
+    expect(groups).toMatchObject({ _encrypted: true })
+    expect(identity).toMatchObject({ _encrypted: true })
+    expect(activeGroupId).toMatchObject({ _encrypted: true })
+    expect(JSON.stringify(groups)).not.toContain('test-group')
+    expect(JSON.stringify(identity)).not.toContain(mnemonic)
+  })
+
+  it('migrates the legacy plaintext mnemonic onto the matching identity', () => {
+    const mnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+    const { pubkey, privkey } = mnemonicToKeypair(mnemonic)
+
+    store.set('canary:identity', JSON.stringify({
+      pubkey,
+      privkey,
+      signerType: 'local',
+      displayName: 'Tester',
+    }))
+    store.set('canary:mnemonic', mnemonic)
+
+    restoreState()
+
+    expect(getState().identity?.mnemonic).toBe(mnemonic)
+    expect(store.has('canary:mnemonic')).toBe(false)
   })
 })

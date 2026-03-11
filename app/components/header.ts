@@ -203,9 +203,17 @@ function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+function preserveMnemonic(nextIdentity: AppIdentity, previousIdentity: AppIdentity | null | undefined): AppIdentity {
+  if (previousIdentity?.pubkey === nextIdentity.pubkey && previousIdentity.mnemonic) {
+    return { ...nextIdentity, mnemonic: previousIdentity.mnemonic }
+  }
+  return nextIdentity
+}
+
 /** Log in with an nsec (bech32 private key). */
 function loginWithNsec(nsec: string, displayName?: string): boolean {
   try {
+    const currentIdentity = getState().identity
     const decoded = nip19decode(nsec.trim())
     if (decoded.type !== 'nsec') {
       alert('Not a valid nsec. Expected a bech32-encoded private key starting with "nsec1".')
@@ -214,12 +222,12 @@ function loginWithNsec(nsec: string, displayName?: string): boolean {
     const privkeyBytes = decoded.data as Uint8Array
     const privkey = bytesToHex(privkeyBytes)
     const pubkey = getPublicKey(privkeyBytes)
-    const newIdentity: AppIdentity = {
+    const newIdentity = preserveMnemonic({
       pubkey,
       privkey,
       signerType: 'local',
       displayName: displayName ?? 'You',
-    }
+    }, currentIdentity)
     // Tear down sync and clear groups from previous identity
     teardownSync()
     update({ identity: newIdentity, groups: {}, activeGroupId: null })
@@ -276,7 +284,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
       <button class="btn btn--sm" id="nip07-disconnect-btn" type="button" style="width: 100%;">Use Local Key</button>
     ` : ''}
 
-    ${identity?.privkey ? `
+    ${(identity?.mnemonic || identity?.privkey) ? `
       <div class="identity-popover__divider"></div>
       <div class="identity-popover__section">
         <span class="identity-popover__label">Recovery phrase</span>
@@ -285,6 +293,8 @@ function showIdentityPopover(anchor: HTMLElement): void {
           <button class="btn btn--sm" id="recovery-reveal-btn" type="button" style="width: 100%;">Show recovery phrase</button>
         </div>
       </div>
+    ` : ''}
+    ${identity?.privkey ? `
       <div class="identity-popover__section" style="padding-top: 0;">
         <details style="font-size: 0.75rem;">
           <summary style="cursor: pointer; color: var(--text-muted);">Advanced: show nsec</summary>
@@ -322,7 +332,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
   popover.querySelector('#recovery-reveal-btn')?.addEventListener('click', () => {
     const area = popover.querySelector('#recovery-reveal-area')
     if (!area) return
-    const mnemonic = localStorage.getItem('canary:mnemonic')
+    const mnemonic = getState().identity?.mnemonic
     if (!mnemonic) {
       area.textContent = ''
       const msg = document.createElement('p')
@@ -410,11 +420,11 @@ function showIdentityPopover(anchor: HTMLElement): void {
     try {
       teardownSync()
       const pubkey = await (window as any).nostr.getPublicKey()
-      const newIdentity: AppIdentity = {
+      const newIdentity = preserveMnemonic({
         pubkey,
         signerType: 'nip07',
         displayName: identity?.displayName ?? 'You',
-      }
+      }, identity)
       update({ identity: newIdentity, groups: {}, activeGroupId: null })
       updateIdentityDisplay()
       document.dispatchEvent(new CustomEvent('canary:resync'))
@@ -428,12 +438,12 @@ function showIdentityPopover(anchor: HTMLElement): void {
   popover.querySelector('#nip07-disconnect-btn')?.addEventListener('click', async () => {
     teardownSync()
     const resolved = await resolveSigner({ pubkey: '', privkey: identity?.privkey })
-    const newIdentity: AppIdentity = {
+    const newIdentity = preserveMnemonic({
       pubkey: resolved.pubkey,
       privkey: resolved.privkey,
       signerType: 'local',
       displayName: identity?.displayName ?? 'You',
-    }
+    }, identity)
     update({ identity: newIdentity, groups: {}, activeGroupId: null })
     updateIdentityDisplay()
     popover.remove()
