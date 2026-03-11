@@ -159,6 +159,256 @@ re-sync messages) MUST enforce the following rules:
    100. This bounds the damage from a compromised sender attempting to desynchronise
    the group by jumping the counter far ahead.
 
+---
+
+## CANARY-SYNC: Transport-Agnostic Synchronisation
+
+CANARY-SYNC is the protocol layer for propagating group state mutations and telemetry
+across any transport without depending on Nostr or any specific relay infrastructure.
+It operates over any channel capable of delivering authenticated, ordered or unordered
+messages — WebSocket, Bluetooth LE, Meshtastic, Matrix, or a direct TCP connection.
+
+### Protocol Version
+
+All CANARY-SYNC messages carry a `protocolVersion` field. The current version is **2**.
+Receivers MUST reject any message whose `protocolVersion` does not exactly equal `2`.
+Version negotiation is not supported — a version mismatch is a hard error. Senders MUST
+inject `protocolVersion: 2` into every message before encoding.
+
+### Message Types
+
+CANARY-SYNC defines eight message types grouped by function:
+
+#### State Mutations
+
+These messages change persistent group state and require epoch/opId replay protection.
+Only admins may send state-mutation messages (except `counter-advance` and self-leave —
+see §Privileged Actions).
+
+| Type | Required Fields | Description |
+|------|----------------|-------------|
+| `member-join` | `pubkey`, `displayName?`, `timestamp`, `epoch`, `opId` | Add a member to the group. Admin-only unless the sender is adding themselves (self-join proves possession of the group key via envelope decryption). |
+| `member-leave` | `pubkey`, `timestamp`, `epoch`, `opId` | Remove a member from the group. Admin-only unless `pubkey` equals `sender` (self-leave). |
+| `counter-advance` | `counter`, `usageOffset`, `timestamp` | Advance the group counter (burn-after-use). Any current member may send; subject to monotonicity and bounded-jump constraints (see §Bounded Counter Advance). No `epoch`/`opId` required. |
+| `reseed` | `seed`, `counter`, `timestamp`, `epoch`, `opId`, `admins[]`, `members[]` | Replace seed, counter, members, and admins atomically. Admin-only. `epoch` MUST equal `current_epoch + 1`. Clears all replay state. |
+
+#### Telemetry (Fire-and-Forget)
+
+These messages convey real-time signals that do not persist in group state. They are
+subject to freshness constraints but not epoch-based replay protection.
+
+| Type | Required Fields | Description |
+|------|----------------|-------------|
+| `beacon` | `lat`, `lon`, `accuracy`, `timestamp`, `opId` | Share the sender's current location. `lat` MUST be in `[−90, 90]`; `lon` in `[−180, 180]`; `accuracy` in `[0, 20_000_000]` metres. |
+| `duress-alert` | `lat`, `lon`, `timestamp`, `opId`, `subject?` | Emergency location alert. Same coordinate constraints as `beacon`. See §Passive Duress. |
+| `liveness-checkin` | `pubkey`, `timestamp`, `opId` | Heartbeat proving presence. Receiver MUST verify that `pubkey` equals `sender`. See §Passive Duress. |
+
+#### Recovery
+
+| Type | Required Fields | Description |
+|------|----------------|-------------|
+| `state-snapshot` | `seed`, `counter`, `usageOffset`, `members[]`, `admins[]`, `epoch`, `opId`, `timestamp`, `prevEpochSeed?` | Admin-issued full state snapshot for catch-up. Subject to same-epoch anti-rollback constraints; higher-epoch snapshots are deliberately disabled (see §State Snapshot Recovery). |
+
+### Field Constraints
+
+- `pubkey`, `seed`, and `prevEpochSeed` fields MUST be 64-character lowercase hex strings
+  (32 bytes). `seed` in `reseed` is a `Uint8Array` in-process; it is hex-encoded for wire
+  transport and decoded back to bytes on receipt.
+- `opId` MUST be a non-empty string of at most 128 characters.
+- `epoch` and `counter` MUST be non-negative integers.
+- `admins` MUST be a subset of `members` (all admins are members).
+- `timestamp` MUST be a non-negative integer (Unix seconds).
+
+### Privileged Actions
+
+Certain message types require the sender to be an admin of the group at the time of
+processing. The following rules govern privilege:
+
+- `reseed` and `state-snapshot` are always privileged.
+- `member-join` is privileged unless `msg.pubkey === sender` (self-join). Self-join is
+  permitted because successful decryption of the group envelope proves the sender holds
+  a valid admin-issued group key.
+- `member-leave` is privileged unless `msg.pubkey === sender` (self-leave).
+- `counter-advance` is not privileged; any current group member MAY send it.
+- Fire-and-forget messages (`beacon`, `duress-alert`, `liveness-checkin`) are not privileged.
+
+Implementations MUST fail closed: a privileged message with no identified sender MUST be
+silently dropped without modifying group state.
+
+### Epoch-Based Replay Protection
+
+Each `reseed` increments the epoch counter by exactly one. Epoch numbers MUST be
+monotonically increasing (Invariant I1).
+
+Every state-mutating message that is subject to replay protection carries an `opId`. The
+group state maintains a `consumedOps` list of opIds processed within the current epoch. A
+message whose `opId` is already in `consumedOps` MUST be silently dropped.
+
+On `reseed`, the new epoch begins and `consumedOps` is reset — the `reseed` message's own
+`opId` is the sole initial entry (Invariant I4).
+
+To bound memory growth, `consumedOps` is capped at 1000 entries per epoch. When this
+limit is exceeded, the oldest entries are evicted and a `consumedOpsFloor` timestamp is
+recorded. Any subsequent message with `timestamp ≤ consumedOpsFloor` MUST be dropped,
+preventing replay of evicted operations.
+
+Epoch matching rules for privileged operations:
+
+| Message type | Epoch constraint |
+|---|---|
+| `reseed` | `msg.epoch` MUST equal `state.epoch + 1` |
+| All other privileged ops | `msg.epoch` MUST equal `state.epoch` |
+| `state-snapshot` (same-epoch) | `msg.epoch` MUST equal `state.epoch` |
+| `state-snapshot` (higher-epoch) | Rejected — see §State Snapshot Recovery |
+
+Messages with `msg.epoch < state.epoch` (stale epoch) MUST be silently dropped (I6).
+
+### Fire-and-Forget Freshness
+
+Telemetry messages (`beacon`, `duress-alert`, `liveness-checkin`) MUST pass a freshness
+gate before being accepted:
+
+- Messages older than **300 seconds** (`FIRE_AND_FORGET_FRESHNESS_SEC`) are silently dropped.
+- Messages timestamped more than **60 seconds** (`MAX_FUTURE_SKEW_SEC`) in the future are
+  silently dropped.
+
+These messages do not modify group state. Implementations SHOULD route them to
+application-layer handlers (e.g. alert the group on `duress-alert`, update a presence
+indicator on `liveness-checkin`). See §Passive Duress.
+
+### Bounded Counter Advance
+
+The `counter-advance` message is not gated by admin privilege but is bounded to limit the
+damage from a compromised or malicious group member.
+
+On receipt of a `counter-advance` message, receivers MUST enforce:
+
+1. **Member check:** `sender` MUST be a current group member. Non-members MUST be rejected.
+2. **Monotonicity:** `msg.counter + msg.usageOffset` MUST be strictly greater than
+   `state.counter + state.usageOffset`. Counter rollback MUST be rejected.
+3. **Bounded jump:** `msg.counter + msg.usageOffset` MUST NOT exceed
+   `floor(now / rotationInterval) + 100`. The offset of **100** (`MAX_COUNTER_ADVANCE_OFFSET`)
+   is a hard cap. Messages that would advance the counter beyond this bound MUST be dropped.
+
+The bound cross-references the **Bounded jumps** rule in §Counter Acceptance: both use a
+`max_offset` of 100 relative to the current time-based counter.
+
+### State Invariants
+
+The following invariants MUST be preserved by all conforming implementations:
+
+| # | Invariant | Description |
+|---|-----------|-------------|
+| **I1** | Epoch monotonicity | `state.epoch` only increases. No message may decrease it. |
+| **I2** | opId uniqueness per epoch | Within a given epoch, each `opId` is processed at most once. Duplicate `opId` values MUST be dropped. |
+| **I3** | Admin-only mutations | Only admins may execute privileged actions (reseed, state-snapshot, adding/removing other members). |
+| **I4** | Reseed atomicity | A `reseed` atomically replaces `{seed, counter, usageOffset, members, admins, epoch}` and resets `consumedOps` to `[reseed.opId]`. No partial application is permitted. |
+| **I5** | Same-epoch snapshot anti-rollback | A same-epoch `state-snapshot` MUST be rejected unless: seed matches, incoming effective counter ≥ local effective counter, incoming members ⊇ local members, and incoming admins ⊇ local admins. |
+| **I6** | Stale-epoch rejection | Any privileged message with `msg.epoch < state.epoch` MUST be silently dropped. |
+
+### State Snapshot Recovery
+
+`state-snapshot` is an admin-issued message that allows group members who missed
+intermediate transitions to resynchronise their local state.
+
+#### Same-Epoch Recovery
+
+When `msg.epoch === state.epoch`, the snapshot is accepted if and only if all of the
+following hold:
+
+1. `msg.seed === state.seed` — the seed has not changed within this epoch (no silent reseed).
+2. `msg.counter + msg.usageOffset >= state.counter + state.usageOffset` — counter does not
+   regress.
+3. `msg.members` is a superset of `state.members` — member removals within an epoch require
+   a reseed.
+4. `msg.admins` is a superset of `state.admins` — admin demotions require a reseed.
+
+On acceptance, the receiver advances to the snapshot's counter, members, and admins, and
+appends the `opId` to `consumedOps`.
+
+#### Higher-Epoch Recovery — Deliberately Disabled
+
+Higher-epoch snapshots (`msg.epoch > state.epoch`) are **rejected**. A group member who
+misses one or more `reseed` messages cannot recover via snapshot and MUST be re-invited
+by an admin.
+
+This restriction eliminates the stale-admin hijack attack surface: a removed admin whose
+local state is stale could otherwise fabricate a higher-epoch snapshot and push a forged
+group state to members who missed the reseed. By rejecting higher-epoch snapshots entirely,
+the attack surface is reduced to same-epoch fabrication, which is mitigated by the
+sender-must-be-in-snapshot-admins self-consistency check at the transport layer.
+
+**Known limitation:** Full mitigation of the stale-admin fabrication attack requires either
+quorum-based recovery (multiple admins must co-sign a snapshot) or a verifiable reseed
+chain (signed epoch transitions stored on a relay). Both are deferred to a future protocol
+version.
+
+### Deterministic Serialisation
+
+All CANARY-SYNC messages MUST be serialised deterministically for signing. The canonical
+form is produced by `canonicaliseSyncMessage`:
+
+1. Binary fields (`seed` in `reseed`) are hex-encoded before serialisation.
+2. All object keys are sorted recursively (depth-first).
+3. Arrays are serialised in their original order (element order is significant).
+4. No whitespace is emitted.
+5. `undefined` values are omitted.
+
+This canonical form is the byte string over which inner signatures are computed (H2). The
+`protocolVersion` field MUST be present in the canonical form — the sender is responsible
+for injecting `protocolVersion: 2` before both encoding and signing, ensuring that the
+canonical bytes always reflect the actual wire value.
+
+Wire encoding uses `JSON.stringify` with the `protocolVersion` field added. Binary fields
+(`seed` in `reseed`) are hex-encoded for safe JSON round-tripping via `bytesToHex`.
+
+### Group Key Derivation and Envelope Encryption
+
+CANARY-SYNC messages are transmitted inside encrypted envelopes keyed to the group seed.
+
+**Group key derivation:**
+
+```
+group_key = HMAC-SHA256(hex_to_bytes(seed), utf8("canary:sync:key"))
+```
+
+**Envelope encryption:** AES-256-GCM with a random 12-byte nonce. The wire format is:
+
+```
+base64(IV || ciphertext || auth_tag)
+```
+
+where `IV` is 12 bytes, `ciphertext` is the UTF-8 encoded JSON message, and `auth_tag` is
+the 16-byte GCM authentication tag appended by the Web Crypto API. Decryption MUST throw
+on authentication failure.
+
+**Per-participant signing key derivation:**
+
+```
+signing_key = HMAC-SHA256(hex_to_bytes(seed), utf8("canary:sync:sign:") || hex_to_bytes(personal_privkey))
+```
+
+Binding the personal private key ensures each participant's signing identity is unique
+within the group, even across reseed events. A reseed invalidates all prior signing keys
+derived from the old seed.
+
+**Group tag hashing:** To avoid correlating events to a known group name, transport-layer
+routing tags use a privacy-preserving hash:
+
+```
+group_tag = hex(SHA256(utf8(group_id)))
+```
+
+### Cross-References
+
+- **§Counter Acceptance** — defines the bounded-jump rule that `counter-advance` enforces.
+- **§Passive Duress** — defines liveness monitoring; `liveness-checkin` and `duress-alert`
+  are the CANARY-SYNC wire representations of liveness heartbeats and active duress signals.
+- **§Seed Storage** — the group seed from which `group_key` and `signing_key` are derived
+  MUST be wiped from storage on group dissolution.
+
+---
+
 ### Output Encodings
 
 The encoding is a presentation layer, not part of the derivation. The same `token_bytes`
