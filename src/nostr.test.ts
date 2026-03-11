@@ -8,6 +8,7 @@ import {
   buildBeaconEvent,
   KINDS,
   SeedDistributionPayload,
+  GroupEventPayload,
 } from './nostr.js'
 
 const CREATOR = 'c'.repeat(64)
@@ -279,5 +280,19 @@ describe('SeedDistributionPayload', () => {
     }
     expect(payload.counter_offset).toBe(0)
     expect(payload.group_d).toBe('test-group')
+  })
+})
+
+describe('GroupEventPayload', () => {
+  it('matches NIP-CANARY encrypted content structure', () => {
+    const payload: GroupEventPayload = {
+      description: 'Family safety group',
+      policies: {
+        invite_by: 'creator',
+        reseed_by: 'creator',
+      },
+    }
+    expect(payload.description).toBe('Family safety group')
+    expect(payload.policies.invite_by).toBe('creator')
   })
 })

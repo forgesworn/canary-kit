@@ -154,6 +154,15 @@ export interface SeedDistributionPayload {
   group_d: string
 }
 
+/** Plaintext payload for kind 38800 encrypted content (group configuration). */
+export interface GroupEventPayload {
+  description: string
+  policies: {
+    invite_by: 'creator' | 'any_member'
+    reseed_by: 'creator' | 'any_admin'
+  }
+}
+
 /** Plaintext payload for kind 28801 (reseed notification). */
 export interface ReseedPayload {
   seed: string
