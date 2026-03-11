@@ -36,7 +36,6 @@ import { showCallVerify } from './components/call-verify.js'
 import { assertRemoteInviteToken, decryptWelcomeEnvelope } from './crypto/remote-invite.js'
 import { sendJoinRequest, fetchInviteToken } from './nostr/invite-relay.js'
 import { resolveSigner, hasNip07 } from './nostr/signer.js'
-import { DEMO_ACCOUNTS } from './demo-accounts.js'
 import { decode as nip19decode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
@@ -1271,11 +1270,7 @@ function showRecoveryPhraseModal(mnemonic: string): void {
 function showLoginScreen(): void {
   const app = document.getElementById('app')!
 
-  const demoButtons = DEMO_ACCOUNTS.map(a => `
-    <button class="btn login-screen__demo" data-nsec="${escapeHtml(a.nsec)}" data-name="${escapeHtml(a.name)}" type="button">
-      <strong>${escapeHtml(a.name)}</strong> <span style="color: var(--text-muted); font-weight: 400;">${escapeHtml(a.bio)}</span>
-    </button>
-  `).join('')
+
 
   app.innerHTML = `
     <div class="lock-screen">
@@ -1332,13 +1327,6 @@ function showLoginScreen(): void {
               <p class="settings-hint" style="font-size: 0.7rem; margin: 0.5rem 0 0 0;">Read relays: ${WELL_KNOWN_READ_RELAYS.map(r => escapeHtml(r.replace('wss://', ''))).join(', ')} + write relay(s)</p>
             </div>
           </details>
-        </div>
-
-        <div style="border-top: 1px solid var(--border); margin: 1rem 0; padding-top: 0.75rem;">
-          <p class="input-label__text" style="margin-bottom: 0.375rem;">Demo accounts</p>
-          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            ${demoButtons}
-          </div>
         </div>
 
       </div>
@@ -1422,23 +1410,6 @@ function showLoginScreen(): void {
       update({ identity: preserveMnemonic({ pubkey, privkey, signerType: 'local', displayName: 'You' }, currentIdentity) })
       await bootApp()
     } catch { alert('Invalid nsec format.') }
-  })
-
-  // Demo account buttons
-  app.querySelectorAll<HTMLButtonElement>('.login-screen__demo').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const currentIdentity = getState().identity
-      const nsec = btn.dataset.nsec!
-      const name = btn.dataset.name!
-      const decoded = nip19decode(nsec)
-      const privkeyBytes = (decoded.data as Uint8Array)
-      const privkey = bytesToHex(privkeyBytes)
-      const pubkey = getPublicKey(privkeyBytes)
-      update({ identity: preserveMnemonic({ pubkey, privkey, signerType: 'local', displayName: name }, currentIdentity) })
-      await bootApp()
-      const { publishKind0 } = await import('./nostr/profiles.js')
-      publishKind0(name, privkey)
-    })
   })
 
   // NIP-07 extension

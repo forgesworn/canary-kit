@@ -4,7 +4,6 @@ import { getState, update } from '../state.js'
 import { hasNip07 } from '../nostr/signer.js'
 import { teardownSync } from '../sync.js'
 import { isConnected, getRelayCount } from '../nostr/connect.js'
-import { DEMO_ACCOUNTS } from '../demo-accounts.js'
 import type { AppIdentity } from '../types.js'
 import { decode as nip19decode, nsecEncode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
@@ -253,11 +252,6 @@ function showIdentityPopover(anchor: HTMLElement): void {
   const pk = identity?.pubkey ?? ''
   const shortPk = pk ? `${pk.slice(0, 8)}\u2026${pk.slice(-8)}` : 'None'
   const signerLabel = identity?.signerType === 'nip07' ? 'Extension (NIP-07)' : 'Local key'
-  const demoAccountsHtml = DEMO_ACCOUNTS.map(a => `
-    <button class="btn btn--sm identity-popover__demo" data-nsec="${a.nsec}" data-name="${a.name}" type="button">
-      <strong>${a.name}</strong> <span class="identity-popover__label">${a.bio}</span>
-    </button>
-  `).join('')
 
   const popover = document.createElement('div')
   popover.id = 'identity-popover'
@@ -309,15 +303,6 @@ function showIdentityPopover(anchor: HTMLElement): void {
         </div>
 
         <button class="btn btn--sm" id="nip07-connect-btn" type="button" style="width: 100%;">Use Browser Extension (NIP-07)</button>
-
-        <div class="identity-popover__divider"></div>
-
-        <div class="identity-popover__section">
-          <span class="identity-popover__label">Demo accounts</span>
-          <div class="identity-popover__demos">
-            ${demoAccountsHtml}
-          </div>
-        </div>
       </div>
     </details>
   `
@@ -404,15 +389,6 @@ function showIdentityPopover(anchor: HTMLElement): void {
     const input = popover.querySelector<HTMLInputElement>('#nsec-input')
     if (!input?.value.trim()) return
     if (loginWithNsec(input.value)) popover.remove()
-  })
-
-  // Demo account quick-select
-  popover.querySelectorAll<HTMLButtonElement>('.identity-popover__demo').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const nsec = btn.dataset.nsec!
-      const name = btn.dataset.name!
-      if (loginWithNsec(nsec, name)) popover.remove()
-    })
   })
 
   // Connect NIP-07

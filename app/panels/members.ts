@@ -21,10 +21,6 @@ import { ensureTransport } from '../sync.js'
 import { deriveToken } from 'canary-kit/token'
 import { GROUP_CONTEXT, toTokenEncoding } from '../utils/encoding.js'
 import { fetchProfiles, getCachedName, getCachedProfile } from '../nostr/profiles.js'
-import { DEMO_ACCOUNTS } from '../demo-accounts.js'
-
-/** Quick lookup: pubkey → demo account name (compile-time, no relay needed). */
-const _demoNameByPubkey = new Map(DEMO_ACCOUNTS.map(a => [a.pubkey, a.name]))
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -59,7 +55,6 @@ function formatPubkey(pubkey: string, _members: string[], groupId?: string): str
     const mn = group?.memberNames?.[pubkey]
     if (mn && mn !== 'You') name = mn
   }
-  if (!name) name = _demoNameByPubkey.get(pubkey)
   if (!name) name = getCachedName(pubkey)
 
   if (isSelf) return name ? `${name} (you)` : 'You'
@@ -409,7 +404,6 @@ function showMemberDetail(pubkey: string, groupId: string): void {
   const isAdminUser = group?.admins.includes(pubkey) ?? false
   const displayName = formatPubkey(pubkey, group?.members ?? [], groupId)
   const profile = getCachedProfile(pubkey)
-  const demoName = _demoNameByPubkey.get(pubkey)
   const memberName = group?.memberNames?.[pubkey]
 
   const lastCheckin = group?.livenessCheckins?.[pubkey]
@@ -442,10 +436,9 @@ function showMemberDetail(pubkey: string, groupId: string): void {
   if (profile?.lud16) rows.push(row('Lightning', profile.lud16))
   if (profile?.website) rows.push(row('Website', profile.website))
   if (memberName && memberName !== 'You' && memberName !== profileName) rows.push(row('Display name', memberName))
-  if (demoName) rows.push(row('Demo account', demoName))
   rows.push(row('Liveness', livenessLabel))
 
-  if (!profile && !demoName) {
+  if (!profile) {
     rows.push(`<div class="member-detail__row"><span class="member-detail__label" style="color: var(--text-muted); font-style: italic;">No Nostr profile found on relay</span></div>`)
   }
 
