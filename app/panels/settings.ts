@@ -103,7 +103,7 @@ export function renderSettings(container: HTMLElement): void {
 
         <!-- Duress Mode -->
         <div class="settings-section">
-          <span class="input-label">Duress Response</span>
+          <span class="input-label">Emergency Alert Mode</span>
           <div class="segmented">
             <button class="segmented__btn ${group.duressMode === 'immediate' || !group.duressMode ? 'segmented__btn--active' : ''}" data-duress-mode="immediate">Immediate</button>
             <button class="segmented__btn ${group.duressMode === 'dead-drop' ? 'segmented__btn--active' : ''}" data-duress-mode="dead-drop">Dead Drop</button>
