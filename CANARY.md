@@ -513,6 +513,71 @@ the two parties. Example namespaces:
 | `barclays`  | `customer`, `agent`          | Banking phone verification     |
 | `id`        | `subject`, `verifier`        | Identity verification          |
 
+### Session Abstraction
+
+Implementations MAY provide a **Session** object that wraps a directional pair with
+role awareness and lifecycle methods. A Session encapsulates the shared secret, the
+namespace, the two roles, and the caller's own role, and exposes the following
+interface:
+
+| Method | Description |
+|--------|-------------|
+| `counter(nowSec?)` | Return the current counter — time-derived (floor(t / rotationSeconds)) or fixed |
+| `myToken(nowSec?)` | Derive the token this party speaks to prove their own identity |
+| `theirToken(nowSec?)` | Derive the token expected from the other party |
+| `verify(spoken, nowSec?)` | Verify a word spoken by the other party; returns a result indicating pass, duress, or fail |
+| `pair(nowSec?)` | Return both tokens keyed by role name |
+
+Sessions are constructed from a `SessionConfig` specifying the secret, namespace,
+roles tuple, own role, and optional parameters (rotationSeconds, tolerance, encoding,
+preset, fixed counter). Implementations SHOULD validate that the two roles are
+distinct and that `myRole` is one of the configured roles.
+
+#### Fixed-Counter Mode
+
+When `rotationSeconds` is set to `0`, the Session operates in **fixed-counter mode**.
+The counter is supplied explicitly at construction time rather than derived from the
+clock. This is appropriate for single-use tokens tied to a specific event identifier
+(e.g. a task ID or booking reference) rather than to a time window.
+
+Implementations MUST require an explicit `counter` value when `rotationSeconds=0`.
+Implementations MUST reject a `counter` value when `rotationSeconds>0`, since the
+counter is derived deterministically from the current time in that case.
+
+#### Session Presets
+
+Implementations MAY provide named presets that configure a Session for a specific
+two-party use case:
+
+| Preset | Words | Rotation | Tolerance | Use case |
+|--------|-------|----------|-----------|----------|
+| `call` | 1 | 30 seconds | 1 | Phone verification for insurance, banking, and call centres |
+| `handoff` | 1 | single-use (fixed counter) | 0 | Physical handoff for rideshare, delivery, and task completion |
+
+The `call` preset uses a 30-second rotation window with a tolerance of ±1 counter,
+giving a 90-second acceptance window to accommodate clock skew between caller and
+agent.
+
+The `handoff` preset uses fixed-counter mode (`rotationSeconds=0`), with a tolerance
+of 0. The counter MUST be set to a value agreed out-of-band (e.g. the event ID
+converted to a 32-bit integer). This ensures the token is single-use and bound to
+a specific event, not to a time window.
+
+#### Deterministic Seed Derivation
+
+When multiple sessions share a master secret but MUST produce independent, isolated
+token streams, implementations SHOULD derive per-session seeds deterministically
+using HMAC:
+
+```
+sessionSeed = HMAC-SHA256(masterKey, utf8(component_0) || 0x00 || utf8(component_1) || ...)
+```
+
+Null-byte separators between components prevent concatenation ambiguity (the byte
+sequence `"ab" || 0x00 || "c"` is distinct from `"a" || 0x00 || "bc"`). Components
+SHOULD be chosen to uniquely identify the session context (e.g. namespace, task ID,
+participant identifiers).
+
 ---
 
 ## CANARY-DURESS
