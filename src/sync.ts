@@ -17,6 +17,9 @@ export type SyncMessage =
   | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number; opId: string; protocolVersion?: number }
   | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId: string; subject?: string; protocolVersion?: number }
   | { type: 'liveness-checkin'; pubkey: string; timestamp: number; opId: string; protocolVersion?: number }
+  /** WARNING: seed is a plaintext hex string. This message type MUST be sent inside an encrypted
+   *  envelope (NIP-44 or AES-GCM via sync-crypto). Callers MUST NOT log SyncMessage objects
+   *  containing state-snapshot data, as the seed field would be exposed in plaintext. */
   | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; admins: string[]; epoch: number; opId: string; timestamp: number; prevEpochSeed?: string; protocolVersion?: number }
 
 const VALID_TYPES = new Set<string>([
@@ -414,6 +417,9 @@ export function applySyncMessage(
     case 'counter-advance': {
       // Require sender to be a current group member
       if (!sender || !group.members.includes(sender)) return group
+
+      // Bound individual fields to prevent overflow when summed
+      if (msg.usageOffset > MAX_COUNTER_ADVANCE_OFFSET) return group
 
       // Monotonic: only advance, never retreat
       const currentEffective = group.counter + group.usageOffset

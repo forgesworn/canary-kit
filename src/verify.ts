@@ -11,6 +11,7 @@
 import { verifyToken, deriveToken } from './token.js'
 import type { TokenEncoding } from './encoding.js'
 import { GROUP_CONTEXT } from './derive.js'
+import { timingSafeStringEqual } from './crypto.js'
 
 export type VerifyStatus = 'verified' | 'duress' | 'stale' | 'failed'
 
@@ -57,6 +58,6 @@ export function verifyWord(
   // result.status === 'valid' — distinguish exact from stale
   const normalised = spokenWord.toLowerCase().trim().replace(/\s+/g, ' ')
   const exact = deriveToken(seedHex, GROUP_CONTEXT, counter, encodingOpt)
-  if (normalised === exact) return { status: 'verified' }
+  if (timingSafeStringEqual(normalised, exact)) return { status: 'verified' }
   return { status: 'stale' }
 }

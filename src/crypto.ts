@@ -256,8 +256,14 @@ export function base64ToBytes(base64: string): Uint8Array {
 }
 
 /**
- * Constant-time comparison of two byte arrays.
+ * Best-effort constant-time comparison of two byte arrays.
  * Pads the shorter array to the longer length to avoid leaking length via timing.
+ *
+ * **Caveat:** JavaScript runtimes do not guarantee constant-time execution —
+ * JIT compilation, speculative execution, and the `??` fallback branch may
+ * introduce timing variation. This is a defence-in-depth measure, not a
+ * cryptographic guarantee. For high-assurance environments, pair with rate
+ * limiting and consider platform-native constant-time primitives.
  */
 export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   const len = Math.max(a.length, b.length)
@@ -270,7 +276,7 @@ export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 const stringEncoder = new TextEncoder()
 
-/** Constant-time comparison of two strings (UTF-8 encoded, then byte-compared). */
+/** Best-effort constant-time comparison of two strings (UTF-8 encoded, then byte-compared). See `timingSafeEqual` caveats. */
 export function timingSafeStringEqual(a: string, b: string): boolean {
   return timingSafeEqual(stringEncoder.encode(a), stringEncoder.encode(b))
 }

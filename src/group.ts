@@ -1,4 +1,4 @@
-import { randomSeed, hmacSha256, hexToBytes, bytesToHex } from './crypto.js'
+import { randomSeed } from './crypto.js'
 import { getCounter, DEFAULT_ROTATION_INTERVAL, MAX_COUNTER_OFFSET } from './counter.js'
 import { deriveToken, deriveDuressToken, MAX_TOLERANCE } from './token.js'
 import { GROUP_CONTEXT } from './derive.js'
@@ -192,25 +192,6 @@ export function reseed(state: GroupState): GroupState {
 }
 
 /**
- * Derive a new seed deterministically from the current seed and a context string.
- *
- * **SECURITY WARNING:** Do NOT use this for member removal. A removed member
- * knows the old seed and can compute the result, defeating forward secrecy.
- * For member removal, use `removeMember()` (which only filters the member list)
- * followed by creating a new group with a fresh random seed.
- *
- * newSeed = HMAC-SHA256(currentSeed, "canary:reseed:" + context)
- *
- * @deprecated Prefer `reseed()` (random) for security-critical key rotation.
- */
-function deterministicReseed(state: GroupState, context: string): GroupState {
-  const key = hexToBytes(state.seed)
-  const data = new TextEncoder().encode('canary:reseed:' + context)
-  const newSeed = bytesToHex(hmacSha256(key, data))
-  return { ...state, seed: newSeed, usageOffset: 0 }
-}
-
-/**
  * Add a member to the group. If the pubkey is already present, returns the
  * existing state unchanged (idempotent).
  * Returns new state — does not mutate the input.
@@ -257,7 +238,8 @@ export function removeMemberAndReseed(state: GroupState, pubkey: string): GroupS
  *
  * Note: zeroing the seed string prevents further token derivation. Full
  * memory erasure of prior string values is not possible in JS — platform-level
- * secure storage should handle that concern.
+ * secure storage should handle that concern. Callers MUST also delete the
+ * persisted record (IndexedDB, localStorage, backend) after calling this.
  *
  * Returns new state — does not mutate the input.
  */

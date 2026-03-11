@@ -71,8 +71,9 @@ export async function encryptEnvelope(groupKey: Uint8Array, plaintext: string): 
 export async function decryptEnvelope(groupKey: Uint8Array, encoded: string): Promise<string> {
   const combined = base64ToBytes(encoded)
 
-  if (combined.length < 12) {
-    throw new Error('decryptEnvelope: encoded data too short')
+  // 12-byte IV + 16-byte GCM auth tag = 28 bytes minimum (matching beacon.ts)
+  if (combined.length < 28) {
+    throw new Error('decryptEnvelope: encoded data too short (minimum 28 bytes: 12-byte IV + 16-byte GCM tag)')
   }
 
   const iv = combined.slice(0, 12)
