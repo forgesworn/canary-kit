@@ -1,0 +1,357 @@
+{
+  "version": 1,
+  "wordlist_sha256": "0334930ebdfbc76e81ec914515d7567ca85738a6bf3069249d97df951d44661c",
+  "wordlist_spotchecks": [
+    { "index": 0, "word": "ability" },
+    { "index": 1000, "word": "innocent" },
+    { "index": 2047, "word": "zoo" }
+  ],
+  "universal": {
+    "description": "CANARY-DERIVE and CANARY-DURESS (context-based, universal token API)",
+    "inputs": {
+      "secret": "0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    "vectors": [
+      {
+        "id": "U-01",
+        "function": "deriveTokenBytes",
+        "context": "canary:verify",
+        "counter": 0,
+        "expected": "c51524053f1f27a4c871c63069f285ce5ac5b69a40d6caa5af9b6945dd9556d1"
+      },
+      {
+        "id": "U-02",
+        "function": "deriveToken",
+        "context": "canary:verify",
+        "counter": 0,
+        "encoding": { "format": "words", "count": 1 },
+        "expected": "net"
+      },
+      {
+        "id": "U-03",
+        "function": "deriveToken",
+        "context": "canary:verify",
+        "counter": 1,
+        "encoding": { "format": "words", "count": 1 },
+        "expected": "famous"
+      },
+      {
+        "id": "U-04",
+        "function": "deriveToken",
+        "context": "dispatch:handoff",
+        "counter": 0,
+        "encoding": { "format": "pin", "digits": 4 },
+        "expected": "2818"
+      },
+      {
+        "id": "U-05",
+        "function": "deriveToken",
+        "context": "id:verify",
+        "counter": 0,
+        "encoding": { "format": "words", "count": 3 },
+        "expected": "decrease mistake require"
+      },
+      {
+        "id": "U-06",
+        "function": "deriveDuressToken",
+        "context": "canary:verify",
+        "identity": "alice",
+        "counter": 0,
+        "maxTolerance": 1,
+        "encoding": { "format": "words", "count": 1 },
+        "expected": "airport"
+      },
+      {
+        "id": "U-07",
+        "function": "deriveDuressToken",
+        "context": "dispatch:handoff",
+        "identity": "rider123",
+        "counter": 0,
+        "maxTolerance": 1,
+        "encoding": { "format": "pin", "digits": 4 },
+        "expected": "0973"
+      },
+      {
+        "id": "U-08",
+        "function": "verifyToken",
+        "context": "canary:verify",
+        "counter": 0,
+        "identities": ["alice"],
+        "input": "net",
+        "expected": { "status": "valid" }
+      },
+      {
+        "id": "U-09",
+        "function": "verifyToken",
+        "context": "canary:verify",
+        "counter": 0,
+        "identities": ["alice"],
+        "input": "airport",
+        "expected": { "status": "duress", "identities": ["alice"] }
+      },
+      {
+        "id": "U-10",
+        "function": "deriveLivenessToken",
+        "context": "canary:verify",
+        "identity": "alice",
+        "counter": 0,
+        "expected": "b38a10676ea8d4e716ad606e0b2ae7d9678e47ff44b0920a68ed6cb02e9bb858"
+      },
+      {
+        "id": "U-11",
+        "function": "deriveToken",
+        "context": "aviva:caller",
+        "counter": 0,
+        "encoding": { "format": "words", "count": 1 },
+        "expected": "bid"
+      },
+      {
+        "id": "U-12",
+        "function": "deriveToken",
+        "context": "aviva:agent",
+        "counter": 0,
+        "encoding": { "format": "words", "count": 1 },
+        "expected": "choose"
+      },
+      {
+        "id": "U-13",
+        "function": "deriveToken",
+        "context": "canary:verify",
+        "counter": 4294967295,
+        "encoding": { "format": "words", "count": 1 },
+        "expected": "stool"
+      },
+      {
+        "id": "U-14",
+        "function": "deriveToken",
+        "context": "",
+        "counter": 0,
+        "encoding": { "format": "words", "count": 1 },
+        "expected": "ski"
+      },
+      {
+        "id": "U-15",
+        "function": "deriveDuressToken",
+        "context": "canary:verify",
+        "identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "counter": 0,
+        "maxTolerance": 1,
+        "encoding": { "format": "words", "count": 1 },
+        "expected": "inlet"
+      },
+      {
+        "id": "U-16",
+        "function": "deriveToken",
+        "context": "canary:verify",
+        "counter": 0,
+        "encoding": { "format": "pin", "digits": 4 },
+        "expected": "0453"
+      },
+      {
+        "id": "U-17",
+        "function": "deriveDuressToken",
+        "context": "canary:verify",
+        "identity": "alice",
+        "counter": 759,
+        "maxTolerance": 1,
+        "encoding": { "format": "words", "count": 1 },
+        "notes": "Collision: raw duress = lodge = normal at counter 759, suffix 0x01 applied",
+        "expected": "rice"
+      },
+      {
+        "id": "U-18",
+        "function": "deriveLivenessToken",
+        "context": "canary:verify",
+        "identity": "alice",
+        "counter": 0,
+        "expected": "b38a10676ea8d4e716ad606e0b2ae7d9678e47ff44b0920a68ed6cb02e9bb858"
+      }
+    ]
+  },
+  "group": {
+    "description": "Group derivation (seed + counter, context='canary:group')",
+    "inputs": {
+      "seed_1": "0000000000000000000000000000000000000000000000000000000000000001",
+      "seed_2": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pubkey_a": "0000000000000000000000000000000000000000000000000000000000000002",
+      "pubkey_b": "0000000000000000000000000000000000000000000000000000000000000003"
+    },
+    "vectors": [
+      {
+        "id": "G-01",
+        "function": "deriveVerificationWord",
+        "seed": "seed_1",
+        "counter": 0,
+        "expected": "situate"
+      },
+      {
+        "id": "G-02",
+        "function": "deriveVerificationWord",
+        "seed": "seed_1",
+        "counter": 1,
+        "expected": "loom"
+      },
+      {
+        "id": "G-03",
+        "function": "deriveVerificationWord",
+        "seed": "seed_2",
+        "counter": 0,
+        "expected": "figure"
+      },
+      {
+        "id": "G-04",
+        "function": "deriveVerificationWord",
+        "seed": "seed_1",
+        "counter": 100,
+        "expected": "iron"
+      },
+      {
+        "id": "G-05",
+        "function": "deriveVerificationPhrase",
+        "seed": "seed_1",
+        "counter": 0,
+        "wordCount": 2,
+        "expected": ["situate", "airport"]
+      },
+      {
+        "id": "G-06",
+        "function": "deriveVerificationPhrase",
+        "seed": "seed_1",
+        "counter": 0,
+        "wordCount": 3,
+        "expected": ["situate", "airport", "defy"]
+      },
+      {
+        "id": "G-07",
+        "function": "deriveDuressWord",
+        "seed": "seed_1",
+        "pubkey": "pubkey_a",
+        "counter": 0,
+        "expected": "image"
+      },
+      {
+        "id": "G-08",
+        "function": "deriveDuressWord",
+        "seed": "seed_1",
+        "pubkey": "pubkey_b",
+        "counter": 0,
+        "expected": "follow"
+      },
+      {
+        "id": "G-09",
+        "function": "verifyWord",
+        "seed": "seed_1",
+        "members": ["pubkey_a", "pubkey_b"],
+        "counter": 0,
+        "input": "situate",
+        "expected": { "status": "verified" }
+      },
+      {
+        "id": "G-10",
+        "function": "verifyWord",
+        "seed": "seed_1",
+        "members": ["pubkey_a", "pubkey_b"],
+        "counter": 0,
+        "input": "image",
+        "expected": { "status": "duress", "members": ["pubkey_a"] }
+      },
+      {
+        "id": "G-11",
+        "function": "deriveVerificationWord",
+        "seed": "seed_1",
+        "counter": 4294967295,
+        "expected": "oxygen"
+      },
+      {
+        "id": "G-12",
+        "function": "deriveDuressWord",
+        "seed": "seed_1",
+        "pubkey": "pubkey_a",
+        "counter": 1136,
+        "notes": "Collision: raw duress = produce = verification word at counter 1138, suffix applied",
+        "expected": "ivory"
+      },
+      {
+        "id": "G-13",
+        "function": "verifyWord",
+        "seed": "seed_1",
+        "members": ["pubkey_a"],
+        "counter": 0,
+        "input": "loom",
+        "notes": "loom is verification word for counter 1; stale at counter 0 with tolerance 1",
+        "expected": { "status": "stale" }
+      },
+      {
+        "id": "G-14",
+        "function": "verifyWord",
+        "seed": "seed_1",
+        "members": ["pubkey_a", "pubkey_b"],
+        "counter": 0,
+        "input": "image",
+        "notes": "Multi-member check; only pubkey_a matches",
+        "expected": { "status": "duress", "members": ["pubkey_a"] }
+      }
+    ]
+  },
+  "beacon": {
+    "description": "Beacon key derivation (deterministic only)",
+    "inputs": {
+      "seed_1": "0000000000000000000000000000000000000000000000000000000000000001",
+      "seed_2": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "vectors": [
+      {
+        "id": "B-01",
+        "function": "deriveBeaconKey",
+        "seed": "seed_1",
+        "expected": "f1cdbb583158728fa3365cd4b01d875cc2462d369413c1adba10fd2bc5594267"
+      },
+      {
+        "id": "B-02",
+        "function": "deriveBeaconKey",
+        "seed": "seed_2",
+        "expected": "04a436a16387fb1352e9c317ed252027f301f81b4c86d6632bd8c1c55d8de52d"
+      }
+    ]
+  },
+  "counter": {
+    "description": "Time-based counter derivation",
+    "vectors": [
+      {
+        "id": "C-01",
+        "function": "getCounter",
+        "timestamp": 1209600,
+        "interval": 604800,
+        "expected": 2
+      },
+      {
+        "id": "C-02",
+        "function": "getCounter",
+        "timestamp": 604800,
+        "interval": 604800,
+        "expected": 1
+      },
+      {
+        "id": "C-03",
+        "function": "getCounter",
+        "timestamp": 604799,
+        "interval": 604800,
+        "expected": 0
+      },
+      {
+        "id": "C-04",
+        "function": "getCounter",
+        "timestamp": 0,
+        "interval": 604800,
+        "expected": 0
+      },
+      {
+        "id": "C-05",
+        "function": "getCounter",
+        "timestamp": 2524608000,
+        "interval": 604800,
+        "expected": 4174
+      }
+    ]
+  }
+}
