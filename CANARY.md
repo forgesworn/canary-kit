@@ -957,6 +957,18 @@ negating the simplicity of a single shared key.
 The protocol provides the machinery for fast recovery. The operational discipline
 of regular reseeds is where real-world resilience comes from.
 
+### Timing Safety
+
+Verification functions MUST NOT leak information through execution time.
+Implementations MUST use constant-time comparison for all token matching
+(e.g. XOR-and-accumulate, not early-exit string comparison). All verification
+branches (exact match, duress check, tolerance window) MUST be computed
+regardless of which branch matches — the result is determined after all
+comparisons complete, not by short-circuiting on the first match.
+
+This prevents an attacker from distinguishing verification tokens from duress
+tokens by measuring response time.
+
 ---
 
 ## Test Vectors
