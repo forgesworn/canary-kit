@@ -43,7 +43,11 @@ export async function encrypt(data: string, key: CryptoKey): Promise<string> {
   const combined = new Uint8Array(iv.length + new Uint8Array(ciphertext).length)
   combined.set(iv)
   combined.set(new Uint8Array(ciphertext), iv.length)
-  return btoa(String.fromCharCode(...combined))
+  // Use a loop instead of String.fromCharCode(...combined) to avoid
+  // stack overflow when the payload exceeds V8's argument limit (~65K bytes).
+  let binary = ''
+  for (let i = 0; i < combined.length; i++) binary += String.fromCharCode(combined[i])
+  return btoa(binary)
 }
 
 // ── Decryption ─────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY } from './types.js'
 import { getState, loadState, subscribe } from './state.js'
 import { deriveKey, encrypt, decrypt, generateSalt, encodeSalt, decodeSalt } from './crypto/pin.js'
 import { mnemonicToKeypair, validateMnemonic } from './mnemonic.js'
+import { initDuressQueueCrypto } from './duress-queue.js'
 
 // ── Storage keys ───────────────────────────────────────────────
 
@@ -508,6 +509,13 @@ const DEBOUNCE_MS = 100
  * - A stale write (version superseded while queued) is skipped.
  */
 export function initStorage(): void {
+  // Wire up duress queue encryption so queued alerts use PIN protection
+  initDuressQueueCrypto({
+    encrypt,
+    decrypt,
+    getPinKey: () => _pinKey,
+  })
+
   subscribe(() => {
     const version = ++_writeVersion
     clearTimeout(_debounceTimer)

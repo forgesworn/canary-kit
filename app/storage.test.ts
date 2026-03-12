@@ -166,6 +166,55 @@ describe('persistState — clean-install PIN regression', () => {
     expect(JSON.stringify(identity)).not.toContain(mnemonic)
   })
 
+  it('handles large payloads without stack overflow (pin.ts spread fix)', async () => {
+    // Create a state with a large serialised footprint (>65K) to verify that
+    // the String.fromCharCode loop in pin.ts doesn't blow the stack.
+    const bigMembers = Array.from({ length: 200 }, (_, i) =>
+      i.toString(16).padStart(64, '0'),
+    )
+    const state = freshState({
+      groups: {
+        'big-group': {
+          seed: 'b'.repeat(64),
+          counter: 1,
+          usageOffset: 0,
+          epoch: 0,
+          wordCount: 1,
+          rotationInterval: 604800,
+          name: 'Big Group',
+          groupId: 'big-group',
+          createdAt: Date.now(),
+          wordlist: 'en-v1',
+          beaconInterval: 300,
+          beaconPrecision: 6,
+          encodingFormat: 'words',
+          tolerance: 1,
+          members: bigMembers,
+          admins: [],
+          relays: [],
+          readRelays: [],
+          writeRelays: [],
+        },
+      },
+      settings: {
+        theme: 'dark',
+        pinEnabled: false,
+        autoLockMinutes: 5,
+        defaultRelays: [],
+        defaultReadRelays: [],
+        defaultWriteRelays: [],
+      },
+    })
+    loadState(state)
+
+    // Enable PIN — this encrypts the large state via pin.ts encrypt()
+    await enablePin('test-pin-large')
+
+    // Should have written encrypted groups without throwing
+    const groups = JSON.parse(store.get('canary:groups')!)
+    expect(groups).toMatchObject({ _encrypted: true })
+  })
+
   it('migrates the legacy plaintext mnemonic onto the matching identity', () => {
     const mnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
     const { pubkey, privkey } = mnemonicToKeypair(mnemonic)

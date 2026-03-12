@@ -88,6 +88,19 @@ describe('encryptBeacon / decryptBeacon', () => {
 const PUBKEY_A = '0000000000000000000000000000000000000000000000000000000000000002'
 
 describe('buildDuressAlert', () => {
+  it('rejects invalid pubkey', () => {
+    expect(() => buildDuressAlert('not-a-hex-pubkey', null)).toThrow(/Invalid member pubkey/)
+  })
+
+  it('rejects uppercase hex pubkey', () => {
+    const upperPubkey = 'ABCDEF0000000000000000000000000000000000000000000000000000000002'
+    expect(() => buildDuressAlert(upperPubkey, null)).toThrow(/Invalid member pubkey/)
+  })
+
+  it('rejects short hex string', () => {
+    expect(() => buildDuressAlert('abcdef', null)).toThrow(/Invalid member pubkey/)
+  })
+
   it('builds alert with beacon location', () => {
     const alert = buildDuressAlert(PUBKEY_A, {
       geohash: 'gcpuuzwjzpb',

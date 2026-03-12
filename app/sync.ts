@@ -81,10 +81,11 @@ export async function ensureTransport(readRelays: string[], writeRelays?: string
 
     // Drain any queued duress alerts for this group
     if (groupId) {
-      const queued = drainDuressQueue(groupId)
-      for (const msg of queued) {
-        broadcastAction(groupId, msg)
-      }
+      drainDuressQueue(groupId).then(queued => {
+        for (const msg of queued) {
+          broadcastAction(groupId, msg)
+        }
+      })
     }
 
     // Wait for relay connections to establish before updating status

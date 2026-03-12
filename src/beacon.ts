@@ -11,6 +11,8 @@
 
 import { hmacSha256, hexToBytes, bytesToBase64, base64ToBytes } from './crypto.js'
 
+const HEX_64_RE = /^[0-9a-f]{64}$/
+
 // ---------------------------------------------------------------------------
 // Key Derivation (sync)
 // ---------------------------------------------------------------------------
@@ -136,6 +138,9 @@ export function buildDuressAlert(
   memberPubkey: string,
   location: DuressLocation | null,
 ): DuressAlert {
+  if (!HEX_64_RE.test(memberPubkey)) {
+    throw new Error(`Invalid member pubkey: expected 64 lowercase hex characters, got "${memberPubkey.length > 80 ? memberPubkey.slice(0, 20) + '…' : memberPubkey}"`)
+  }
   if (location) {
     return {
       type: 'duress',
