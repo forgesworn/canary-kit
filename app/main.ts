@@ -1094,14 +1094,14 @@ function wireGlobalEvents(): void {
   // Re-sync when identity changes (e.g. nsec login from header popover)
   document.addEventListener('canary:resync', () => void bootSync())
 
-  // Force full reconnect when app returns to foreground — mobile browsers
-  // suspend WebSockets when backgrounded. The relay thinks the subscription
-  // is still active but data isn't flowing. Tearing down everything and
-  // reconnecting forces fresh WebSockets and subscriptions that pick up
-  // stored events (counter-advance, duress-alert) missed while away.
+  // Immediate vault publish requested (e.g. after word rotation)
+  document.addEventListener('canary:vault-publish-now', () => publishVaultNow())
+
+  // On foreground: reconnect relay + fetch vault to catch up on any state
+  // changes from other devices while this tab was suspended.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return
-    console.info('[canary:boot] App foregrounded — forcing full reconnect')
+    console.info('[canary:boot] App foregrounded — reconnecting and syncing vault')
     teardownSync()
     import('./nostr/connect.js').then(({ disconnectRelays }) => {
       disconnectRelays()
@@ -1183,16 +1183,29 @@ async function bootSync(): Promise<void> {
     // Full sync: transport + subscriptions + liveness heartbeat
     await ensureTransport(allReadRelays, allWriteRelays)
 
-    // Vault restore: fetch encrypted group state from relay if we have few/no local groups
+    // Vault sync: always fetch and merge — catches up on state changes from
+    // other devices (counter-advance, member changes, etc.)
     try {
       const vaultGroups = await fetchVault(identity!.privkey!, identity!.pubkey)
       if (vaultGroups && Object.keys(vaultGroups).length > 0) {
         const { groups: localGroups } = getState()
         const merged = mergeVaultGroups(localGroups, vaultGroups)
-        const newCount = Object.keys(merged).length - Object.keys(localGroups).length
-        if (newCount > 0) {
+        // Check if anything actually changed
+        const localKeys = Object.keys(localGroups).sort().join(',')
+        const mergedKeys = Object.keys(merged).sort().join(',')
+        const stateChanged = localKeys !== mergedKeys || Object.entries(merged).some(([id, g]) => {
+          const local = localGroups[id]
+          if (!local) return true
+          return g.epoch !== local.epoch || g.counter !== local.counter || g.usageOffset !== local.usageOffset || g.members.length !== local.members.length
+        })
+        if (stateChanged) {
           update({ groups: merged })
-          showToast(`Restored ${newCount} group(s) from vault`, 'success')
+          const newGroupCount = Object.keys(merged).length - Object.keys(localGroups).length
+          if (newGroupCount > 0) {
+            showToast(`Restored ${newGroupCount} group(s) from vault`, 'success')
+          } else {
+            showToast('Synced from vault', 'success', 1500)
+          }
         }
       }
     } catch (err) {
