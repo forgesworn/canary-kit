@@ -171,6 +171,10 @@ export class NostrSyncTransport implements SyncTransport {
 
     try {
       const signed = await groupInfo.signer.sign(unsigned)
+      // Track published event IDs so we don't process our own echoes from the relay
+      if (typeof (signed as any).id === 'string') {
+        this.seenEventIds.add((signed as any).id)
+      }
       console.info('[canary:sync] Publishing', message.type, 'to', groupId.slice(0, 8), '→ d-tag:', groupInfo.tagHash.slice(0, 12), '(write relays only)')
       await pool.publish(this.writeRelays, signed as any)
       console.info('[canary:sync] Published OK')
@@ -220,8 +224,11 @@ export class NostrSyncTransport implements SyncTransport {
             const active = this.groupKeys.get(groupId)
             if (!active) return // group was unregistered
 
-            // Skip our own events
-            if (event.pubkey === active.signer.pubkey) return
+            // Skip our own events — but only if WE published this exact event
+            // (checked via seenEventIds below). Two devices with the same nsec
+            // produce the same group signer pubkey, so we can't filter by pubkey alone.
+            // Instead, rely on seenEventIds: events we published are added to the set
+            // after publish, so they'll be caught by the dedup check below.
 
             // Verify relay event signature before trusting event.pubkey.
             if (!verifyEvent(event)) {
