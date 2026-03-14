@@ -11,8 +11,9 @@ import { encrypt as nip44Encrypt, decrypt as nip44Decrypt, getConversationKey } 
 
 /** Ephemeral kind for fire-and-forget messages (beacons, liveness). Not stored by relays. */
 const SYNC_EPHEMERAL_KIND = 29_111
-/** Stored kind for state mutations and safety-critical messages. Relays keep these for offline catch-up. */
-const SYNC_STORED_KIND = 9_111
+/** Parameterised replaceable kind for state mutations and safety-critical messages.
+ *  Relays store the latest event per pubkey+kind+d-tag for offline catch-up. */
+const SYNC_STORED_KIND = 39_111
 /** Event kind for recovery requests (NIP-44 personal-key encrypted). */
 const RECOVERY_REQUEST_KIND = 29_112
 /** Event kind for recovery responses (NIP-44 personal-key encrypted). */
@@ -146,10 +147,13 @@ export class NostrSyncTransport implements SyncTransport {
     const envelope = JSON.stringify({ s: this.personalPubkey, sig: innerSig, p: payload })
     const encrypted = await encryptEnvelope(groupInfo.key, envelope)
 
-    const kind = STORED_MESSAGE_TYPES.has(message.type) ? SYNC_STORED_KIND : SYNC_EPHEMERAL_KIND
-    const tags: string[][] = [['d', groupInfo.tagHash]]
-    // Stored events get NIP-40 expiration so relays clean them up after 7 days
-    if (kind === SYNC_STORED_KIND) {
+    const isStored = STORED_MESSAGE_TYPES.has(message.type)
+    const kind = isStored ? SYNC_STORED_KIND : SYNC_EPHEMERAL_KIND
+    // Stored events use type-scoped d-tags so each message type gets its own
+    // replaceable slot (counter-advance doesn't overwrite duress-alert, etc.)
+    const dTag = isStored ? `${groupInfo.tagHash}:${message.type}` : groupInfo.tagHash
+    const tags: string[][] = [['d', dTag]]
+    if (isStored) {
       tags.push(['expiration', String(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60)])
     }
     const unsigned = {
@@ -182,9 +186,11 @@ export class NostrSyncTransport implements SyncTransport {
     // Start the personal-key recovery channel if not already active
     this._ensureRecoverySub()
 
+    // Subscribe to both ephemeral (plain d-tag) and stored (type-scoped d-tags)
+    const storedDTags = Array.from(STORED_MESSAGE_TYPES).map(t => `${groupInfo.tagHash}:${t}`)
     const filter = {
       kinds: [SYNC_STORED_KIND, SYNC_EPHEMERAL_KIND],
-      '#d': [groupInfo.tagHash],
+      '#d': [groupInfo.tagHash, ...storedDTags],
       // 7-day window covers the default rotation interval and typical offline periods.
       // Privileged ops use epoch+opId for ordering, so receiving stale messages is safe
       // (they're idempotent or rejected by epoch/opId checks).
