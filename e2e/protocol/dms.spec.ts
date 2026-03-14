@@ -29,7 +29,7 @@ test.describe("Dead man's switch", () => {
     await addSimulatedMember(page)
 
     // That member has no check-in record — the liveness dot should be grey
-    await expect(page.locator('.liveness-dot--grey')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('.liveness-dot--grey').first()).toBeVisible({ timeout: 3000 })
   })
 
   test('overdue member shows red status after interval exceeded', async ({ cleanPage: page }) => {

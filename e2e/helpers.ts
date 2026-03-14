@@ -314,6 +314,12 @@ export async function verifyWord(
     if (firstValue) await memberSelect.selectOption(firstValue)
   }
 
+  // The manual input is inside a collapsed <details> — open it first
+  const details = page.locator('details.verify-fallback')
+  if (await details.count() > 0 && (await details.getAttribute('open')) === null) {
+    await details.locator('summary').click()
+  }
+
   await page.fill('#verify-input', word)
   await page.click('#verify-btn')
 
