@@ -1094,14 +1094,19 @@ function wireGlobalEvents(): void {
   // Re-sync when identity changes (e.g. nsec login from header popover)
   document.addEventListener('canary:resync', () => void bootSync())
 
-  // Reconnect when app returns to foreground — mobile browsers kill WebSockets
-  // when backgrounded. Re-subscribing picks up stored messages (counter-advance,
-  // duress-alert, member changes) that arrived while the tab was suspended.
+  // Force full reconnect when app returns to foreground — mobile browsers
+  // suspend WebSockets when backgrounded. The relay thinks the subscription
+  // is still active but data isn't flowing. Tearing down everything and
+  // reconnecting forces fresh WebSockets and subscriptions that pick up
+  // stored events (counter-advance, duress-alert) missed while away.
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      console.info('[canary:boot] App foregrounded — reconnecting sync')
+    if (document.hidden) return
+    console.info('[canary:boot] App foregrounded — forcing full reconnect')
+    teardownSync()
+    import('./nostr/connect.js').then(({ disconnectRelays }) => {
+      disconnectRelays()
       void bootSync()
-    }
+    })
   })
 }
 
