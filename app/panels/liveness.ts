@@ -36,6 +36,10 @@ function formatElapsed(seconds: number, lastCheckin: number): string {
  * Provides an "I'm Alive" button for the local identity.
  */
 const LIVENESS_INTERVALS: { label: string; value: number }[] = [
+  { label: '1m', value: 60 },
+  { label: '2m', value: 120 },
+  { label: '5m', value: 300 },
+  { label: '15m', value: 900 },
   { label: '1h', value: 3600 },
   { label: '4h', value: 14400 },
   { label: '24h', value: 86400 },
