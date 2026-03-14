@@ -277,17 +277,17 @@ export function renderHero(container: HTMLElement): void {
   burnBtn?.addEventListener('click', () => {
     try {
       burnWord(activeGroupId)
-      // Scramble animation on the masked word
-      const heroWord = container.querySelector<HTMLElement>('#hero-word')
-      if (heroWord) {
-        const { groups: g } = getState()
-        const updated = g[activeGroupId]
-        const newMasked = updated ? maskWord(formatForDisplay(getDisplayToken(updated), updated.encodingFormat)) : '••••••••'
-        scrambleText(heroWord, newMasked)
-      }
       const isOnline = groupMode(getState().groups[activeGroupId] ?? group) === 'online'
       showToast(isOnline ? 'Word rotated — syncing to group' : 'Word rotated', 'success', 2000)
       document.dispatchEvent(new CustomEvent('canary:vault-publish-now'))
+      // Scramble animation — run after the re-render replaces the DOM
+      requestAnimationFrame(() => {
+        const freshWord = document.getElementById('hero-word')
+        if (freshWord) {
+          const finalText = freshWord.textContent ?? '••••••••'
+          scrambleText(freshWord, finalText)
+        }
+      })
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to rotate word', 'error')
     }
