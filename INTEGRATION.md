@@ -245,6 +245,58 @@ if (result.status === 'valid') {
 }
 ```
 
+## Cross-Device State Sync
+
+Group-based deployments (family safety, field operations) must consider how
+group state reaches a user's second device. The seed, members, and settings
+are security-critical — they must not be transmitted in the clear.
+
+### Recommended: Encrypted Vault
+
+Encrypt the full group state with the user's own key and store it on an
+available transport. On login from a new device, fetch and decrypt the vault.
+
+Properties an implementation should preserve:
+
+| Property | Why |
+|----------|-----|
+| **Self-encrypted** | Only the user's own key can decrypt — the storage layer sees an opaque blob |
+| **No metadata leakage** | The transport must not reveal how many groups exist, who the members are, or that the blob is a CANARY vault |
+| **Transport-agnostic** | The vault is a single encrypted blob. It can be stored on a relay, a cloud bucket, a USB stick, or passed over a mesh radio |
+| **Conflict resolution** | When two devices have diverged, the merge strategy must be deterministic. Recommend: higher epoch wins (rekey happened), then higher counter wins, otherwise keep local |
+| **Offline-first** | A device that has never synced must still function. The vault is an enhancement, not a dependency |
+
+### What to store
+
+Include everything needed to derive tokens and verify members:
+
+- Group seed, counter, epoch, usage offset
+- Member list and admin list
+- Rotation interval, word count, tolerance, encoding format
+- Relay configuration (for online groups)
+- Display names (advisory, not security-critical)
+
+Exclude ephemeral or device-local state:
+
+- Beacon positions (device-local, stale quickly)
+- Liveness check-in timestamps (device-local)
+- UI preferences that are per-device
+
+### What NOT to do
+
+- **Do not sync seeds in plaintext** — even over TLS, storage backends may log or cache
+- **Do not use a shared encryption key** — each user encrypts their own vault with their own key
+- **Do not expose group count** — an attacker learning "this person has 3 safety groups" is itself sensitive information
+- **Do not require sync for operation** — the app must work offline after initial group setup
+
+### Reference implementation
+
+The canary-kit demo app (`app/nostr/vault.ts`) implements this pattern using
+NIP-44 self-encryption and NIP-78 application-specific replaceable events on
+Nostr relays. The vault is a single JSON blob containing all group states,
+encrypted with the user's own keypair, published as a kind 30078 event with
+a `d` tag of `canary:vault`.
+
 ## Licence
 
 MIT — same as canary-kit.
