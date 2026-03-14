@@ -1579,6 +1579,11 @@ function publishVaultNow(): void {
   const { identity, groups } = getState()
   if (identity?.privkey && identity?.pubkey && Object.keys(groups).length > 0) {
     publishVault(groups, identity.privkey, identity.pubkey)
+      .then(() => console.info('[canary:vault] Vault published OK'))
+      .catch((err) => {
+        console.error('[canary:vault] Vault publish FAILED:', err)
+        showToast(`Vault publish failed: ${err instanceof Error ? err.message : err}`, 'error')
+      })
   }
 }
 
