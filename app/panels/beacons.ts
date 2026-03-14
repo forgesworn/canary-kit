@@ -141,7 +141,6 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
 
   const group = groups[activeGroupId]
   const precision = group.beaconPrecision ?? 5
-  const duressPrecision = group.duressPrecision ?? 9
 
   // Restore persisted positions into the in-memory map (runs once per session)
   if (Object.keys(positions).length === 0 && group.lastPositions) {
@@ -174,15 +173,7 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
         </div>
         <p class="settings-hint">How precisely your location is shared in routine check-ins</p>
       </div>
-      <div style="margin-top: 0.5rem;">
-        <span class="input-label">Emergency precision</span>
-        <div class="segmented" id="duress-precision-picker">
-          ${PRECISION_PRESETS.map(p =>
-            `<button class="segmented__btn ${duressPrecision === p.value ? 'segmented__btn--active' : ''}" data-duress-precision="${p.value}" title="${p.hint}">${p.label}</button>`
-          ).join('')}
-        </div>
-        <p class="settings-hint">How precisely your location is shared in an emergency</p>
-      </div>
+      <p class="settings-hint" style="margin-top: 0.5rem; color: var(--duress);">Emergency signals always share your exact GPS so your group can find you.</p>
       <div class="beacon-list" id="beacon-list"></div>
     </section>
   `
@@ -198,16 +189,6 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
           stopBeaconWatch()
           startBeaconWatch()
         }
-        void renderBeacons(container)
-      }
-    })
-  })
-  container.querySelectorAll('[data-duress-precision]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const val = Number((btn as HTMLElement).dataset.duressPrecision)
-      const { activeGroupId: gid } = getState()
-      if (gid) {
-        updateGroup(gid, { duressPrecision: val })
         void renderBeacons(container)
       }
     })

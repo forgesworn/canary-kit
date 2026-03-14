@@ -5,7 +5,6 @@ import { getState } from '../state.js'
 import type { AppGroup } from '../types.js'
 import { toTokenEncoding, GROUP_CONTEXT, formatForDisplay } from '../utils/encoding.js'
 import { broadcastAction } from '../sync.js'
-import { encode, decode } from 'geohash-kit'
 
 /**
  * Derive the duress display token using the universal CANARY token API.
@@ -118,24 +117,14 @@ export function renderDuress(container: HTMLElement): void {
       // In the demo, all modes broadcast via the sync transport.
       // In production, 'dead-drop' would skip push notifications
       // and only persist on the relay for later retrieval.
-      // Share location at the configured duress precision (default: exact GPS).
-      const duressPrecision = currentGroup.duressPrecision ?? 9
+      // Emergency signals ALWAYS share exact GPS — you need to find them.
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            let lat = pos.coords.latitude
-            let lon = pos.coords.longitude
-            // Apply geohash quantisation at the configured precision
-            if (duressPrecision < 9) {
-              const gh = encode(lat, lon, duressPrecision)
-              const center = decode(gh)
-              lat = center.lat
-              lon = center.lon
-            }
             broadcastAction(gid, {
               type: 'duress-alert',
-              lat,
-              lon,
+              lat: pos.coords.latitude,
+              lon: pos.coords.longitude,
               timestamp: Math.floor(Date.now() / 1000),
               opId,
               subject: id.pubkey,
@@ -151,7 +140,7 @@ export function renderDuress(container: HTMLElement): void {
               subject: id.pubkey,
             })
           },
-          { enableHighAccuracy: duressPrecision >= 7, timeout: 5000 },
+          { enableHighAccuracy: true, timeout: 5000 },
         )
       } else {
         broadcastAction(gid, {
