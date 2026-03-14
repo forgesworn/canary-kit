@@ -209,7 +209,8 @@ function normaliseGroups(raw: unknown): Record<string, AppGroup> {
               .map(([pubkey, value]) => [pubkey, value]),
           ) as AppGroup['lastPositions']
         : undefined,
-      beaconPrecision: typeof group.beaconPrecision === 'number' ? group.beaconPrecision : 6,
+      beaconPrecision: typeof group.beaconPrecision === 'number' ? group.beaconPrecision : 5,
+      duressPrecision: typeof (group as any).duressPrecision === 'number' ? (group as any).duressPrecision : 9,
       nostrEnabled: typeof group.nostrEnabled === 'boolean'
         ? group.nostrEnabled
         : relayConfig.writeRelays.length > 0 || relayConfig.readRelays.length > 0,

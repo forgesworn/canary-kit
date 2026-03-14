@@ -42,9 +42,11 @@ export interface AppGroup extends GroupState {
   memberNames?: Record<string, string>
   /** Silent duress response mode: immediate alert, dead-drop, or both. */
   duressMode?: 'immediate' | 'dead-drop' | 'both'
-  /** Geohash precision for location beacons (1–11, default 6 ≈ 1.2km). Higher = more precise.
+  /** Geohash precision for location beacons (1–11, default 5 ≈ neighbourhood). Higher = more precise.
    * Inherited from GroupState where it's required; optional here for backwards compat with persisted state. */
   beaconPrecision: number
+  /** Geohash precision for duress alerts (1–11, default 9 ≈ exact). Higher = more precise. */
+  duressPrecision?: number
   /** Last known beacon positions per member pubkey — persisted so map shows data on refresh. */
   lastPositions?: Record<string, { lat: number; lon: number; geohash: string; precision: number; timestamp: number }>
 }

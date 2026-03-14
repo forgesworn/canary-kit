@@ -16,17 +16,13 @@ let geoWatchId: number | null = null
 let duressMembers = new Set<string>()
 let mapReady = false
 
-const PRECISION_LABELS: Record<number, string> = {
-  1: '2,500 km — continental',
-  2: '630 km — country',
-  3: '78 km — region',
-  4: '20 km — city',
-  5: '2.4 km — neighbourhood',
-  6: '610 m — street',
-  7: '76 m — building',
-  8: '19 m — door',
-  9: '2.4 m — exact',
-}
+/** Named precision presets — human-readable, ordered from least to most precise. */
+const PRECISION_PRESETS = [
+  { label: 'City', value: 4, hint: '~20 km' },
+  { label: 'Neighbourhood', value: 5, hint: '~2.4 km' },
+  { label: 'Street', value: 6, hint: '~610 m' },
+  { label: 'Exact', value: 9, hint: '~2 m' },
+] as const
 
 // ── Circle geometry helper ────────────────────────────────────
 
@@ -144,7 +140,8 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
   }
 
   const group = groups[activeGroupId]
-  const precision = group.beaconPrecision ?? 4
+  const precision = group.beaconPrecision ?? 5
+  const duressPrecision = group.duressPrecision ?? 9
 
   // Restore persisted positions into the in-memory map (runs once per session)
   if (Object.keys(positions).length === 0 && group.lastPositions) {
@@ -169,37 +166,51 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
         ${geoWatchId !== null ? '<span class="settings-hint" style="margin: 0;">Your approximate area is visible to group members</span>' : ''}
       </div>
       <div style="margin-top: 0.75rem;">
-        <label class="input-label" style="margin-bottom: 0.25rem;">
-          <span>Location Precision</span>
-        </label>
-        <input type="range" id="precision-slider" min="1" max="9" value="${precision}" style="width: 100%; accent-color: #f59e0b;" />
-        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.25rem;">
-          <span class="settings-hint" id="precision-label">${PRECISION_LABELS[precision]}</span>
-          <span class="settings-hint" style="opacity: 0.5; font-size: 0.7rem;">Emergency: full GPS</span>
+        <span class="input-label">"I'm Alive" precision</span>
+        <div class="segmented" id="beacon-precision-picker">
+          ${PRECISION_PRESETS.map(p =>
+            `<button class="segmented__btn ${precision === p.value ? 'segmented__btn--active' : ''}" data-beacon-precision="${p.value}" title="${p.hint}">${p.label}</button>`
+          ).join('')}
         </div>
+        <p class="settings-hint">How precisely your location is shared in routine check-ins</p>
+      </div>
+      <div style="margin-top: 0.5rem;">
+        <span class="input-label">Emergency precision</span>
+        <div class="segmented" id="duress-precision-picker">
+          ${PRECISION_PRESETS.map(p =>
+            `<button class="segmented__btn ${duressPrecision === p.value ? 'segmented__btn--active' : ''}" data-duress-precision="${p.value}" title="${p.hint}">${p.label}</button>`
+          ).join('')}
+        </div>
+        <p class="settings-hint">How precisely your location is shared in an emergency</p>
       </div>
       <div class="beacon-list" id="beacon-list"></div>
     </section>
   `
 
-  // ── Precision slider ────────────────────────────────────────
-  const slider = container.querySelector<HTMLInputElement>('#precision-slider')
-  const precisionLabel = container.querySelector<HTMLElement>('#precision-label')
-  slider?.addEventListener('input', () => {
-    const val = Number(slider.value)
-    if (precisionLabel) precisionLabel.textContent = PRECISION_LABELS[val] ?? ''
-  })
-  slider?.addEventListener('change', () => {
-    const val = Number(slider.value)
-    const { activeGroupId: gid } = getState()
-    if (gid) {
-      updateGroup(gid, { beaconPrecision: val })
-      // Restart watch with new precision if active
-      if (geoWatchId !== null) {
-        stopBeaconWatch()
-        startBeaconWatch()
+  // ── Precision pickers ────────────────────────────────────────
+  container.querySelectorAll('[data-beacon-precision]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = Number((btn as HTMLElement).dataset.beaconPrecision)
+      const { activeGroupId: gid } = getState()
+      if (gid) {
+        updateGroup(gid, { beaconPrecision: val })
+        if (geoWatchId !== null) {
+          stopBeaconWatch()
+          startBeaconWatch()
+        }
+        void renderBeacons(container)
       }
-    }
+    })
+  })
+  container.querySelectorAll('[data-duress-precision]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = Number((btn as HTMLElement).dataset.duressPrecision)
+      const { activeGroupId: gid } = getState()
+      if (gid) {
+        updateGroup(gid, { duressPrecision: val })
+        void renderBeacons(container)
+      }
+    })
   })
 
   container.querySelector<HTMLButtonElement>('#beacon-toggle-btn')?.addEventListener('click', () => {
@@ -324,7 +335,7 @@ function startBeaconWatch(): void {
   const beaconKey = deriveBeaconKey(group.seed)
 
   // City-level precision (4 ≈ 20 km cell radius) — deliberately coarse
-  const geohashPrecision = group.beaconPrecision || 4
+  const geohashPrecision = group.beaconPrecision || 5
 
   geoWatchId = navigator.geolocation.watchPosition(
     async (pos) => {
@@ -547,7 +558,7 @@ export function sendLocationPing(): void {
 
   const group = groups[activeGroupId]
   const beaconKey = deriveBeaconKey(group.seed)
-  const geohashPrecision = group.beaconPrecision || 4
+  const geohashPrecision = group.beaconPrecision || 5
 
   // Start the continuous watch if not already running
   if (geoWatchId === null) startBeaconWatch()

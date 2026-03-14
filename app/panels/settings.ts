@@ -427,7 +427,8 @@ export function renderSettings(container: HTMLElement): void {
           livenessCheckins: {} as Record<string, number>,
           tolerance: typeof imported.tolerance === 'number' && imported.tolerance >= 0 && imported.tolerance <= 10 ? imported.tolerance : 1,
           beaconInterval: typeof imported.beaconInterval === 'number' && imported.beaconInterval > 0 ? imported.beaconInterval : 60,
-          beaconPrecision: typeof imported.beaconPrecision === 'number' && imported.beaconPrecision > 0 ? imported.beaconPrecision : 6,
+          beaconPrecision: typeof imported.beaconPrecision === 'number' && imported.beaconPrecision > 0 ? imported.beaconPrecision : 5,
+          duressPrecision: typeof imported.duressPrecision === 'number' && imported.duressPrecision > 0 ? imported.duressPrecision : 9,
           duressMode: (['immediate', 'dead-drop', 'both'] as const).includes(imported.duressMode) ? imported.duressMode : 'immediate',
           createdAt: typeof imported.createdAt === 'number' ? imported.createdAt : Math.floor(Date.now() / 1000),
           admins: Array.isArray(imported.admins)
