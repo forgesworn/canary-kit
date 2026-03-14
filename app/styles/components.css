@@ -565,6 +565,17 @@ select.input option {
   text-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
 }
 
+.hero__word--rotating {
+  animation: word-rotate 0.5s ease-in-out;
+}
+
+@keyframes word-rotate {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  40% { opacity: 0; transform: translateY(-12px) scale(0.95); }
+  60% { opacity: 0; transform: translateY(12px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* ── .hero__reveal-btn ───────────────────────────────────── */
 
 .hero__reveal-btn {
@@ -803,6 +814,51 @@ select.input option {
 
 .verify-form .input {
   flex: 1;
+}
+
+/* ── .verify-choices ─────────────────────────────────────── */
+
+.verify-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.verify-choice {
+  padding: 0.875rem 0.5rem;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  min-height: 48px;
+}
+
+.verify-choice:hover {
+  border-color: var(--text-muted);
+  background: var(--surface-alt, rgba(255,255,255,0.05));
+}
+
+.verify-choice:active {
+  transform: scale(0.97);
+}
+
+.verify-choice--correct {
+  border-color: var(--verified);
+  background: var(--verified-bg);
+  color: var(--verified);
+}
+
+.verify-choice--wrong {
+  border-color: var(--failed);
+  background: var(--failed-bg);
+  color: var(--failed);
 }
 
 /* ── .verify-result ──────────────────────────────────────── */

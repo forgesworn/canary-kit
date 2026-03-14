@@ -243,10 +243,15 @@ export function renderHero(container: HTMLElement): void {
   const burnBtn = container.querySelector<HTMLButtonElement>('#burn-btn')
   burnBtn?.addEventListener('click', () => {
     try {
+      // Animate the word change
+      const heroWord = container.querySelector<HTMLElement>('#hero-word')
+      if (heroWord) {
+        heroWord.classList.add('hero__word--rotating')
+        heroWord.addEventListener('animationend', () => heroWord.classList.remove('hero__word--rotating'), { once: true })
+      }
       burnWord(activeGroupId)
       const isOnline = groupMode(getState().groups[activeGroupId] ?? group) === 'online'
       showToast(isOnline ? 'Word rotated — syncing to group' : 'Word rotated', 'success', 2000)
-      // Trigger immediate vault publish so other devices catch up
       document.dispatchEvent(new CustomEvent('canary:vault-publish-now'))
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to rotate word', 'error')
