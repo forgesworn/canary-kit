@@ -1,7 +1,13 @@
 // app/nostr/adapter.ts — Nostr implementation of SyncTransport (group key encryption)
 
 import type { SyncTransport, SyncMessage } from 'canary-kit/sync'
-import { encodeSyncMessage, decodeSyncMessage, hashGroupTag, encryptEnvelope, decryptEnvelope, deriveGroupKey, canonicaliseSyncMessage, PROTOCOL_VERSION, STORED_MESSAGE_TYPES } from 'canary-kit/sync'
+import { encodeSyncMessage, decodeSyncMessage, hashGroupTag, encryptEnvelope, decryptEnvelope, deriveGroupKey, canonicaliseSyncMessage, PROTOCOL_VERSION } from 'canary-kit/sync'
+
+/** Message types that must be stored (not ephemeral) for offline catch-up. */
+const STORED_MESSAGE_TYPES = new Set([
+  'member-join', 'member-leave', 'counter-advance', 'reseed',
+  'state-snapshot', 'duress-alert', 'duress-clear',
+])
 import { bytesToHex, hexToBytes, sha256 } from 'canary-kit/crypto'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { getPool, isConnected, connectRelays, getReadRelayUrls, getWriteRelayUrls } from './connect.js'
