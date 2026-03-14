@@ -39,6 +39,7 @@ import { resolveSigner, hasNip07 } from './nostr/signer.js'
 import { decode as nip19decode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
+import { fetchVault, publishVault, mergeVaultGroups } from './nostr/vault.js'
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
 import { escapeHtml } from './utils/escape.js'
@@ -451,6 +452,7 @@ function showCreateGroupModal(): void {
     if (newGroup && groupMode(newGroup) === 'online' && allRelaysForGroup(newGroup).length > 0) {
       void ensureTransport(newGroup.readRelays ?? [], newGroup.writeRelays ?? [], groupId)
     }
+    publishVaultNow()
   })
 
   requestAnimationFrame(() => {
@@ -638,6 +640,7 @@ function showBinaryJoinScreen(b64url: string): void {
         update({ groups, activeGroupId: id })
         consumeInvite(id, validated.nonce)
         flushPersist()
+        publishVaultNow()
 
         // Boot relay sync if available
         if (hasRelays && identity) {
@@ -743,6 +746,7 @@ function acceptWelcomeEnvelope(
   const groups = { ...existingGroups, [id]: appGroup }
   update({ groups, activeGroupId: id })
   flushPersist()
+  publishVaultNow()
 
   // Boot relay sync and announce
   if (hasRelays && identity) {
@@ -1159,6 +1163,23 @@ async function bootSync(): Promise<void> {
   if (hasPrivkey) {
     // Full sync: transport + subscriptions + liveness heartbeat
     await ensureTransport(allReadRelays, allWriteRelays)
+
+    // Vault restore: fetch encrypted group state from relay if we have few/no local groups
+    try {
+      const vaultGroups = await fetchVault(identity!.privkey!, identity!.pubkey)
+      if (vaultGroups && Object.keys(vaultGroups).length > 0) {
+        const { groups: localGroups } = getState()
+        const merged = mergeVaultGroups(localGroups, vaultGroups)
+        const newCount = Object.keys(merged).length - Object.keys(localGroups).length
+        if (newCount > 0) {
+          update({ groups: merged })
+          showToast(`Restored ${newCount} group(s) from vault`, 'success')
+        }
+      }
+    } catch (err) {
+      console.warn('[canary:vault] Vault fetch failed:', err)
+    }
+
     subscribeToAllGroups()
     showToast(`Syncing via ${totalRelays} relay(s)`, 'success', 2000)
   } else {
@@ -1493,6 +1514,7 @@ async function bootApp(): Promise<void> {
   wireSidebarToggle()
   render()
   subscribe(scheduleRender)
+  subscribe(scheduleVaultPublish)
   wireGlobalEvents()
 
   // Must come AFTER wireGlobalEvents so the 'canary:join-group' listener is registered
@@ -1501,6 +1523,36 @@ async function bootApp(): Promise<void> {
 
   void bootSync()
 }
+
+// ── Vault sync: debounced publish on group changes ────────────
+let _vaultTimer: ReturnType<typeof setTimeout> | null = null
+const VAULT_DEBOUNCE_MS = 30_000
+
+function scheduleVaultPublish(): void {
+  const { identity, groups } = getState()
+  if (!identity?.privkey || !identity?.pubkey) return
+  if (Object.keys(groups).length === 0) return
+
+  if (_vaultTimer) clearTimeout(_vaultTimer)
+  _vaultTimer = setTimeout(() => {
+    const { identity: id, groups: g } = getState()
+    if (id?.privkey && id?.pubkey && Object.keys(g).length > 0) {
+      publishVault(g, id.privkey, id.pubkey)
+    }
+  }, VAULT_DEBOUNCE_MS)
+}
+
+function publishVaultNow(): void {
+  if (_vaultTimer) clearTimeout(_vaultTimer)
+  const { identity, groups } = getState()
+  if (identity?.privkey && identity?.pubkey && Object.keys(groups).length > 0) {
+    publishVault(groups, identity.privkey, identity.pubkey)
+  }
+}
+
+window.addEventListener('beforeunload', () => {
+  if (_vaultTimer) publishVaultNow()
+})
 
 // ── Bootstrap ──────────────────────────────────────────────────
 
