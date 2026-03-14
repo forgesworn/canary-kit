@@ -158,10 +158,11 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
       <h3 class="panel__title">Location</h3>
       <p class="settings-hint" style="margin-bottom: 0.5rem;">Approximate location of group members. Circles show the geohash area — your exact position is never shared. In an emergency, full GPS precision is used so your group can help. Circles turn <span style="color: #f87171; font-weight: 500;">red</span> when an emergency signal is active.</p>
       <div class="beacon-map" id="beacon-map" style="height: 500px; border-radius: 8px;"></div>
-      <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; flex-wrap: wrap;">
         <button class="btn ${geoWatchId !== null ? 'btn--primary' : ''}" id="beacon-toggle-btn" type="button">
           ${geoWatchId !== null ? 'Sharing Location' : 'Share Location'}
         </button>
+        <button class="btn btn--ghost" id="beacon-fit-btn" type="button" title="Zoom to fit all group members on the map">Fit All</button>
         ${geoWatchId !== null ? '<span class="settings-hint" style="margin: 0;">Your approximate area is visible to group members</span>' : ''}
       </div>
       <div style="margin-top: 0.75rem;">
@@ -205,6 +206,10 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
     }
     // Re-render to update button state
     void renderBeacons(container)
+  })
+
+  container.querySelector<HTMLButtonElement>('#beacon-fit-btn')?.addEventListener('click', () => {
+    fitMapToMarkers()
   })
 
   try {
