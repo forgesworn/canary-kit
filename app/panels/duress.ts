@@ -56,6 +56,7 @@ export function renderDuress(container: HTMLElement): void {
         type="button"
         ${!isMember ? 'disabled' : ''}
         aria-label="Hold to reveal emergency word"
+        title="Hold briefly to see your emergency word. Hold 3+ seconds to silently alert your group."
       >
         <span class="duress-btn__ring" id="duress-ring"></span>
         <span id="duress-label">Hold to Reveal</span>

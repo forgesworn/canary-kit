@@ -550,9 +550,9 @@ export function renderMembers(container: HTMLElement): void {
         ${memberItems}
       </ul>
       ${isAdmin ? `<div class="members-actions">
-        <button class="btn btn--sm" id="invite-btn" type="button">+ Invite</button>
-        <button class="btn btn--sm" id="share-state-btn" type="button">Share State</button>
-        <button class="btn btn--sm" id="confirm-member-btn" type="button">Confirm Member</button>
+        <button class="btn btn--sm" id="invite-btn" type="button" title="Invite a new person to join this group">+ Invite</button>
+        <button class="btn btn--sm" id="share-state-btn" type="button" title="Share the latest group state with existing members after changes">Share State</button>
+        <button class="btn btn--sm" id="confirm-member-btn" type="button" title="Verify and add a member using their acknowledgement token or verification word">Confirm Member</button>
       </div>` : ''}
     </section>
   `

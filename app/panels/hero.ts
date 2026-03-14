@@ -5,8 +5,10 @@ import { deriveToken, deriveDuressToken } from 'canary-kit/token'
 import { getState, updateGroup } from '../state.js'
 import { burnWord } from '../actions/groups.js'
 import type { AppGroup } from '../types.js'
+import { groupMode } from '../types.js'
 import { toTokenEncoding, GROUP_CONTEXT, formatForDisplay } from '../utils/encoding.js'
 import { escapeHtml } from '../utils/escape.js'
+import { showToast } from '../components/toast.js'
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -190,8 +192,8 @@ export function renderHero(container: HTMLElement): void {
 
       <p class="hero__hint">Press and hold to reveal. Tap the right side for your alternate word.</p>
 
-      <button class="btn btn--ghost" id="burn-btn" type="button">I used this word</button>
-      <button class="btn btn--outline" id="hero-invite-btn" type="button">Invite Someone</button>
+      <button class="btn btn--ghost" id="burn-btn" type="button" title="Rotate to a new word now. All group members will get a new word too.">I used this word</button>
+      <button class="btn btn--outline" id="hero-invite-btn" type="button" title="Share group access with someone new">Invite Someone</button>
       ${group.members.length >= 2 ? `<button class="btn btn--outline" id="hero-call-btn" type="button" title="Start a phone call verification">Verify Call</button>` : ''}
 
     </section>
@@ -240,7 +242,13 @@ export function renderHero(container: HTMLElement): void {
 
   const burnBtn = container.querySelector<HTMLButtonElement>('#burn-btn')
   burnBtn?.addEventListener('click', () => {
-    burnWord(activeGroupId)
+    try {
+      burnWord(activeGroupId)
+      const isOnline = groupMode(getState().groups[activeGroupId] ?? group) === 'online'
+      showToast(isOnline ? 'Word rotated — syncing to group' : 'Word rotated', 'success', 2000)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to rotate word', 'error')
+    }
   })
 
   const inviteBtn = container.querySelector<HTMLButtonElement>('#hero-invite-btn')

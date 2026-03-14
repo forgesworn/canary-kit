@@ -100,7 +100,7 @@ export function renderLiveness(container: HTMLElement): void {
         ${memberItems}
       </ul>
       ${showCheckinBtn ? `
-        <button class="btn btn--primary" id="checkin-btn" type="button">I'm Alive</button>
+        <button class="btn btn--primary" id="checkin-btn" type="button" title="Check in with your group and share your approximate location">I'm Alive</button>
       ` : ''}
     </section>
   `
