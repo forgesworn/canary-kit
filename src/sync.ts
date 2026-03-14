@@ -16,6 +16,7 @@ export type SyncMessage =
   | { type: 'reseed'; seed: Uint8Array; counter: number; timestamp: number; epoch: number; opId: string; admins: string[]; members: string[]; protocolVersion?: number }
   | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number; opId: string; protocolVersion?: number }
   | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId: string; subject?: string; protocolVersion?: number }
+  | { type: 'duress-clear'; subject: string; timestamp: number; opId: string; protocolVersion?: number }
   | { type: 'liveness-checkin'; pubkey: string; timestamp: number; opId: string; protocolVersion?: number }
   /** WARNING: seed is a plaintext hex string. This message type MUST be sent inside an encrypted
    *  envelope (NIP-44 or AES-GCM via sync-crypto). Callers MUST NOT log SyncMessage objects
@@ -24,7 +25,17 @@ export type SyncMessage =
 
 const VALID_TYPES = new Set<string>([
   'member-join', 'member-leave', 'counter-advance',
-  'reseed', 'beacon', 'duress-alert', 'liveness-checkin', 'state-snapshot',
+  'reseed', 'beacon', 'duress-alert', 'duress-clear', 'liveness-checkin', 'state-snapshot',
+])
+
+/**
+ * Message types that mutate group state or are safety-critical.
+ * These MUST be delivered to offline devices — use a stored event kind.
+ * Fire-and-forget messages (beacons, liveness) use ephemeral kinds.
+ */
+export const STORED_MESSAGE_TYPES = new Set<string>([
+  'member-join', 'member-leave', 'counter-advance', 'reseed',
+  'state-snapshot', 'duress-alert', 'duress-clear',
 ])
 
 /** 64-character lowercase hex string (32 bytes — Nostr pubkey or CANARY seed). */

@@ -1,7 +1,7 @@
 // app/nostr/adapter.ts — Nostr implementation of SyncTransport (group key encryption)
 
 import type { SyncTransport, SyncMessage } from 'canary-kit/sync'
-import { encodeSyncMessage, decodeSyncMessage, hashGroupTag, encryptEnvelope, decryptEnvelope, deriveGroupKey, canonicaliseSyncMessage, PROTOCOL_VERSION } from 'canary-kit/sync'
+import { encodeSyncMessage, decodeSyncMessage, hashGroupTag, encryptEnvelope, decryptEnvelope, deriveGroupKey, canonicaliseSyncMessage, PROTOCOL_VERSION, STORED_MESSAGE_TYPES } from 'canary-kit/sync'
 import { bytesToHex, hexToBytes, sha256 } from 'canary-kit/crypto'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { getPool, isConnected, connectRelays, getReadRelayUrls, getWriteRelayUrls } from './connect.js'
@@ -9,8 +9,10 @@ import { dedupeRelays } from '../types.js'
 import { verifyEvent, finalizeEvent } from 'nostr-tools/pure'
 import { encrypt as nip44Encrypt, decrypt as nip44Decrypt, getConversationKey } from 'nostr-tools/nip44'
 
-/** Single event kind for all CANARY-SYNC messages (type is inside encrypted payload). */
-const SYNC_EVENT_KIND = 29_111
+/** Ephemeral kind for fire-and-forget messages (beacons, liveness). Not stored by relays. */
+const SYNC_EPHEMERAL_KIND = 29_111
+/** Stored kind for state mutations and safety-critical messages. Relays keep these for offline catch-up. */
+const SYNC_STORED_KIND = 9_111
 /** Event kind for recovery requests (NIP-44 personal-key encrypted). */
 const RECOVERY_REQUEST_KIND = 29_112
 /** Event kind for recovery responses (NIP-44 personal-key encrypted). */
@@ -144,10 +146,16 @@ export class NostrSyncTransport implements SyncTransport {
     const envelope = JSON.stringify({ s: this.personalPubkey, sig: innerSig, p: payload })
     const encrypted = await encryptEnvelope(groupInfo.key, envelope)
 
+    const kind = STORED_MESSAGE_TYPES.has(message.type) ? SYNC_STORED_KIND : SYNC_EPHEMERAL_KIND
+    const tags: string[][] = [['d', groupInfo.tagHash]]
+    // Stored events get NIP-40 expiration so relays clean them up after 7 days
+    if (kind === SYNC_STORED_KIND) {
+      tags.push(['expiration', String(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60)])
+    }
     const unsigned = {
-      kind: SYNC_EVENT_KIND,
+      kind,
       content: encrypted,
-      tags: [['d', groupInfo.tagHash]],
+      tags,
       created_at: Math.floor(Date.now() / 1000),
     }
 
@@ -175,7 +183,7 @@ export class NostrSyncTransport implements SyncTransport {
     this._ensureRecoverySub()
 
     const filter = {
-      kinds: [SYNC_EVENT_KIND],
+      kinds: [SYNC_STORED_KIND, SYNC_EPHEMERAL_KIND],
       '#d': [groupInfo.tagHash],
       // 7-day window covers the default rotation interval and typical offline periods.
       // Privileged ops use epoch+opId for ordering, so receiving stale messages is safe

@@ -1084,6 +1084,10 @@ function wireGlobalEvents(): void {
       const { identity: localIdentity } = getState()
       if (localIdentity?.pubkey === duressPubkey) return
       showDuressAlert(duressPubkey, groupId, message.lat != null ? { lat: message.lat, lon: message.lon } : undefined, message.timestamp)
+    } else if (message.type === 'duress-clear') {
+      document.dispatchEvent(new CustomEvent('canary:duress-clear', {
+        detail: { subject: message.subject, clearedBy: sender, groupId },
+      }))
     }
   })
 

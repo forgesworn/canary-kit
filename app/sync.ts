@@ -192,7 +192,7 @@ export function handleFireAndForget(
   }
 
   // App-layer side effects for fire-and-forget messages (with replay protection).
-  if (msg.type === 'beacon' || msg.type === 'duress-alert') {
+  if (msg.type === 'beacon' || msg.type === 'duress-alert' || msg.type === 'duress-clear') {
     const elapsed = nowSec - msg.timestamp
     if (elapsed > FIRE_AND_FORGET_FRESHNESS_SEC || elapsed < -60) return // stale or future — suppress
 

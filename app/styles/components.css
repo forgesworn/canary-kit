@@ -2129,6 +2129,25 @@ select.input option {
   background: #f0f0f0;
 }
 
+.duress-overlay__stand-down {
+  min-width: 200px;
+  background: transparent;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 0.75rem;
+  min-height: 44px;
+}
+
+.duress-overlay__stand-down:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* ── Call verification overlay ──────────────────────────────── */
 
 .call-verify {
