@@ -189,7 +189,10 @@ export async function renderBeacons(container: HTMLElement): Promise<void> {
           stopBeaconWatch()
           startBeaconWatch()
         }
-        void renderBeacons(container)
+        // Update active state directly — can't re-render because the map early-return blocks it
+        container.querySelectorAll('[data-beacon-precision]').forEach(b => {
+          b.classList.toggle('segmented__btn--active', Number((b as HTMLElement).dataset.beaconPrecision) === val)
+        })
       }
     })
   })
