@@ -313,7 +313,7 @@ export interface DirectionalPair {
 
 /**
  * Derive a directional pair: two distinct tokens from the same secret,
- * one per role. Each token uses context = `${namespace}:${role}`.
+ * one per role. Each token uses context = `${namespace}\0${role}`.
  *
  * Neither token can be derived from the other without the shared secret.
  * This prevents the "echo problem" where the second speaker could parrot
