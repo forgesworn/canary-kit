@@ -18,13 +18,23 @@ const HEX_64_RE = /^[0-9a-f]{64}$/
 // ---------------------------------------------------------------------------
 
 const BEACON_KEY_INFO = new TextEncoder().encode('canary:beacon:key')
+const DURESS_KEY_INFO = new TextEncoder().encode('canary:duress:key')
 
 /**
- * Derive a 256-bit AES key from the group seed for beacon/duress encryption.
+ * Derive a 256-bit AES key from the group seed for beacon encryption.
  * Deterministic: same seed always produces the same key.
  */
 export function deriveBeaconKey(seedHex: string): Uint8Array {
   return hmacSha256(hexToBytes(seedHex), BEACON_KEY_INFO)
+}
+
+/**
+ * Derive a 256-bit AES key from the group seed for duress alert encryption.
+ * Uses a distinct HMAC info string from beacon keys for domain separation —
+ * prevents cross-type key reuse between normal beacons and duress alerts.
+ */
+export function deriveDuressKey(seedHex: string): Uint8Array {
+  return hmacSha256(hexToBytes(seedHex), DURESS_KEY_INFO)
 }
 
 // ---------------------------------------------------------------------------
@@ -99,11 +109,17 @@ export async function decryptBeacon(
   content: string,
 ): Promise<BeaconPayload> {
   const plaintext = await aesGcmDecrypt(key, content)
-  const parsed = JSON.parse(new TextDecoder().decode(plaintext))
-  if (typeof parsed.geohash !== 'string' || typeof parsed.precision !== 'number' || typeof parsed.timestamp !== 'number') {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(plaintext))
+  } catch {
+    throw new Error('Invalid beacon payload: decrypted content is not valid JSON')
+  }
+  const obj = parsed as Record<string, unknown>
+  if (typeof obj.geohash !== 'string' || typeof obj.precision !== 'number' || typeof obj.timestamp !== 'number') {
     throw new Error('Invalid beacon payload: missing or malformed required fields')
   }
-  return parsed
+  return parsed as BeaconPayload
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +155,7 @@ export function buildDuressAlert(
   location: DuressLocation | null,
 ): DuressAlert {
   if (!HEX_64_RE.test(memberPubkey)) {
-    throw new Error(`Invalid member pubkey: expected 64 lowercase hex characters, got "${memberPubkey.length > 80 ? memberPubkey.slice(0, 20) + '…' : memberPubkey}"`)
+    throw new Error(`Invalid member pubkey: expected 64 lowercase hex characters, got ${memberPubkey.length} chars`)
   }
   if (location) {
     return {
@@ -180,17 +196,23 @@ export async function decryptDuressAlert(
   content: string,
 ): Promise<DuressAlert> {
   const plaintext = await aesGcmDecrypt(key, content)
-  const parsed = JSON.parse(new TextDecoder().decode(plaintext))
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(plaintext))
+  } catch {
+    throw new Error('Invalid duress alert payload: decrypted content is not valid JSON')
+  }
+  const obj = parsed as Record<string, unknown>
   const VALID_SOURCES = new Set(['beacon', 'verifier', 'none'])
   if (
-    parsed.type !== 'duress' ||
-    typeof parsed.member !== 'string' ||
-    typeof parsed.timestamp !== 'number' ||
-    typeof parsed.geohash !== 'string' ||
-    typeof parsed.precision !== 'number' ||
-    !VALID_SOURCES.has(parsed.locationSource)
+    obj.type !== 'duress' ||
+    typeof obj.member !== 'string' ||
+    typeof obj.timestamp !== 'number' ||
+    typeof obj.geohash !== 'string' ||
+    typeof obj.precision !== 'number' ||
+    !VALID_SOURCES.has(obj.locationSource as string)
   ) {
     throw new Error('Invalid duress alert payload: missing or malformed required fields')
   }
-  return parsed
+  return parsed as DuressAlert
 }

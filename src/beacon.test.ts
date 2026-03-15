@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   deriveBeaconKey,
+  deriveDuressKey,
   encryptBeacon,
   decryptBeacon,
   buildDuressAlert,
@@ -209,5 +210,39 @@ describe('encryptDuressAlert / decryptDuressAlert', () => {
     })
     const encrypted = await encryptDuressAlert(key1, alert)
     await expect(decryptDuressAlert(key2, encrypted)).rejects.toThrow()
+  })
+})
+
+describe('security audit fixes', () => {
+  it('deriveDuressKey produces a different key from deriveBeaconKey', () => {
+    const beaconKey = deriveBeaconKey(SEED_1)
+    const duressKey = deriveDuressKey(SEED_1)
+    expect(bytesToHex(beaconKey)).not.toBe(bytesToHex(duressKey))
+  })
+
+  it('deriveDuressKey is deterministic', () => {
+    const a = deriveDuressKey(SEED_1)
+    const b = deriveDuressKey(SEED_1)
+    expect(bytesToHex(a)).toBe(bytesToHex(b))
+  })
+
+  it('duress alert can be encrypted with deriveDuressKey', async () => {
+    const key = deriveDuressKey(SEED_1)
+    const alert = buildDuressAlert(PUBKEY_A, {
+      geohash: 'gcpuuz', precision: 6, locationSource: 'beacon',
+    })
+    const encrypted = await encryptDuressAlert(key, alert)
+    const decrypted = await decryptDuressAlert(key, encrypted)
+    expect(decrypted.member).toBe(PUBKEY_A)
+  })
+
+  it('error message does not leak pubkey content in buildDuressAlert', () => {
+    const fakeSecret = 'x'.repeat(100)
+    try {
+      buildDuressAlert(fakeSecret, null)
+    } catch (e: any) {
+      expect(e.message).toContain('100 chars')
+      expect(e.message).not.toContain(fakeSecret)
+    }
   })
 })

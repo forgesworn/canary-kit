@@ -52,6 +52,7 @@ export {
 
 export {
   deriveBeaconKey,
+  deriveDuressKey,
   encryptBeacon,
   decryptBeacon,
   buildDuressAlert,
