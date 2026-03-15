@@ -1593,3 +1593,34 @@ describe('applySyncMessageWithResult', () => {
     expect(result.applied).toBe(false)
   })
 })
+
+describe('duress-clear validation (security audit)', () => {
+  it('rejects duress-clear with missing subject', () => {
+    const payload = JSON.stringify({
+      type: 'duress-clear', timestamp: 1000, opId: 'dc-1', protocolVersion: PROTOCOL_VERSION,
+    })
+    expect(() => decodeSyncMessage(payload)).toThrow(/subject/)
+  })
+
+  it('rejects duress-clear with empty subject', () => {
+    const payload = JSON.stringify({
+      type: 'duress-clear', subject: '', timestamp: 1000, opId: 'dc-1', protocolVersion: PROTOCOL_VERSION,
+    })
+    expect(() => decodeSyncMessage(payload)).toThrow(/subject/)
+  })
+
+  it('rejects duress-clear with missing opId', () => {
+    const payload = JSON.stringify({
+      type: 'duress-clear', subject: 'alice', timestamp: 1000, protocolVersion: PROTOCOL_VERSION,
+    })
+    expect(() => decodeSyncMessage(payload)).toThrow(/opId/)
+  })
+
+  it('accepts valid duress-clear', () => {
+    const payload = JSON.stringify({
+      type: 'duress-clear', subject: 'alice', timestamp: 1000, opId: 'dc-1', protocolVersion: PROTOCOL_VERSION,
+    })
+    const msg = decodeSyncMessage(payload)
+    expect(msg.type).toBe('duress-clear')
+  })
+})

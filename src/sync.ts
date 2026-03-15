@@ -265,6 +265,15 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       }
       break
 
+    case 'duress-clear':
+      if (typeof parsed.subject !== 'string' || parsed.subject.length === 0) {
+        throw new Error('Invalid sync message: duress-clear requires a non-empty subject')
+      }
+      if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
+        throw new Error('Invalid sync message: duress-clear requires a non-empty opId (max 128 chars)')
+      }
+      break
+
     case 'state-snapshot':
       if (typeof parsed.seed !== 'string' || !HEX_64_RE.test(parsed.seed)) {
         throw new Error('Invalid sync message: state-snapshot requires a 64-char hex seed')
