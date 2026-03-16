@@ -39,14 +39,12 @@
     <circle cx="270" cy="74" r="8" fill="#0f172a"/>
     <circle cx="272" cy="72" r="2.5" fill="#f8fafc"/>
 
-    <!-- Legs -->
-    <line x1="180" y1="240" x2="176" y2="300" stroke="#d97706" stroke-width="4" stroke-linecap="round"/>
-    <line x1="210" y1="244" x2="207" y2="300" stroke="#d97706" stroke-width="4" stroke-linecap="round"/>
+    <!-- Legs (thick rectangles for clean rasterisation) -->
+    <rect x="173" y="238" width="8" height="65" rx="4" fill="#f59e0b"/>
+    <rect x="204" y="242" width="8" height="62" rx="4" fill="#f59e0b"/>
     <!-- Feet -->
-    <line x1="176" y1="300" x2="163" y2="304" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
-    <line x1="176" y1="300" x2="183" y2="308" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
-    <line x1="207" y1="300" x2="196" y2="304" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
-    <line x1="207" y1="300" x2="214" y2="308" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
+    <rect x="160" y="298" width="24" height="7" rx="3.5" fill="#f59e0b"/>
+    <rect x="193" y="300" width="24" height="7" rx="3.5" fill="#f59e0b"/>
   </g>
 
   <!-- Sound waves from beak -->
