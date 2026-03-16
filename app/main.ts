@@ -124,7 +124,8 @@ function resetAutoLockTimer(): void {
   const { settings } = getState()
   if (!settings.pinEnabled || settings.autoLockMinutes <= 0 || !hasPinSalt()) return
 
-  _autoLockTimer = setTimeout(() => {
+  _autoLockTimer = setTimeout(async () => {
+    await flushPersist()
     clearPinKey()
     clearSensitiveState()
     showLockScreen()
