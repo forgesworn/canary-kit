@@ -73,6 +73,20 @@ export function deriveTokenBytes(
  *
  * When `identity` is provided, produces a per-member token unique to that member.
  * When omitted, produces the group-wide token (backwards-compatible).
+ *
+ * @param secret - Shared secret (hex string or Uint8Array, minimum 16 bytes).
+ * @param context - Context string for domain separation (e.g. `'canary:group'`).
+ * @param counter - Time-based or usage counter (uint32).
+ * @param encoding - Output encoding format (default: single word from en-v1 wordlist).
+ * @param identity - Optional member pubkey for per-member tokens.
+ * @returns Encoded token string (word, PIN, or hex depending on encoding).
+ * @throws {RangeError} If secret is too short or counter is out of range.
+ *
+ * @example
+ * ```ts
+ * deriveToken(seedHex, 'canary:group', 42)           // "falcon"
+ * deriveToken(seedHex, 'canary:group', 42, { format: 'pin', digits: 6 })  // "083721"
+ * ```
  */
 export function deriveToken(
   secret: Uint8Array | string,
@@ -211,6 +225,21 @@ export interface VerifyOptions {
  *
  * Per CANARY-DURESS: the verifier MUST check all identities and collect all matches.
  * The verifier MUST NOT short-circuit after the first duress match.
+ *
+ * @param secret - Shared secret (hex string or Uint8Array).
+ * @param context - Context string for domain separation.
+ * @param counter - Current time-based counter.
+ * @param input - The spoken/entered token to verify.
+ * @param identities - Array of member pubkeys (max 100).
+ * @param options - Optional encoding and tolerance settings.
+ * @returns `{ status: 'valid' | 'duress' | 'invalid', identities?: string[] }`.
+ * @throws {RangeError} If tolerance exceeds MAX_TOLERANCE or identities exceeds 100.
+ *
+ * @example
+ * ```ts
+ * const result = verifyToken(seed, 'canary:group', counter, 'falcon', [alice, bob])
+ * if (result.status === 'duress') alert(`Duress from: ${result.identities}`)
+ * ```
  */
 export function verifyToken(
   secret: Uint8Array | string,
@@ -324,6 +353,14 @@ export interface DirectionalPair {
  * Neither token can be derived from the other without the shared secret.
  * This prevents the "echo problem" where the second speaker could parrot
  * the first.
+ *
+ * @param secret - Shared secret (hex string or Uint8Array).
+ * @param namespace - Namespace prefix (e.g. `'aviva'`, `'dispatch'`).
+ * @param roles - Exactly two role names (e.g. `['caller', 'agent']`).
+ * @param counter - Current counter value.
+ * @param encoding - Output encoding format (default: single word).
+ * @returns Object keyed by role name, each value is the role's token string.
+ * @throws {Error} If roles does not contain exactly 2 entries, or roles are identical.
  */
 export function deriveDirectionalPair(
   secret: Uint8Array | string,

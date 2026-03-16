@@ -141,6 +141,23 @@ export interface Session {
  *
  * Wraps the low-level token API with role awareness, time management,
  * and optional duress detection.
+ *
+ * @param config - Session configuration including secret, namespace, roles, and optional preset.
+ * @returns A {@link Session} object with `myToken()`, `theirToken()`, `verify()`, `counter()`, and `pair()` methods.
+ * @throws {Error} If namespace is empty or contains null bytes, roles are invalid, or myRole is not in roles.
+ *
+ * @example
+ * ```ts
+ * const session = createSession({
+ *   secret: sharedSeed,
+ *   namespace: 'aviva',
+ *   roles: ['caller', 'agent'],
+ *   myRole: 'agent',
+ *   preset: 'call',
+ * })
+ * session.myToken()     // word I speak
+ * session.theirToken()  // word I expect to hear
+ * ```
  */
 export function createSession(config: SessionConfig): Session {
   const preset = config.preset ? SESSION_PRESETS[config.preset] : undefined

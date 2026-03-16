@@ -13,6 +13,12 @@ export const DEFAULT_ENCODING: TokenEncoding = { format: 'words', count: 1 }
 /**
  * Encode raw bytes as words using 11-bit indices into a wordlist.
  * Each word uses a consecutive 2-byte slice: readUint16BE(bytes, i*2) % wordlistSize.
+ *
+ * @param bytes - Raw bytes to encode (must have at least `count * 2` bytes).
+ * @param count - Number of words to produce (integer 1–16, default: 1).
+ * @param wordlist - Custom wordlist (must be exactly 2048 entries, default: en-v1).
+ * @returns Array of lowercase word strings.
+ * @throws {RangeError} If count is not an integer 1–16, wordlist is wrong size, or insufficient bytes.
  */
 export function encodeAsWords(
   bytes: Uint8Array,

@@ -82,7 +82,23 @@ function effectiveCounter(state: GroupState): number {
   return state.counter + state.usageOffset
 }
 
-/** Create a new group with a freshly generated seed and time-based counter. */
+/**
+ * Create a new group with a freshly generated seed and time-based counter.
+ *
+ * @param config - Group configuration including name, members, optional preset and overrides.
+ * @returns A new {@link GroupState} with a cryptographically secure random seed.
+ * @throws {Error} If name is empty, preset is unknown, members contain invalid pubkeys, or config values are out of range.
+ *
+ * @example
+ * ```ts
+ * const group = createGroup({
+ *   name: 'Family',
+ *   members: [alicePubkey, bobPubkey],
+ *   preset: 'family',
+ * })
+ * getCurrentWord(group)  // "falcon"
+ * ```
+ */
 export function createGroup(config: GroupConfig): GroupState {
   if (typeof config.name !== 'string' || config.name.length === 0) {
     throw new Error('name must be a non-empty string')
