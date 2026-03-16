@@ -99,7 +99,7 @@ export function clearSensitiveState(): void {
   const scrubbed = { ..._state }
   // Wipe identity secrets
   if (scrubbed.identity) {
-    scrubbed.identity = { ...scrubbed.identity, privkey: '', mnemonic: undefined }
+    scrubbed.identity = { ...scrubbed.identity, privkey: '', mnemonic: undefined, nsec: undefined }
   }
   // Wipe group seeds
   const groups: typeof scrubbed.groups = {}
