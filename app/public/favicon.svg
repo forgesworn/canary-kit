@@ -32,21 +32,21 @@
     <polygon points="250,60 290,68 282,44 242,44" fill="#f59e0b"/>
 
     <!-- Beak (open) -->
-    <polygon points="298,76 325,73 305,84" fill="#92400e"/>
-    <polygon points="298,90 325,96 305,84" fill="#78350f"/>
+    <polygon points="298,76 325,73 305,84" fill="#b45309"/>
+    <polygon points="298,90 325,96 305,84" fill="#92400e"/>
 
     <!-- Eye -->
     <circle cx="270" cy="74" r="8" fill="#0f172a"/>
     <circle cx="272" cy="72" r="2.5" fill="#f8fafc"/>
 
     <!-- Legs -->
-    <line x1="180" y1="240" x2="176" y2="300" stroke="#92400e" stroke-width="4" stroke-linecap="round"/>
-    <line x1="210" y1="244" x2="207" y2="300" stroke="#92400e" stroke-width="4" stroke-linecap="round"/>
+    <line x1="180" y1="240" x2="176" y2="300" stroke="#d97706" stroke-width="4" stroke-linecap="round"/>
+    <line x1="210" y1="244" x2="207" y2="300" stroke="#d97706" stroke-width="4" stroke-linecap="round"/>
     <!-- Feet -->
-    <line x1="176" y1="300" x2="163" y2="304" stroke="#92400e" stroke-width="3" stroke-linecap="round"/>
-    <line x1="176" y1="300" x2="183" y2="308" stroke="#92400e" stroke-width="3" stroke-linecap="round"/>
-    <line x1="207" y1="300" x2="196" y2="304" stroke="#92400e" stroke-width="3" stroke-linecap="round"/>
-    <line x1="207" y1="300" x2="214" y2="308" stroke="#92400e" stroke-width="3" stroke-linecap="round"/>
+    <line x1="176" y1="300" x2="163" y2="304" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
+    <line x1="176" y1="300" x2="183" y2="308" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
+    <line x1="207" y1="300" x2="196" y2="304" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
+    <line x1="207" y1="300" x2="214" y2="308" stroke="#d97706" stroke-width="3" stroke-linecap="round"/>
   </g>
 
   <!-- Sound waves from beak -->
