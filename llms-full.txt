@@ -2,7 +2,7 @@
 
 > Deepfake-proof spoken-word identity verification. Open protocol, minimal dependencies.
 
-Zero dependencies. ESM-only. TypeScript native.
+Minimal dependencies. ESM-only. TypeScript native.
 
 Repository: https://github.com/TheCryptoDonkey/canary-kit
 Interactive demo: https://thecryptodonkey.github.io/canary-kit/
