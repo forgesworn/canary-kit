@@ -13,6 +13,7 @@ plans/
 # Playwright
 test-results/
 playwright-report/
+.playwright-mcp/
 .worktrees/
 
 # Recording output
