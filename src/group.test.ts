@@ -110,6 +110,16 @@ describe('createGroup', () => {
       .toThrow('tolerance must be an integer 0–10, got 1.5')
   })
 
+  it('rejects empty name', () => {
+    expect(() => createGroup({ name: '', members: [ALICE] }))
+      .toThrow('name must be a non-empty string')
+  })
+
+  it('rejects non-string name', () => {
+    expect(() => createGroup({ name: 123 as any, members: [ALICE] }))
+      .toThrow('name must be a non-empty string')
+  })
+
   it('accepts valid edge-case config', () => {
     const group = createGroup({
       name: 'Edge',

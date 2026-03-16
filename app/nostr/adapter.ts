@@ -244,6 +244,12 @@ export class NostrSyncTransport implements SyncTransport {
             // suppress the event on relay replay.
             if (typeof event.id === 'string' && this.seenEventIds.has(event.id)) return
 
+            // Reject oversized event content to prevent memory exhaustion from malicious relays
+            if (typeof event.content === 'string' && event.content.length > 65536) {
+              console.warn('[canary:sync] Rejected oversized event content')
+              return
+            }
+
             // Decrypt with group key — track failures for auto-recovery
             let decrypted: string
             try {
@@ -413,7 +419,8 @@ export class NostrSyncTransport implements SyncTransport {
     const privkeyBytes = hexToBytes(this.personalPrivkey)
     const ck = getConversationKey(privkeyBytes, requesterPubkey)
     const decrypted = nip44Decrypt(event.content, ck)
-    const parsed = JSON.parse(decrypted) as Record<string, unknown>
+    let parsed: Record<string, unknown>
+    try { parsed = JSON.parse(decrypted) } catch { return }
 
     const groupTag = parsed.groupTag
     const localEpoch = parsed.epoch
@@ -478,7 +485,8 @@ export class NostrSyncTransport implements SyncTransport {
     const privkeyBytes = hexToBytes(this.personalPrivkey)
     const ck = getConversationKey(privkeyBytes, adminPubkey)
     const decrypted = nip44Decrypt(event.content, ck)
-    const parsed = JSON.parse(decrypted) as Record<string, unknown>
+    let parsed: Record<string, unknown>
+    try { parsed = JSON.parse(decrypted) } catch { return }
 
     const sender = parsed.s
     const sig = parsed.sig

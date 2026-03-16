@@ -25,6 +25,17 @@ describe('sync message serialisation', () => {
     expect(decoded).toEqual(msg)
   })
 
+  it('rejects member-join with oversized displayName', () => {
+    const raw = JSON.stringify({ type: 'member-join', pubkey: 'a'.repeat(64), timestamp: 1700000000, epoch: 0, opId: 'join-1', protocolVersion: 2, displayName: 'x'.repeat(257) })
+    expect(() => decodeSyncMessage(raw)).toThrow('displayName must be a string of at most 256 characters')
+  })
+
+  it('accepts member-join with valid displayName', () => {
+    const msg: SyncMessage = { type: 'member-join', pubkey: 'a'.repeat(64), timestamp: 1700000000, epoch: 0, opId: 'join-1', protocolVersion: 2, displayName: 'Alice' }
+    const decoded = decodeSyncMessage(encodeSyncMessage(msg))
+    expect(decoded.type).toBe('member-join')
+  })
+
   it('round-trips a member-leave message', () => {
     const msg: SyncMessage = { type: 'member-leave', pubkey: 'a'.repeat(64), timestamp: 1700000000, epoch: 0, opId: 'leave-1', protocolVersion: 2 }
     expect(decodeSyncMessage(encodeSyncMessage(msg))).toEqual(msg)

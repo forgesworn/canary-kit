@@ -20,7 +20,7 @@ export function encodeAsWords(
   wordlist: readonly string[] = WORDLIST,
 ): string[] {
   if (wordlist.length !== 2048) throw new RangeError('Wordlist must contain exactly 2048 entries')
-  if (count < 1 || count > 16) throw new RangeError('Word count must be 1–16')
+  if (!Number.isInteger(count) || count < 1 || count > 16) throw new RangeError('Word count must be an integer 1–16')
   if (bytes.length < count * 2) throw new RangeError('Not enough bytes for requested word count')
   const words: string[] = []
   for (let i = 0; i < count; i++) {
@@ -37,6 +37,7 @@ export function encodeAsWords(
  */
 export function encodeAsPin(bytes: Uint8Array, digits: number = 4): string {
   if (digits < 1 || digits > 10) throw new RangeError('PIN digits must be 1–10')
+  if (bytes.length === 0) throw new RangeError('Cannot encode empty byte array as PIN')
   const needed = Math.min(Math.ceil(digits * 0.415), bytes.length)
   const mod = Math.pow(10, digits)
 
@@ -60,6 +61,7 @@ export function encodeAsPin(bytes: Uint8Array, digits: number = 4): string {
 export function encodeAsHex(bytes: Uint8Array, length: number = 8): string {
   if (length < 1 || length > 64) throw new RangeError('Hex length must be 1–64')
   const needed = Math.ceil(length / 2)
+  if (bytes.length < needed) throw new RangeError(`Not enough bytes: need ${needed}, got ${bytes.length}`)
   let hex = ''
   for (let i = 0; i < needed && i < bytes.length; i++) {
     hex += bytes[i].toString(16).padStart(2, '0')

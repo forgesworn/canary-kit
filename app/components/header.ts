@@ -8,6 +8,7 @@ import type { AppIdentity } from '../types.js'
 import { decode as nip19decode, nsecEncode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
 import { hexToBytes } from 'canary-kit/crypto'
+import { escapeHtml } from '../utils/escape.js'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -269,7 +270,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
   popover.innerHTML = `
     <div class="identity-popover__row">
       <span class="identity-popover__label">Pubkey</span>
-      <span class="identity-popover__value" title="${pk}">${shortPk}</span>
+      <span class="identity-popover__value" title="${escapeHtml(pk)}">${escapeHtml(shortPk)}</span>
     </div>
     <div class="identity-popover__row">
       <span class="identity-popover__label">Signer</span>
@@ -380,7 +381,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
     if (!area || !identity?.privkey) return
     const nsec = nsecEncode(hexToBytes(identity.privkey))
     area.innerHTML = `
-      <code style="font-size: 0.65rem; word-break: break-all; display: block; background: var(--bg); padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border); user-select: all;">${nsec}</code>
+      <code style="font-size: 0.65rem; word-break: break-all; display: block; background: var(--bg); padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border); user-select: all;">${escapeHtml(nsec)}</code>
       <button class="btn btn--sm" id="nsec-copy-btn" type="button" style="width: 100%; margin-top: 0.375rem;">Copy nsec</button>
     `
     area.querySelector('#nsec-copy-btn')?.addEventListener('click', async (e) => {

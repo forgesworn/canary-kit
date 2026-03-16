@@ -67,14 +67,14 @@ export function showCallVerify(groupId: string, theirPubkey: string): void {
 
       <div class="call-verify__section call-verify__section--say">
         <span class="call-verify__label">Say this:</span>
-        <span class="call-verify__word call-verify__word--mine" id="cv-word-mine">${myWord}</span>
+        <span class="call-verify__word call-verify__word--mine" id="cv-word-mine">${escapeHtml(myWord)}</span>
       </div>
 
       <div class="call-verify__divider"></div>
 
       <div class="call-verify__section call-verify__section--hear">
         <span class="call-verify__label">They should say:</span>
-        <span class="call-verify__word call-verify__word--theirs" id="cv-word-theirs">${theirWord}</span>
+        <span class="call-verify__word call-verify__word--theirs" id="cv-word-theirs">${escapeHtml(theirWord)}</span>
       </div>
 
       <p class="call-verify__timer">Words change in <span id="cv-countdown">${rotationSeconds}</span>s</p>

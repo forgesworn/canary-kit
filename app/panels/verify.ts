@@ -11,6 +11,13 @@ import { escapeHtml } from '../utils/escape.js'
 
 // ── Helpers ──────────────────────────────────────────────────
 
+/** CSPRNG-backed random integer in [0, max). */
+function secureRandom(max: number): number {
+  const buf = new Uint32Array(1)
+  crypto.getRandomValues(buf)
+  return buf[0] % max
+}
+
 function resolveName(pubkey: string): string {
   const { groups, activeGroupId, identity } = getState()
   if (identity?.pubkey === pubkey) return 'You'
@@ -26,7 +33,7 @@ function randomDecoys(count: number, exclude: Set<string>): string[] {
   const decoys: string[] = []
   const used = new Set(exclude)
   while (decoys.length < count) {
-    const idx = Math.floor(Math.random() * WORDLIST_SIZE)
+    const idx = secureRandom(WORDLIST_SIZE)
     const word = getWord(idx).toLowerCase()
     if (!used.has(word)) {
       used.add(word)
@@ -38,7 +45,7 @@ function randomDecoys(count: number, exclude: Set<string>): string[] {
 
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = secureRandom(i + 1)
     ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
   return arr

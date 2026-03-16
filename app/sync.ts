@@ -146,7 +146,7 @@ function _recoveryOptions(groupId: string) {
         members: group.members,
         admins: group.admins,
         epoch: group.epoch,
-        opId: `recovery-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        opId: crypto.randomUUID(),
         timestamp: Math.floor(Date.now() / 1000),
       }
     },

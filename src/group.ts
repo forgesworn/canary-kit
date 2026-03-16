@@ -84,6 +84,9 @@ function effectiveCounter(state: GroupState): number {
 
 /** Create a new group with a freshly generated seed and time-based counter. */
 export function createGroup(config: GroupConfig): GroupState {
+  if (typeof config.name !== 'string' || config.name.length === 0) {
+    throw new Error('name must be a non-empty string')
+  }
   if (config.preset !== undefined) {
     if (typeof config.preset !== 'string' || !Object.hasOwn(PRESETS, config.preset)) {
       throw new Error(`Unknown preset: "${config.preset}". Valid presets: ${Object.keys(PRESETS).join(', ')}`)
@@ -134,7 +137,7 @@ export function createGroup(config: GroupConfig): GroupState {
 
   if (wordCount === 1 && config.members.length >= 10) {
     console.warn(
-      `[canary-kit] Group "${config.name}" has ${config.members.length} members with 1-word encoding. ` +
+      `[canary-kit] Group has ${config.members.length} members with 1-word encoding. ` +
       `CANARY spec recommends 2+ words for groups of 10+ members to avoid duress collision (~2.2% at 10 members).`
     )
   }

@@ -142,6 +142,20 @@ describe('encodeAsWords with maximum count', () => {
   })
 })
 
+describe('encoding input validation', () => {
+  it('encodeAsWords rejects fractional count', () => {
+    expect(() => encodeAsWords(new Uint8Array(32), 1.5)).toThrow('Word count must be an integer 1–16')
+  })
+
+  it('encodeAsPin rejects empty byte array', () => {
+    expect(() => encodeAsPin(new Uint8Array(0), 4)).toThrow('Cannot encode empty byte array as PIN')
+  })
+
+  it('encodeAsHex rejects insufficient bytes', () => {
+    expect(() => encodeAsHex(new Uint8Array(1), 8)).toThrow('Not enough bytes')
+  })
+})
+
 describe('encodeToken', () => {
   it('defaults to single word', () => {
     const bytes = new Uint8Array(32)

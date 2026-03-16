@@ -8,6 +8,12 @@ docs/plans/
 plans/
 .env
 .env.*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+serviceAccountKey.json
 .idea/
 
 # Playwright

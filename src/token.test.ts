@@ -146,6 +146,12 @@ describe('deriveDuressToken', () => {
 })
 
 describe('verifyToken', () => {
+  it('rejects identities array exceeding MAX_MEMBERS', () => {
+    const oversized = Array.from({ length: 101 }, (_, i) => (i + 1).toString(16).padStart(64, '0'))
+    expect(() => verifyToken(SECRET_1, 'test', 0, 'word', oversized))
+      .toThrow('identities array must not exceed 100 entries')
+  })
+
   it('returns valid for correct token', () => {
     const token = deriveToken(SECRET_1, 'test', 0)
     const result = verifyToken(SECRET_1, 'test', 0, token, [IDENTITY_A])

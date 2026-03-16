@@ -30,6 +30,9 @@ function counterBe32(counter: number): Uint8Array {
 // (e.g. per-session or per-task handoff secrets).
 const MIN_SECRET_BYTES = 16
 
+/** Maximum identities in verifyToken to bound O(n²·t²) computational cost. */
+const MAX_MEMBERS = 100
+
 function normaliseSecret(secret: Uint8Array | string): Uint8Array {
   const key = typeof secret === 'string' ? hexToBytes(secret) : secret
   if (key.length < MIN_SECRET_BYTES) {
@@ -224,6 +227,9 @@ export function verifyToken(
   }
   if (tolerance > MAX_TOLERANCE) {
     throw new RangeError(`Tolerance must be <= ${MAX_TOLERANCE}, got ${tolerance}`)
+  }
+  if (identities.length > MAX_MEMBERS) {
+    throw new RangeError(`identities array must not exceed ${MAX_MEMBERS} entries, got ${identities.length}`)
   }
   const normalised = input.toLowerCase().trim().replace(/\s+/g, ' ')
 

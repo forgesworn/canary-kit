@@ -181,6 +181,11 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
         throw new Error('Invalid sync message: member-join requires a non-empty opId (max 128 chars)')
       }
+      if (parsed.displayName !== undefined) {
+        if (typeof parsed.displayName !== 'string' || parsed.displayName.length > 256) {
+          throw new Error('Invalid sync message: member-join displayName must be a string of at most 256 characters')
+        }
+      }
       break
 
     case 'member-leave':
