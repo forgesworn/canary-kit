@@ -640,6 +640,15 @@ export function handleIncomingBeacon(
   timestamp: number,
 ): void {
   if (import.meta.env.DEV) console.info('[canary:beacon] handleIncomingBeacon', { pubkey: pubkey.slice(0, 8), accuracy, map: !!map, mapReady })
+
+  // Only accept beacons from members of the active group
+  const { groups, activeGroupId } = getState()
+  const group = activeGroupId ? groups[activeGroupId] : null
+  if (!group || !group.members.includes(pubkey)) {
+    if (import.meta.env.DEV) console.warn('[canary:beacon] ignoring beacon from non-member', pubkey.slice(0, 8))
+    return
+  }
+
   // Estimate geohash precision from accuracy radius
   const precision = accuracyToPrecision(accuracy)
   const geohash = encode(lat, lon, precision)
