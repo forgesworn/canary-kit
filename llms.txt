@@ -2,7 +2,7 @@
 
 > Spoken secrets. Silent alerts. Dead man's switch. canary-kit is a minimal-dependency TypeScript library for deepfake-proof identity verification — spoken-word tokens derived from shared secrets, with built-in duress signalling, liveness heartbeats, and encrypted location beacons. Open protocol.
 
-Interactive demo: https://thecryptodonkey.github.io/canary-kit/
+Interactive demo: https://canary.trotters.cc/
 GitHub: https://github.com/TheCryptoDonkey/canary-kit
 
 ESM-only. Eight subpath exports: `canary-kit` (main), `canary-kit/token`, `canary-kit/encoding`, `canary-kit/session`, `canary-kit/wordlist`, `canary-kit/nostr`, `canary-kit/beacon`, `canary-kit/sync`.

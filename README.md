@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-native-blue)](https://www.typescriptlang.org/)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](vitest.config.ts)
 
-**[Interactive Demo](https://thecryptodonkey.github.io/canary-kit/)** · [Protocol Spec](CANARY.md) · [Nostr Binding](NIP-CANARY.md) · [Integration Guide](INTEGRATION.md)
+**[Interactive Demo](https://canary.trotters.cc/)** · [Protocol Spec](CANARY.md) · [Nostr Binding](NIP-CANARY.md) · [Integration Guide](INTEGRATION.md)
 
 ## The Problem
 
