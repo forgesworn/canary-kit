@@ -16,6 +16,9 @@ credentials.json
 serviceAccountKey.json
 .idea/
 
+# Coverage
+coverage/
+
 # Playwright
 test-results/
 playwright-report/

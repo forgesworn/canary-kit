@@ -6,6 +6,7 @@
 [![CI](https://github.com/TheCryptoDonkey/canary-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/TheCryptoDonkey/canary-kit/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-native-blue)](https://www.typescriptlang.org/)
+[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](vitest.config.ts)
 
 **[Interactive Demo](https://thecryptodonkey.github.io/canary-kit/)** · [Protocol Spec](CANARY.md) · [Nostr Binding](NIP-CANARY.md) · [Integration Guide](INTEGRATION.md)
 

@@ -22,7 +22,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm run build:app
-      - run: npm test
+      - run: npx vitest run --coverage
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:protocol
 
