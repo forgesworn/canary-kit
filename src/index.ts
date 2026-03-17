@@ -1,86 +1,59 @@
 // src/index.ts
+
+// --- Re-exported from spoken-token (backwards compatibility) ---
 export {
-  WORDLIST,
-  WORDLIST_SIZE,
-  getWord,
-  indexOf,
+  WORDLIST, WORDLIST_SIZE, getWord, indexOf,
 } from './wordlist.js'
 
 export {
-  getCounter,
-  counterToBytes,
-  counterFromEventId,
-  DEFAULT_ROTATION_INTERVAL,
-  MAX_COUNTER_OFFSET,
+  getCounter, counterToBytes, counterFromEventId,
+  DEFAULT_ROTATION_INTERVAL, MAX_COUNTER_OFFSET,
 } from './counter.js'
 
 export {
+  encodeAsWords, encodeAsPin, encodeAsHex, encodeToken,
+  type TokenEncoding, DEFAULT_ENCODING,
+} from './encoding.js'
+
+// --- CANARY Protocol (universal + duress-aware) ---
+export {
+  MAX_TOLERANCE,
+  deriveTokenBytes, deriveToken,
+  deriveDuressTokenBytes, deriveDuressToken,
+  verifyToken, deriveLivenessToken,
+  deriveDirectionalPair,
+  type DirectionalPair,
+  type TokenVerifyResult, type VerifyOptions,
+} from './token.js'
+
+// --- Group layer ---
+export {
   GROUP_CONTEXT,
-  deriveVerificationWord,
-  deriveVerificationPhrase,
-  deriveDuressWord,
-  deriveDuressPhrase,
+  deriveVerificationWord, deriveVerificationPhrase,
+  deriveDuressWord, deriveDuressPhrase,
   deriveCurrentWord,
 } from './derive.js'
 
 export {
   verifyWord,
-  type VerifyResult,
-  type VerifyStatus,
+  type VerifyResult, type VerifyStatus,
 } from './verify.js'
 
 export {
-  createGroup,
-  getCurrentWord,
-  getCurrentDuressWord,
-  advanceCounter,
-  reseed,
-  addMember,
-  removeMember,
-  removeMemberAndReseed,
-  syncCounter,
-  dissolveGroup,
-  type GroupConfig,
-  type GroupState,
+  createGroup, getCurrentWord, getCurrentDuressWord,
+  advanceCounter, reseed, addMember, removeMember,
+  removeMemberAndReseed, syncCounter, dissolveGroup,
+  type GroupConfig, type GroupState,
 } from './group.js'
 
 export {
-  PRESETS,
-  type PresetName,
-  type GroupPreset,
+  PRESETS, type PresetName, type GroupPreset,
 } from './presets.js'
 
+// --- Beacon ---
 export {
-  deriveBeaconKey,
-  deriveDuressKey,
-  encryptBeacon,
-  decryptBeacon,
-  buildDuressAlert,
-  encryptDuressAlert,
-  decryptDuressAlert,
-  type BeaconPayload,
-  type DuressAlert,
-  type DuressLocation,
+  deriveBeaconKey, deriveDuressKey,
+  encryptBeacon, decryptBeacon,
+  buildDuressAlert, encryptDuressAlert, decryptDuressAlert,
+  type BeaconPayload, type DuressAlert, type DuressLocation,
 } from './beacon.js'
-
-// --- CANARY Protocol (universal API) ---
-export {
-  MAX_TOLERANCE,
-  deriveTokenBytes,
-  deriveToken,
-  deriveDuressTokenBytes,
-  deriveDuressToken,
-  verifyToken,
-  deriveLivenessToken,
-  type TokenVerifyResult,
-  type VerifyOptions,
-} from './token.js'
-
-export {
-  encodeAsWords,
-  encodeAsPin,
-  encodeAsHex,
-  encodeToken,
-  type TokenEncoding,
-  DEFAULT_ENCODING,
-} from './encoding.js'

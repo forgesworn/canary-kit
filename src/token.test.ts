@@ -1,80 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { MAX_TOLERANCE, deriveTokenBytes, deriveToken, deriveDuressTokenBytes, deriveDuressToken, verifyToken, deriveLivenessToken, deriveDirectionalPair } from './token.js'
-import { hexToBytes, bytesToHex } from './crypto.js'
+import { deriveTokenBytes, deriveToken, deriveDuressTokenBytes, deriveDuressToken, verifyToken, deriveLivenessToken } from './token.js'
+import { bytesToHex } from './crypto.js'
 
 const SECRET_1 = '0000000000000000000000000000000000000000000000000000000000000001'
-const SECRET_2 = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
-
-describe('deriveTokenBytes', () => {
-  it('returns 32 bytes', () => {
-    const bytes = deriveTokenBytes(SECRET_1, 'test', 0)
-    expect(bytes).toBeInstanceOf(Uint8Array)
-    expect(bytes.length).toBe(32)
-  })
-
-  it('is deterministic', () => {
-    const a = deriveTokenBytes(SECRET_1, 'test', 0)
-    const b = deriveTokenBytes(SECRET_1, 'test', 0)
-    expect(bytesToHex(a)).toBe(bytesToHex(b))
-  })
-
-  it('different context produces different output', () => {
-    const a = deriveTokenBytes(SECRET_1, 'context-a', 0)
-    const b = deriveTokenBytes(SECRET_1, 'context-b', 0)
-    expect(bytesToHex(a)).not.toBe(bytesToHex(b))
-  })
-
-  it('different counter produces different output', () => {
-    const a = deriveTokenBytes(SECRET_1, 'test', 0)
-    const b = deriveTokenBytes(SECRET_1, 'test', 1)
-    expect(bytesToHex(a)).not.toBe(bytesToHex(b))
-  })
-
-  it('different secret produces different output', () => {
-    const a = deriveTokenBytes(SECRET_1, 'test', 0)
-    const b = deriveTokenBytes(SECRET_2, 'test', 0)
-    expect(bytesToHex(a)).not.toBe(bytesToHex(b))
-  })
-
-  it('accepts Uint8Array secret', () => {
-    const secretBytes = hexToBytes(SECRET_1)
-    const a = deriveTokenBytes(SECRET_1, 'test', 0)
-    const b = deriveTokenBytes(secretBytes, 'test', 0)
-    expect(bytesToHex(a)).toBe(bytesToHex(b))
-  })
-})
-
-describe('deriveToken', () => {
-  it('defaults to single word encoding', () => {
-    const token = deriveToken(SECRET_1, 'test', 0)
-    expect(typeof token).toBe('string')
-    expect(token.length).toBeGreaterThan(0)
-    expect(token.split(' ')).toHaveLength(1)
-  })
-
-  it('encodes as PIN', () => {
-    const token = deriveToken(SECRET_1, 'test', 0, { format: 'pin', digits: 4 })
-    expect(token).toHaveLength(4)
-    expect(Number(token)).not.toBeNaN()
-  })
-
-  it('encodes as hex', () => {
-    const token = deriveToken(SECRET_1, 'test', 0, { format: 'hex', length: 8 })
-    expect(token).toHaveLength(8)
-    expect(token).toMatch(/^[0-9a-f]+$/)
-  })
-
-  it('encodes as multi-word phrase', () => {
-    const token = deriveToken(SECRET_1, 'test', 0, { format: 'words', count: 3 })
-    expect(token.split(' ')).toHaveLength(3)
-  })
-
-  it('is deterministic', () => {
-    const a = deriveToken(SECRET_1, 'test', 0)
-    const b = deriveToken(SECRET_1, 'test', 0)
-    expect(a).toBe(b)
-  })
-})
 
 const IDENTITY_A = 'alice'
 const IDENTITY_B = 'bob'
@@ -220,20 +148,6 @@ describe('verifyToken', () => {
   })
 })
 
-describe('counterBe32 guards', () => {
-  it('throws on negative counter', () => {
-    expect(() => deriveTokenBytes(SECRET_1, 'ctx', -1)).toThrow(RangeError)
-  })
-
-  it('throws on counter exceeding uint32 max', () => {
-    expect(() => deriveTokenBytes(SECRET_1, 'ctx', 0xFFFFFFFF + 1)).toThrow(RangeError)
-  })
-
-  it('throws on fractional counter', () => {
-    expect(() => deriveTokenBytes(SECRET_1, 'ctx', 1.5)).toThrow(RangeError)
-  })
-})
-
 describe('tolerance window', () => {
   it('tolerance window does not wrap at counter=0', () => {
     const token = deriveToken(SECRET_1, 'ctx', 0xFFFFFFFF)
@@ -310,67 +224,6 @@ describe('deriveLivenessToken', () => {
   })
 })
 
-describe('deriveDirectionalPair', () => {
-  it('returns an object with both role keys', () => {
-    const pair = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
-    expect(pair).toHaveProperty('caller')
-    expect(pair).toHaveProperty('agent')
-  })
-
-  it('both values are non-empty strings', () => {
-    const pair = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
-    expect(typeof pair.caller).toBe('string')
-    expect(typeof pair.agent).toBe('string')
-    expect(pair.caller.length).toBeGreaterThan(0)
-    expect(pair.agent.length).toBeGreaterThan(0)
-  })
-
-  it('produces different tokens for each role', () => {
-    const pair = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
-    expect(pair.caller).not.toBe(pair.agent)
-  })
-
-  it('is deterministic', () => {
-    const a = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
-    const b = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
-    expect(a).toEqual(b)
-  })
-
-  it('different counter produces different pair', () => {
-    const a = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
-    const b = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 1)
-    expect(a.caller).not.toBe(b.caller)
-    expect(a.agent).not.toBe(b.agent)
-  })
-
-  it('different namespace produces different pair', () => {
-    const a = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
-    const b = deriveDirectionalPair(SECRET_1, 'barclays', ['caller', 'agent'], 0)
-    expect(a.caller).not.toBe(b.caller)
-  })
-
-  it('role tokens match individual deriveToken calls', () => {
-    const pair = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0)
-    expect(pair.caller).toBe(deriveToken(SECRET_1, 'aviva\0caller', 0))
-    expect(pair.agent).toBe(deriveToken(SECRET_1, 'aviva\0agent', 0))
-  })
-
-  it('works with PIN encoding', () => {
-    const encoding = { format: 'pin' as const, digits: 4 }
-    const pair = deriveDirectionalPair(SECRET_1, 'dispatch', ['requester', 'provider'], 0, encoding)
-    expect(pair.requester).toHaveLength(4)
-    expect(pair.provider).toHaveLength(4)
-    expect(pair.requester).not.toBe(pair.provider)
-  })
-
-  it('works with multi-word encoding', () => {
-    const encoding = { format: 'words' as const, count: 2 }
-    const pair = deriveDirectionalPair(SECRET_1, 'aviva', ['caller', 'agent'], 0, encoding)
-    expect(pair.caller.split(' ')).toHaveLength(2)
-    expect(pair.agent.split(' ')).toHaveLength(2)
-  })
-})
-
 describe('cross-counter collision avoidance', () => {
   it('deriveDuressToken never matches normal token at adjacent counters (default maxTolerance=1)', () => {
     // Reviewer's reproduction: secret=...0001, context=canary:verify, identity=alice, counter=1946
@@ -430,7 +283,7 @@ describe('cross-counter collision avoidance', () => {
     }
   })
 
-  it('duress token avoids collisions across 2× tolerance window (P2 regression)', () => {
+  it('duress token avoids collisions across 2x tolerance window (P2 regression)', () => {
     // Regression: deriveDuressToken with maxTolerance=T must avoid collisions
     // in the range ±2T, because the verifier's counter can drift by ±T from
     // the deriver's counter, expanding the normal-token window to ±2T.
@@ -542,35 +395,10 @@ describe('deriveDuressToken — maxTolerance=0', () => {
   })
 })
 
-describe('secret validation', () => {
-  it('rejects empty secret string', () => {
-    expect(() => deriveToken('', 'test', 0)).toThrow(RangeError)
-  })
-
-  it('rejects empty identity string', () => {
-    expect(() => deriveTokenBytes(SECRET_1, 'test', 0, '')).toThrow('identity must be non-empty when provided')
-    expect(() => deriveToken(SECRET_1, 'test', 0, undefined, '')).toThrow('identity must be non-empty when provided')
-  })
-
-  it('rejects short secret (< 16 bytes)', () => {
-    const shortSecret = '00'.repeat(15) // 15 bytes = 30 hex chars
-    expect(() => deriveToken(shortSecret, 'test', 0)).toThrow(RangeError)
-  })
-
-  it('accepts 16-byte secret', () => {
-    const minSecret = '00'.repeat(16) // 16 bytes = 32 hex chars
-    expect(() => deriveToken(minSecret, 'test', 0)).not.toThrow()
-  })
-
-  it('rejects short Uint8Array secret', () => {
-    expect(() => deriveToken(new Uint8Array(15), 'test', 0)).toThrow(RangeError)
-  })
-})
-
 describe('unicode identity handling', () => {
   it('NFC and NFD representations produce different tokens (no normalisation)', () => {
-    // café as precomposed (NFC) vs decomposed (NFD)
-    const nfc = 'caf\u00e9'   // é as single codepoint
+    // cafe as precomposed (NFC) vs decomposed (NFD)
+    const nfc = 'caf\u00e9'   // e as single codepoint
     const nfd = 'cafe\u0301'  // e + combining acute accent
     const a = deriveDuressToken(SECRET_1, 'test', nfc, 0, undefined, 1)
     const b = deriveDuressToken(SECRET_1, 'test', nfd, 0, undefined, 1)
@@ -623,36 +451,5 @@ describe('per-member collision avoidance (security audit)', () => {
       const normal = deriveToken(SECRET_1, 'test', c)
       expect(duress).not.toBe(normal)
     }
-  })
-})
-
-describe('deriveDirectionalPair validation (security audit)', () => {
-  it('rejects empty namespace', () => {
-    expect(() => deriveDirectionalPair(SECRET_1, '', ['a', 'b'], 0)).toThrow(/non-empty/)
-  })
-
-  it('rejects empty role', () => {
-    expect(() => deriveDirectionalPair(SECRET_1, 'ns', ['', 'b'], 0)).toThrow(/non-empty/)
-    expect(() => deriveDirectionalPair(SECRET_1, 'ns', ['a', ''], 0)).toThrow(/non-empty/)
-  })
-
-  it('rejects null bytes in namespace', () => {
-    expect(() => deriveDirectionalPair(SECRET_1, 'ns\0x', ['a', 'b'], 0)).toThrow(/null bytes/)
-  })
-
-  it('rejects null bytes in roles', () => {
-    expect(() => deriveDirectionalPair(SECRET_1, 'ns', ['a\0x', 'b'], 0)).toThrow(/null bytes/)
-    expect(() => deriveDirectionalPair(SECRET_1, 'ns', ['a', 'b\0x'], 0)).toThrow(/null bytes/)
-  })
-
-  it('rejects duplicate roles', () => {
-    expect(() => deriveDirectionalPair(SECRET_1, 'ns', ['x', 'x'], 0)).toThrow(/distinct/)
-  })
-
-  it('namespace:role concatenation is unambiguous (security audit)', () => {
-    // "a:b" + role "c" must differ from "a" + role "b:c"
-    const pair1 = deriveDirectionalPair(SECRET_1, 'a:b', ['c', 'd'], 0)
-    const pair2 = deriveDirectionalPair(SECRET_1, 'a', ['b:c', 'd'], 0)
-    expect(pair1.c).not.toBe(pair2['b:c'])
   })
 })

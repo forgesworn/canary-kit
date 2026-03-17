@@ -1,12 +1,12 @@
-import { hmacSha256, hexToBytes, concatBytes, timingSafeStringEqual } from './crypto.js'
-import { encodeToken, type TokenEncoding, DEFAULT_ENCODING } from './encoding.js'
+// Re-export generic functions from spoken-token
+export { deriveTokenBytes, deriveToken, deriveDirectionalPair, type DirectionalPair } from 'spoken-token'
+export { MAX_TOLERANCE } from 'spoken-token'
 
-/**
- * Maximum allowed tolerance/maxTolerance value.
- * Prevents pathological iteration: at MAX_TOLERANCE=10, the collision
- * avoidance window is ±20 counters (41 iterations) — well within reason.
- */
-export const MAX_TOLERANCE = 10
+import {
+  hmacSha256, hexToBytes, concatBytes, timingSafeStringEqual,
+  deriveToken as _deriveToken, encodeToken,
+  type TokenEncoding, DEFAULT_ENCODING,
+} from 'spoken-token'
 
 const encoder = new TextEncoder()
 
@@ -39,72 +39,6 @@ function normaliseSecret(secret: Uint8Array | string): Uint8Array {
     throw new RangeError(`Secret must be at least ${MIN_SECRET_BYTES} bytes, got ${key.length}`)
   }
   return key
-}
-
-/**
- * CANARY-DERIVE: Derive raw token bytes from a shared secret, context, and counter.
- *
- * When `identity` is omitted, derives a group-wide token:
- *   HMAC-SHA256(secret, utf8(context) || counter_be32)
- *
- * When `identity` is provided, derives a per-member token:
- *   HMAC-SHA256(secret, utf8(context) || 0x00 || utf8(identity) || counter_be32)
- *
- * The null-byte separator prevents concatenation ambiguity between context and identity.
- *
- * @param secret - Shared secret (hex string or Uint8Array, minimum 16 bytes).
- * @param context - Context string for domain separation (e.g. `'canary:group'`).
- * @param counter - Time-based or usage counter (uint32).
- * @param identity - Optional member pubkey for per-member tokens.
- * @returns Raw 32-byte HMAC-SHA256 digest.
- * @throws {RangeError} If secret is too short or counter is out of range.
- * @throws {Error} If identity is provided but empty.
- */
-export function deriveTokenBytes(
-  secret: Uint8Array | string,
-  context: string,
-  counter: number,
-  identity?: string,
-): Uint8Array {
-  if (identity !== undefined && identity === '') {
-    throw new Error('identity must be non-empty when provided')
-  }
-  const key = normaliseSecret(secret)
-  const data = identity
-    ? concatBytes(utf8(context), new Uint8Array([0x00]), utf8(identity), counterBe32(counter))
-    : concatBytes(utf8(context), counterBe32(counter))
-  return hmacSha256(key, data)
-}
-
-/**
- * CANARY-DERIVE: Derive an encoded token string.
- *
- * When `identity` is provided, produces a per-member token unique to that member.
- * When omitted, produces the group-wide token (backwards-compatible).
- *
- * @param secret - Shared secret (hex string or Uint8Array, minimum 16 bytes).
- * @param context - Context string for domain separation (e.g. `'canary:group'`).
- * @param counter - Time-based or usage counter (uint32).
- * @param encoding - Output encoding format (default: single word from en-v1 wordlist).
- * @param identity - Optional member pubkey for per-member tokens.
- * @returns Encoded token string (word, PIN, or hex depending on encoding).
- * @throws {RangeError} If secret is too short or counter is out of range.
- *
- * @example
- * ```ts
- * deriveToken(seedHex, 'canary:group', 42)           // "falcon"
- * deriveToken(seedHex, 'canary:group', 42, { format: 'pin', digits: 6 })  // "083721"
- * ```
- */
-export function deriveToken(
-  secret: Uint8Array | string,
-  context: string,
-  counter: number,
-  encoding: TokenEncoding = DEFAULT_ENCODING,
-  identity?: string,
-): string {
-  const bytes = deriveTokenBytes(secret, context, counter, identity)
-  return encodeToken(bytes, encoding)
 }
 
 /**
@@ -142,8 +76,7 @@ export function deriveDuressTokenBytes(
  * If the duress token collides with any normal verification token within
  * ±(2 × maxTolerance) counter values (at the encoding level), re-derives with
  * incrementing suffix bytes (0x01, 0x02, ..., 0xFF) until distinct.
- * The 2× factor accounts for worst-case counter drift: the deriver and verifier
- * may each be off by maxTolerance in opposite directions.
+ * The 2× factor accounts for worst-case counter drift between deriver and verifier.
  * If all 255 suffixes collide (astronomically unlikely), throws an error
  * rather than failing open.
  *
@@ -176,11 +109,13 @@ export function deriveDuressToken(
   maxTolerance: number,
   identities?: string[],
 ): string {
+  // Import MAX_TOLERANCE value directly to avoid circular reference with the re-export
+  const MAX_TOLERANCE_VAL = 10
   if (!Number.isInteger(maxTolerance) || maxTolerance < 0) {
     throw new RangeError('maxTolerance must be a non-negative integer')
   }
-  if (maxTolerance > MAX_TOLERANCE) {
-    throw new RangeError(`maxTolerance must be <= ${MAX_TOLERANCE}, got ${maxTolerance}`)
+  if (maxTolerance > MAX_TOLERANCE_VAL) {
+    throw new RangeError(`maxTolerance must be <= ${MAX_TOLERANCE_VAL}, got ${maxTolerance}`)
   }
   // Collect normal tokens within ±(2 × maxTolerance) for cross-counter collision avoidance.
   // The 2× window accounts for worst-case counter drift between deriver and verifier.
@@ -190,11 +125,11 @@ export function deriveDuressToken(
   const hi = Math.min(0xFFFFFFFF, counter + window)
   for (let c = lo; c <= hi; c++) {
     // Group-wide (anonymous) token
-    forbidden.add(deriveToken(secret, context, c, encoding))
+    forbidden.add(_deriveToken(secret, context, c, encoding))
     // Per-member tokens for all known identities
     if (identities) {
       for (const id of identities) {
-        forbidden.add(deriveToken(secret, context, c, encoding, id))
+        forbidden.add(_deriveToken(secret, context, c, encoding, id))
       }
     }
   }
@@ -275,13 +210,14 @@ export function verifyToken(
   identities: string[],
   options?: VerifyOptions,
 ): TokenVerifyResult {
+  const MAX_TOLERANCE_VAL = 10
   const encoding = options?.encoding ?? DEFAULT_ENCODING
   const tolerance = options?.tolerance ?? 0
   if (!Number.isInteger(tolerance) || tolerance < 0) {
     throw new RangeError('Tolerance must be a non-negative integer')
   }
-  if (tolerance > MAX_TOLERANCE) {
-    throw new RangeError(`Tolerance must be <= ${MAX_TOLERANCE}, got ${tolerance}`)
+  if (tolerance > MAX_TOLERANCE_VAL) {
+    throw new RangeError(`Tolerance must be <= ${MAX_TOLERANCE_VAL}, got ${tolerance}`)
   }
   if (identities.length > MAX_MEMBERS) {
     throw new RangeError(`identities array must not exceed ${MAX_MEMBERS} entries, got ${identities.length}`)
@@ -299,7 +235,7 @@ export function verifyToken(
   // 1. Check per-member tokens at exact counter (each member has a unique word)
   let exactMember: string | null = null
   for (const identity of identities) {
-    if (timingSafeStringEqual(normalised, deriveToken(secret, context, counter, encoding, identity))) {
+    if (timingSafeStringEqual(normalised, _deriveToken(secret, context, counter, encoding, identity))) {
       exactMember = identity
     }
   }
@@ -321,7 +257,7 @@ export function verifyToken(
   for (const identity of identities) {
     for (let c = lo; c <= hi; c++) {
       if (c === counter) continue // already checked in step 1
-      if (timingSafeStringEqual(normalised, deriveToken(secret, context, c, encoding, identity))) {
+      if (timingSafeStringEqual(normalised, _deriveToken(secret, context, c, encoding, identity))) {
         toleranceMember = identity
       }
     }
@@ -330,7 +266,7 @@ export function verifyToken(
   // 4. Also check group-wide token (backwards compat for anonymous verification)
   let groupMatch = false
   for (let c = lo; c <= hi; c++) {
-    if (timingSafeStringEqual(normalised, deriveToken(secret, context, c, encoding))) {
+    if (timingSafeStringEqual(normalised, _deriveToken(secret, context, c, encoding))) {
       groupMatch = true
     }
   }
@@ -372,55 +308,4 @@ export function deriveLivenessToken(
   const key = normaliseSecret(secret)
   const data = concatBytes(utf8(context + ':alive'), new Uint8Array([0x00]), utf8(identity), counterBe32(counter))
   return hmacSha256(key, data)
-}
-
-/** A pair of directional tokens keyed by role name. */
-export interface DirectionalPair {
-  [role: string]: string
-}
-
-/**
- * Derive a directional pair: two distinct tokens from the same secret,
- * one per role. Each token uses context = `${namespace}\0${role}`.
- *
- * Neither token can be derived from the other without the shared secret.
- * This prevents the "echo problem" where the second speaker could parrot
- * the first.
- *
- * @param secret - Shared secret (hex string or Uint8Array).
- * @param namespace - Namespace prefix (e.g. `'aviva'`, `'dispatch'`).
- * @param roles - Exactly two role names (e.g. `['caller', 'agent']`).
- * @param counter - Current counter value.
- * @param encoding - Output encoding format (default: single word).
- * @returns Object keyed by role name, each value is the role's token string.
- * @throws {Error} If roles does not contain exactly 2 entries, or roles are identical.
- */
-export function deriveDirectionalPair(
-  secret: Uint8Array | string,
-  namespace: string,
-  roles: [string, string],
-  counter: number,
-  encoding: TokenEncoding = DEFAULT_ENCODING,
-): DirectionalPair {
-  if (!namespace) {
-    throw new Error('namespace must be a non-empty string')
-  }
-  if (namespace.includes('\0')) {
-    throw new Error('namespace must not contain null bytes')
-  }
-  if (!roles[0] || !roles[1]) {
-    throw new Error('Both roles must be non-empty strings')
-  }
-  if (roles[0].includes('\0') || roles[1].includes('\0')) {
-    throw new Error('Roles must not contain null bytes')
-  }
-  if (roles[0] === roles[1]) {
-    throw new Error(`Roles must be distinct, got ["${roles[0]}", "${roles[1]}"]`)
-  }
-  // Use null-byte separator to prevent concatenation ambiguity
-  // (e.g. namespace "a:b" + role "c" vs namespace "a" + role "b:c")
-  return {
-    [roles[0]]: deriveToken(secret, `${namespace}\0${roles[0]}`, counter, encoding),
-    [roles[1]]: deriveToken(secret, `${namespace}\0${roles[1]}`, counter, encoding),
-  }
 }
