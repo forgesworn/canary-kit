@@ -1,117 +1,152 @@
 NIP-XX
 ======
 
-Simple Shared Secret Groups
-----------------------------
+Shared Secret Groups
+--------------------
 
 `draft` `optional`
 
 ## Abstract
 
-This NIP defines a Nostr transport binding for the Simple Shared Secret Groups
-protocol ([GROUPS.md](GROUPS.md)). It maps group state, secret distribution, and
-real-time signals onto existing Nostr event kinds — **no new event kinds are
-required**.
+A convention for lightweight encrypted groups using existing Nostr event kinds.
+Members share a 256-bit seed from which they derive a symmetric encryption key.
+Group state is stored in kind 30078 (NIP-78) events, real-time signals use kind
+20078 ephemeral events, and seeds are distributed via NIP-17 direct messages.
 
-The protocol enables groups of Nostr users to share a rotating symmetric secret
-for application-specific purposes: verification tokens, encryption keys, access
-codes, or any function that requires a shared secret with proper rotation and
-member management.
+No new event kinds are introduced.
 
 ## Motivation
 
-Three previous proposals for encrypted group communication on Nostr (NIP-38,
-NIP-76, NIP-112) remain unmerged. This NIP takes a deliberately simpler approach
-using only existing event infrastructure:
+Several applications need a group of participants who share encrypted state:
 
-- **Kind 30078** (NIP-78, application-specific data) for durable group state
-- **NIP-17** (gift-wrapped private messages) for secret distribution
-- **Kind 20078** (ephemeral application-specific data) for real-time signals
+- **Rotating verification codes** — members derive the same spoken word from the
+  shared seed on a schedule, enabling mutual authentication over voice calls
+- **Encrypted coordination** — a dispatch system where drivers share encrypted
+  status updates visible to all group members
+- **IoT device fleets** — devices publish encrypted telemetry that any authorised
+  device in the group can decrypt
+- **Shared encrypted state** — collaborative applications where all participants
+  need access to the same encrypted data store
 
-No new event kinds. No new relay requirements. Works on any NIP-01 compliant relay
-today.
+NIP-17 gift wraps serve well for private conversations, but each message must be
+individually wrapped for every recipient — O(N) per message. MLS-based protocols
+provide forward secrecy but require complex ratchet-tree state management.
 
-## Transport Mapping
+Shared Secret Groups fill the gap: a single shared seed, O(1) encryption per
+event, and zero new event kinds. This deliberately trades forward secrecy for
+simplicity — the right trade-off when the goal is shared state derivation rather
+than confidential messaging.
 
-The Simple Shared Secret Groups protocol defines three categories of messages.
-Each maps to an existing Nostr transport:
+## Specification
 
-| Category | Nostr transport | Event kind |
-|----------|----------------|------------|
-| **Durable group state** | NIP-78 (application-specific data) | Kind 30078 (addressable) |
-| **Private point-to-point** | NIP-17 (gift-wrapped DMs) | Kind 1059 (gift wrap) |
-| **Real-time group broadcast** | Ephemeral application-specific | Kind 20078 (ephemeral) |
+### Group seed
 
-### Why three transports
+A group is defined by a 256-bit cryptographically random seed, encoded as a
+64-character lowercase hex string. The seed MUST be generated using a CSPRNG
+(`crypto.getRandomValues` or equivalent).
 
-- **Kind 30078** is addressable (replaceable by `d` tag). Relays store the latest
-  version. Suitable for group metadata that members query on connect.
-- **NIP-17 gift wraps** provide metadata-hiding point-to-point delivery. Sender,
-  recipient, timestamp, and inner event kind are all hidden from relays. Suitable
-  for infrequent, private, latency-tolerant messages (seed distribution, reseed).
-- **Kind 20078** is ephemeral. Relays broadcast to connected subscribers but do not
-  store. Suitable for frequent, time-sensitive group signals (counter advance).
+### Key derivation
 
-## Event Specifications
+The symmetric group key used for encryption is derived from the seed:
 
-### Kind 30078: Group State
+```
+group_key = HMAC-SHA256(key = seed_bytes, data = utf8("ssg:key"))
+```
 
-Published by the group admin. The `d` tag value uniquely identifies the group.
-This is the canonical source of group membership and configuration.
+Where `seed_bytes` is the 32-byte binary representation of the hex-encoded seed.
+The result is a 32-byte AES-256 key.
+
+Applications that need additional derived keys SHOULD use distinct HMAC info
+strings with their own namespace (e.g., `"myapp:telemetry:key"`). The `ssg:key`
+derivation is reserved for the standard group encryption key defined in this NIP.
+
+### Encryption
+
+All group-encrypted content uses AES-256-GCM with a random 12-byte IV:
+
+```
+ciphertext = base64( IV[12] || AES-GCM-ciphertext || auth_tag[16] )
+```
+
+- The group key MUST be exactly 32 bytes. Implementations MUST reject shorter
+  keys to prevent silent AES-128 downgrade.
+- The IV MUST be generated using a CSPRNG for each encryption operation. Reusing
+  an IV with the same key is catastrophic in GCM mode.
+- Encrypted content SHOULD NOT exceed 65,536 bytes to stay within typical relay
+  event size limits.
+
+### Group state event (kind 30078)
+
+Group configuration is stored as a kind 30078 (NIP-78) addressable event:
 
 ```json
 {
   "kind": 30078,
-  "content": "<NIP-44 encrypted group config>",
+  "content": "<AES-256-GCM encrypted>",
   "tags": [
-    ["d", "ssg/<group-identifier>"],
+    ["d", "ssg/<group-id>"],
     ["p", "<member-1-pubkey>"],
     ["p", "<member-2-pubkey>"],
-    ["p", "<member-3-pubkey>"],
     ["L", "ssg"],
-    ["l", "group", "ssg"],
-    ["rotation", "604800"],
-    ["tolerance", "1"],
-    ["expiration", "<unix timestamp>"]
+    ["l", "group", "ssg"]
   ]
 }
 ```
 
 | Tag | Required | Description |
 |-----|----------|-------------|
-| `d` | MUST | `ssg/<group-identifier>` — unique group address. The `ssg/` prefix enables filtering. |
-| `p` | MUST | One tag per member. Members' Nostr public keys (64-char lowercase hex). |
-| `L` | SHOULD | Label namespace `ssg` (NIP-32) for discovery. |
-| `l` | SHOULD | Label `group` in namespace `ssg`. |
-| `rotation` | SHOULD | Rotation interval in seconds (e.g. `"604800"` for 7 days). |
-| `tolerance` | SHOULD | Counter tolerance window for verification (e.g. `"1"`). |
-| `expiration` | MAY | NIP-40 expiration timestamp — group auto-dissolves after this time. |
+| `d` | MUST | `ssg/<group-id>` — unique group address. |
+| `p` | MUST | One tag per member (64-char lowercase hex pubkey). |
+| `L` | SHOULD | Label namespace `ssg` (NIP-32). |
+| `l` | SHOULD | Label `group` in namespace `ssg` (NIP-32). |
 
-The encrypted `content` is a NIP-44 encrypted JSON object containing private
-group configuration. The encryption recipient is the group admin's own pubkey
-(self-encrypted), or NIP-44 encrypted individually for each member via separate
-gift-wrapped distribution.
+The `ssg/` d-tag prefix is defined by this NIP. Applications using Shared Secret
+Groups MUST use this prefix to avoid collisions with other NIP-78 consumers.
+
+The encrypted `content` carries application-specific group configuration as JSON.
+This NIP does not prescribe the content schema — applications define their own.
+Any member with the group seed can derive the key and decrypt the content.
+
+Applications MAY add additional tags. Unknown tags MUST be ignored.
+
+### Ephemeral signal event (kind 20078)
+
+Real-time signals between group members use kind 20078 ephemeral events. This
+NIP registers kind 20078 as the ephemeral counterpart to kind 30078 (NIP-78),
+following the established kind-range pattern (20000–29999 for ephemeral events).
 
 ```json
 {
-  "description": "Family safety group",
-  "policies": {
-    "invite_by": "admin",
-    "reseed_by": "admin"
-  }
+  "kind": 20078,
+  "content": "<AES-256-GCM encrypted>",
+  "tags": [
+    ["d", "ssg/<SHA-256(group-id)>"]
+  ]
 }
 ```
 
-Applications MAY add additional tags for application-specific metadata. Unknown
-tags MUST be ignored by implementations.
+| Tag | Required | Description |
+|-----|----------|-------------|
+| `d` | MUST | `ssg/` followed by `SHA-256(utf8(group_id))` as 64-char lowercase hex. |
 
-### NIP-17 Gift Wrap: Private Messages
+The `d` tag uses a SHA-256 hash of the group ID rather than the plaintext. This
+prevents relay operators from correlating high-frequency ephemeral signals to a
+named group. Kind 30078 uses the plaintext group ID because member pubkeys are
+already visible in `p` tags.
 
-Secret distribution, reseed notifications, and member updates are delivered as
-NIP-17 gift-wrapped private messages. Each recipient receives their own gift wrap.
+Signal types and encrypted payload schemas are application-defined. This NIP does
+not prescribe specific signal types. Applications MAY add a `t` tag for
+client-side signal routing. Unknown signal types MUST be silently ignored.
 
-The inner rumour (unsigned event inside the seal) uses kind 14 with a `subject`
-tag to identify the message type:
+### Seed distribution
+
+Seeds are distributed to members using NIP-17 gift-wrapped direct messages:
+
+1. The admin creates a kind 14 rumour containing the seed and group identifier.
+2. The rumour is NIP-44 encrypted and NIP-59 gift-wrapped for each recipient.
+3. Each recipient receives their own individually-wrapped copy.
+
+The rumour uses a `subject` tag to identify the message type:
 
 ```json
 {
@@ -119,200 +154,70 @@ tag to identify the message type:
   "content": "<NIP-44 encrypted payload>",
   "tags": [
     ["p", "<recipient-pubkey>"],
-    ["subject", "ssg:seed-distribution"],
-    ["e", "<group-30078-event-id>"]
+    ["subject", "ssg:seed"]
   ]
 }
 ```
 
-#### Subject types
+The encrypted content carries the group seed and any application-specific
+parameters. This NIP does not prescribe the encrypted payload schema — only the
+`subject` tag is standardised for client-side routing.
 
-| Subject tag | Purpose | Payload |
-|-------------|---------|---------|
-| `ssg:seed-distribution` | Deliver group seed to a member | `{ "seed": "<hex>", "counter": 42, "group_d": "<d-tag>" }` |
-| `ssg:reseed` | New seed after member removal or compromise | `{ "seed": "<hex>", "counter": 42, "epoch": 2, "reason": "member_removed" }` |
-| `ssg:member-update` | Notification of membership change | `{ "action": "add" \| "remove", "pubkey": "<hex>", "reseed": true }` |
-| `ssg:state-snapshot` | Full state for new member or recovery | See GROUPS.md `state-snapshot` message format |
+NIP-17 is used for seed distribution because it hides sender, recipient,
+timestamp, and inner event kind from relays. A relay that can see who receives
+seeds can infer group membership even when the seed itself is encrypted.
 
-Reseed reasons: `member_removed`, `compromise`, `scheduled`, `duress`.
+### Member removal and reseed
 
-#### Why NIP-17
+When a member is removed, the group MUST generate a new seed and distribute it
+to all remaining members via NIP-17 with subject `ssg:reseed`. The old seed MUST
+be discarded. This ensures the removed member cannot derive future group keys.
 
-NIP-17 gift wraps hide sender, recipient, timestamp, and inner event kind from
-relays. This is essential for seed distribution — a relay that sees who receives
-seeds can infer group membership even if the seed itself is encrypted.
+## Security Considerations
 
-NIP-17 timestamps are jittered (up to 2 days for privacy). This is acceptable
-because these messages are infrequent and not time-critical.
+### No forward secrecy
 
-### Kind 20078: Real-Time Group Signals
+A compromised seed exposes all past content encrypted under that seed. This is a
+deliberate trade-off: SSG prioritises simplicity and shared-state derivation over
+message confidentiality. Groups that require forward secrecy should use MLS-based
+protocols instead. The reseed mechanism provides forward secrecy at the
+membership-change boundary — after a reseed, the old seed cannot decrypt new
+content.
 
-Counter advances, and application-specific ephemeral signals (beacons, liveness)
-are broadcast as ephemeral events. All connected group members receive them
-instantly; offline members do not.
+### Trust model
 
-```json
-{
-  "kind": 20078,
-  "content": "<AES-256-GCM encrypted payload>",
-  "tags": [
-    ["d", "ssg/<hashed-group-id>"],
-    ["t", "<signal-type>"]
-  ]
-}
-```
+All members with the seed can read and write group events. SSG is appropriate for
+groups where members trust each other. For admin-gated access control, the
+application layer should enforce authority — this NIP does not prescribe an
+authority model.
 
-| Tag | Required | Description |
-|-----|----------|-------------|
-| `d` | MUST | `ssg/<SHA-256(group_id)>` — hashed to hide group identity from relays. |
-| `t` | MUST | Signal type for client-side routing. |
+### Metadata
 
-#### Group ID hashing
+Member pubkeys are visible in kind 30078 `p` tags. This is the cost of
+relay-side filtering — members subscribe to events that tag them. Applications
+that need membership privacy should not use SSG, or should use purpose-specific
+keypairs that are not linked to the user's primary identity. Kind 20078 events
+use hashed `d` tags to reduce correlation of ephemeral signals to known groups.
 
-The `d` tag uses `SHA-256(utf8(group_id))` (64-char lowercase hex) so relays can
-filter subscriptions without learning the group identifier.
+### Ephemeral signal reliability
 
-#### Encryption
+Kind 20078 events are ephemeral — relays do not store them. Members who are
+offline will miss ephemeral signals. Applications SHOULD NOT rely on ephemeral
+signals for critical state transitions. Use NIP-17 gift wraps for messages that
+must reach offline members.
 
-Kind 20078 content is AES-256-GCM encrypted with a group-derived symmetric key
-(see GROUPS.md §Envelope Encryption). This is NOT NIP-44 — NIP-44 is point-to-point
-ECDH encryption, while group signals use a shared symmetric key for broadcast
-efficiency. One encryption, all members decrypt.
+### Seed storage
 
-Envelope format: `base64(iv[12] || ciphertext || auth_tag[16])`.
-
-#### Signal types
-
-| `t` tag | Purpose | Encrypted payload |
-|---------|---------|-------------------|
-| `counter-advance` | Token burned, advance counter | `{ "counter": 42, "usageOffset": 3, "timestamp": 1709510400 }` |
-
-Applications MAY define additional signal types. The CANARY protocol defines
-`beacon`, `duress-alert`, `duress-clear`, and `liveness-checkin`. Unknown signal
-types MUST be silently ignored.
-
-#### Counter advance validation
-
-Per GROUPS.md §Counter Advancement:
-- New effective counter MUST be greater than local effective counter.
-- `usageOffset` MUST NOT exceed 100.
-- The event MUST be signed by a pubkey listed in the group's `p` tags (kind 30078).
-
-## Group Lifecycle Over Nostr
-
-### Creation
-
-1. Admin generates a group seed and initial state (GROUPS.md §Group Creation).
-2. Admin publishes a kind 30078 event with all initial members' `p` tags.
-3. Admin sends a `ssg:seed-distribution` gift wrap to each member.
-
-### Active use
-
-Members independently derive tokens from the shared seed and counter. No network
-required for derivation. When a token is used:
-
-1. The member publishes a kind 20078 `counter-advance` signal.
-2. All connected members advance their counter.
-
-### Member addition
-
-1. Admin publishes an updated kind 30078 event with the new member's `p` tag.
-2. Admin sends a `ssg:seed-distribution` gift wrap to the new member.
-3. Admin sends a `ssg:member-update` gift wrap to existing members.
-
-### Member removal
-
-1. Admin publishes an updated kind 30078 event without the removed member's `p` tag.
-2. Admin generates a new seed (GROUPS.md §Member Removal and Reseed).
-3. Admin sends a `ssg:reseed` gift wrap to all remaining members.
-4. Admin sends a `ssg:member-update` gift wrap to remaining members.
-
-### Dissolution
-
-Admin deletes the kind 30078 event (NIP-09) or lets the NIP-40 expiration pass.
-Members wipe local state on receiving the deletion or reaching expiration.
-
-## Relay Compatibility
-
-This NIP has been tested against major Nostr relays (March 2026):
-
-| Relay | Kind 30078 | Kind 20078 | NIP-17 |
-|-------|-----------|-----------|--------|
-| relay.damus.io | Yes | Yes | Yes |
-| nos.lol | Yes | Yes | Yes |
-| relay.primal.net | Yes | Yes | Yes |
-
-Kind 30078 is NIP-78 — any NIP-01 compliant relay stores addressable events.
-Kind 20078 falls in the NIP-01 ephemeral range (20000-29999) — relays broadcast
-but do not store. NIP-17 requires NIP-44 and NIP-59 support.
-
-## Discovery
-
-Clients can discover SSG-enabled groups using:
-
-- **NIP-32 labels**: Query for events with `["L", "ssg"]` label namespace.
-- **`d` tag prefix**: Filter kind 30078 events with `d` tag starting with `ssg/`.
-- **NIP-89 handlers**: Applications register as handlers for kind 30078 events
-  with `ssg/` prefix.
+Seeds MUST be stored securely on the client. Applications SHOULD encrypt seeds at
+rest and zero seed material from memory when no longer needed.
 
 ## Dependencies
 
 | NIP | Usage |
 |-----|-------|
-| NIP-01 | Event structure, kind ranges, relay protocol |
-| NIP-17 | Gift-wrapped private messages for secret distribution |
+| NIP-01 | Event structure, kind ranges |
+| NIP-17 | Gift-wrapped messages for seed distribution |
 | NIP-32 | Labels for group discovery |
-| NIP-40 | Expiration tags for group auto-dissolution |
-| NIP-44 | Encryption for kind 30078 content and NIP-17 payloads |
-| NIP-59 | Gift wrap (seal + wrap) for metadata hiding |
+| NIP-44 | Encryption within NIP-17 payloads |
+| NIP-59 | Gift wrap for metadata hiding |
 | NIP-78 | Application-specific data (kind 30078) |
-| NIP-89 | Recommended application handlers (discovery) |
-
-## Security Considerations
-
-### Metadata leakage
-
-Kind 30078 events expose member pubkeys in `p` tags. This is necessary for relay
-filtering (members subscribe to events that tag them) but reveals group membership
-to relay operators. Applications that require membership privacy should use
-pseudonymous pubkeys or consider NIP-59 gift wrapping for the group event itself.
-
-### Ephemeral signal reliability
-
-Kind 20078 events are ephemeral — relays do not store them. Members who are
-offline when a `counter-advance` signal is published will miss it. They
-resynchronise at the next natural time-based counter rotation. Applications
-SHOULD NOT rely on ephemeral signals for critical state transitions.
-
-### Gift wrap overhead
-
-NIP-17 produces one gift-wrapped event per recipient. For a group of N members,
-a reseed generates N events. This is acceptable for infrequent operations
-(membership changes, reseeds) but would be prohibitive for high-frequency signals
-— hence the split transport architecture.
-
-### Kind 20078 status
-
-Kind 20078 is not formally registered as a NIP but falls within NIP-01's ephemeral
-range (20000-29999). Relay support is confirmed empirically (see Relay
-Compatibility). If relay support proves unreliable at scale, the fallback is
-NIP-17 gift wraps for all messages, accepting the per-member overhead.
-
-## Reference Implementation
-
-The canonical implementation is the `canary-kit` npm package:
-
-- Nostr event builders: `src/nostr.ts`
-- Group management: `src/group.ts`
-- Sync protocol: `src/sync.ts`
-
-Source: https://github.com/TheCryptoDonkey/canary-kit
-
-## Relationship to Other Specifications
-
-| Specification | Relationship |
-|---|---|
-| Simple Shared Secret Groups (GROUPS.md) | Transport-agnostic protocol this NIP implements |
-| Spoken Token Protocol (spoken-token PROTOCOL.md) | Token derivation used by groups for verification |
-| CANARY Protocol (CANARY.md) | Extension adding duress, liveness, beacons |
-| NIP-CANARY | Application profile of this NIP for CANARY groups |
