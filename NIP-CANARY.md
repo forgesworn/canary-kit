@@ -13,6 +13,32 @@ providing group management, seed distribution, and counter synchronisation over
 Nostr relays. The core protocol (CANARY-DERIVE, CANARY-DURESS, CANARY-WORDLIST)
 is defined in the transport-agnostic [CANARY specification](CANARY.md).
 
+## Protocol Layering
+
+NIP-CANARY is an **application profile** of [NIP-XX: Simple Shared Secret Groups](NIP-XX.md).
+
+The generic group transport (NIP-XX) defines how to manage shared-secret groups over
+Nostr using existing event kinds:
+- **Kind 30078** (NIP-78) for durable group state
+- **NIP-17 gift wraps** for secret distribution
+- **Kind 20078** (ephemeral) for real-time signals
+
+NIP-CANARY extends NIP-XX with CANARY-specific features:
+- **Duress signal semantics** in kind 20078 payloads (`duress-alert`, `duress-clear`)
+- **Encrypted location beacons** in kind 20078 payloads
+- **Liveness check-in signals** for dead man's switch
+- **Meshtastic fallback transport** for offline/mesh operation
+
+The six custom event kinds defined below (38800–20800) represent the **current
+implementation**. A future version of this NIP will migrate to NIP-XX's transport
+mapping (zero new kinds). The custom kinds are documented here for compatibility
+with existing deployments.
+
+> **Migration path:** New implementations SHOULD use NIP-XX transport (kind 30078,
+> NIP-17, kind 20078) with the `ssg/` tag prefix and CANARY-specific signal types.
+> Existing implementations using kinds 38800–20800 will continue to work — clients
+> MAY support both during the transition period.
+
 ## Nostr Canary Groups
 
 This section defines a Nostr application layer built on the CANARY protocol, providing

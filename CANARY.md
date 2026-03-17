@@ -31,6 +31,32 @@ The protocol is defined in three layers:
    monitoring)
 3. **CANARY-WORDLIST** — Spoken-word encoding optimised for voice clarity
 
+## Protocol Layering
+
+CANARY builds on two generic protocol specifications:
+
+- **[Spoken Token Protocol](https://github.com/TheCryptoDonkey/spoken-token/blob/main/PROTOCOL.md)**
+  — defines SPOKEN-DERIVE (the core HMAC-counter-to-words derivation) and SPOKEN-ENCODE
+  (word/PIN/hex encoding). CANARY-DERIVE is a superset of SPOKEN-DERIVE. The generic
+  protocol is implemented by the `spoken-token` npm package.
+
+- **[Simple Shared Secret Groups](GROUPS.md)** — defines the group lifecycle (creation,
+  member management, seed rotation, sync protocol, replay protection). CANARY groups
+  are an application of this generic group protocol with additional duress, liveness,
+  and beacon extensions.
+
+The Nostr transport binding is defined in two layers:
+
+- **[NIP-XX: Simple Shared Secret Groups](NIP-XX.md)** — maps the generic group
+  protocol onto existing Nostr kinds (30078, NIP-17, 20078). Zero new event kinds.
+
+- **[NIP-CANARY](NIP-CANARY.md)** — application profile of NIP-XX adding
+  CANARY-specific signal types (duress alerts, beacons) and Meshtastic fallback.
+
+CANARY's unique contributions beyond the generic layers are: **duress detection**
+(CANARY-DURESS), **liveness monitoring** (dead man's switch), **threat-profile
+presets**, and **encrypted location beacons**.
+
 ## Motivation
 
 AI voice cloning now requires as little as three seconds of audio. A thirty-second clip
@@ -95,6 +121,12 @@ separate keys or counters.
 ## CANARY-DERIVE
 
 Core deterministic token derivation. The universal primitive that all other layers build on.
+
+> **Generic layer:** The core derivation algorithm (HMAC-SHA256 with context and counter)
+> is specified generically in the [Spoken Token Protocol](https://github.com/TheCryptoDonkey/spoken-token/blob/main/PROTOCOL.md)
+> as SPOKEN-DERIVE. CANARY-DERIVE is identical to SPOKEN-DERIVE — this section
+> documents it in CANARY's context for completeness. The `spoken-token` npm package
+> provides a standalone implementation of the generic layer.
 
 ### Algorithm
 
@@ -162,6 +194,12 @@ re-sync messages) MUST enforce the following rules:
 ---
 
 ## CANARY-SYNC: Transport-Agnostic Synchronisation
+
+> **Generic layer:** The core group management protocol (creation, member management,
+> seed rotation, counter sync, replay protection) is specified generically in
+> [Simple Shared Secret Groups](GROUPS.md). CANARY-SYNC extends it with
+> application-specific message types: `beacon`, `duress-alert`, `duress-clear`,
+> and `liveness-checkin`.
 
 CANARY-SYNC is the protocol layer for propagating group state mutations and telemetry
 across any transport without depending on Nostr or any specific relay infrastructure.
