@@ -2,6 +2,7 @@
 
 import type { SyncTransport, SyncMessage } from 'canary-kit/sync'
 import { encodeSyncMessage, decodeSyncMessage, hashGroupTag, encryptEnvelope, decryptEnvelope, deriveGroupKey, canonicaliseSyncMessage, PROTOCOL_VERSION } from 'canary-kit/sync'
+import { KINDS } from 'canary-kit/nostr'
 
 /** Message types that must be stored (not ephemeral) for offline catch-up. */
 const STORED_MESSAGE_TYPES = new Set([
@@ -14,16 +15,6 @@ import { getPool, isConnected, connectRelays, getReadRelayUrls, getWriteRelayUrl
 import { dedupeRelays } from '../types.js'
 import { verifyEvent, finalizeEvent } from 'nostr-tools/pure'
 import { encrypt as nip44Encrypt, decrypt as nip44Decrypt, getConversationKey } from 'nostr-tools/nip44'
-
-/** Ephemeral kind for fire-and-forget messages (beacons, liveness). Not stored by relays. */
-const SYNC_EPHEMERAL_KIND = 29_111
-/** Parameterised replaceable kind for state mutations and safety-critical messages.
- *  Relays store the latest event per pubkey+kind+d-tag for offline catch-up. */
-const SYNC_STORED_KIND = 39_111
-/** Event kind for recovery requests (NIP-44 personal-key encrypted). */
-const RECOVERY_REQUEST_KIND = 29_112
-/** Event kind for recovery responses (NIP-44 personal-key encrypted). */
-const RECOVERY_RESPONSE_KIND = 29_113
 
 const HEX_64_RE = /^[0-9a-f]{64}$/
 const HEX_128_RE = /^[0-9a-f]{128}$/
@@ -154,13 +145,15 @@ export class NostrSyncTransport implements SyncTransport {
     const encrypted = await encryptEnvelope(groupInfo.key, envelope)
 
     const isStored = STORED_MESSAGE_TYPES.has(message.type)
-    const kind = isStored ? SYNC_STORED_KIND : SYNC_EPHEMERAL_KIND
+    const kind = isStored ? KINDS.groupState : KINDS.signal
     // Stored events use type-scoped d-tags so each message type gets its own
     // replaceable slot (counter-advance doesn't overwrite duress-alert, etc.)
-    const dTag = isStored ? `${groupInfo.tagHash}:${message.type}` : groupInfo.tagHash
+    const dTag = isStored ? `ssg/${groupInfo.tagHash}:${message.type}` : `ssg/${groupInfo.tagHash}`
     const tags: string[][] = [['d', dTag]]
     if (isStored) {
       tags.push(['expiration', String(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60)])
+    } else {
+      tags.push(['t', message.type])
     }
     const unsigned = {
       kind,
@@ -197,10 +190,10 @@ export class NostrSyncTransport implements SyncTransport {
     this._ensureRecoverySub()
 
     // Subscribe to both ephemeral (plain d-tag) and stored (type-scoped d-tags)
-    const storedDTags = Array.from(STORED_MESSAGE_TYPES).map(t => `${groupInfo.tagHash}:${t}`)
+    const storedDTags = Array.from(STORED_MESSAGE_TYPES).map(t => `ssg/${groupInfo.tagHash}:${t}`)
     const filter = {
-      kinds: [SYNC_STORED_KIND, SYNC_EPHEMERAL_KIND],
-      '#d': [groupInfo.tagHash, ...storedDTags],
+      kinds: [KINDS.groupState, KINDS.signal],
+      '#d': [`ssg/${groupInfo.tagHash}`, ...storedDTags],
       // 7-day window covers the default rotation interval and typical offline periods.
       // Privileged ops use epoch+opId for ordering, so receiving stale messages is safe
       // (they're idempotent or rejected by epoch/opId checks).
@@ -363,9 +356,9 @@ export class NostrSyncTransport implements SyncTransport {
         const encrypted = nip44Encrypt(requestPayload, ck)
 
         const unsigned = {
-          kind: RECOVERY_REQUEST_KIND,
+          kind: KINDS.signal,
           content: encrypted,
-          tags: [['p', adminPubkey]],
+          tags: [['p', adminPubkey], ['t', 'ssg:recovery-request']],
           created_at: Math.floor(Date.now() / 1000),
         }
 
@@ -384,8 +377,9 @@ export class NostrSyncTransport implements SyncTransport {
     if (!pool) return
 
     const filter = {
-      kinds: [RECOVERY_REQUEST_KIND, RECOVERY_RESPONSE_KIND],
+      kinds: [KINDS.signal],
       '#p': [this.personalPubkey],
+      '#t': ['ssg:recovery-request', 'ssg:recovery-response'],
       since: Math.floor(Date.now() / 1000) - 300,
     }
 
@@ -398,9 +392,10 @@ export class NostrSyncTransport implements SyncTransport {
             if (!event || typeof event !== 'object') return
             if (!verifyEvent(event)) return
 
-            if (event.kind === RECOVERY_REQUEST_KIND) {
+            const tTags = (event.tags || []).filter((t: string[]) => t[0] === 't').map((t: string[]) => t[1])
+            if (tTags.includes('ssg:recovery-request')) {
               await this._handleRecoveryRequest(event)
-            } else if (event.kind === RECOVERY_RESPONSE_KIND) {
+            } else if (tTags.includes('ssg:recovery-response')) {
               await this._handleRecoveryResponse(event)
             }
           } catch (err) {
@@ -469,9 +464,9 @@ export class NostrSyncTransport implements SyncTransport {
     const encrypted = nip44Encrypt(responseEnvelope, responseCk)
 
     const unsigned = {
-      kind: RECOVERY_RESPONSE_KIND,
+      kind: KINDS.signal,
       content: encrypted,
-      tags: [['p', requesterPubkey]],
+      tags: [['p', requesterPubkey], ['t', 'ssg:recovery-response']],
       created_at: Math.floor(Date.now() / 1000),
     }
 
