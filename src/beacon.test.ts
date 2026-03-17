@@ -84,6 +84,27 @@ describe('encryptBeacon / decryptBeacon', () => {
     const truncated = encrypted.slice(0, 8)
     await expect(decryptBeacon(key, truncated)).rejects.toThrow()
   })
+
+  it('rejects empty geohash', async () => {
+    const key = deriveBeaconKey(SEED_1)
+    await expect(encryptBeacon(key, '', 6)).rejects.toThrow(/geohash/)
+  })
+
+  it('rejects geohash with invalid characters', async () => {
+    const key = deriveBeaconKey(SEED_1)
+    await expect(encryptBeacon(key, 'abc!xyz', 6)).rejects.toThrow(/invalid characters/)
+  })
+
+  it('rejects geohash longer than 11 characters', async () => {
+    const key = deriveBeaconKey(SEED_1)
+    await expect(encryptBeacon(key, 'gcpuuzwjzpbb', 6)).rejects.toThrow(/geohash/)
+  })
+
+  it('rejects precision out of range', async () => {
+    const key = deriveBeaconKey(SEED_1)
+    await expect(encryptBeacon(key, 'gcpuuz', 0)).rejects.toThrow(/precision/)
+    await expect(encryptBeacon(key, 'gcpuuz', 12)).rejects.toThrow(/precision/)
+  })
 })
 
 const PUBKEY_A = '0000000000000000000000000000000000000000000000000000000000000002'
@@ -131,6 +152,21 @@ describe('buildDuressAlert', () => {
     expect(alert.locationSource).toBe('none')
     expect(alert.geohash).toBe('')
     expect(alert.precision).toBe(0)
+  })
+
+  it('rejects invalid geohash characters in location', () => {
+    expect(() => buildDuressAlert(PUBKEY_A, {
+      geohash: 'abc!xyz', precision: 6, locationSource: 'beacon',
+    })).toThrow(/invalid characters/)
+  })
+
+  it('rejects precision out of range in location', () => {
+    expect(() => buildDuressAlert(PUBKEY_A, {
+      geohash: 'gcpuuz', precision: 0, locationSource: 'beacon',
+    })).toThrow(/precision/)
+    expect(() => buildDuressAlert(PUBKEY_A, {
+      geohash: 'gcpuuz', precision: 12, locationSource: 'beacon',
+    })).toThrow(/precision/)
   })
 })
 

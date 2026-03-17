@@ -110,7 +110,11 @@ export function encodeSyncMessage(msg: SyncMessage): string {
  */
 export function stableStringify(value: unknown): string {
   if (value === null || value === undefined) return 'null'
-  if (typeof value === 'boolean' || typeof value === 'number') return JSON.stringify(value)
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error('stableStringify: NaN/Infinity not allowed in canonical signing')
+    return JSON.stringify(value)
+  }
+  if (typeof value === 'boolean') return JSON.stringify(value)
   if (typeof value === 'string') return JSON.stringify(value)
   if (Array.isArray(value)) {
     return '[' + value.map(stableStringify).join(',') + ']'
@@ -201,7 +205,11 @@ export function decodeSyncMessage(payload: string): SyncMessage {
           throw new Error('Invalid sync message: member-join displayName must be a string of at most 256 characters')
         }
       }
-      break
+      return {
+        type, pubkey: parsed.pubkey, timestamp: ts, epoch: parsed.epoch as number, opId: parsed.opId as string,
+        ...(parsed.displayName !== undefined ? { displayName: parsed.displayName as string } : {}),
+        protocolVersion: PROTOCOL_VERSION,
+      } as SyncMessage
 
     case 'member-leave':
       if (typeof parsed.pubkey !== 'string' || !HEX_64_RE.test(parsed.pubkey)) {
@@ -213,7 +221,7 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
         throw new Error('Invalid sync message: member-leave requires a non-empty opId (max 128 chars)')
       }
-      break
+      return { type, pubkey: parsed.pubkey, timestamp: ts, epoch: parsed.epoch as number, opId: parsed.opId as string, protocolVersion: PROTOCOL_VERSION } as SyncMessage
 
     case 'liveness-checkin':
       if (typeof parsed.pubkey !== 'string' || !HEX_64_RE.test(parsed.pubkey)) {
@@ -222,7 +230,7 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
         throw new Error('Invalid sync message: liveness-checkin requires a non-empty opId (max 128 chars)')
       }
-      break
+      return { type, pubkey: parsed.pubkey, timestamp: ts, opId: parsed.opId as string, protocolVersion: PROTOCOL_VERSION } as SyncMessage
 
     case 'counter-advance':
       if (!isNonNegativeInt(parsed.counter) || parsed.counter > 0xFFFFFFFF) {
@@ -231,7 +239,10 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (!isNonNegativeInt(parsed.usageOffset)) {
         throw new Error('Invalid sync message: counter-advance requires a non-negative usageOffset')
       }
-      break
+      if (parsed.usageOffset > MAX_COUNTER_ADVANCE_OFFSET) {
+        throw new Error(`Invalid sync message: counter-advance usageOffset exceeds maximum of ${MAX_COUNTER_ADVANCE_OFFSET}`)
+      }
+      return { type, counter: parsed.counter, usageOffset: parsed.usageOffset, timestamp: ts, protocolVersion: PROTOCOL_VERSION } as SyncMessage
 
     case 'reseed':
       if (typeof parsed.seed !== 'string' || !HEX_64_RE.test(parsed.seed)) {
@@ -278,7 +289,7 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
         throw new Error('Invalid sync message: beacon requires a non-empty opId (max 128 chars)')
       }
-      break
+      return { type, lat: parsed.lat, lon: parsed.lon, accuracy: parsed.accuracy, timestamp: ts, opId: parsed.opId as string, protocolVersion: PROTOCOL_VERSION } as SyncMessage
 
     case 'duress-alert':
       if (!isFiniteNumber(parsed.lat) || !isFiniteNumber(parsed.lon)) {
@@ -293,7 +304,11 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (parsed.subject !== undefined && (typeof parsed.subject !== 'string' || parsed.subject.length > MAX_TAG_LENGTH)) {
         throw new Error(`Invalid sync message: duress-alert subject must be a string of at most ${MAX_TAG_LENGTH} characters`)
       }
-      break
+      return {
+        type, lat: parsed.lat, lon: parsed.lon, timestamp: ts, opId: parsed.opId as string,
+        ...(parsed.subject !== undefined ? { subject: parsed.subject as string } : {}),
+        protocolVersion: PROTOCOL_VERSION,
+      } as SyncMessage
 
     case 'duress-clear':
       if (typeof parsed.subject !== 'string' || parsed.subject.length === 0) {
@@ -305,7 +320,7 @@ export function decodeSyncMessage(payload: string): SyncMessage {
       if (typeof parsed.opId !== 'string' || parsed.opId.length === 0 || parsed.opId.length > 128) {
         throw new Error('Invalid sync message: duress-clear requires a non-empty opId (max 128 chars)')
       }
-      break
+      return { type, subject: parsed.subject, timestamp: ts, opId: parsed.opId as string, protocolVersion: PROTOCOL_VERSION } as SyncMessage
 
     case 'state-snapshot':
       if (typeof parsed.seed !== 'string' || !HEX_64_RE.test(parsed.seed)) {
@@ -341,10 +356,18 @@ export function decodeSyncMessage(payload: string): SyncMessage {
           throw new Error('Invalid sync message: state-snapshot.prevEpochSeed must be a 64-char hex string')
         }
       }
-      break
+      return {
+        type, seed: parsed.seed as string, counter: parsed.counter as number,
+        usageOffset: parsed.usageOffset as number, members: [...parsed.members as string[]],
+        admins: [...parsed.admins as string[]], epoch: parsed.epoch as number,
+        opId: parsed.opId as string, timestamp: ts,
+        ...(parsed.prevEpochSeed !== undefined ? { prevEpochSeed: parsed.prevEpochSeed as string } : {}),
+        protocolVersion: PROTOCOL_VERSION,
+      } as SyncMessage
   }
 
-  return parsed as SyncMessage
+  // Unreachable — all valid types return above — but satisfies the type checker
+  throw new Error(`Invalid sync message type: ${type}`)
 }
 
 // ── State application ─────────────────────────────────────────

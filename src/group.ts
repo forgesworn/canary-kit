@@ -103,6 +103,9 @@ export function createGroup(config: GroupConfig): GroupState {
   if (typeof config.name !== 'string' || config.name.length === 0) {
     throw new Error('name must be a non-empty string')
   }
+  if (config.name.length > 256) {
+    throw new Error('name must be at most 256 characters')
+  }
   if (config.preset !== undefined) {
     if (typeof config.preset !== 'string' || !Object.hasOwn(PRESETS, config.preset)) {
       throw new Error(`Unknown preset: "${config.preset}". Valid presets: ${Object.keys(PRESETS).join(', ')}`)
@@ -324,6 +327,7 @@ export function dissolveGroup(state: GroupState): GroupState {
     admins: [],
     usageOffset: 0,
     consumedOps: [],
+    consumedOpsFloor: undefined,
   }
 }
 

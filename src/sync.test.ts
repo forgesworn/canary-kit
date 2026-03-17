@@ -886,7 +886,7 @@ describe('state-snapshot', () => {
     expect(result).toBe(group)
   })
 
-  it('decode ignores unknown extra fields on state-snapshot', () => {
+  it('decode strips unknown extra fields on state-snapshot', () => {
     const raw = JSON.stringify({
       type: 'state-snapshot',
       seed: 'a'.repeat(64),
@@ -902,6 +902,37 @@ describe('state-snapshot', () => {
     })
     const msg = decodeSyncMessage(raw)
     expect(msg.type).toBe('state-snapshot')
+    // Extra fields must NOT leak through to the decoded message
+    expect((msg as Record<string, unknown>).someUnknownField).toBeUndefined()
+  })
+
+  it('decode strips unknown extra fields on member-join', () => {
+    const raw = JSON.stringify({
+      type: 'member-join',
+      pubkey: 'a'.repeat(64),
+      timestamp: 1700000000,
+      epoch: 0,
+      opId: 'join-extra',
+      injectedProp: 'attack',
+      protocolVersion: PROTOCOL_VERSION,
+    })
+    const msg = decodeSyncMessage(raw)
+    expect(msg.type).toBe('member-join')
+    expect((msg as Record<string, unknown>).injectedProp).toBeUndefined()
+  })
+
+  it('decode strips unknown extra fields on counter-advance', () => {
+    const raw = JSON.stringify({
+      type: 'counter-advance',
+      counter: 5,
+      usageOffset: 1,
+      timestamp: 1700000000,
+      injectedProp: 'attack',
+      protocolVersion: PROTOCOL_VERSION,
+    })
+    const msg = decodeSyncMessage(raw)
+    expect(msg.type).toBe('counter-advance')
+    expect((msg as Record<string, unknown>).injectedProp).toBeUndefined()
   })
 })
 
@@ -1294,6 +1325,13 @@ describe('authority model serialisation', () => {
     expect(() => decodeSyncMessage(payload)).toThrow('epoch')
   })
 
+  it('rejects counter-advance with usageOffset exceeding maximum', () => {
+    const payload = JSON.stringify({
+      type: 'counter-advance', counter: 5, usageOffset: 101, timestamp: 1700000000, protocolVersion: 2,
+    })
+    expect(() => decodeSyncMessage(payload)).toThrow('usageOffset')
+  })
+
   it('rejects reseed with opId exceeding 128 chars', () => {
     const payload = JSON.stringify({
       type: 'reseed', seed: 'a'.repeat(64), counter: 0, timestamp: 1700000000,
@@ -1357,6 +1395,15 @@ describe('canonical JSON (H2)', () => {
 
   it('stableStringify rejects Uint8Array', () => {
     expect(() => stableStringify(new Uint8Array([1]))).toThrow('Uint8Array must be hex-encoded')
+  })
+
+  it('stableStringify rejects NaN', () => {
+    expect(() => stableStringify(NaN)).toThrow('NaN/Infinity')
+  })
+
+  it('stableStringify rejects Infinity', () => {
+    expect(() => stableStringify(Infinity)).toThrow('NaN/Infinity')
+    expect(() => stableStringify(-Infinity)).toThrow('NaN/Infinity')
   })
 
   it('canonicaliseSyncMessage produces deterministic output', () => {

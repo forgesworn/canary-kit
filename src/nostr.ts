@@ -113,6 +113,8 @@ export interface WordUsedPayload {
 
 const HEX_64_RE = /^[0-9a-f]{64}$/
 const MAX_TAG_LENGTH = 256
+/** Maximum encrypted content length (64 KB — aligns with typical Nostr relay limits). */
+const MAX_CONTENT_LENGTH = 65_536
 
 export function validatePubkey(pubkey: string, label: string): void {
   if (!HEX_64_RE.test(pubkey)) {
@@ -138,6 +140,12 @@ export function validateExpiration(expiration: number): void {
 export function validateEventId(eventId: string, label: string): void {
   if (!HEX_64_RE.test(eventId)) {
     throw new Error(`Invalid ${label}: expected 64 lowercase hex characters, got ${eventId.length} chars`)
+  }
+}
+
+function validateContent(content: string): void {
+  if (content.length > MAX_CONTENT_LENGTH) {
+    throw new Error(`encryptedContent exceeds maximum length of ${MAX_CONTENT_LENGTH} characters`)
   }
 }
 
@@ -172,6 +180,7 @@ export function hashGroupId(groupId: string): string {
  */
 export function buildGroupStateEvent(params: GroupStateEventParams): UnsignedEvent {
   validateTagString(params.groupId, 'groupId')
+  validateContent(params.encryptedContent)
   for (const m of params.members) validatePubkey(m, 'member pubkey')
 
   const tags: string[][] = [
@@ -189,8 +198,8 @@ export function buildGroupStateEvent(params: GroupStateEventParams): UnsignedEve
   }
 
   if (params.tolerance !== undefined) {
-    if (!Number.isInteger(params.tolerance) || params.tolerance <= 0) {
-      throw new Error(`Invalid tolerance: must be a positive integer, got ${params.tolerance}`)
+    if (!Number.isInteger(params.tolerance) || params.tolerance < 0) {
+      throw new Error(`Invalid tolerance: must be a non-negative integer, got ${params.tolerance}`)
     }
     tags.push(['tolerance', String(params.tolerance)])
   }
@@ -218,6 +227,7 @@ export function buildGroupStateEvent(params: GroupStateEventParams): UnsignedEve
 export function buildStoredSignalEvent(params: StoredSignalEventParams): UnsignedEvent {
   validateTagString(params.groupId, 'groupId')
   validateTagString(params.signalType, 'signalType')
+  validateContent(params.encryptedContent)
 
   const hash = hashGroupId(params.groupId)
   const createdAt = now()
@@ -249,6 +259,7 @@ export function buildStoredSignalEvent(params: StoredSignalEventParams): Unsigne
 export function buildSignalEvent(params: SignalEventParams): UnsignedEvent {
   validateTagString(params.groupId, 'groupId')
   validateTagString(params.signalType, 'signalType')
+  validateContent(params.encryptedContent)
 
   const hash = hashGroupId(params.groupId)
 
@@ -277,6 +288,7 @@ export function buildSignalEvent(params: SignalEventParams): UnsignedEvent {
 export function buildRumourEvent(params: RumourEventParams): UnsignedEvent {
   validatePubkey(params.recipientPubkey, 'recipientPubkey')
   validateTagString(params.subject, 'subject')
+  validateContent(params.encryptedContent)
 
   if (params.groupEventId !== undefined) {
     validateEventId(params.groupEventId, 'groupEventId')

@@ -12,6 +12,7 @@
 import { hmacSha256, hexToBytes, bytesToBase64, base64ToBytes } from './crypto.js'
 
 const HEX_64_RE = /^[0-9a-f]{64}$/
+const GEOHASH_RE = /^[0-9b-hjkmnp-z]+$/
 
 // ---------------------------------------------------------------------------
 // Key Derivation (sync)
@@ -122,6 +123,15 @@ export async function encryptBeacon(
   geohash: string,
   precision: number,
 ): Promise<string> {
+  if (typeof geohash !== 'string' || geohash.length === 0 || geohash.length > 11) {
+    throw new Error('geohash must be a non-empty string of at most 11 characters')
+  }
+  if (!GEOHASH_RE.test(geohash)) {
+    throw new Error('geohash contains invalid characters (valid: 0-9, b-h, j-k, m-n, p-z)')
+  }
+  if (!Number.isInteger(precision) || precision < 1 || precision > 11) {
+    throw new Error('precision must be an integer between 1 and 11')
+  }
   const payload: BeaconPayload = {
     geohash,
     precision,
@@ -153,6 +163,12 @@ export async function decryptBeacon(
   const obj = parsed as Record<string, unknown>
   if (typeof obj.geohash !== 'string' || typeof obj.precision !== 'number' || typeof obj.timestamp !== 'number') {
     throw new Error('Invalid beacon payload: missing or malformed required fields')
+  }
+  if (obj.geohash.length > 11 || (obj.geohash.length > 0 && !GEOHASH_RE.test(obj.geohash))) {
+    throw new Error('Invalid beacon payload: geohash contains invalid characters or exceeds max length')
+  }
+  if (!Number.isInteger(obj.precision) || obj.precision < 0 || obj.precision > 11) {
+    throw new Error('Invalid beacon payload: precision must be an integer between 0 and 11')
   }
   return parsed as BeaconPayload
 }
@@ -198,6 +214,15 @@ export function buildDuressAlert(
     throw new Error(`Invalid member pubkey: expected 64 lowercase hex characters, got ${memberPubkey.length} chars`)
   }
   if (location) {
+    if (typeof location.geohash !== 'string' || location.geohash.length === 0 || location.geohash.length > 11) {
+      throw new Error('location.geohash must be a non-empty string of at most 11 characters')
+    }
+    if (!GEOHASH_RE.test(location.geohash)) {
+      throw new Error('location.geohash contains invalid characters (valid: 0-9, b-h, j-k, m-n, p-z)')
+    }
+    if (!Number.isInteger(location.precision) || location.precision < 1 || location.precision > 11) {
+      throw new Error('location.precision must be an integer between 1 and 11')
+    }
     return {
       type: 'duress',
       member: memberPubkey,
@@ -263,6 +288,9 @@ export async function decryptDuressAlert(
     !VALID_SOURCES.has(obj.locationSource as string)
   ) {
     throw new Error('Invalid duress alert payload: missing or malformed required fields')
+  }
+  if (!HEX_64_RE.test(obj.member)) {
+    throw new Error('Invalid duress alert payload: member must be a 64-character lowercase hex string')
   }
   return parsed as DuressAlert
 }

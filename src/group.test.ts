@@ -120,6 +120,16 @@ describe('createGroup', () => {
       .toThrow('name must be a non-empty string')
   })
 
+  it('rejects name exceeding 256 characters', () => {
+    expect(() => createGroup({ name: 'x'.repeat(257), members: [ALICE] }))
+      .toThrow('name must be at most 256 characters')
+  })
+
+  it('accepts name at exactly 256 characters', () => {
+    const group = createGroup({ name: 'x'.repeat(256), members: [ALICE] })
+    expect(group.name).toHaveLength(256)
+  })
+
   it('accepts valid edge-case config', () => {
     const group = createGroup({
       name: 'Edge',
@@ -363,6 +373,14 @@ describe('dissolveGroup', () => {
     const dissolved = dissolveGroup(state)
     expect(dissolved.name).toBe('audit-trail')
     expect(dissolved.createdAt).toBe(state.createdAt)
+  })
+
+  it('clears consumedOpsFloor on dissolution', () => {
+    const state = createGroup({ name: 'floor-test', members: [ALICE] })
+    const withFloor = { ...state, consumedOpsFloor: 1700000000, consumedOps: ['op-1'] }
+    const dissolved = dissolveGroup(withFloor)
+    expect(dissolved.consumedOps).toEqual([])
+    expect(dissolved.consumedOpsFloor).toBeUndefined()
   })
 })
 

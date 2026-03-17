@@ -120,13 +120,17 @@ describe('buildGroupStateEvent', () => {
     })).toThrow(/rotationInterval/)
   })
 
-  it('rejects non-positive tolerance', () => {
-    expect(() => buildGroupStateEvent({
-      groupId: GROUP_ID, members: [ALICE], encryptedContent: '', tolerance: 0,
-    })).toThrow(/tolerance/)
+  it('rejects negative tolerance', () => {
     expect(() => buildGroupStateEvent({
       groupId: GROUP_ID, members: [ALICE], encryptedContent: '', tolerance: -1,
     })).toThrow(/tolerance/)
+  })
+
+  it('accepts tolerance: 0 (exact counter match)', () => {
+    const event = buildGroupStateEvent({
+      groupId: GROUP_ID, members: [ALICE], encryptedContent: '', tolerance: 0,
+    })
+    expect(event.tags.find(t => t[0] === 'tolerance')?.[1]).toBe('0')
   })
 
   it('rejects empty groupId', () => {
@@ -157,6 +161,12 @@ describe('buildGroupStateEvent', () => {
     expect(() => buildGroupStateEvent({
       groupId: GROUP_ID, members: [ALICE, BOB], encryptedContent: '',
     })).not.toThrow()
+  })
+
+  it('rejects encryptedContent exceeding 64KB', () => {
+    expect(() => buildGroupStateEvent({
+      groupId: GROUP_ID, members: [ALICE], encryptedContent: 'x'.repeat(65537),
+    })).toThrow(/encryptedContent/)
   })
 
   it('error message does not leak pubkey content', () => {

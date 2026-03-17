@@ -17,6 +17,23 @@ export interface NostrProfile {
   banner?: string
 }
 
+/** Defensively normalise a parsed kind 0 profile, coercing fields to expected types. */
+function normaliseProfile(raw: unknown): NostrProfile {
+  if (!raw || typeof raw !== 'object') return {}
+  const r = raw as Record<string, unknown>
+  return {
+    ...(typeof r.name === 'string' ? { name: r.name } : {}),
+    ...(typeof r.display_name === 'string' ? { display_name: r.display_name } : {}),
+    ...(typeof r.picture === 'string' ? { picture: r.picture } : {}),
+    ...(typeof r.about === 'string' ? { about: r.about } : {}),
+    ...(typeof r.nip05 === 'string' ? { nip05: r.nip05 } : {}),
+    ...(typeof r.lud16 === 'string' ? { lud16: r.lud16 } : {}),
+    ...(typeof r.lud06 === 'string' ? { lud06: r.lud06 } : {}),
+    ...(typeof r.website === 'string' ? { website: r.website } : {}),
+    ...(typeof r.banner === 'string' ? { banner: r.banner } : {}),
+  }
+}
+
 /** In-memory cache: pubkey → profile. Survives re-renders but not page reload. */
 const _cache = new Map<string, NostrProfile>()
 
@@ -81,7 +98,7 @@ export function fetchProfiles(pubkeys: string[], groupId?: string): void {
         if (!verifyEvent(event)) return
         if (typeof event.content === 'string' && event.content.length > 65536) return
         try {
-          const profile: NostrProfile = JSON.parse(event.content)
+          const profile: NostrProfile = normaliseProfile(JSON.parse(event.content))
           console.warn('[profiles] got profile for', event.pubkey.slice(0, 8), profile.display_name || profile.name || '(no name)')
           _cache.set(event.pubkey, profile)
           _pending.delete(event.pubkey)
@@ -160,7 +177,7 @@ export async function fetchOwnProfile(): Promise<void> {
         if (!verifyEvent(event)) return
         if (typeof event.content === 'string' && event.content.length > 65536) return
         try {
-          const profile: NostrProfile = JSON.parse(event.content)
+          const profile: NostrProfile = normaliseProfile(JSON.parse(event.content))
           console.warn('[profiles] got own profile from relay:', profile.display_name || profile.name || '(no name)')
           _cache.set(event.pubkey, profile)
           _pending.delete(event.pubkey)

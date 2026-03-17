@@ -152,8 +152,14 @@ export function deriveGroupSigningKey(seedHex: string, personalPrivkeyHex: strin
   if (!/^[0-9a-f]{64}$/.test(personalPrivkeyHex)) {
     throw new Error('personalPrivkeyHex must be a 64-character lowercase hex string (32 bytes)')
   }
+  const seedBytes = hexToBytes(seedHex)
   const data = concatBytes(utf8('canary:sync:sign:'), hexToBytes(personalPrivkeyHex))
-  return hmacSha256(hexToBytes(seedHex), data)
+  const result = hmacSha256(seedBytes, data)
+  // Zero intermediate buffers containing key material (defence-in-depth).
+  // JS strings are immutable so the hex inputs cannot be zeroed, but Uint8Arrays can.
+  seedBytes.fill(0)
+  data.fill(0)
+  return result
 }
 
 // ── Task 2: Hashed group tag ──────────────────────────────────────────────────
