@@ -170,7 +170,7 @@ export async function decryptBeacon(
   if (!Number.isInteger(obj.precision) || obj.precision < 0 || obj.precision > 11) {
     throw new Error('Invalid beacon payload: precision must be an integer between 0 and 11')
   }
-  return parsed as BeaconPayload
+  return { geohash: obj.geohash, precision: obj.precision, timestamp: obj.timestamp }
 }
 
 // ---------------------------------------------------------------------------
@@ -292,5 +292,18 @@ export async function decryptDuressAlert(
   if (!HEX_64_RE.test(obj.member)) {
     throw new Error('Invalid duress alert payload: member must be a 64-character lowercase hex string')
   }
-  return parsed as DuressAlert
+  if (obj.geohash.length > 11 || (obj.geohash.length > 0 && !GEOHASH_RE.test(obj.geohash))) {
+    throw new Error('Invalid duress alert payload: geohash contains invalid characters or exceeds max length')
+  }
+  if (!Number.isInteger(obj.precision) || obj.precision < 0 || obj.precision > 11) {
+    throw new Error('Invalid duress alert payload: precision must be an integer between 0 and 11')
+  }
+  return {
+    type: 'duress',
+    member: obj.member,
+    geohash: obj.geohash,
+    precision: obj.precision,
+    locationSource: obj.locationSource as DuressAlert['locationSource'],
+    timestamp: obj.timestamp,
+  }
 }
