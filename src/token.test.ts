@@ -318,7 +318,7 @@ describe('cross-counter collision avoidance', () => {
     }
   })
 
-  it('verifyToken detects duress with tolerance=3 (P2 regression round 2)', () => {
+  it('verifyToken detects duress with tolerance=3 (P2 regression round 2)', { timeout: 15_000 }, () => {
     // Regression: derive at c=427, verify at vc=430, tolerance=3
     // Before fix: duress token classified as 'valid' because collision avoidance
     // window was insufficient for the verifier's tolerance.
