@@ -41,7 +41,7 @@
         "context": "dispatch:handoff",
         "counter": 0,
         "encoding": { "format": "pin", "digits": 4 },
-        "expected": "2818"
+        "expected": "1429"
       },
       {
         "id": "U-05",
@@ -69,7 +69,7 @@
         "counter": 0,
         "maxTolerance": 1,
         "encoding": { "format": "pin", "digits": 4 },
-        "expected": "0973"
+        "expected": "9160"
       },
       {
         "id": "U-08",
@@ -127,7 +127,7 @@
         "context": "",
         "counter": 0,
         "encoding": { "format": "words", "count": 1 },
-        "expected": "ski"
+        "expectedError": "context must be a non-empty string"
       },
       {
         "id": "U-15",
@@ -145,7 +145,7 @@
         "context": "canary:verify",
         "counter": 0,
         "encoding": { "format": "pin", "digits": 4 },
-        "expected": "0453"
+        "expected": "6004"
       },
       {
         "id": "U-17",

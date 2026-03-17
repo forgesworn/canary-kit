@@ -1,8 +1,7 @@
-import { hmacSha256, hexToBytes, concatBytes } from './crypto.js'
+import { hmacSha256, hexToBytes, concatBytes, timingSafeStringEqual } from './crypto.js'
+import { encodeToken } from './encoding.js'
 import {
   MAX_TOLERANCE,
-  deriveToken,
-  verifyToken,
   deriveDirectionalPair,
   type TokenVerifyResult,
   type DirectionalPair,
@@ -10,6 +9,12 @@ import {
 import type { TokenEncoding } from './encoding.js'
 
 const encoder = new TextEncoder()
+
+function counterBe32(counter: number): Uint8Array {
+  const buf = new Uint8Array(4)
+  new DataView(buf.buffer).setUint32(0, counter, false)
+  return buf
+}
 
 /**
  * Generate a cryptographically secure 256-bit seed.
@@ -214,10 +219,9 @@ export function createSession(config: SessionConfig): Session {
 
   const secret = typeof config.secret === 'string' ? hexToBytes(config.secret) : config.secret
   const theirRole = config.roles[0] === config.myRole ? config.roles[1] : config.roles[0]
-  // Use null-byte separator to match deriveDirectionalPair and prevent
-  // concatenation ambiguity (e.g. namespace "a:b" + role "c" vs "a" + "b:c")
-  const myContext = `${config.namespace}\0${config.myRole}`
-  const theirContext = `${config.namespace}\0${theirRole}`
+  // Duress context uses a colon-separated format (no null bytes) to avoid
+  // the null-byte restriction in spoken-token v2's public API.
+  const theirDuressContext = `pair:${config.namespace}:${theirRole}`
 
   const isFixedCounter = rotationSeconds === 0
 
@@ -236,20 +240,71 @@ export function createSession(config: SessionConfig): Session {
     counter: getCounter,
 
     myToken(nowSec?: number): string {
-      return deriveToken(secret, myContext, getCounter(nowSec), encoding)
+      return deriveDirectionalPair(secret, config.namespace, config.roles, getCounter(nowSec), encoding)[config.myRole]
     },
 
     theirToken(nowSec?: number): string {
-      return deriveToken(secret, theirContext, getCounter(nowSec), encoding)
+      return deriveDirectionalPair(secret, config.namespace, config.roles, getCounter(nowSec), encoding)[theirRole]
     },
 
     verify(spoken: string, nowSec?: number): TokenVerifyResult {
-      const identities: string[] = []
-      if (config.theirIdentity) identities.push(config.theirIdentity)
-      return verifyToken(secret, theirContext, getCounter(nowSec), spoken, identities, {
-        encoding,
-        tolerance,
-      })
+      const normalised = spoken.toLowerCase().trim().replace(/\s+/g, ' ')
+      const c = getCounter(nowSec)
+      const lo = Math.max(0, c - tolerance)
+      const hi = Math.min(0xFFFFFFFF, c + tolerance)
+
+      // 1. Check normal directional pair tokens across tolerance window
+      let normalMatch = false
+      for (let t = lo; t <= hi; t++) {
+        const pair = deriveDirectionalPair(secret, config.namespace, config.roles, t, encoding)
+        if (timingSafeStringEqual(normalised, pair[theirRole])) {
+          normalMatch = true
+        }
+      }
+
+      // 2. Check duress tokens (only when theirIdentity is provided)
+      const duressMatches: string[] = []
+      if (config.theirIdentity) {
+        // Build forbidden set from directional pair tokens for collision avoidance
+        const forbidden = new Set<string>()
+        const duressWindow = 2 * tolerance
+        const dlo = Math.max(0, c - duressWindow)
+        const dhi = Math.min(0xFFFFFFFF, c + duressWindow)
+        for (let t = dlo; t <= dhi; t++) {
+          const pair = deriveDirectionalPair(secret, config.namespace, config.roles, t, encoding)
+          forbidden.add(pair[theirRole])
+        }
+
+        // Check if spoken word matches duress token at any counter in window
+        for (let t = lo; t <= hi; t++) {
+          const duressData = concatBytes(
+            encoder.encode(theirDuressContext + ':duress'),
+            new Uint8Array([0x00]),
+            encoder.encode(config.theirIdentity),
+            counterBe32(t),
+          )
+
+          let bytes = hmacSha256(secret, duressData)
+          let token = encodeToken(bytes, encoding)
+
+          // Collision avoidance: match deriveDuressToken's suffix retry
+          let suffix = 1
+          while (forbidden.has(token) && suffix <= 255) {
+            bytes = hmacSha256(secret, concatBytes(duressData, new Uint8Array([suffix])))
+            token = encodeToken(bytes, encoding)
+            suffix++
+          }
+
+          if (timingSafeStringEqual(normalised, token)) {
+            duressMatches.push(config.theirIdentity)
+          }
+        }
+      }
+
+      // Priority: duress wins over normal (safety-first)
+      if (duressMatches.length > 0) return { status: 'duress', identities: duressMatches }
+      if (normalMatch) return { status: 'valid' }
+      return { status: 'invalid' }
     },
 
     pair(nowSec?: number): DirectionalPair {

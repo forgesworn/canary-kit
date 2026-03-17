@@ -140,6 +140,6 @@
   "dependencies": {
     "@scure/bip32": "^2.0.1",
     "@scure/bip39": "^2.0.1",
-    "spoken-token": "^1.0.0"
+    "spoken-token": "^2.0.0"
   }
 }

@@ -74,8 +74,12 @@ describe('universal', () => {
 
         case 'deriveToken': {
           const encoding = vector.encoding as TokenEncoding
-          const result = deriveToken(secret, vector.context, vector.counter, encoding)
-          expect(result).toBe(vector.expected)
+          if (vector.expectedError) {
+            expect(() => deriveToken(secret, vector.context, vector.counter, encoding)).toThrow(vector.expectedError)
+          } else {
+            const result = deriveToken(secret, vector.context, vector.counter, encoding)
+            expect(result).toBe(vector.expected)
+          }
           break
         }
 
