@@ -1118,10 +1118,15 @@ function wireGlobalEvents(): void {
   // Immediate vault publish requested (e.g. after word rotation)
   document.addEventListener('canary:vault-publish-now', () => publishVaultNow())
 
+  // On background: flush vault to relay so other devices can pick up changes.
   // On foreground: reconnect relay + fetch vault to catch up on any state
   // changes from other devices while this tab was suspended.
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return
+    if (document.hidden) {
+      // Mobile browsers kill tabs without beforeunload — publish vault immediately
+      publishVaultNow()
+      return
+    }
     console.info('[canary:boot] App foregrounded — reconnecting and syncing vault')
     teardownSync()
     import('./nostr/connect.js').then(({ disconnectRelays }) => {
@@ -1624,7 +1629,8 @@ function publishVaultNow(): void {
   }
 }
 
-window.addEventListener('beforeunload', () => {
+// pagehide fires reliably on mobile (beforeunload does not on iOS Safari)
+window.addEventListener('pagehide', () => {
   if (_vaultTimer) publishVaultNow()
 })
 

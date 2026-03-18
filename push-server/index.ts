@@ -95,8 +95,9 @@ serve({ fetch: app.fetch, port: Number(PORT) })
 console.info(`[push] HTTP server on port ${PORT}`)
 
 // ── Relay watcher — duress alerts ─────────────────────────
+// SSG stored events use kind 30078 with d-tags: ssg/{tagHash}:{messageType}
 
-const STORED_KIND = 39_111
+const GROUP_STATE_KIND = 30_078
 const pool = new SimplePool()
 
 function startWatching(): void {
@@ -104,30 +105,45 @@ function startWatching(): void {
 
   pool.subscribeMany(
     [RELAY_URL],
-    { kinds: [STORED_KIND], since: Math.floor(Date.now() / 1000) } as any,
+    { kinds: [GROUP_STATE_KIND], since: Math.floor(Date.now() / 1000) } as any,
     {
       onevent(event: any) {
         const dTag = event.tags?.find((t: string[]) => t[0] === 'd')?.[1] ?? ''
-        const groupHash = dTag.split(':')[0]
-        const msgType = dTag.split(':')[1] ?? ''
+        if (!dTag.startsWith('ssg/')) return
+
+        const payload = dTag.slice(4) // strip 'ssg/'
+        const separatorIdx = payload.lastIndexOf(':')
+        if (separatorIdx < 0) return
+
+        const groupHash = payload.slice(0, separatorIdx)
+        const msgType = payload.slice(separatorIdx + 1)
 
         if (!groupHash) return
-        if (msgType !== 'duress-alert') return
 
-        console.info(`[push] Duress alert for group ${groupHash.slice(0, 12)}`)
+        // Only dispatch push for duress alerts and duress clears
+        if (msgType !== 'duress-alert' && msgType !== 'duress-clear') return
+
+        console.info(`[push] ${msgType} for group ${groupHash.slice(0, 12)}`)
 
         const targets = devices.filter((d) => d.groups.some((g) => g.tagHash === groupHash))
         if (targets.length === 0) return
 
-        const payload = JSON.stringify({
-          title: 'CANARY — Emergency Alert',
-          body: 'A group member may need help.',
+        const title = msgType === 'duress-alert'
+          ? 'CANARY — Emergency Alert'
+          : 'CANARY — Alert Cleared'
+        const body = msgType === 'duress-alert'
+          ? 'A group member may need help.'
+          : 'A duress alert has been cleared.'
+
+        const pushPayload = JSON.stringify({
+          title,
+          body,
           tag: `duress-${groupHash.slice(0, 8)}`,
           url: './',
         })
 
         for (const device of targets) {
-          sendPush(device, payload)
+          sendPush(device, pushPayload)
         }
       },
       oneose() {

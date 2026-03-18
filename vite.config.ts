@@ -1,5 +1,8 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
+
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
 
 export default defineConfig({
   // Source root is app/ — Vite looks for index.html here
@@ -7,6 +10,10 @@ export default defineConfig({
 
   // Relative base so the build works on GitHub Pages and via file://
   base: './',
+
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
 
   resolve: {
     alias: {

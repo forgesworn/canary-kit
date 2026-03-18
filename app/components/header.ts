@@ -52,7 +52,7 @@ export function renderHeader(container: HTMLElement): void {
 
   container.innerHTML = `
     <button class="header__hamburger" id="hamburger" aria-label="Toggle menu">&#9776;</button>
-    <div class="header__brand">CANARY</div>
+    <div class="header__brand">CANARY <span class="header__version">v${__APP_VERSION__}</span></div>
     <nav class="header__nav" id="header-nav">
       <button class="header__nav-tab${view === 'groups' ? ' header__nav-tab--active' : ''}" data-view="groups">Groups</button>
       <button class="header__nav-tab${view === 'call-demo' ? ' header__nav-tab--active' : ''}" data-view="call-demo">Call Demo</button>
