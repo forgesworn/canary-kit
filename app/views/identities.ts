@@ -7,11 +7,12 @@ import { getState, update } from '../state.js'
 import { isPersonasInitialised, createPersona } from '../persona.js'
 import { renderPersonaCard, wirePersonaCards } from '../components/persona-card.js'
 import { renderIdentityTree, wireIdentityTree } from '../components/identity-tree.js'
+import { walkTree, findById } from '../persona-tree.js'
 import { escapeHtml } from '../utils/escape.js'
+import type { AppPersona } from '../types.js'
 
 // ── Module state ──────────────────────────────────────────────
 
-let _treeVisible = false
 let _archivedVisible = false
 let _backupRevealed = false
 
@@ -646,7 +647,8 @@ function renderGroupSummary(): string {
   const rows: string[] = []
   for (const [personaId, pGroups] of byPersona) {
     const isUnassigned = personaId === '(unassigned)'
-    const personaEntry = !isUnassigned ? personas[personaId] : undefined
+    const found = !isUnassigned ? findById(personas, personaId) : null
+    const personaEntry = found?.persona
     const isArchived = personaEntry?.archived
     const personaName = personaEntry?.name ?? personaId
     const label = isUnassigned
@@ -672,7 +674,11 @@ function renderMasterCard(): string {
   const { identity, personas, groups } = getState()
   if (!identity) return ''
 
-  const personaCount = Object.values(personas).filter(p => !p.archived).length
+  // Count active personas across the whole tree
+  let personaCount = 0
+  for (const { persona } of walkTree(personas)) {
+    if (!persona.archived) personaCount++
+  }
   const totalGroupCount = Object.keys(groups).length
   const hasMnemonic = !!identity.mnemonic
 
@@ -687,7 +693,6 @@ function renderMasterCard(): string {
           <span>${hasMnemonic ? 'Backed up' : 'No backup'}</span>
         </div>
         <div class="id-master__actions">
-          <button class="btn btn--sm" id="id-toggle-tree">${_treeVisible ? 'Hide tree' : 'Show tree'}</button>
           ${hasMnemonic ? '<button class="btn btn--sm" id="id-backup-btn">Backup</button>' : ''}
           <button class="btn btn--sm" id="id-shamir-btn">Shamir</button>
           <button class="btn btn--sm" id="id-verify-proof-btn">Verify proof</button>
@@ -702,25 +707,16 @@ function renderMasterCard(): string {
   `
 }
 
-// ── Render: Tree section ─────────────────────────────────────
-
-function renderTreeSection(): string {
-  const treeHtml = renderIdentityTree()
-  if (_treeVisible) {
-    return treeHtml.replace('max-height: 0', 'max-height: 2000px')
-      .replace('class="identity-tree"', 'class="identity-tree expanded"')
-  }
-  return treeHtml
-}
-
 // ── Render: Active persona cards ─────────────────────────────
 
 function renderActivePersonas(): string {
   const { personas, groups } = getState()
   const groupList = Object.values(groups)
-  const active = Object.values(personas).filter(p => !p.archived)
 
-  if (active.length === 0) {
+  // Use walkTree to render in depth-first order
+  const activeEntries = [...walkTree(personas)].filter(({ persona }) => !persona.archived)
+
+  if (activeEntries.length === 0) {
     return `
       <div class="id-empty">
         <div class="id-empty__icon">\u{1F464}</div>
@@ -735,7 +731,7 @@ function renderActivePersonas(): string {
     `
   }
 
-  return active.map(p => renderPersonaCard(p, groupList)).join('')
+  return activeEntries.map(({ persona }) => renderPersonaCard(persona, groupList)).join('')
 }
 
 // ── Render: New persona form ─────────────────────────────────
@@ -754,7 +750,11 @@ function renderNewPersonaForm(): string {
 
 function renderArchivedSection(): string {
   const { personas } = getState()
-  const archived = Object.values(personas).filter(p => p.archived)
+
+  // Collect archived personas from the entire tree
+  const archived = [...walkTree(personas)]
+    .filter(({ persona }) => persona.archived)
+    .map(({ persona }) => persona)
 
   if (archived.length === 0) return ''
 
@@ -765,7 +765,7 @@ function renderArchivedSection(): string {
         <span class="id-archived__badge" style="background: var(--text-muted);">${letter}</span>
         <span class="id-archived__name">${escapeHtml(p.name)}</span>
         <span class="id-archived__npub">${escapeHtml(truncateNpub(p.npub))}</span>
-        <button class="btn btn--sm" data-restore-persona="${escapeHtml(p.name)}">Restore</button>
+        <button class="btn btn--sm" data-restore-persona="${escapeHtml(p.id)}">Restore</button>
       </div>
     `
   }).join('')
@@ -812,7 +812,7 @@ export function renderIdentities(container: HTMLElement): void {
     '<h1 class="id-hub__heading">Identities</h1>',
     '<div class="id-hub__sub">Derived from your master key</div>',
     renderMasterCard(),
-    renderTreeSection(),
+    renderIdentityTree(),
     renderActivePersonas(),
     renderNewPersonaForm(),
     renderArchivedSection(),
@@ -821,28 +821,7 @@ export function renderIdentities(container: HTMLElement): void {
 
   // ── Wire components ──────────────────────────────────────────
   wirePersonaCards(container)
-
-  const tree = container.querySelector('.identity-tree')
-  if (tree) wireIdentityTree(container)
-
-  // ── Tree toggle ──────────────────────────────────────────────
-  const toggleTreeBtn = container.querySelector<HTMLButtonElement>('#id-toggle-tree')
-  if (toggleTreeBtn) {
-    toggleTreeBtn.addEventListener('click', () => {
-      _treeVisible = !_treeVisible
-      const treeEl = container.querySelector<HTMLElement>('.identity-tree')
-      if (treeEl) {
-        if (_treeVisible) {
-          treeEl.classList.add('expanded')
-          treeEl.style.maxHeight = treeEl.scrollHeight + 'px'
-        } else {
-          treeEl.classList.remove('expanded')
-          treeEl.style.maxHeight = '0'
-        }
-      }
-      toggleTreeBtn.textContent = _treeVisible ? 'Hide tree' : 'Show tree'
-    })
-  }
+  wireIdentityTree(container)
 
   // ── Backup reveal ────────────────────────────────────────────
   const backupBtn = container.querySelector<HTMLButtonElement>('#id-backup-btn')
@@ -918,12 +897,34 @@ export function renderIdentities(container: HTMLElement): void {
   container.addEventListener('click', e => {
     const restoreBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-restore-persona]')
     if (!restoreBtn) return
-    const name = restoreBtn.dataset.restorePersona!
+    const personaId = restoreBtn.dataset.restorePersona!
     const { personas } = getState()
-    // Find persona by name (archived personas displayed by name)
-    const entry = Object.entries(personas).find(([, p]) => p.name === name)
-    if (!entry) return
-    const [id, persona] = entry
-    update({ personas: { ...personas, [id]: { ...persona, archived: false } } })
+    // Find persona by id anywhere in the tree
+    const found = findById(personas, personaId)
+    if (!found) return
+    // Immutably update the persona's archived flag in the tree
+    const updatedPersonas = deepSetArchived(personas, personaId, false)
+    update({ personas: updatedPersonas })
   })
+}
+
+/**
+ * Immutably set archived flag for a persona anywhere in the tree.
+ */
+function deepSetArchived(
+  personas: Record<string, AppPersona>,
+  targetId: string,
+  archived: boolean,
+): Record<string, AppPersona> {
+  const result: Record<string, AppPersona> = {}
+  for (const [id, p] of Object.entries(personas)) {
+    if (id === targetId) {
+      result[id] = { ...p, archived }
+    } else if (p.children && Object.keys(p.children).length > 0) {
+      result[id] = { ...p, children: deepSetArchived(p.children, targetId, archived) }
+    } else {
+      result[id] = p
+    }
+  }
+  return result
 }
