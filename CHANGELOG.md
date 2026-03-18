@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/forgesworn/canary-kit/compare/v1.0.3...v1.0.4) (2026-03-18)
+
+
+### Bug Fixes
+
+* iOS/Safari push notification support ([8f44ef4](https://github.com/forgesworn/canary-kit/commit/8f44ef47073f90d0616ae76afefde3d6a4ef8c86))
+
 ## [1.0.3](https://github.com/forgesworn/canary-kit/compare/v1.0.2...v1.0.3) (2026-03-18)
 
 
