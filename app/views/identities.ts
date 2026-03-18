@@ -31,15 +31,63 @@ function isValidPersonaName(name: string): boolean {
 // ── Render: NIP-07 fallback ──────────────────────────────────
 
 function renderNip07Fallback(): string {
+  const { identity, groups } = getState()
+  const pubkey = identity?.pubkey ?? ''
+  const npubShort = pubkey ? `${pubkey.slice(0, 8)}\u2026${pubkey.slice(-4)}` : 'unknown'
+  const groupCount = Object.keys(groups).length
+
   return `
-    <div class="identities__fallback" style="
-      padding: 2rem;
-      text-align: center;
-      color: var(--text-muted, #999);
-    ">
-      <p style="font-size: 1rem; margin: 0;">
-        Identity management requires a local key. Switch to a local account to manage personas.
-      </p>
+    <div style="padding: 1rem; max-width: 640px; margin: 0 auto;">
+      <div style="
+        background: var(--surface-1, #1a1a2e);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+        border: 1px solid var(--border, #333);
+      ">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+          <div style="
+            width: 44px; height: 44px; border-radius: 50%;
+            background: hsl(210, 60%, 45%);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 18px;
+          ">&#x1F511;</div>
+          <div>
+            <div style="font-weight: 600; font-size: 15px;">Your Identity</div>
+            <div style="font-size: 12px; opacity: 0.5;">${escapeHtml(npubShort)} &middot; NIP-07 extension &middot; ${groupCount} group${groupCount !== 1 ? 's' : ''}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="
+        background: var(--surface-1, #1a1a2e);
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid var(--border, #333);
+      ">
+        <h3 style="margin: 0 0 12px 0; font-size: 14px;">Persona features unavailable</h3>
+        <p style="font-size: 13px; opacity: 0.7; line-height: 1.5; margin: 0 0 12px 0;">
+          Your NIP-07 browser extension (Alby, nos2x, etc.) keeps your private key secure by never exposing it to apps.
+          This is good security &mdash; but it means canary-kit cannot derive sub-identities from your key.
+        </p>
+        <p style="font-size: 13px; opacity: 0.7; line-height: 1.5; margin: 0 0 16px 0;">
+          Personas, Shamir backup, nsec export, and linkage proofs all require the raw private key to perform
+          cryptographic derivation (HMAC-SHA256). Your extension only allows signing and encryption &mdash; not key derivation.
+        </p>
+        <p style="font-size: 13px; opacity: 0.7; line-height: 1.5; margin: 0 0 16px 0;">
+          To use persona features, switch to a local key by creating a new account or importing a recovery phrase.
+          Your extension identity will remain separate.
+        </p>
+        <details style="font-size: 12px; opacity: 0.5;">
+          <summary style="cursor: pointer;">Technical detail</summary>
+          <p style="margin: 8px 0 0 0; line-height: 1.5;">
+            nsec-tree derives child keys via <code>HMAC-SHA256(master_key, purpose)</code>.
+            NIP-07 extensions expose <code>signEvent()</code> and <code>nip44.encrypt()</code>
+            but not the raw key bytes needed for HMAC input. A future NIP could add a
+            <code>deriveChild(purpose, index)</code> API to bridge this gap.
+          </p>
+        </details>
+      </div>
     </div>
   `
 }
