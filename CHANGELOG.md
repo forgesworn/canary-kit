@@ -1,3 +1,15 @@
+# [1.2.0](https://github.com/forgesworn/canary-kit/compare/v1.1.0...v1.2.0) (2026-03-18)
+
+
+### Bug Fixes
+
+* show pubkey in sync toast to diagnose identity mismatch ([223f7ef](https://github.com/forgesworn/canary-kit/commit/223f7ef7a2bd675eab08947eba29eb0ab6ae3837))
+
+
+### Features
+
+* move Sync Groups to footer for mobile visibility ([26435f3](https://github.com/forgesworn/canary-kit/commit/26435f37bcfa601e89e19cd1bc7312df777e9d6e))
+
 # [1.1.0](https://github.com/forgesworn/canary-kit/compare/v1.0.5...v1.1.0) (2026-03-18)
 
 
