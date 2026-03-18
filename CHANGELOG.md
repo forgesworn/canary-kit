@@ -1,3 +1,10 @@
+# [2.3.0](https://github.com/forgesworn/canary-kit/compare/v2.2.2...v2.3.0) (2026-03-18)
+
+
+### Features
+
+* add group-to-persona assignment controls in identity view ([61e6ace](https://github.com/forgesworn/canary-kit/commit/61e6ace629b03932e93025b03111994f24da4837))
+
 ## [2.2.2](https://github.com/forgesworn/canary-kit/compare/v2.2.1...v2.2.2) (2026-03-18)
 
 
