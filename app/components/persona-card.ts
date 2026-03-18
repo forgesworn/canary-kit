@@ -207,10 +207,23 @@ function renderActions(persona: AppPersona): string {
 
 // ── Public API ────────────────────────────────────────────────
 
+function renderBreadcrumb(ancestors: AppPersona[]): string {
+  if (ancestors.length === 0) return ''
+  const parts = ancestors.map((a, i) => {
+    const isLast = i === ancestors.length - 1
+    const nameHtml = escapeHtml(a.name)
+    return isLast
+      ? `<span class="persona-card__breadcrumb-current">${nameHtml}</span>`
+      : `<span>${nameHtml}</span>`
+  })
+  const joined = parts.join(' <span class="persona-card__breadcrumb-sep">/</span> ')
+  return `<div class="persona-card__breadcrumb">${joined}</div>`
+}
+
 /**
  * Render a single persona card. Returns HTML string.
  */
-export function renderPersonaCard(persona: AppPersona, groups: AppGroup[]): string {
+export function renderPersonaCard(persona: AppPersona, groups: AppGroup[], ancestors: AppPersona[] = []): string {
   const isExpanded = expandedCards.has(persona.name)
   const groupCount = countGroupsForPersona(persona.id, groups)
   const { personas: allPersonas } = getState()
@@ -223,6 +236,7 @@ export function renderPersonaCard(persona: AppPersona, groups: AppGroup[]): stri
       ${renderCollapsedCard(persona, groupCount)}
       ${isExpanded ? `
         <div class="persona-card__body">
+          ${renderBreadcrumb(ancestors)}
           <div class="persona-card__npub">${escapeHtml(persona.npub)}</div>
           ${renderProfileSection(persona)}
           ${renderRelaySection(persona)}

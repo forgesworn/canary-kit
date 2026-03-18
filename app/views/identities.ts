@@ -359,6 +359,23 @@ const STYLES = `
     border-top: 1px solid var(--border);
   }
 
+  .persona-card__breadcrumb {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    padding-top: 0.625rem;
+    line-height: 1.4;
+  }
+
+  .persona-card__breadcrumb-sep {
+    opacity: 0.4;
+    margin: 0 0.125rem;
+  }
+
+  .persona-card__breadcrumb-current {
+    color: var(--text-secondary);
+  }
+
   .persona-card__npub {
     font-family: var(--font-mono);
     font-size: 0.6875rem;
@@ -731,7 +748,7 @@ function renderActivePersonas(): string {
     `
   }
 
-  return activeEntries.map(({ persona }) => renderPersonaCard(persona, groupList)).join('')
+  return activeEntries.map(({ persona, ancestors }) => renderPersonaCard(persona, groupList, ancestors)).join('')
 }
 
 // ── Render: New persona form ─────────────────────────────────
