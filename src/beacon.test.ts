@@ -303,6 +303,37 @@ describe('seed validation (security audit)', () => {
   })
 })
 
+describe('DuressAlert scope', () => {
+  const validPubkey = 'a'.repeat(64)
+  const location = { geohash: 'gcpuuz', precision: 6, locationSource: 'beacon' as const }
+
+  it('buildDuressAlert defaults scope to group', () => {
+    const alert = buildDuressAlert(validPubkey, location)
+    expect(alert.scope).toBe('group')
+    expect(alert.originGroupId).toBeUndefined()
+  })
+
+  it('buildDuressAlert accepts persona scope with originGroupId', () => {
+    const alert = buildDuressAlert(validPubkey, location, { scope: 'persona', originGroupId: 'family-2026' })
+    expect(alert.scope).toBe('persona')
+    expect(alert.originGroupId).toBe('family-2026')
+  })
+
+  it('buildDuressAlert accepts master scope', () => {
+    const alert = buildDuressAlert(validPubkey, location, { scope: 'master', originGroupId: 'family-2026' })
+    expect(alert.scope).toBe('master')
+  })
+
+  it('duress alert with scope round-trips through encrypt/decrypt', async () => {
+    const key = deriveDuressKey('a'.repeat(64))
+    const alert = buildDuressAlert(validPubkey, location, { scope: 'persona', originGroupId: 'test-group' })
+    const encrypted = await encryptDuressAlert(key, alert)
+    const decrypted = await decryptDuressAlert(key, encrypted)
+    expect(decrypted.scope).toBe('persona')
+    expect(decrypted.originGroupId).toBe('test-group')
+  })
+})
+
 describe('AES key length validation (security audit)', () => {
   it('encryptBeacon rejects 16-byte key (prevents silent AES-128 downgrade)', async () => {
     const shortKey = new Uint8Array(16)

@@ -177,6 +177,9 @@ export async function decryptBeacon(
 // Duress Alert
 // ---------------------------------------------------------------------------
 
+/** Duress propagation scope. */
+export type DuressScope = 'group' | 'persona' | 'master'
+
 /** Decrypted content of a duress alert beacon (kind 20800, AES-GCM encrypted). */
 export interface DuressAlert {
   type: 'duress'
@@ -185,6 +188,10 @@ export interface DuressAlert {
   precision: number
   locationSource: 'beacon' | 'verifier' | 'none'
   timestamp: number
+  /** Propagation scope: group (default), persona (all groups in category), or master (everything). */
+  scope: DuressScope
+  /** The group that originally triggered the duress alert. Present when scope is persona or master. */
+  originGroupId?: string
 }
 
 /** Location info for a duress alert. Null means no location available. */
@@ -203,12 +210,14 @@ export interface DuressLocation {
  *
  * @param memberPubkey - 64-character lowercase hex pubkey of the member under duress.
  * @param location - Location info with geohash, precision, and source; or null if unavailable.
+ * @param options - Optional scope and originGroupId for propagation control.
  * @returns A {@link DuressAlert} payload ready for encryption.
  * @throws {Error} If memberPubkey is not a valid 64-character hex string.
  */
 export function buildDuressAlert(
   memberPubkey: string,
   location: DuressLocation | null,
+  options?: { scope?: DuressScope; originGroupId?: string },
 ): DuressAlert {
   if (!HEX_64_RE.test(memberPubkey)) {
     throw new Error(`Invalid member pubkey: expected 64 lowercase hex characters, got ${memberPubkey.length} chars`)
@@ -230,6 +239,8 @@ export function buildDuressAlert(
       precision: location.precision,
       locationSource: location.locationSource,
       timestamp: Math.floor(Date.now() / 1000),
+      scope: options?.scope ?? 'group',
+      ...(options?.originGroupId !== undefined && { originGroupId: options.originGroupId }),
     }
   }
   return {
@@ -239,6 +250,8 @@ export function buildDuressAlert(
     precision: 0,
     locationSource: 'none',
     timestamp: Math.floor(Date.now() / 1000),
+    scope: options?.scope ?? 'group',
+    ...(options?.originGroupId !== undefined && { originGroupId: options.originGroupId }),
   }
 }
 
@@ -298,6 +311,10 @@ export async function decryptDuressAlert(
   if (!Number.isInteger(obj.precision) || obj.precision < 0 || obj.precision > 11) {
     throw new Error('Invalid duress alert payload: precision must be an integer between 0 and 11')
   }
+  const VALID_SCOPES = new Set<string>(['group', 'persona', 'master'])
+  const scope: DuressScope = (typeof obj.scope === 'string' && VALID_SCOPES.has(obj.scope))
+    ? obj.scope as DuressScope
+    : 'group'
   return {
     type: 'duress',
     member: obj.member,
@@ -305,5 +322,7 @@ export async function decryptDuressAlert(
     precision: obj.precision,
     locationSource: obj.locationSource as DuressAlert['locationSource'],
     timestamp: obj.timestamp,
+    scope,
+    ...(typeof obj.originGroupId === 'string' && { originGroupId: obj.originGroupId }),
   }
 }
