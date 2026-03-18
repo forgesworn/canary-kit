@@ -1,3 +1,45 @@
+# [2.0.0](https://github.com/forgesworn/canary-kit/compare/v1.4.0...v2.0.0) (2026-03-18)
+
+
+### Bug Fixes
+
+* prevent vault merge from resurrecting deleted groups (tombstone pattern) ([baeb5c8](https://github.com/forgesworn/canary-kit/commit/baeb5c860ae5293a1a4cb0f1b49c48385499d808))
+* remove mnemonicToKeypair references from storage.ts and main.ts (use nsec-tree restoreFromMnemonic) ([e54dfd4](https://github.com/forgesworn/canary-kit/commit/e54dfd41a6737d62d0c2206871ee342426abcdfe))
+* update mnemonic and storage tests for nsec-tree API (replaces mnemonicToKeypair) ([0fcbe1a](https://github.com/forgesworn/canary-kit/commit/0fcbe1a68b1d579f4c713ad1f3e265ceeb868929))
+* wire persona-aware GroupSigner construction in sync.ts ([e44aab8](https://github.com/forgesworn/canary-kit/commit/e44aab83717ed940eb05540027e4f1dd853b66f0))
+
+
+### Code Refactoring
+
+* replace NIP-06 mnemonic derivation with nsec-tree restoreFromMnemonic ([db5a09f](https://github.com/forgesworn/canary-kit/commit/db5a09fb3fbd432096bd35730b061b97451a76c2))
+
+
+### Features
+
+* add AppPersona type, extend AppState and AppGroup for persona support ([cbcd736](https://github.com/forgesworn/canary-kit/commit/cbcd73622d663fa190aea85b9f632ec4e376989b))
+* add duress fan-out with persona/master scope targeting ([5a23e0c](https://github.com/forgesworn/canary-kit/commit/5a23e0ce6b6e8cde985751efc2e5084f6788e8ee))
+* add duress propagation scope (group/persona/master) to DuressAlert ([bcd1a89](https://github.com/forgesworn/canary-kit/commit/bcd1a899b4e3a0019e8519b52dae2a91c37ccaa2))
+* add nsec-tree dependency ([7bc8637](https://github.com/forgesworn/canary-kit/commit/7bc8637a34a8d43fb6123bd4f730ea26a6048736))
+* add persona badges and filtering to sidebar group list ([20da62d](https://github.com/forgesworn/canary-kit/commit/20da62db5af0c4f70b8cece440418612152a38ca))
+* add persona kind 0 profile publish and fetch ([49087a1](https://github.com/forgesworn/canary-kit/commit/49087a1bb7de823465967bb7b739e7c28188824b))
+* add persona module — TreeRoot lifecycle, derivation, group identity ([8be93e7](https://github.com/forgesworn/canary-kit/commit/8be93e7c3f02a659bbff94785f367d77ac018b3c))
+* add persona picker dropdown component ([845b95b](https://github.com/forgesworn/canary-kit/commit/845b95b93e14cbfcada171274d218dc347b394d3))
+* assign personaName when creating groups ([a943865](https://github.com/forgesworn/canary-kit/commit/a9438658edc937b184bac25b8f29246f43fa3ddd))
+* integrate persona picker into header with active persona display ([18263b5](https://github.com/forgesworn/canary-kit/commit/18263b561a6131ee7349b63590ea99a34ee97f4e))
+* persona section in settings, persona selector in group creation, invite, and duress flows ([79db87c](https://github.com/forgesworn/canary-kit/commit/79db87c2ff5fc58b8e27fdefd559dfcb63bc6be1))
+* replace deriveGroupSigningKey with nsec-tree-based deriveGroupIdentity ([944b74b](https://github.com/forgesworn/canary-kit/commit/944b74be8bcb25c87f8f1308e0cbf533dd61e106))
+* vault version 2 with personaName per group and personas array ([439a518](https://github.com/forgesworn/canary-kit/commit/439a518928618a6f900d4e083ecca46e0f68167b))
+* wire persona init/destroy into boot sequence and auto-lock ([fc04b59](https://github.com/forgesworn/canary-kit/commit/fc04b59c9861862cb0fb76adaac4e2861b22ba7b))
+
+
+### BREAKING CHANGES
+
+* mnemonicToKeypair removed. Uses nsec-tree path m/44'/1237'/727'/0'/0' instead of NIP-06.
+* deriveGroupSigningKey(seedHex, personalPrivkeyHex) has been
+removed. Use deriveGroupIdentity(persona, groupId, epoch) instead, which
+delegates to nsec-tree's two-level derivation (persona → group). The sync.ts
+barrel now exports deriveGroupIdentity and re-exports Persona/Identity types.
+
 # [1.4.0](https://github.com/forgesworn/canary-kit/compare/v1.3.0...v1.4.0) (2026-03-18)
 
 
