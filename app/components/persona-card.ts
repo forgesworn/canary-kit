@@ -202,7 +202,7 @@ export function renderPersonaCard(persona: AppPersona, groups: AppGroup[]): stri
       ${renderCollapsedCard(persona, groupCount)}
       ${isExpanded ? `
         <div class="persona-card__body">
-          <div class="persona-card__npub">${escapeHtml(truncateNpub(persona.npub))}</div>
+          <div class="persona-card__npub">${escapeHtml(persona.npub)}</div>
           ${renderProfileSection(persona)}
           ${renderRelaySection(persona)}
           ${renderGroupsSection(persona, groups)}
