@@ -51,8 +51,9 @@ function hexToBytes(hex: string): Uint8Array {
  * @param name         Human-readable group name.
  * @param preset       Named threat-profile preset ('family' | 'field-ops' | 'enterprise').
  * @param memberPubkey Optional 64-char hex pubkey to add as the first member.
+ * @param personaName  Optional persona name to associate with this group. Defaults to 'personal'.
  */
-export function createNewGroup(name: string, preset: PresetName, memberPubkey?: string): string {
+export function createNewGroup(name: string, preset: PresetName, memberPubkey?: string, personaName?: string): string {
   const id = crypto.randomUUID()
 
   const members: string[] = memberPubkey ? [memberPubkey] : []
@@ -84,6 +85,7 @@ export function createNewGroup(name: string, preset: PresetName, memberPubkey?: 
     tolerance: 1,
     memberNames: {},
     duressMode: 'immediate',
+    personaName: personaName ?? 'personal',
   }
 
   const { groups } = getState()
