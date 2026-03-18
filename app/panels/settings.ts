@@ -2,7 +2,10 @@
 
 import { getState, updateGroup, update } from '../state.js'
 import { groupMode, allRelaysForGroup, WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY } from '../types.js'
+import type { AppPersona } from '../types.js'
 import { deleteGroup, reseedGroup, compromiseReseed, validateGroupImport } from '../actions/groups.js'
+import { createPersona } from '../persona.js'
+import { personaBadgeHtml } from '../components/persona-picker.js'
 import { showToast } from '../components/toast.js'
 import { disconnectRelays, isConnected, getRelayCount } from '../nostr/connect.js'
 import { ensureTransport, teardownSync } from '../sync.js'
@@ -26,6 +29,25 @@ function isAllowedRelayUrl(url: string): boolean {
 // collapse the drawer. We persist the open/closed state here so it
 // survives re-renders.
 let _drawerOpen = false
+
+/** Render the persona list items for the settings panel. */
+function renderPersonaList(): string {
+  const { personas } = getState()
+  const entries = Object.values(personas)
+  if (entries.length === 0) return '<li class="relay-item"><span class="settings-hint">No personas yet</span></li>'
+
+  return entries.map((p: AppPersona) => {
+    const shortNpub = p.npub.length > 16 ? `${p.npub.slice(0, 8)}\u2026${p.npub.slice(-4)}` : p.npub
+    return `
+      <li class="relay-item">
+        ${personaBadgeHtml(p.name)}
+        <span class="relay-url">${escapeHtml(p.displayName ?? p.name)}</span>
+        <span class="settings-hint" style="margin-left: 0.25rem;">${escapeHtml(shortNpub)}</span>
+        <button class="btn btn--ghost btn--sm persona-publish-btn" data-persona-name="${escapeHtml(p.name)}" title="Publish profile">Publish</button>
+      </li>
+    `
+  }).join('')
+}
 
 export function renderSettings(container: HTMLElement): void {
   const { groups, activeGroupId } = getState()
@@ -184,6 +206,18 @@ export function renderSettings(container: HTMLElement): void {
           ${isAdmin ? `<button class="btn btn--warning" id="reseed-btn">Rotate Key</button>` : ''}
           ${isAdmin ? `<button class="btn btn--danger" id="compromise-reseed-btn">Compromise Reseed</button>` : ''}
           <button class="btn btn--danger" id="dissolve-btn">Dissolve Group</button>
+        </div>
+
+        <!-- Personas -->
+        <div class="settings-section">
+          <span class="input-label">Personas</span>
+          <ul class="relay-list" id="persona-list">
+            ${renderPersonaList()}
+          </ul>
+          <div class="relay-add-row" style="margin-top: 0.5rem;">
+            <input class="input relay-add-input" id="persona-name-input" type="text" placeholder="New persona name">
+            <button class="btn btn--ghost btn--sm" id="persona-create-btn">Create</button>
+          </div>
         </div>
       </div>
     </div>
@@ -446,6 +480,40 @@ export function renderSettings(container: HTMLElement): void {
       }
     })
     input.click()
+  })
+
+  // ── Persona create ──────────────────────────────────────────
+
+  document.getElementById('persona-create-btn')?.addEventListener('click', () => {
+    const input = document.getElementById('persona-name-input') as HTMLInputElement | null
+    const name = input?.value.trim()
+    if (!name) { input?.focus(); return }
+    try {
+      const appPersona = createPersona(name)
+      const { personas } = getState()
+      update({ personas: { ...personas, [name]: appPersona } })
+      if (input) input.value = ''
+      showToast(`Persona "${name}" created`, 'success')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to create persona.', 'error')
+    }
+  })
+
+  document.getElementById('persona-name-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('persona-create-btn')?.click()
+  })
+
+  // ── Persona publish profile ─────────────────────────────────
+
+  container.querySelectorAll<HTMLButtonElement>('.persona-publish-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const personaName = btn.dataset.personaName
+      if (!personaName) return
+      document.dispatchEvent(new CustomEvent('canary:publish-persona-profile', {
+        detail: { personaName },
+      }))
+      showToast(`Publishing profile for "${personaName}"…`, 'info')
+    })
   })
 }
 

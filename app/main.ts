@@ -404,8 +404,16 @@ function render(): void {
 // ── Modal: create group ────────────────────────────────────────
 
 function showCreateGroupModal(): void {
-  const { identity } = getState()
+  const { identity, personas, activePersonaName } = getState()
   const knownName = identity?.displayName && identity.displayName !== 'You' ? identity.displayName : ''
+
+  const personaNames = Object.keys(personas)
+  const personaOptions = personaNames.length > 0
+    ? personaNames.map(n => {
+        const sel = n === (activePersonaName ?? 'personal') ? ' selected' : ''
+        return `<option value="${escapeHtml(n)}"${sel}>${escapeHtml(n)}</option>`
+      }).join('')
+    : '<option value="personal">personal</option>'
 
   const content = `
     <h2 class="modal__title">New Group</h2>
@@ -431,6 +439,10 @@ function showCreateGroupModal(): void {
       />
     </label>
     ` : ''}
+    <label class="input-label" style="margin-top: 0.5rem;">
+      <span>Persona</span>
+      <select class="input" name="persona">${personaOptions}</select>
+    </label>
     <fieldset class="segmented" style="margin-top: 0.5rem;">
       <legend class="input-label__text" style="margin-bottom: 0.25rem;">Preset</legend>
       <button type="button" class="segmented__btn segmented__btn--active" data-preset="family">Family</button>
@@ -448,9 +460,10 @@ function showCreateGroupModal(): void {
     const name = (formData.get('name') as string | null)?.trim() ?? ''
     if (!name) return
     const myName = knownName || (formData.get('myname') as string | null)?.trim() || ''
+    const selectedPersona = (formData.get('persona') as string | null)?.trim() || 'personal'
     const activePresetBtn = document.querySelector<HTMLButtonElement>('.segmented__btn.segmented__btn--active[data-preset]')
     const preset = (activePresetBtn?.dataset.preset ?? 'family') as 'family' | 'field-ops' | 'enterprise' | 'event'
-    const groupId = createNewGroup(name, preset, identity?.pubkey)
+    const groupId = createNewGroup(name, preset, identity?.pubkey, selectedPersona)
     if (myName && identity?.pubkey) {
       const group = getState().groups[groupId]
       if (group) {
@@ -674,6 +687,7 @@ function showBinaryJoinScreen(b64url: string): void {
           livenessInterval: validated.rotationInterval,
           livenessCheckins: {} as Record<string, number>,
           tolerance: validated.tolerance,
+          personaName: getState().activePersonaName ?? 'personal',
           createdAt: Math.floor(Date.now() / 1000),
           admins: [...validated.admins],
           epoch: validated.epoch,
@@ -781,6 +795,7 @@ function acceptWelcomeEnvelope(
     livenessInterval: welcome.rotationInterval,
     livenessCheckins: {} as Record<string, number>,
     tolerance: welcome.tolerance,
+    personaName: getState().activePersonaName ?? 'personal',
     createdAt: Math.floor(Date.now() / 1000),
     admins: [...welcome.admins],
     epoch: welcome.epoch,

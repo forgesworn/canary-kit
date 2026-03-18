@@ -1,10 +1,13 @@
 // app/panels/duress.ts — Duress panel: hold to reveal duress word
 
 import { deriveDuressToken } from 'canary-kit/token'
+import type { DuressScope } from 'canary-kit/beacon'
 import { getState } from '../state.js'
 import type { AppGroup } from '../types.js'
 import { toTokenEncoding, GROUP_CONTEXT, formatForDisplay } from '../utils/encoding.js'
+import { escapeHtml } from '../utils/escape.js'
 import { broadcastAction } from '../sync.js'
+import { getTargetGroups } from '../actions/duress.js'
 
 /**
  * Derive the duress display token using the universal CANARY token API.
@@ -44,11 +47,25 @@ export function renderDuress(container: HTMLElement): void {
   }
 
   const isMember = !!(identity?.pubkey && group.members.includes(identity.pubkey))
+  const personaLabel = group.personaName ? escapeHtml(`All ${group.personaName} groups`) : 'All persona groups'
 
   container.innerHTML = `
     <section class="panel duress-section">
       <h3 class="panel__title">Emergency Signal</h3>
       <p class="duress-section__hint">Your personal emergency word. It appears valid to others. Hold for 3 seconds to silently alert your group.</p>
+
+      <div class="settings-section" style="margin-bottom: 0.75rem;">
+        <span class="input-label" style="margin-bottom: 0.25rem;">Alert scope</span>
+        <label style="display: block; font-size: 0.8125rem; margin: 0.125rem 0;">
+          <input type="radio" name="duress-scope" value="group"> This group only
+        </label>
+        <label style="display: block; font-size: 0.8125rem; margin: 0.125rem 0;">
+          <input type="radio" name="duress-scope" value="persona" checked> ${personaLabel}
+        </label>
+        <label style="display: block; font-size: 0.8125rem; margin: 0.125rem 0;">
+          <input type="radio" name="duress-scope" value="master"> All personas
+        </label>
+      </div>
 
       <button
         class="btn duress-btn"
@@ -113,44 +130,37 @@ export function renderDuress(container: HTMLElement): void {
       const currentGroup = g[gid]
       if (!currentGroup) return
 
-      const opId = crypto.randomUUID()
+      // Read scope from radio buttons (default: persona)
+      const scopeRadio = container.querySelector<HTMLInputElement>('input[name="duress-scope"]:checked')
+      const scope: DuressScope = (scopeRadio?.value as DuressScope) ?? 'persona'
+      const targetGroups = getTargetGroups(g, gid, scope)
+
       // In the demo, all modes broadcast via the sync transport.
       // In production, 'dead-drop' would skip push notifications
       // and only persist on the relay for later retrieval.
       // Emergency signals ALWAYS share exact GPS — you need to find them.
+
+      function dispatchToTargets(lat: number, lon: number): void {
+        for (const target of targetGroups) {
+          broadcastAction(target.id, {
+            type: 'duress-alert',
+            lat,
+            lon,
+            timestamp: Math.floor(Date.now() / 1000),
+            opId: crypto.randomUUID(),
+            subject: id!.pubkey,
+          })
+        }
+      }
+
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            broadcastAction(gid, {
-              type: 'duress-alert',
-              lat: pos.coords.latitude,
-              lon: pos.coords.longitude,
-              timestamp: Math.floor(Date.now() / 1000),
-              opId,
-              subject: id.pubkey,
-            })
-          },
-          () => {
-            broadcastAction(gid, {
-              type: 'duress-alert',
-              lat: 0,
-              lon: 0,
-              timestamp: Math.floor(Date.now() / 1000),
-              opId,
-              subject: id.pubkey,
-            })
-          },
+          (pos) => dispatchToTargets(pos.coords.latitude, pos.coords.longitude),
+          () => dispatchToTargets(0, 0),
           { enableHighAccuracy: true, timeout: 5000 },
         )
       } else {
-        broadcastAction(gid, {
-          type: 'duress-alert',
-          lat: 0,
-          lon: 0,
-          timestamp: Math.floor(Date.now() / 1000),
-          opId,
-          subject: id.pubkey,
-        })
+        dispatchToTargets(0, 0)
       }
 
     }, 3000)
