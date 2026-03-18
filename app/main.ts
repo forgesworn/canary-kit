@@ -39,7 +39,7 @@ import { resolveSigner, hasNip07 } from './nostr/signer.js'
 import { decode as nip19decode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
-import { fetchVault, publishVault, mergeVaultGroups } from './nostr/vault.js'
+import { fetchVault, fetchVaultNip07, publishVault, publishVaultNip07, mergeVaultGroups } from './nostr/vault.js'
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
 import { escapeHtml } from './utils/escape.js'
@@ -1296,8 +1296,43 @@ async function bootSync(): Promise<void> {
         }
       }).catch((err) => console.error('[canary:push] Re-registration failed:', err))
     }
+  } else if (identity?.signerType === 'nip07') {
+    // NIP-07: relay connection + vault sync via browser extension
+    const { connectRelays, waitForConnection } = await import('./nostr/connect.js')
+    connectRelays(allReadRelays, allWriteRelays)
+
+    // Vault sync via NIP-07 NIP-44
+    try {
+      await waitForConnection()
+      console.info('[canary:vault] NIP-07 vault sync starting...')
+      const vaultGroups = await fetchVaultNip07(identity.pubkey)
+      console.info('[canary:vault] NIP-07 vault result:', vaultGroups ? `${Object.keys(vaultGroups).length} group(s)` : 'null')
+      if (vaultGroups && Object.keys(vaultGroups).length > 0) {
+        const { groups: localGroups } = getState()
+        const merged = mergeVaultGroups(localGroups, vaultGroups)
+        const stateChanged = Object.keys(merged).length !== Object.keys(localGroups).length ||
+          Object.entries(merged).some(([id, g]) => {
+            const local = localGroups[id]
+            if (!local) return true
+            return g.epoch !== local.epoch || g.counter !== local.counter
+          })
+        if (stateChanged) {
+          update({ groups: merged })
+          const newGroupCount = Object.keys(merged).length - Object.keys(localGroups).length
+          if (newGroupCount > 0) {
+            showToast(`Restored ${newGroupCount} group(s) from vault`, 'success')
+          } else {
+            showToast('Synced from vault', 'success', 1500)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[canary:vault] NIP-07 vault sync failed:', err)
+    }
+
+    showToast(`Connected to ${totalRelays} relay(s)`, 'success', 2000)
   } else {
-    // NIP-07: read-only relay connection for profile fetch (no sync transport)
+    // No privkey and no NIP-07 — minimal relay connection
     const { connectRelays } = await import('./nostr/connect.js')
     connectRelays(allReadRelays, allWriteRelays)
     showToast(`Connected to ${totalRelays} relay(s)`, 'success', 2000)
@@ -1714,14 +1749,18 @@ const VAULT_DEBOUNCE_MS = 30_000
 
 function scheduleVaultPublish(): void {
   const { identity, groups } = getState()
-  if (!identity?.privkey || !identity?.pubkey) return
+  if (!identity?.pubkey) return
+  if (!identity.privkey && identity.signerType !== 'nip07') return
   if (Object.keys(groups).length === 0) return
 
   if (_vaultTimer) clearTimeout(_vaultTimer)
   _vaultTimer = setTimeout(() => {
     const { identity: id, groups: g } = getState()
-    if (id?.privkey && id?.pubkey && Object.keys(g).length > 0) {
+    if (!id?.pubkey || Object.keys(g).length === 0) return
+    if (id.privkey) {
       publishVault(g, id.privkey, id.pubkey)
+    } else if (id.signerType === 'nip07') {
+      publishVaultNip07(g, id.pubkey)
     }
   }, VAULT_DEBOUNCE_MS)
 }
@@ -1729,14 +1768,20 @@ function scheduleVaultPublish(): void {
 function publishVaultNow(): void {
   if (_vaultTimer) clearTimeout(_vaultTimer)
   const { identity, groups } = getState()
-  if (identity?.privkey && identity?.pubkey && Object.keys(groups).length > 0) {
-    publishVault(groups, identity.privkey, identity.pubkey)
-      .then(() => console.info('[canary:vault] Vault published OK'))
-      .catch((err) => {
-        console.error('[canary:vault] Vault publish FAILED:', err)
-        showToast(`Vault publish failed: ${err instanceof Error ? err.message : err}`, 'error')
-      })
-  }
+  if (!identity?.pubkey || Object.keys(groups).length === 0) return
+
+  const publish = identity.privkey
+    ? publishVault(groups, identity.privkey, identity.pubkey)
+    : identity.signerType === 'nip07'
+      ? publishVaultNip07(groups, identity.pubkey)
+      : null
+
+  publish
+    ?.then(() => console.info('[canary:vault] Vault published OK'))
+    .catch((err) => {
+      console.error('[canary:vault] Vault publish FAILED:', err)
+      showToast(`Vault publish failed: ${err instanceof Error ? err.message : err}`, 'error')
+    })
 }
 
 /**
@@ -1745,25 +1790,36 @@ function publishVaultNow(): void {
  */
 async function manualVaultSync(): Promise<void> {
   const { identity, groups } = getState()
-  if (!identity?.privkey || !identity?.pubkey) {
+  if (!identity?.pubkey) {
     showToast('No identity — cannot sync', 'error')
     return
   }
+  if (!identity.privkey && identity.signerType !== 'nip07') {
+    showToast('No private key or extension — cannot sync', 'error')
+    return
+  }
 
+  const isNip07 = !identity.privkey && identity.signerType === 'nip07'
   const shortPk = identity.pubkey.slice(0, 8)
-  showToast(`Syncing as ${shortPk}\u2026`, 'info', 3000)
-  console.info(`[canary:vault] Manual sync for pubkey ${shortPk}`)
+  showToast(`Syncing as ${shortPk}\u2026${isNip07 ? ' (NIP-07)' : ''}`, 'info', 3000)
+  console.info(`[canary:vault] Manual sync for pubkey ${shortPk} (${isNip07 ? 'NIP-07' : 'local key'})`)
 
   try {
     // Publish local state first so the other device can pick it up
     if (Object.keys(groups).length > 0) {
-      await publishVault(groups, identity.privkey, identity.pubkey)
+      if (isNip07) {
+        await publishVaultNip07(groups, identity.pubkey)
+      } else {
+        await publishVault(groups, identity.privkey!, identity.pubkey)
+      }
     }
 
     // Fetch remote vault and merge
     const { waitForConnection } = await import('./nostr/connect.js')
     await waitForConnection()
-    const vaultGroups = await fetchVault(identity.privkey, identity.pubkey)
+    const vaultGroups = isNip07
+      ? await fetchVaultNip07(identity.pubkey)
+      : await fetchVault(identity.privkey!, identity.pubkey)
 
     if (vaultGroups && Object.keys(vaultGroups).length > 0) {
       const { groups: localGroups } = getState()

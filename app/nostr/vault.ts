@@ -230,6 +230,136 @@ export async function fetchVault(
   })
 }
 
+// ── NIP-07 Vault (browser extension signing + encryption) ───────
+
+/** Check if NIP-07 extension supports NIP-44. */
+function hasNip07Nip44(): boolean {
+  return !!(window as any).nostr?.nip44?.encrypt && !!(window as any).nostr?.nip44?.decrypt
+}
+
+/**
+ * Publish vault using NIP-07 for signing and NIP-44 encryption.
+ * Self-encrypts by passing the user's own pubkey as the recipient.
+ */
+export async function publishVaultNip07(
+  groups: Record<string, AppGroup>,
+  pubkey: string,
+): Promise<void> {
+  const pool = getPool()
+  if (!pool) throw new Error('No relay pool — connect first')
+  if (!hasNip07Nip44()) throw new Error('NIP-07 extension does not support NIP-44')
+
+  const writeRelays = getWriteRelayUrls()
+  if (writeRelays.length === 0) throw new Error('No write relays configured')
+
+  const json = serialiseVault(groups)
+  const ciphertext: string = await (window as any).nostr.nip44.encrypt(pubkey, json)
+
+  const now = Math.floor(Date.now() / 1000)
+  const template = {
+    kind: VAULT_KIND,
+    created_at: now,
+    tags: [
+      ['d', VAULT_D_TAG],
+      ['expiration', String(now + VAULT_EXPIRY_SECONDS)],
+    ],
+    content: ciphertext,
+  }
+
+  const signed = await (window as any).nostr.signEvent(template)
+
+  console.info(`[canary:vault] Publishing vault via NIP-07 (${Object.keys(groups).length} groups) to`, writeRelays)
+  document.dispatchEvent(new CustomEvent('canary:vault-syncing'))
+  const results = await Promise.allSettled(pool.publish(writeRelays, signed))
+  const ok = results.filter(r => r.status === 'fulfilled').length
+  const fail = results.filter(r => r.status === 'rejected').length
+  console.info(`[canary:vault] NIP-07 publish results: ${ok} OK, ${fail} failed`)
+  document.dispatchEvent(new CustomEvent('canary:vault-synced', {
+    detail: { timestamp: now },
+  }))
+}
+
+/**
+ * Fetch and decrypt vault using NIP-07 for NIP-44 decryption.
+ */
+export async function fetchVaultNip07(
+  pubkey: string,
+): Promise<Record<string, AppGroup> | null> {
+  const pool = getPool()
+  if (!pool) {
+    console.warn('[canary:vault] fetchVaultNip07: no pool')
+    return null
+  }
+  if (!hasNip07Nip44()) {
+    console.warn('[canary:vault] fetchVaultNip07: extension lacks NIP-44')
+    return null
+  }
+
+  const readRelays = getReadRelayUrls()
+  if (readRelays.length === 0) {
+    console.warn('[canary:vault] fetchVaultNip07: no read relays')
+    return null
+  }
+
+  console.info(`[canary:vault] Fetching vault via NIP-07 from`, readRelays, 'for', pubkey.slice(0, 8))
+
+  return new Promise<Record<string, AppGroup> | null>((resolve) => {
+    let resolved = false
+    let bestEvent: { created_at: number; content: string } | null = null
+
+    const timeout = setTimeout(async () => {
+      if (!resolved) {
+        resolved = true
+        sub.close()
+        console.warn('[canary:vault] fetchVaultNip07 timed out after 10s')
+        if (bestEvent) {
+          try {
+            const plaintext: string = await (window as any).nostr.nip44.decrypt(pubkey, bestEvent.content)
+            resolve(deserialiseVault(plaintext))
+          } catch { resolve(null) }
+        } else {
+          resolve(null)
+        }
+      }
+    }, 10_000)
+
+    const sub = pool.subscribeMany(
+      readRelays,
+      { kinds: [VAULT_KIND], authors: [pubkey], '#d': [VAULT_D_TAG], limit: 1 } as any,
+      {
+        onevent(event) {
+          if (!verifyEvent(event)) return
+          if (typeof event.content === 'string' && event.content.length > 262144) return
+          console.info(`[canary:vault] NIP-07 received vault event created_at=${event.created_at}`)
+          if (!bestEvent || event.created_at > bestEvent.created_at) {
+            bestEvent = event
+          }
+        },
+        async oneose() {
+          if (!resolved) {
+            resolved = true
+            clearTimeout(timeout)
+            sub.close()
+            if (bestEvent) {
+              console.info('[canary:vault] NIP-07 EOSE — decrypting vault event')
+              try {
+                const plaintext: string = await (window as any).nostr.nip44.decrypt(pubkey, bestEvent.content)
+                resolve(deserialiseVault(plaintext))
+              } catch (err) {
+                console.warn('[canary:vault] NIP-07 vault decryption failed:', err)
+                resolve(null)
+              }
+            } else {
+              console.info('[canary:vault] NIP-07 EOSE — no vault event found')
+              resolve(null)
+            }
+          }
+        },
+      },
+    )
+  })
+}
+
 // ── Merge Logic ─────────────────────────────────────────────────
 
 /**
