@@ -277,6 +277,284 @@ const STYLES = `
 
   .id-nip07__why summary { cursor: pointer; }
   .id-nip07__why code { font-family: var(--font-mono); font-size: 0.6875rem; }
+
+  /* ── Persona cards ──────────────────────────────── */
+
+  .persona-card {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+  }
+
+  .persona-card--expanded {
+    border-color: var(--border-amber);
+  }
+
+  .persona-card__header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out);
+  }
+
+  .persona-card__header:hover {
+    background: var(--bg-hover);
+  }
+
+  .persona-card__badge {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .persona-card__info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .persona-card__name {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+  }
+
+  .persona-card__display-name {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+  }
+
+  .persona-card__meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .persona-card__chevron {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: transform 0.2s var(--ease-out);
+  }
+
+  .persona-card--expanded .persona-card__chevron {
+    transform: rotate(90deg);
+  }
+
+  .persona-card__body {
+    padding: 0 1rem 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .persona-card__npub {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    padding: 0.625rem 0;
+    word-break: break-all;
+  }
+
+  .persona-card__section {
+    padding: 0.5rem 0;
+  }
+
+  .persona-card__section-title {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin: 0 0 0.5rem;
+    font-weight: 600;
+  }
+
+  .persona-card__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .persona-card__field-label {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+  }
+
+  .persona-card__input {
+    font-size: 0.8125rem;
+  }
+
+  .persona-card__publish-btn {
+    margin-top: 0.375rem;
+  }
+
+  .persona-card__relay-default {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  .persona-card__customise-link {
+    font-size: 0.75rem;
+    color: var(--amber-400);
+    margin-left: 0.5rem;
+    text-decoration: none;
+  }
+
+  .persona-card__customise-link:hover {
+    text-decoration: underline;
+  }
+
+  .persona-card__group-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+
+  .persona-card__group-chip {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color 0.15s var(--ease-out);
+  }
+
+  .persona-card__group-chip:hover {
+    border-color: var(--amber-400);
+    color: var(--text-primary);
+  }
+
+  .persona-card__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding-top: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .persona-card__more {
+    position: relative;
+    margin-left: auto;
+  }
+
+  .persona-card__more-btn {
+    font-size: 1rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .persona-card__menu {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 10;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    min-width: 160px;
+    padding: 0.25rem 0;
+  }
+
+  .persona-card__menu-item {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .persona-card__menu-item:hover {
+    background: var(--bg-hover);
+  }
+
+  .persona-card__menu-item--danger {
+    color: var(--failed);
+  }
+
+  .persona-card__qr {
+    text-align: center;
+    padding: 0.75rem 0;
+  }
+
+  .persona-card__qr-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--text-muted);
+    margin-top: 0.375rem;
+  }
+
+  /* ── Mobile ─────────────────────────────────────── */
+
+  @media (max-width: 480px) {
+    .id-hub { padding: 1rem 0.75rem 2rem; }
+
+    .id-master__row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .id-master__actions {
+      width: 100%;
+    }
+
+    .id-master__actions .btn {
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+    }
+
+    .id-create {
+      flex-direction: column;
+    }
+
+    .id-create .input {
+      width: 100%;
+    }
+
+    .persona-card__actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .persona-card__more {
+      margin-left: 0;
+    }
+
+    .persona-card__menu {
+      position: fixed;
+      left: 0.75rem;
+      right: 0.75rem;
+      bottom: 0.75rem;
+      top: auto;
+      border-radius: 8px;
+    }
+
+    .persona-card__menu-item {
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+    }
+  }
 `
 
 // ── Render: NIP-07 fallback ──────────────────────────────────
