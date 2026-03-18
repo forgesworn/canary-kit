@@ -141,7 +141,7 @@
     "@forgesworn/shamir-words": "^1.0.2",
     "@scure/bip32": "^2.0.1",
     "@scure/bip39": "^2.0.1",
-    "nsec-tree": "^1.1.0",
+    "nsec-tree": "^1.4.0",
     "spoken-token": "^2.0.2"
   }
 }
