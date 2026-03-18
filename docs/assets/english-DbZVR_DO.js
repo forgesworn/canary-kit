@@ -1,0 +1,1 @@
+import{t as e}from"./english-mdr-mXCq.js";export{e as wordlist};

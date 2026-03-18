@@ -1,0 +1,1 @@
+import{t as e}from"./english-CivtqfBt.js";export{e as wordlist};

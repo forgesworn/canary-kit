@@ -1588,11 +1588,30 @@ function showLoginScreen(): void {
 
         <div style="background: var(--bg-raised); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem;">
           <p class="input-label__text" style="margin-bottom: 0.5rem;">Recover Account</p>
-          <p class="settings-hint" style="margin-bottom: 0.5rem;">Paste your 12-word recovery phrase to restore your account.</p>
-          <form id="mnemonic-login-form" autocomplete="off" style="display: flex; flex-direction: column; gap: 0.375rem;">
-            <textarea class="input" id="login-mnemonic" placeholder="Enter your 12 recovery words..." rows="3" style="width: 100%; font-size: 0.8rem; resize: none; padding: 0.5rem; font-family: var(--font-mono, monospace);"></textarea>
-            <button class="btn btn--primary" type="submit">Recover account</button>
-          </form>
+
+          <div style="display: flex; gap: 0; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border);">
+            <button id="tab-recovery-phrase" type="button" class="btn btn--ghost btn--sm" style="border-bottom: 2px solid var(--accent); border-radius: 0; padding: 0.375rem 0.75rem; font-size: 0.75rem; opacity: 1;">Recovery Phrase</button>
+            <button id="tab-shamir-shares" type="button" class="btn btn--ghost btn--sm" style="border-bottom: 2px solid transparent; border-radius: 0; padding: 0.375rem 0.75rem; font-size: 0.75rem; opacity: 0.6;">Shamir Shares</button>
+          </div>
+
+          <div id="panel-recovery-phrase">
+            <p class="settings-hint" style="margin-bottom: 0.5rem;">Paste your 12-word recovery phrase to restore your account.</p>
+            <form id="mnemonic-login-form" autocomplete="off" style="display: flex; flex-direction: column; gap: 0.375rem;">
+              <textarea class="input" id="login-mnemonic" placeholder="Enter your 12 recovery words..." rows="3" style="width: 100%; font-size: 0.8rem; resize: none; padding: 0.5rem; font-family: var(--font-mono, monospace);"></textarea>
+              <button class="btn btn--primary" type="submit">Recover account</button>
+            </form>
+          </div>
+
+          <div id="panel-shamir-shares" style="display: none;">
+            <p class="settings-hint" style="margin-bottom: 0.5rem;">Paste Shamir shares one at a time to reconstruct your recovery phrase.</p>
+            <div style="display: flex; flex-direction: column; gap: 0.375rem;">
+              <textarea class="input" id="shamir-share-input" placeholder="Paste a Shamir share (word list)..." rows="3" style="width: 100%; font-size: 0.8rem; resize: none; padding: 0.5rem; font-family: var(--font-mono, monospace);"></textarea>
+              <button class="btn btn--primary" id="shamir-add-share" type="button">Add share</button>
+              <p class="settings-hint" id="shamir-status" style="margin: 0; font-size: 0.75rem;"></p>
+              <ul id="shamir-share-list" style="list-style: none; padding: 0; margin: 0;"></ul>
+              <button class="btn btn--primary" id="shamir-recover" type="button" disabled style="margin-top: 0.25rem;">Recover</button>
+            </div>
+          </div>
         </div>
 
         <div style="background: var(--bg-raised); border: 1px solid var(--border); border-radius: 6px; padding: 1rem;">
@@ -1698,6 +1717,124 @@ function showLoginScreen(): void {
       await bootApp()
     } catch {
       alert('Invalid recovery phrase.')
+    }
+  })
+
+  // ── Recovery tab switching ───
+  const tabPhrase = app.querySelector<HTMLButtonElement>('#tab-recovery-phrase')!
+  const tabShamir = app.querySelector<HTMLButtonElement>('#tab-shamir-shares')!
+  const panelPhrase = app.querySelector<HTMLDivElement>('#panel-recovery-phrase')!
+  const panelShamir = app.querySelector<HTMLDivElement>('#panel-shamir-shares')!
+
+  tabPhrase.addEventListener('click', () => {
+    panelPhrase.style.display = ''
+    panelShamir.style.display = 'none'
+    tabPhrase.style.borderBottomColor = 'var(--accent)'
+    tabPhrase.style.opacity = '1'
+    tabShamir.style.borderBottomColor = 'transparent'
+    tabShamir.style.opacity = '0.6'
+  })
+
+  tabShamir.addEventListener('click', () => {
+    panelPhrase.style.display = 'none'
+    panelShamir.style.display = ''
+    tabShamir.style.borderBottomColor = 'var(--accent)'
+    tabShamir.style.opacity = '1'
+    tabPhrase.style.borderBottomColor = 'transparent'
+    tabPhrase.style.opacity = '0.6'
+  })
+
+  // ── Shamir share recovery ───
+  type CollectedShare = import('@forgesworn/shamir-words').ShamirShare
+  const collectedShares: CollectedShare[] = []
+  let shamirThreshold = 0
+
+  function updateShamirUI(): void {
+    const statusEl = app.querySelector<HTMLParagraphElement>('#shamir-status')!
+    const listEl = app.querySelector<HTMLUListElement>('#shamir-share-list')!
+    const recoverBtn = app.querySelector<HTMLButtonElement>('#shamir-recover')!
+
+    listEl.textContent = ''
+    for (let i = 0; i < collectedShares.length; i++) {
+      const li = document.createElement('li')
+      li.className = 'settings-hint'
+      li.style.cssText = 'font-size: 0.75rem; padding: 0.125rem 0;'
+      li.textContent = `Share ${i + 1} added`
+      listEl.appendChild(li)
+    }
+
+    if (collectedShares.length === 0) {
+      statusEl.textContent = ''
+      recoverBtn.disabled = true
+    } else if (collectedShares.length < shamirThreshold) {
+      const remaining = shamirThreshold - collectedShares.length
+      statusEl.textContent = `Share ${collectedShares.length} added. Need ${remaining} more.`
+      recoverBtn.disabled = true
+    } else {
+      statusEl.textContent = 'Ready to recover!'
+      recoverBtn.disabled = false
+    }
+  }
+
+  app.querySelector<HTMLButtonElement>('#shamir-add-share')?.addEventListener('click', async () => {
+    const textarea = app.querySelector<HTMLTextAreaElement>('#shamir-share-input')!
+    const text = textarea.value.trim()
+    if (!text) return
+
+    try {
+      const { wordsToShare } = await import('@forgesworn/shamir-words')
+      const words = text.split(/\s+/)
+      const share = wordsToShare(words)
+
+      // Check for duplicate share ID
+      if (collectedShares.some(s => s.id === share.id)) {
+        alert(`Share ${share.id} has already been added.`)
+        return
+      }
+
+      // Set or validate threshold
+      if (collectedShares.length === 0) {
+        shamirThreshold = share.threshold
+      } else if (share.threshold !== shamirThreshold) {
+        alert(`Threshold mismatch: expected ${shamirThreshold}, got ${share.threshold}. Shares must be from the same set.`)
+        return
+      }
+
+      collectedShares.push(share)
+      textarea.value = ''
+      updateShamirUI()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Invalid share. Please check the words and try again.')
+    }
+  })
+
+  app.querySelector<HTMLButtonElement>('#shamir-recover')?.addEventListener('click', async () => {
+    if (collectedShares.length < shamirThreshold) return
+
+    try {
+      const { reconstructSecret } = await import('@forgesworn/shamir-words')
+      const secretBytes = reconstructSecret(collectedShares, shamirThreshold)
+      const phrase = new TextDecoder().decode(secretBytes)
+
+      // Validate the reconstructed mnemonic
+      const { validateMnemonic, restoreFromMnemonic } = await import('./mnemonic.js')
+      const { wordlist } = await import('@scure/bip39/wordlists/english.js')
+      if (!validateMnemonic(phrase, wordlist)) {
+        alert('Reconstructed phrase is not a valid mnemonic. Please check your shares.')
+        return
+      }
+
+      const { root, defaultPersona } = restoreFromMnemonic(phrase)
+      const privkey = Array.from(defaultPersona.identity.privateKey, b => b.toString(16).padStart(2, '0')).join('')
+      const pubkey = Array.from(defaultPersona.identity.publicKey, b => b.toString(16).padStart(2, '0')).join('')
+      root.destroy()
+      update({
+        identity: { pubkey, privkey, mnemonic: phrase, signerType: 'local', displayName: 'You' },
+      })
+
+      await bootApp()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to reconstruct secret from shares.')
     }
   })
 
