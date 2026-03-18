@@ -1235,10 +1235,17 @@ async function bootSync(): Promise<void> {
     // Full sync: transport + subscriptions + liveness heartbeat
     await ensureTransport(allReadRelays, allWriteRelays)
 
+    // Wait for relay connections before vault fetch — without this,
+    // subscribeMany silently returns no results because WebSockets aren't open.
+    const { waitForConnection } = await import('./nostr/connect.js')
+    await waitForConnection()
+    console.info('[canary:vault] Relay connections ready, fetching vault...')
+
     // Vault sync: always fetch and merge — catches up on state changes from
     // other devices (counter-advance, member changes, etc.)
     try {
       const vaultGroups = await fetchVault(identity!.privkey!, identity!.pubkey)
+      console.info('[canary:vault] Vault fetch result:', vaultGroups ? `${Object.keys(vaultGroups).length} group(s)` : 'null')
       if (vaultGroups && Object.keys(vaultGroups).length > 0) {
         const { groups: localGroups } = getState()
         const merged = mergeVaultGroups(localGroups, vaultGroups)

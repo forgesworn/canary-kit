@@ -135,8 +135,17 @@ export async function publishVault(
   const ciphertext = encryptVault(json, privkey, pubkey)
   const event = buildVaultEvent(ciphertext, privkey)
 
+  console.info(`[canary:vault] Publishing vault (${Object.keys(groups).length} groups) to`, writeRelays)
   document.dispatchEvent(new CustomEvent('canary:vault-syncing'))
-  await Promise.allSettled(pool.publish(writeRelays, event))
+  const results = await Promise.allSettled(pool.publish(writeRelays, event))
+  const ok = results.filter(r => r.status === 'fulfilled').length
+  const fail = results.filter(r => r.status === 'rejected').length
+  console.info(`[canary:vault] Publish results: ${ok} OK, ${fail} failed`)
+  if (fail > 0) {
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') console.warn(`[canary:vault] Relay ${writeRelays[i]} rejected:`, r.reason)
+    })
+  }
   document.dispatchEvent(new CustomEvent('canary:vault-synced', {
     detail: { timestamp: Math.floor(Date.now() / 1000) },
   }))
@@ -152,10 +161,18 @@ export async function fetchVault(
   pubkey: string,
 ): Promise<Record<string, AppGroup> | null> {
   const pool = getPool()
-  if (!pool) return null
+  if (!pool) {
+    console.warn('[canary:vault] fetchVault: no pool')
+    return null
+  }
 
   const readRelays = getReadRelayUrls()
-  if (readRelays.length === 0) return null
+  if (readRelays.length === 0) {
+    console.warn('[canary:vault] fetchVault: no read relays')
+    return null
+  }
+
+  console.info(`[canary:vault] Fetching vault from`, readRelays, 'for', pubkey.slice(0, 8))
 
   return new Promise<Record<string, AppGroup> | null>((resolve) => {
     let resolved = false
@@ -165,6 +182,7 @@ export async function fetchVault(
       if (!resolved) {
         resolved = true
         sub.close()
+        console.warn('[canary:vault] fetchVault timed out after 10s')
         if (bestEvent) {
           const plaintext = decryptVault(bestEvent.content, privkey, pubkey)
           if (plaintext) {
@@ -183,6 +201,7 @@ export async function fetchVault(
         onevent(event) {
           if (!verifyEvent(event)) return
           if (typeof event.content === 'string' && event.content.length > 262144) return  // 256KB vault limit
+          console.info(`[canary:vault] Received vault event created_at=${event.created_at}`)
           if (!bestEvent || event.created_at > bestEvent.created_at) {
             bestEvent = event
           }
@@ -193,11 +212,15 @@ export async function fetchVault(
             clearTimeout(timeout)
             sub.close()
             if (bestEvent) {
+              console.info('[canary:vault] EOSE — decrypting vault event')
               const plaintext = decryptVault(bestEvent.content, privkey, pubkey)
               if (plaintext) {
                 resolve(deserialiseVault(plaintext))
                 return
               }
+              console.warn('[canary:vault] Vault decryption failed')
+            } else {
+              console.info('[canary:vault] EOSE — no vault event found')
             }
             resolve(null)
           }
