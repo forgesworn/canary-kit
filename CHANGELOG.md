@@ -1,3 +1,16 @@
+# [2.2.0](https://github.com/forgesworn/canary-kit/compare/v2.1.0...v2.2.0) (2026-03-18)
+
+
+### Bug Fixes
+
+* redesign identities view — empty slate by default, proper styling, no auto-populated defaults ([d43cf68](https://github.com/forgesworn/canary-kit/commit/d43cf6823e7ac20b787c39ac10f99c08b0f297f3))
+* show degraded identity view for NIP-07 users with explanation of why personas require local key ([9f2eb6d](https://github.com/forgesworn/canary-kit/commit/9f2eb6dee0e8b4f339f4b940303303a2598ef86d))
+
+
+### Features
+
+* add persona card CSS + mobile responsive styles (bottom-sheet menu on small screens) ([d9f6b18](https://github.com/forgesworn/canary-kit/commit/d9f6b1890a46302eafd03f33e305502978d81604))
+
 # [2.1.0](https://github.com/forgesworn/canary-kit/compare/v2.0.0...v2.1.0) (2026-03-18)
 
 
