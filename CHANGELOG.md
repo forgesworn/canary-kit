@@ -1,3 +1,13 @@
+# [2.4.0](https://github.com/forgesworn/canary-kit/compare/v2.3.0...v2.4.0) (2026-03-18)
+
+
+### Features
+
+* add persona tree utilities — walkTree, findById, generatePersonaId ([126580f](https://github.com/forgesworn/canary-kit/commit/126580f95c9fd5c9fa004ae1ee9c9ee4d142a512))
+* hierarchical persona model with id-based keying and vault v3 ([8004abf](https://github.com/forgesworn/canary-kit/commit/8004abf0a9c8eebf06cea46b62805bb2a1fc47ec))
+* persona card breadcrumbs and group assignment by id ([aeae5cf](https://github.com/forgesworn/canary-kit/commit/aeae5cff2f6cab295a34990e0f0c38b477090519))
+* vertical indented identity tree with inline child creation ([7116a8d](https://github.com/forgesworn/canary-kit/commit/7116a8d66a553c0cfcaa51dbfc388c5a2b328bea))
+
 # [2.3.0](https://github.com/forgesworn/canary-kit/compare/v2.2.2...v2.3.0) (2026-03-18)
 
 
