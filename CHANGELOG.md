@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/forgesworn/canary-kit/compare/v1.0.0...v1.0.1) (2026-03-18)
+
+
+### Bug Fixes
+
+* add CI retries for flaky Chromium headless crashes ([5656c9b](https://github.com/forgesworn/canary-kit/commit/5656c9bbb19dfedf487716d9acd963cd26bf994a))
+
 # [1.0.0](https://github.com/forgesworn/canary-kit/compare/v0.11.0...v1.0.0) (2026-03-18)
 
 
