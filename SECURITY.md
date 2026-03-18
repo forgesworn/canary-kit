@@ -11,7 +11,7 @@
 
 **Please report security vulnerabilities through GitHub Security Advisories only.**
 
-1. Go to [Security Advisories](https://github.com/TheCryptoDonkey/canary-kit/security/advisories)
+1. Go to [Security Advisories](https://github.com/forgesworn/canary-kit/security/advisories)
 2. Click **"New draft security advisory"**
 3. Fill in the details of the vulnerability
 

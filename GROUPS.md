@@ -461,7 +461,7 @@ The canonical implementation is the `canary-kit` npm package:
 - Sync protocol: `src/sync.ts`
 - Sync encryption: `src/sync-crypto.ts`
 
-Source: https://github.com/TheCryptoDonkey/canary-kit
+Source: https://github.com/forgesworn/canary-kit
 
 ## Relationship to Other Specifications
 

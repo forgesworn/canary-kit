@@ -35,7 +35,7 @@ The protocol is defined in three layers:
 
 CANARY builds on two generic protocol specifications:
 
-- **[Spoken Token Protocol](https://github.com/TheCryptoDonkey/spoken-token/blob/main/PROTOCOL.md)**
+- **[Spoken Token Protocol](https://github.com/forgesworn/spoken-token/blob/main/PROTOCOL.md)**
   — defines SPOKEN-DERIVE (the core HMAC-counter-to-words derivation) and SPOKEN-ENCODE
   (word/PIN/hex encoding). CANARY-DERIVE is a superset of SPOKEN-DERIVE. The generic
   protocol is implemented by the `spoken-token` npm package.
@@ -123,7 +123,7 @@ separate keys or counters.
 Core deterministic token derivation. The universal primitive that all other layers build on.
 
 > **Generic layer:** The core derivation algorithm (HMAC-SHA256 with context and counter)
-> is specified generically in the [Spoken Token Protocol](https://github.com/TheCryptoDonkey/spoken-token/blob/main/PROTOCOL.md)
+> is specified generically in the [Spoken Token Protocol](https://github.com/forgesworn/spoken-token/blob/main/PROTOCOL.md)
 > as SPOKEN-DERIVE. CANARY-DERIVE is identical to SPOKEN-DERIVE — this section
 > documents it in CANARY's context for completeness. The `spoken-token` npm package
 > provides a standalone implementation of the generic layer.
@@ -1100,4 +1100,4 @@ import {
 } from 'canary-kit/encoding'
 ```
 
-Source: `https://github.com/TheCryptoDonkey/canary-kit`
+Source: `https://github.com/forgesworn/canary-kit`

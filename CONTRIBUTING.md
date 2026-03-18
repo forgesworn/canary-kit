@@ -3,7 +3,7 @@
 ## Setup
 
 ```bash
-git clone https://github.com/TheCryptoDonkey/canary-kit.git
+git clone https://github.com/forgesworn/canary-kit.git
 cd canary-kit
 npm install
 ```

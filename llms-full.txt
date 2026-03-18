@@ -4,7 +4,7 @@
 
 Minimal dependencies. ESM-only. TypeScript native.
 
-Repository: https://github.com/TheCryptoDonkey/canary-kit
+Repository: https://github.com/forgesworn/canary-kit
 Interactive demo: https://canary.trotters.cc/
 Licence: MIT
 

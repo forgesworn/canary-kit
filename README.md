@@ -3,7 +3,7 @@
 > Deepfake-proof identity verification. Open protocol, minimal dependencies.
 
 [![npm](https://img.shields.io/npm/v/canary-kit)](https://www.npmjs.com/package/canary-kit)
-[![CI](https://github.com/TheCryptoDonkey/canary-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/TheCryptoDonkey/canary-kit/actions)
+[![CI](https://github.com/forgesworn/canary-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/forgesworn/canary-kit/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-native-blue)](https://www.typescriptlang.org/)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](vitest.config.ts)
@@ -31,7 +31,7 @@ of CANARY's security properties against each regulation, see
 
 The full verification stack covers four caller scenarios: known person, known
 institution (CANARY handles this), unknown person, and unknown institution
-cold-calling — the last via [Signet](https://github.com/TheCryptoDonkey/signet)
+cold-calling — the last via [Signet](https://github.com/forgesworn/signet)
 cold-call verification (forthcoming). Deepfake labelling tools and CANARY are
 complementary: one labels AI-generated content after the fact; CANARY verifies
 the caller's identity in real time at the point of interaction.
@@ -201,7 +201,7 @@ Content is encrypted with **NIP-44**. Events may carry a **NIP-40** `expiration`
 
 ## Support
 
-For issues and feature requests, see [GitHub Issues](https://github.com/TheCryptoDonkey/canary-kit/issues).
+For issues and feature requests, see [GitHub Issues](https://github.com/forgesworn/canary-kit/issues).
 
 If you find canary-kit useful, consider sending a tip:
 

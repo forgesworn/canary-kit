@@ -101,15 +101,15 @@
     "phone-verification",
     "family-safety"
   ],
-  "author": "TheCryptoDonkey",
+  "author": "forgesworn",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/TheCryptoDonkey/canary-kit.git"
+    "url": "https://github.com/forgesworn/canary-kit.git"
   },
   "homepage": "https://canary.trotters.cc/",
   "bugs": {
-    "url": "https://github.com/TheCryptoDonkey/canary-kit/issues"
+    "url": "https://github.com/forgesworn/canary-kit/issues"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

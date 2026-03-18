@@ -634,7 +634,7 @@ and distributed with the `canary-kit` npm package. Implementations MUST use this
 list without modification. The wordlist file contains exactly 2048 entries, one word per
 line, ordered alphabetically, UTF-8 encoding, Unix line endings.
 
-Reference: `https://github.com/TheCryptoDonkey/canary-kit` — `src/wordlists/en-v1.txt`
+Reference: `https://github.com/forgesworn/canary-kit` — `src/wordlists/en-v1.txt`
 
 ## Reference Implementation
 
@@ -647,4 +647,4 @@ import {
 } from 'canary-kit'
 ```
 
-Source: `https://github.com/TheCryptoDonkey/canary-kit`
+Source: `https://github.com/forgesworn/canary-kit`

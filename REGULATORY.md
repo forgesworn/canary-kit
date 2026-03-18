@@ -15,7 +15,7 @@ CANARY and Signet together address all four real-world caller identity scenarios
 | **Known person** | A known individual (friend, colleague, family member) | Signet "Signet me" — ECDH from prior QR exchange | Prior relationship required |
 | **Known institution** | A bank, insurer, or service provider the customer is already enrolled with | CANARY session (pre-shared seed, app-derived) | App-derived seed via Pattern 1 (see INTEGRATION.md) |
 | **Unknown person** | A caller whose identity is unverified | Signet trust tier check | Verifier checks Signet credential tier |
-| **Unknown institution cold-calling** | A bank or institution calling a customer who has no prior session | Signet cold-call verification (`.well-known` + ephemeral ECDH) | Forthcoming — see [Signet](https://github.com/TheCryptoDonkey/signet) |
+| **Unknown institution cold-calling** | A bank or institution calling a customer who has no prior session | Signet cold-call verification (`.well-known` + ephemeral ECDH) | Forthcoming — see [Signet](https://github.com/forgesworn/signet) |
 
 The regulations below primarily address the **known institution** scenario — a financial institution or regulated service calling an enrolled customer. CANARY's HMAC-counter session protocol is the appropriate tool for this scenario.
 
@@ -239,7 +239,7 @@ SCA requires authentication codes to be "dynamically linked" to the specific tra
 | [INTEGRATION.md](INTEGRATION.md) | Deployment patterns — call centre, banking, rideshare, field operations |
 | [CANARY.md](CANARY.md) | Full protocol specification |
 | [NIP-CANARY.md](NIP-CANARY.md) | Nostr binding for group protocols |
-| [Signet](https://github.com/TheCryptoDonkey/signet) | Cold-call verification for unknown institutions (forthcoming) |
+| [Signet](https://github.com/forgesworn/signet) | Cold-call verification for unknown institutions (forthcoming) |
 
 ---
 
