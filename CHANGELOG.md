@@ -1,3 +1,10 @@
+## [2.2.1](https://github.com/forgesworn/canary-kit/compare/v2.2.0...v2.2.1) (2026-03-18)
+
+
+### Bug Fixes
+
+* show full bech32 npub in expanded persona card, remove truncated hex ([54564fd](https://github.com/forgesworn/canary-kit/commit/54564fd5ccd750542f0ac1038c328e1c1f9dbfbb))
+
 # [2.2.0](https://github.com/forgesworn/canary-kit/compare/v2.1.0...v2.2.0) (2026-03-18)
 
 
