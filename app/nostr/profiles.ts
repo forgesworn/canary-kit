@@ -3,7 +3,11 @@
 import { getPool, waitForConnection } from './connect.js'
 import { getState, update, updateGroup } from '../state.js'
 import { finalizeEvent, verifyEvent } from 'nostr-tools/pure'
+import { SimplePool } from 'nostr-tools/pool'
+import { decode } from 'nostr-tools/nip19'
 import { dedupeRelays } from '../types.js'
+import type { AppPersona } from '../types.js'
+import { getPersona } from '../persona.js'
 
 export interface NostrProfile {
   name?: string
@@ -276,4 +280,129 @@ export function publishKind0(name: string, privkeyHex: string): void {
       console.warn('[profiles] kind 0 publish failed:', err)
     }
   }, 2000)
+}
+
+// ── Persona kind 0 publishing and fetching ────────────────────
+
+/**
+ * Publish a kind 0 profile event for a named persona to the given write relays.
+ *
+ * Uses the persona's derived signing key. Fire-and-forget — errors are logged
+ * but not thrown. Skipped silently if persona derivation fails (e.g. personas
+ * not yet initialised).
+ */
+export async function publishPersonaProfile(
+  persona: AppPersona,
+  writeRelays: string[],
+): Promise<void> {
+  if (writeRelays.length === 0) return
+
+  try {
+    const derived = getPersona(persona.name, persona.index)
+
+    const content = JSON.stringify({
+      name: persona.displayName ?? persona.name,
+      about: persona.about ?? '',
+      picture: persona.picture ?? '',
+    })
+
+    const unsigned = {
+      kind: 0,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [] as string[][],
+      content,
+    }
+
+    const signed = finalizeEvent(unsigned, derived.identity.privateKey)
+
+    const pool = new SimplePool()
+    try {
+      const results = pool.publish(writeRelays, signed as any)
+      const settled = await Promise.allSettled(results)
+      const ok = settled.filter(r => r.status === 'fulfilled').length
+      console.warn(`[profiles] persona "${persona.name}" kind 0 published to ${ok}/${writeRelays.length} relay(s)`)
+    } finally {
+      pool.close(writeRelays)
+    }
+  } catch (err) {
+    console.warn(`[profiles] persona "${persona.name}" kind 0 publish failed:`, err)
+  }
+}
+
+/**
+ * Fetch kind 0 profiles for all known personas and update their displayName,
+ * picture, and about fields in state.
+ *
+ * Errors are logged but not thrown.
+ */
+export async function fetchPersonaProfiles(readRelays: string[]): Promise<void> {
+  if (readRelays.length === 0) return
+
+  try {
+    const { personas } = getState()
+    const personaList = Object.values(personas)
+    if (personaList.length === 0) return
+
+    // Decode each persona's npub to a hex pubkey
+    const pubkeyToName = new Map<string, string>()
+    for (const p of personaList) {
+      try {
+        const decoded = decode(p.npub)
+        if (decoded.type === 'npub') {
+          pubkeyToName.set(decoded.data as string, p.name)
+        }
+      } catch {
+        // Skip invalid npubs
+      }
+    }
+
+    if (pubkeyToName.size === 0) return
+
+    const pubkeys = Array.from(pubkeyToName.keys())
+
+    await new Promise<void>((resolve) => {
+      const pool = new SimplePool()
+
+      const sub = pool.subscribeMany(
+        readRelays,
+        [{ kinds: [0], authors: pubkeys }] as any,
+        {
+          onevent(event) {
+            if (!verifyEvent(event)) return
+            if (typeof event.content === 'string' && event.content.length > 65536) return
+
+            const personaName = pubkeyToName.get(event.pubkey)
+            if (!personaName) return
+
+            try {
+              const profile: NostrProfile = normaliseProfile(JSON.parse(event.content))
+              const { personas: current } = getState()
+              const existing = current[personaName]
+              if (!existing) return
+
+              const updated: AppPersona = {
+                ...existing,
+                ...(profile.display_name || profile.name
+                  ? { displayName: profile.display_name || profile.name }
+                  : {}),
+                ...(profile.picture ? { picture: profile.picture } : {}),
+                ...(profile.about !== undefined ? { about: profile.about } : {}),
+              }
+
+              update({ personas: { ...current, [personaName]: updated } })
+            } catch {
+              // Malformed profile content — skip
+            }
+          },
+          oneose() {
+            sub.close()
+            pool.close(readRelays)
+            resolve()
+          },
+        },
+      )
+    })
+  } catch (err) {
+    console.warn('[profiles] fetchPersonaProfiles failed:', err)
+  }
 }
