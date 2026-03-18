@@ -456,6 +456,8 @@ export async function unlockAndRestoreState(pin: string): Promise<void> {
     activeGroupId: resolveActiveGroupId(activeGroupResult.activeGroupId, groupsResult.groups),
     identity: identityResult.identity,
     settings,
+    personas: {},
+    activePersonaName: null,
   }
 
   setPinKey(key)
@@ -483,6 +485,8 @@ export function restoreState(): void {
     activeGroupId: resolveActiveGroupId(activeGroupResult.activeGroupId, groupsResult.groups),
     identity: identityResult.identity,
     settings,
+    personas: {},
+    activePersonaName: null,
   }
 
   loadState(restored)

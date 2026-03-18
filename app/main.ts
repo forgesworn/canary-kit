@@ -40,6 +40,8 @@ import { decode as nip19decode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
 import { fetchVault, fetchVaultNip07, publishVault, publishVaultNip07, mergeVaultGroups, subscribeToVault, unsubscribeFromVault } from './nostr/vault.js'
+import { initPersonas, destroyPersonas } from './persona.js'
+import { fetchPersonaProfiles, publishPersonaProfile } from './nostr/profiles.js'
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
 import { escapeHtml } from './utils/escape.js'
@@ -126,6 +128,7 @@ function resetAutoLockTimer(): void {
 
   _autoLockTimer = setTimeout(async () => {
     await flushPersist()
+    destroyPersonas()
     clearPinKey()
     clearSensitiveState()
     showLockScreen()
@@ -197,6 +200,22 @@ function showLockScreen(): void {
       await unlockAndRestoreState(pin)
       // Success: build the full app shell and start auto-lock.
       await ensureLocalIdentity()
+      // Derive persona keys from identity and merge vault metadata
+      {
+        const { identity, personas: vaultPersonas } = getState()
+        if (identity?.privkey) {
+          const customNames = Object.keys(vaultPersonas).filter(
+            name => !['personal', 'bitcoiner', 'work', 'social', 'anonymous'].includes(name)
+          )
+          const personas = initPersonas(identity, customNames.length > 0 ? customNames : undefined)
+          for (const [name, vaultP] of Object.entries(vaultPersonas)) {
+            if (personas[name]) {
+              personas[name] = { ...personas[name], ...vaultP, npub: personas[name].npub }
+            }
+          }
+          update({ personas })
+        }
+      }
       buildShell()
       const header = document.getElementById('header')
       if (header) renderHeader(header)
@@ -209,6 +228,9 @@ function showLockScreen(): void {
       checkInviteFragment()
       window.addEventListener('hashchange', () => checkInviteFragment())
       void bootSync()
+      // Non-blocking: fetch kind 0 profiles for all personas
+      const { settings: _s } = getState()
+      fetchPersonaProfiles(_s.defaultReadRelays).catch(() => {})
     } catch {
       _failCount++
       const delay = DELAYS[Math.min(_failCount, DELAYS.length - 1)]
@@ -1125,6 +1147,7 @@ function wireGlobalEvents(): void {
   })
 
   document.addEventListener('canary:lock', () => {
+    destroyPersonas()
     clearPinKey()
     showLockScreen()
   })
@@ -1155,6 +1178,15 @@ function wireGlobalEvents(): void {
 
   // Re-sync when identity changes (e.g. nsec login from header popover)
   document.addEventListener('canary:resync', () => void bootSync())
+
+  // Publish a persona's kind 0 profile to relays (fired from settings panel)
+  document.addEventListener('canary:publish-persona-profile', async (e) => {
+    const { personaName } = (e as CustomEvent).detail
+    const persona = getState().personas[personaName]
+    if (!persona) return
+    const { settings: s } = getState()
+    await publishPersonaProfile(persona, s.defaultWriteRelays)
+  })
 
   // Immediate vault publish requested (e.g. after word rotation)
   document.addEventListener('canary:vault-publish-now', () => publishVaultNow())
@@ -1307,7 +1339,8 @@ async function bootSync(): Promise<void> {
     // Vault sync: always fetch and merge — catches up on state changes from
     // other devices (counter-advance, member changes, etc.)
     try {
-      const vaultGroups = await fetchVault(identity!.privkey!, identity!.pubkey)
+      const vaultData = await fetchVault(identity!.privkey!, identity!.pubkey)
+      const vaultGroups = vaultData?.groups
       console.info('[canary:vault] Vault fetch result:', vaultGroups ? `${Object.keys(vaultGroups).length} group(s)` : 'null')
       if (vaultGroups && Object.keys(vaultGroups).length > 0) {
         const { groups: localGroups } = getState()
@@ -1329,6 +1362,17 @@ async function bootSync(): Promise<void> {
             showToast('Synced from vault', 'success', 1500)
           }
         }
+      }
+      // Merge vault persona metadata onto derived personas
+      if (vaultData?.personas && vaultData.personas.length > 0) {
+        const { personas: currentPersonas } = getState()
+        const updated = { ...currentPersonas }
+        for (const vaultP of vaultData.personas) {
+          if (updated[vaultP.name]) {
+            updated[vaultP.name] = { ...updated[vaultP.name], ...vaultP, npub: updated[vaultP.name].npub }
+          }
+        }
+        update({ personas: updated })
       }
     } catch (err) {
       console.warn('[canary:vault] Vault fetch failed:', err)
@@ -1364,7 +1408,8 @@ async function bootSync(): Promise<void> {
     try {
       await waitForConnection()
       console.info('[canary:vault] NIP-07 vault sync starting...')
-      const vaultGroups = await fetchVaultNip07(identity.pubkey)
+      const vaultData = await fetchVaultNip07(identity.pubkey)
+      const vaultGroups = vaultData?.groups
       console.info('[canary:vault] NIP-07 vault result:', vaultGroups ? `${Object.keys(vaultGroups).length} group(s)` : 'null')
       if (vaultGroups && Object.keys(vaultGroups).length > 0) {
         const { groups: localGroups } = getState()
@@ -1384,6 +1429,17 @@ async function bootSync(): Promise<void> {
             showToast('Synced from vault', 'success', 1500)
           }
         }
+      }
+      // Merge vault persona metadata (NIP-07 has no local keys, so just metadata)
+      if (vaultData?.personas && vaultData.personas.length > 0) {
+        const { personas: currentPersonas } = getState()
+        const updated = { ...currentPersonas }
+        for (const vaultP of vaultData.personas) {
+          if (updated[vaultP.name]) {
+            updated[vaultP.name] = { ...updated[vaultP.name], ...vaultP, npub: updated[vaultP.name].npub }
+          }
+        }
+        update({ personas: updated })
       }
     } catch (err) {
       console.warn('[canary:vault] NIP-07 vault sync failed:', err)
@@ -1712,6 +1768,23 @@ function showLoginScreen(): void {
 }
 
 async function bootApp(): Promise<void> {
+  // Derive persona keys from identity and merge any stored vault metadata
+  {
+    const { identity, personas: vaultPersonas } = getState()
+    if (identity?.privkey) {
+      const customNames = Object.keys(vaultPersonas).filter(
+        name => !['personal', 'bitcoiner', 'work', 'social', 'anonymous'].includes(name)
+      )
+      const personas = initPersonas(identity, customNames.length > 0 ? customNames : undefined)
+      for (const [name, vaultP] of Object.entries(vaultPersonas)) {
+        if (personas[name]) {
+          personas[name] = { ...personas[name], ...vaultP, npub: personas[name].npub }
+        }
+      }
+      update({ personas })
+    }
+  }
+
   buildShell()
 
   if (window.location.hash === '#call') {
@@ -1737,6 +1810,9 @@ async function bootApp(): Promise<void> {
   window.addEventListener('hashchange', () => checkInviteFragment())
 
   void bootSync()
+  // Non-blocking: fetch kind 0 profiles for all personas
+  const { settings: bootSettings } = getState()
+  fetchPersonaProfiles(bootSettings.defaultReadRelays).catch(() => {})
 }
 
 // ── In-app notification prompt (replaces confirm()) ───────────
@@ -1815,25 +1891,27 @@ function scheduleVaultPublish(): void {
 
   if (_vaultTimer) clearTimeout(_vaultTimer)
   _vaultTimer = setTimeout(() => {
-    const { identity: id, groups: g } = getState()
+    const { identity: id, groups: g, personas: p } = getState()
     if (!id?.pubkey || Object.keys(g).length === 0) return
+    const personaArr = Object.values(p)
     if (id.privkey) {
-      publishVault(g, id.privkey, id.pubkey)
+      publishVault(g, id.privkey, id.pubkey, personaArr)
     } else if (id.signerType === 'nip07') {
-      publishVaultNip07(g, id.pubkey)
+      publishVaultNip07(g, id.pubkey, personaArr)
     }
   }, VAULT_DEBOUNCE_MS)
 }
 
 function publishVaultNow(): void {
   if (_vaultTimer) clearTimeout(_vaultTimer)
-  const { identity, groups } = getState()
+  const { identity, groups, personas } = getState()
   if (!identity?.pubkey || Object.keys(groups).length === 0) return
+  const personaArr = Object.values(personas)
 
   const publish = identity.privkey
-    ? publishVault(groups, identity.privkey, identity.pubkey)
+    ? publishVault(groups, identity.privkey, identity.pubkey, personaArr)
     : identity.signerType === 'nip07'
-      ? publishVaultNip07(groups, identity.pubkey)
+      ? publishVaultNip07(groups, identity.pubkey, personaArr)
       : null
 
   publish
@@ -1849,7 +1927,7 @@ function publishVaultNow(): void {
  * Triggered by the "Sync Groups" button in the sidebar.
  */
 async function manualVaultSync(): Promise<void> {
-  const { identity, groups } = getState()
+  const { identity, groups, personas } = getState()
   if (!identity?.pubkey) {
     showToast('No identity — cannot sync', 'error')
     return
@@ -1866,20 +1944,22 @@ async function manualVaultSync(): Promise<void> {
 
   try {
     // Publish local state first so the other device can pick it up
+    const personaArr = Object.values(personas)
     if (Object.keys(groups).length > 0) {
       if (isNip07) {
-        await publishVaultNip07(groups, identity.pubkey)
+        await publishVaultNip07(groups, identity.pubkey, personaArr)
       } else {
-        await publishVault(groups, identity.privkey!, identity.pubkey)
+        await publishVault(groups, identity.privkey!, identity.pubkey, personaArr)
       }
     }
 
     // Fetch remote vault and merge
     const { waitForConnection } = await import('./nostr/connect.js')
     await waitForConnection()
-    const vaultGroups = isNip07
+    const vaultData = isNip07
       ? await fetchVaultNip07(identity.pubkey)
       : await fetchVault(identity.privkey!, identity.pubkey)
+    const vaultGroups = vaultData?.groups
 
     if (vaultGroups && Object.keys(vaultGroups).length > 0) {
       const { groups: localGroups } = getState()
@@ -1896,6 +1976,17 @@ async function manualVaultSync(): Promise<void> {
       }
     } else {
       showToast(`No vault found for ${shortPk}\u2026 — are both devices using the same identity?`, 'warning', 5000)
+    }
+    // Merge vault persona metadata
+    if (vaultData?.personas && vaultData.personas.length > 0) {
+      const { personas: currentPersonas } = getState()
+      const updated = { ...currentPersonas }
+      for (const vaultP of vaultData.personas) {
+        if (updated[vaultP.name]) {
+          updated[vaultP.name] = { ...updated[vaultP.name], ...vaultP, npub: updated[vaultP.name].npub }
+        }
+      }
+      update({ personas: updated })
     }
   } catch (err) {
     console.error('[canary:vault] Manual sync failed:', err)
