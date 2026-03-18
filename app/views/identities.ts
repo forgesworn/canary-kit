@@ -1,10 +1,12 @@
 // app/views/identities.ts — Identity hub: master card, persona cards, tree, archive
+//
+// Numbers Station aesthetic — deep slate, amber accents, monospace body,
+// Playfair Display headings. Matches the existing canary-kit design language.
 
 import { getState, update } from '../state.js'
 import { isPersonasInitialised, createPersona } from '../persona.js'
 import { renderPersonaCard, wirePersonaCards } from '../components/persona-card.js'
 import { renderIdentityTree, wireIdentityTree } from '../components/identity-tree.js'
-import { personaColour } from '../components/persona-picker.js'
 import { escapeHtml } from '../utils/escape.js'
 
 // ── Module state ──────────────────────────────────────────────
@@ -20,13 +22,262 @@ function truncateNpub(npub: string): string {
   return `${npub.slice(0, 8)}\u2026${npub.slice(-4)}`
 }
 
-/** Validate a persona name: lowercase, no spaces, max 32 chars. */
 function isValidPersonaName(name: string): boolean {
   if (name.length === 0 || name.length > 32) return false
   if (name !== name.toLowerCase()) return false
   if (/\s/.test(name)) return false
   return true
 }
+
+// ── Styles ────────────────────────────────────────────────────
+
+const STYLES = `
+  .id-hub { max-width: 600px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+
+  .id-hub__heading {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 400;
+    color: var(--text-bright);
+    margin: 0 0 0.25rem;
+    letter-spacing: 0.01em;
+  }
+
+  .id-hub__sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+  }
+
+  /* ── Master card ────────────────────────────────── */
+
+  .id-master {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--amber-500);
+    border-radius: 6px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .id-master__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .id-master__stats {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .id-master__actions {
+    display: flex;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+  }
+
+  .id-master__mnemonic {
+    margin-top: 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    cursor: pointer;
+    user-select: none;
+    filter: blur(5px);
+    transition: filter 0.2s var(--ease-out);
+    line-height: 1.6;
+    word-spacing: 0.25em;
+  }
+
+  .id-master__mnemonic--revealed {
+    filter: none;
+    user-select: text;
+  }
+
+  .id-master__mnemonic-hint {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+    display: block;
+  }
+
+  /* ── Empty state ────────────────────────────────── */
+
+  .id-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+  }
+
+  .id-empty__icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.4;
+  }
+
+  .id-empty__title {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    color: var(--text-primary);
+    margin: 0 0 0.5rem;
+  }
+
+  .id-empty__text {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 380px;
+    margin: 0 auto 1.25rem;
+  }
+
+  /* ── Create form ────────────────────────────────── */
+
+  .id-create {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.25rem;
+  }
+
+  .id-create__error {
+    font-size: 0.75rem;
+    color: var(--failed);
+    min-height: 1.125rem;
+  }
+
+  /* ── Section divider ────────────────────────────── */
+
+  .id-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1.5rem 0;
+  }
+
+  /* ── Archived ───────────────────────────────────── */
+
+  .id-archived__toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  .id-archived__toggle:hover { color: var(--text-secondary); }
+
+  .id-archived__list {
+    overflow: hidden;
+    transition: max-height 0.3s var(--ease-out);
+  }
+
+  .id-archived__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8125rem;
+  }
+
+  .id-archived__badge {
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: #fff;
+    opacity: 0.5;
+  }
+
+  .id-archived__name { color: var(--text-muted); }
+  .id-archived__npub { color: var(--text-muted); opacity: 0.5; font-size: 0.6875rem; flex: 1; }
+
+  /* ── NIP-07 fallback ────────────────────────────── */
+
+  .id-nip07 { padding: 2rem 1.5rem; }
+
+  .id-nip07__card {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .id-nip07__header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .id-nip07__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--bg-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+
+  .id-nip07__why {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem;
+  }
+
+  .id-nip07__why h3 {
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    margin: 0 0 0.75rem;
+    color: var(--text-primary);
+  }
+
+  .id-nip07__why p {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 0 0 0.625rem;
+  }
+
+  .id-nip07__why details {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    opacity: 0.7;
+    margin-top: 0.75rem;
+  }
+
+  .id-nip07__why summary { cursor: pointer; }
+  .id-nip07__why code { font-family: var(--font-mono); font-size: 0.6875rem; }
+`
 
 // ── Render: NIP-07 fallback ──────────────────────────────────
 
@@ -37,55 +288,25 @@ function renderNip07Fallback(): string {
   const groupCount = Object.keys(groups).length
 
   return `
-    <div style="padding: 1rem; max-width: 640px; margin: 0 auto;">
-      <div style="
-        background: var(--surface-1, #1a1a2e);
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 16px;
-        border: 1px solid var(--border, #333);
-      ">
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-          <div style="
-            width: 44px; height: 44px; border-radius: 50%;
-            background: hsl(210, 60%, 45%);
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 18px;
-          ">&#x1F511;</div>
+    <div class="id-nip07">
+      <div class="id-nip07__card">
+        <div class="id-nip07__header">
+          <div class="id-nip07__icon">\u{1F511}</div>
           <div>
-            <div style="font-weight: 600; font-size: 15px;">Your Identity</div>
-            <div style="font-size: 12px; opacity: 0.5;">${escapeHtml(npubShort)} &middot; NIP-07 extension &middot; ${groupCount} group${groupCount !== 1 ? 's' : ''}</div>
+            <div style="font-weight: 600; font-size: 0.9375rem;">Your Identity</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(npubShort)} \u00B7 NIP-07 extension \u00B7 ${groupCount} group${groupCount !== 1 ? 's' : ''}</div>
           </div>
         </div>
       </div>
 
-      <div style="
-        background: var(--surface-1, #1a1a2e);
-        border-radius: 12px;
-        padding: 20px;
-        border: 1px solid var(--border, #333);
-      ">
-        <h3 style="margin: 0 0 12px 0; font-size: 14px;">Persona features unavailable</h3>
-        <p style="font-size: 13px; opacity: 0.7; line-height: 1.5; margin: 0 0 12px 0;">
-          Your NIP-07 browser extension (Alby, nos2x, etc.) keeps your private key secure by never exposing it to apps.
-          This is good security &mdash; but it means canary-kit cannot derive sub-identities from your key.
-        </p>
-        <p style="font-size: 13px; opacity: 0.7; line-height: 1.5; margin: 0 0 16px 0;">
-          Personas, Shamir backup, nsec export, and linkage proofs all require the raw private key to perform
-          cryptographic derivation (HMAC-SHA256). Your extension only allows signing and encryption &mdash; not key derivation.
-        </p>
-        <p style="font-size: 13px; opacity: 0.7; line-height: 1.5; margin: 0 0 16px 0;">
-          To use persona features, switch to a local key by creating a new account or importing a recovery phrase.
-          Your extension identity will remain separate.
-        </p>
-        <details style="font-size: 12px; opacity: 0.5;">
-          <summary style="cursor: pointer;">Technical detail</summary>
-          <p style="margin: 8px 0 0 0; line-height: 1.5;">
-            nsec-tree derives child keys via <code>HMAC-SHA256(master_key, purpose)</code>.
-            NIP-07 extensions expose <code>signEvent()</code> and <code>nip44.encrypt()</code>
-            but not the raw key bytes needed for HMAC input. A future NIP could add a
-            <code>deriveChild(purpose, index)</code> API to bridge this gap.
-          </p>
+      <div class="id-nip07__why">
+        <h3>Why can\u2019t I manage personas?</h3>
+        <p>Your NIP-07 browser extension keeps your private key secure by never exposing it to apps. This is good security \u2014 but it means canary-kit cannot derive sub-identities from your key.</p>
+        <p>Personas, Shamir backup, nsec export, and linkage proofs all require the raw private key for cryptographic derivation. Your extension only allows signing and encryption.</p>
+        <p>To use persona features, create a new account with a recovery phrase or import an existing one.</p>
+        <details>
+          <summary>Technical detail</summary>
+          <p style="margin: 0.5rem 0 0; line-height: 1.5;">nsec-tree derives child keys via <code>HMAC-SHA256(master_key, purpose)</code>. NIP-07 extensions expose <code>signEvent()</code> and <code>nip44.encrypt()</code> but not the raw key bytes. A future NIP could add <code>deriveChild(purpose, index)</code> to bridge this gap.</p>
         </details>
       </div>
     </div>
@@ -98,75 +319,31 @@ function renderMasterCard(): string {
   const { identity, personas, groups } = getState()
   if (!identity) return ''
 
-  const personaCount = Object.values(personas).filter((p) => !p.archived).length
+  const personaCount = Object.values(personas).filter(p => !p.archived).length
   const totalGroupCount = Object.keys(groups).length
   const hasMnemonic = !!identity.mnemonic
-  const backupStatus = hasMnemonic ? 'Mnemonic available' : 'No backup phrase'
-
-  const mnemonicSection = hasMnemonic
-    ? `
-      <div class="identities__backup" style="margin-top: 0.75rem;">
-        <div class="identities__mnemonic${_backupRevealed ? '' : ' identities__mnemonic--blurred'}"
-             id="identities-mnemonic"
-             style="
-               font-family: monospace;
-               font-size: 0.8125rem;
-               padding: 0.5rem 0.75rem;
-               background: var(--surface, #1e1e2e);
-               border: 1px solid var(--border, #444);
-               border-radius: 6px;
-               cursor: pointer;
-               user-select: ${_backupRevealed ? 'text' : 'none'};
-               filter: ${_backupRevealed ? 'none' : 'blur(5px)'};
-               transition: filter 0.2s ease;
-               color: var(--text, #e0e0e0);
-             ">${escapeHtml(identity.mnemonic ?? '')}</div>
-        <span style="font-size: 0.6875rem; color: var(--text-muted, #999); margin-top: 0.25rem; display: block;">
-          ${_backupRevealed ? 'Click to hide' : 'Click to reveal recovery phrase'}
-        </span>
-      </div>
-    `
-    : ''
 
   return `
-    <div class="identities__master-card" style="
-      background: linear-gradient(135deg, hsl(260, 50%, 20%) 0%, hsl(220, 40%, 15%) 100%);
-      border: 2px solid var(--accent, #7c3aed);
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-      margin-bottom: 1.5rem;
-    ">
-      <h2 style="
-        margin: 0 0 0.75rem;
-        font-size: 1.25rem;
-        color: var(--text, #e0e0e0);
-      ">Your Identity Tree</h2>
-
-      <div style="
-        display: flex;
-        gap: 1rem;
-        flex-wrap: wrap;
-        font-size: 0.8125rem;
-        color: var(--text-muted, #999);
-        margin-bottom: 1rem;
-      ">
-        <span>${personaCount} persona${personaCount === 1 ? '' : 's'}</span>
-        <span>\u00B7</span>
-        <span>${totalGroupCount} group${totalGroupCount === 1 ? '' : 's'}</span>
-        <span>\u00B7</span>
-        <span>${backupStatus}</span>
+    <div class="id-master">
+      <div class="id-master__row">
+        <div class="id-master__stats">
+          <span>${personaCount} persona${personaCount === 1 ? '' : 's'}</span>
+          <span>\u00B7</span>
+          <span>${totalGroupCount} group${totalGroupCount === 1 ? '' : 's'}</span>
+          <span>\u00B7</span>
+          <span>${hasMnemonic ? 'Backed up' : 'No backup'}</span>
+        </div>
+        <div class="id-master__actions">
+          <button class="btn btn--sm" id="id-toggle-tree">${_treeVisible ? 'Hide tree' : 'Show tree'}</button>
+          ${hasMnemonic ? '<button class="btn btn--sm" id="id-backup-btn">Backup</button>' : ''}
+          <button class="btn btn--sm" id="id-shamir-btn">Shamir</button>
+          <button class="btn btn--sm" id="id-verify-proof-btn">Verify proof</button>
+        </div>
       </div>
-
-      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-        <button class="btn btn--sm" id="identities-toggle-tree">
-          ${_treeVisible ? 'Hide Tree' : 'Show Tree'}
-        </button>
-        ${hasMnemonic ? '<button class="btn btn--sm" id="identities-backup-btn">Backup</button>' : ''}
-        <button class="btn btn--sm" id="identities-shamir-btn">Shamir Split</button>
-        <button class="btn btn--sm" id="identities-verify-proof-btn">Verify Proof</button>
-      </div>
-
-      ${mnemonicSection}
+      ${hasMnemonic ? `
+        <div id="id-mnemonic" class="id-master__mnemonic${_backupRevealed ? ' id-master__mnemonic--revealed' : ''}">${escapeHtml(identity.mnemonic ?? '')}</div>
+        <span class="id-master__mnemonic-hint">${_backupRevealed ? 'Click to hide' : 'Click to reveal recovery phrase'}</span>
+      ` : ''}
     </div>
   `
 }
@@ -175,7 +352,6 @@ function renderMasterCard(): string {
 
 function renderTreeSection(): string {
   const treeHtml = renderIdentityTree()
-  // Replace the default collapsed style with expanded if visible
   if (_treeVisible) {
     return treeHtml.replace('max-height: 0', 'max-height: 2000px')
       .replace('class="identity-tree"', 'class="identity-tree expanded"')
@@ -188,49 +364,35 @@ function renderTreeSection(): string {
 function renderActivePersonas(): string {
   const { personas, groups } = getState()
   const groupList = Object.values(groups)
-  const active = Object.values(personas).filter((p) => !p.archived)
+  const active = Object.values(personas).filter(p => !p.archived)
 
   if (active.length === 0) {
     return `
-      <div style="
-        padding: 1rem;
-        text-align: center;
-        color: var(--text-muted, #999);
-        font-size: 0.875rem;
-      ">No personas yet. Create one below.</div>
+      <div class="id-empty">
+        <div class="id-empty__icon">\u{1F464}</div>
+        <h3 class="id-empty__title">No personas yet</h3>
+        <p class="id-empty__text">
+          Create your first persona to get started. Each persona is an independent
+          Nostr identity \u2014 use one for personal groups, another for bitcoin meetups,
+          another as a burner. They\u2019re all derived from your master key and recoverable
+          from your 12-word phrase.
+        </p>
+      </div>
     `
   }
 
-  return active.map((p) => renderPersonaCard(p, groupList)).join('')
+  return active.map(p => renderPersonaCard(p, groupList)).join('')
 }
 
 // ── Render: New persona form ─────────────────────────────────
 
 function renderNewPersonaForm(): string {
   return `
-    <div class="identities__create" style="
-      margin-top: 1rem;
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-    ">
-      <input
-        class="input"
-        type="text"
-        id="identities-new-name"
-        placeholder="New persona name"
-        maxlength="32"
-        autocomplete="off"
-        style="flex: 1; min-width: 0;"
-      />
-      <button class="btn btn--primary btn--sm" id="identities-create-btn">Create</button>
+    <div class="id-create">
+      <input class="input" type="text" id="id-new-name" placeholder="persona name" maxlength="32" autocomplete="off" style="flex: 1; min-width: 0;" />
+      <button class="btn btn--primary btn--sm" id="id-create-btn">+ Create persona</button>
     </div>
-    <div id="identities-create-error" style="
-      color: var(--danger, #ef4444);
-      font-size: 0.75rem;
-      margin-top: 0.25rem;
-      min-height: 1rem;
-    "></div>
+    <div class="id-create__error" id="id-create-error"></div>
   `
 }
 
@@ -238,92 +400,66 @@ function renderNewPersonaForm(): string {
 
 function renderArchivedSection(): string {
   const { personas } = getState()
-  const archived = Object.values(personas).filter((p) => p.archived)
+  const archived = Object.values(personas).filter(p => p.archived)
 
   if (archived.length === 0) return ''
 
-  const rows = archived.map((p) => {
-    const colour = personaColour(p.name)
+  const rows = archived.map(p => {
     const letter = escapeHtml(p.name.slice(0, 1).toUpperCase())
     return `
-      <div class="identities__archived-row" style="
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.375rem 0.5rem;
-        border-bottom: 1px solid var(--border, #333);
-      ">
-        <span style="
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 1.5rem;
-          height: 1.5rem;
-          border-radius: 50%;
-          background: ${colour};
-          color: #fff;
-          font-size: 0.6875rem;
-          font-weight: 600;
-          opacity: 0.6;
-        ">${letter}</span>
-        <span style="font-size: 0.8125rem; color: var(--text-muted, #999);">${escapeHtml(p.name)}</span>
-        <span style="font-size: 0.6875rem; color: var(--text-muted, #666); flex: 1;">${escapeHtml(truncateNpub(p.npub))}</span>
+      <div class="id-archived__row">
+        <span class="id-archived__badge" style="background: var(--text-muted);">${letter}</span>
+        <span class="id-archived__name">${escapeHtml(p.name)}</span>
+        <span class="id-archived__npub">${escapeHtml(truncateNpub(p.npub))}</span>
         <button class="btn btn--sm" data-restore-persona="${escapeHtml(p.name)}">Restore</button>
       </div>
     `
   }).join('')
 
   return `
-    <div class="identities__archived" style="margin-top: 1.5rem;">
-      <button class="identities__archived-header" id="identities-archived-toggle" style="
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        width: 100%;
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 0.5rem 0;
-        font-size: 0.875rem;
-        font-weight: 600;
-        color: var(--text-muted, #999);
-        text-align: left;
-      ">
+    <hr class="id-divider" />
+    <div>
+      <button class="id-archived__toggle" id="id-archived-toggle">
         <span>${_archivedVisible ? '\u25BC' : '\u25B6'}</span>
         <span>Archived (${archived.length})</span>
       </button>
-      <div id="identities-archived-list" style="
-        overflow: hidden;
-        max-height: ${_archivedVisible ? '1000px' : '0'};
-        transition: max-height 0.3s ease-out;
-      ">${rows}</div>
+      <div class="id-archived__list" id="id-archived-list" style="max-height: ${_archivedVisible ? '1000px' : '0'};">
+        ${rows}
+      </div>
     </div>
   `
 }
 
 // ── Public API ────────────────────────────────────────────────
 
-/** Render the identity hub view. */
 export function renderIdentities(container: HTMLElement): void {
   container.textContent = ''
 
-  // NIP-07 fallback — no local key material
+  // Inject scoped styles once
+  if (!document.getElementById('id-hub-styles')) {
+    const style = document.createElement('style')
+    style.id = 'id-hub-styles'
+    style.textContent = STYLES
+    document.head.appendChild(style)
+  }
+
+  // NIP-07 fallback
   if (!isPersonasInitialised()) {
     const div = document.createElement('div')
+    div.className = 'id-hub'
     div.innerHTML = renderNip07Fallback()
     container.appendChild(div)
     return
   }
 
   const wrapper = document.createElement('div')
-  wrapper.className = 'identities'
-  wrapper.style.cssText = 'padding: 1rem; max-width: 640px; margin: 0 auto;'
+  wrapper.className = 'id-hub'
   wrapper.innerHTML = [
+    '<h1 class="id-hub__heading">Identities</h1>',
+    '<div class="id-hub__sub">Derived from your master key</div>',
     renderMasterCard(),
     renderTreeSection(),
-    '<div class="identities__persona-list">',
     renderActivePersonas(),
-    '</div>',
     renderNewPersonaForm(),
     renderArchivedSection(),
   ].join('')
@@ -333,12 +469,10 @@ export function renderIdentities(container: HTMLElement): void {
   wirePersonaCards(container)
 
   const tree = container.querySelector('.identity-tree')
-  if (tree) {
-    wireIdentityTree(container)
-  }
+  if (tree) wireIdentityTree(container)
 
   // ── Tree toggle ──────────────────────────────────────────────
-  const toggleTreeBtn = container.querySelector<HTMLButtonElement>('#identities-toggle-tree')
+  const toggleTreeBtn = container.querySelector<HTMLButtonElement>('#id-toggle-tree')
   if (toggleTreeBtn) {
     toggleTreeBtn.addEventListener('click', () => {
       _treeVisible = !_treeVisible
@@ -352,92 +486,71 @@ export function renderIdentities(container: HTMLElement): void {
           treeEl.style.maxHeight = '0'
         }
       }
-      toggleTreeBtn.textContent = _treeVisible ? 'Hide Tree' : 'Show Tree'
+      toggleTreeBtn.textContent = _treeVisible ? 'Hide tree' : 'Show tree'
     })
   }
 
-  // ── Backup reveal (blur toggle) ──────────────────────────────
-  const backupBtn = container.querySelector<HTMLButtonElement>('#identities-backup-btn')
-  const mnemonicEl = container.querySelector<HTMLElement>('#identities-mnemonic')
-  if (backupBtn && mnemonicEl) {
-    backupBtn.addEventListener('click', () => {
-      _backupRevealed = !_backupRevealed
-      mnemonicEl.style.filter = _backupRevealed ? 'none' : 'blur(5px)'
-      mnemonicEl.style.userSelect = _backupRevealed ? 'text' : 'none'
-      const hint = mnemonicEl.nextElementSibling as HTMLElement | null
-      if (hint) {
-        hint.textContent = _backupRevealed ? 'Click to hide' : 'Click to reveal recovery phrase'
-      }
-    })
-  }
-  if (mnemonicEl) {
-    mnemonicEl.addEventListener('click', () => {
-      _backupRevealed = !_backupRevealed
-      mnemonicEl.style.filter = _backupRevealed ? 'none' : 'blur(5px)'
-      mnemonicEl.style.userSelect = _backupRevealed ? 'text' : 'none'
-      const hint = mnemonicEl.nextElementSibling as HTMLElement | null
-      if (hint) {
-        hint.textContent = _backupRevealed ? 'Click to hide' : 'Click to reveal recovery phrase'
-      }
-    })
+  // ── Backup reveal ────────────────────────────────────────────
+  const backupBtn = container.querySelector<HTMLButtonElement>('#id-backup-btn')
+  const mnemonicEl = container.querySelector<HTMLElement>('#id-mnemonic')
+  const mnemonicHint = mnemonicEl?.nextElementSibling as HTMLElement | null
+
+  function toggleBackup(): void {
+    if (!mnemonicEl) return
+    _backupRevealed = !_backupRevealed
+    mnemonicEl.classList.toggle('id-master__mnemonic--revealed', _backupRevealed)
+    if (mnemonicHint) {
+      mnemonicHint.textContent = _backupRevealed ? 'Click to hide' : 'Click to reveal recovery phrase'
+    }
   }
 
-  // ── Shamir Split custom event ────────────────────────────────
-  const shamirBtn = container.querySelector<HTMLButtonElement>('#identities-shamir-btn')
-  if (shamirBtn) {
-    shamirBtn.addEventListener('click', () => {
-      container.dispatchEvent(new CustomEvent('canary:shamir-split', { bubbles: true }))
-    })
-  }
+  backupBtn?.addEventListener('click', toggleBackup)
+  mnemonicEl?.addEventListener('click', toggleBackup)
 
-  // ── Verify Proof custom event ────────────────────────────────
-  const verifyProofBtn = container.querySelector<HTMLButtonElement>('#identities-verify-proof-btn')
-  if (verifyProofBtn) {
-    verifyProofBtn.addEventListener('click', () => {
-      container.dispatchEvent(new CustomEvent('canary:verify-proof', { bubbles: true }))
-    })
-  }
+  // ── Shamir + Verify events ───────────────────────────────────
+  container.querySelector('#id-shamir-btn')?.addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent('canary:shamir-split', { bubbles: true }))
+  })
+  container.querySelector('#id-verify-proof-btn')?.addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent('canary:verify-proof', { bubbles: true }))
+  })
 
   // ── New persona form ─────────────────────────────────────────
-  const nameInput = container.querySelector<HTMLInputElement>('#identities-new-name')
-  const createBtn = container.querySelector<HTMLButtonElement>('#identities-create-btn')
-  const errorEl = container.querySelector<HTMLElement>('#identities-create-error')
+  const nameInput = container.querySelector<HTMLInputElement>('#id-new-name')
+  const createBtn = container.querySelector<HTMLButtonElement>('#id-create-btn')
+  const errorEl = container.querySelector<HTMLElement>('#id-create-error')
 
   function handleCreate(): void {
     if (!nameInput || !errorEl) return
     const name = nameInput.value.trim()
 
     if (!isValidPersonaName(name)) {
-      errorEl.textContent = 'Name must be lowercase, no spaces, max 32 characters.'
+      errorEl.textContent = 'Lowercase, no spaces, max 32 characters.'
       return
     }
 
     const { personas } = getState()
     if (personas[name]) {
-      errorEl.textContent = 'A persona with that name already exists.'
+      errorEl.textContent = 'That name is already taken.'
       return
     }
 
     try {
       const newPersona = createPersona(name)
       update({ personas: { ...personas, [name]: newPersona } })
+      nameInput.value = ''
+      errorEl.textContent = ''
     } catch (err) {
       errorEl.textContent = err instanceof Error ? err.message : 'Failed to create persona.'
     }
   }
 
-  if (createBtn) {
-    createBtn.addEventListener('click', handleCreate)
-  }
-  if (nameInput) {
-    nameInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') handleCreate()
-    })
-  }
+  createBtn?.addEventListener('click', handleCreate)
+  nameInput?.addEventListener('keydown', e => { if (e.key === 'Enter') handleCreate() })
 
-  // ── Archived section toggle ──────────────────────────────────
-  const archivedToggle = container.querySelector<HTMLButtonElement>('#identities-archived-toggle')
-  const archivedList = container.querySelector<HTMLElement>('#identities-archived-list')
+  // ── Archived toggle + restore ────────────────────────────────
+  const archivedToggle = container.querySelector<HTMLButtonElement>('#id-archived-toggle')
+  const archivedList = container.querySelector<HTMLElement>('#id-archived-list')
   if (archivedToggle && archivedList) {
     archivedToggle.addEventListener('click', () => {
       _archivedVisible = !_archivedVisible
@@ -447,15 +560,13 @@ export function renderIdentities(container: HTMLElement): void {
     })
   }
 
-  // ── Restore archived persona ─────────────────────────────────
-  container.addEventListener('click', (e) => {
+  container.addEventListener('click', e => {
     const restoreBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-restore-persona]')
     if (!restoreBtn) return
     const name = restoreBtn.dataset.restorePersona!
     const { personas } = getState()
     const persona = personas[name]
     if (!persona) return
-    const updated = { ...persona, archived: false }
-    update({ personas: { ...personas, [name]: updated } })
+    update({ personas: { ...personas, [name]: { ...persona, archived: false } } })
   })
 }

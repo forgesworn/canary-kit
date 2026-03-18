@@ -43,14 +43,22 @@ describe('persona module', () => {
   })
 
   describe('initPersonas', () => {
-    it('returns 5+ default personas with npubs for a local identity', () => {
+    it('returns empty when no custom names provided (user creates their own)', () => {
       const identity = localIdentity()
       const personas = initPersonas(identity)
+      expect(Object.keys(personas)).toHaveLength(0)
+      expect(isPersonasInitialised()).toBe(true)
+    })
+
+    it('derives personas for provided custom names', () => {
+      const identity = localIdentity()
+      const personas = initPersonas(identity, ['personal', 'bitcoiner'])
 
       const names = Object.keys(personas)
-      expect(names.length).toBeGreaterThanOrEqual(5)
+      expect(names).toHaveLength(2)
+      expect(names).toContain('personal')
+      expect(names).toContain('bitcoiner')
 
-      // Each persona has name, index 0, and a valid npub
       for (const [name, p] of Object.entries(personas)) {
         expect(p.name).toBe(name)
         expect(p.index).toBe(0)
@@ -60,10 +68,11 @@ describe('persona module', () => {
 
     it('is deterministic — same privkey produces same personas', () => {
       const identity = fixedIdentity()
+      const names = ['personal', 'bitcoiner']
 
-      const first = initPersonas(identity)
+      const first = initPersonas(identity, names)
       destroyPersonas()
-      const second = initPersonas(identity)
+      const second = initPersonas(identity, names)
 
       // Same npubs for every persona name
       for (const name of Object.keys(first)) {
@@ -95,7 +104,7 @@ describe('persona module', () => {
   describe('getGroupIdentity', () => {
     it('returns Identity with npub and privateKey', () => {
       const identity = localIdentity()
-      initPersonas(identity)
+      initPersonas(identity, ['personal', 'bitcoiner', 'work'])
 
       const groupIdentity = getGroupIdentity('personal', 'group-abc', 0)
       expect(groupIdentity.npub).toMatch(/^npub1/)
@@ -105,7 +114,7 @@ describe('persona module', () => {
 
     it('different groups produce different identities', () => {
       const identity = localIdentity()
-      initPersonas(identity)
+      initPersonas(identity, ['personal', 'bitcoiner', 'work'])
 
       const id1 = getGroupIdentity('personal', 'group-a', 0)
       const id2 = getGroupIdentity('personal', 'group-b', 0)
@@ -114,7 +123,7 @@ describe('persona module', () => {
 
     it('different personas produce different identities for the same group', () => {
       const identity = localIdentity()
-      initPersonas(identity)
+      initPersonas(identity, ['personal', 'bitcoiner', 'work'])
 
       const id1 = getGroupIdentity('personal', 'group-x', 0)
       const id2 = getGroupIdentity('work', 'group-x', 0)
@@ -125,7 +134,7 @@ describe('persona module', () => {
   describe('createPersona', () => {
     it('creates a custom persona at index 0', () => {
       const identity = localIdentity()
-      initPersonas(identity)
+      initPersonas(identity, ['personal', 'bitcoiner', 'work'])
 
       const persona = createPersona('stealth')
       expect(persona.name).toBe('stealth')
@@ -137,7 +146,7 @@ describe('persona module', () => {
   describe('rotatePersona', () => {
     it('increments index and produces a new npub', () => {
       const identity = localIdentity()
-      initPersonas(identity)
+      initPersonas(identity, ['personal', 'bitcoiner', 'work'])
 
       const original = createPersona('rotate-test')
       const rotated = rotatePersona('rotate-test', original.index)
@@ -151,7 +160,7 @@ describe('persona module', () => {
   describe('destroyPersonas', () => {
     it('cleans up TreeRoot', () => {
       const identity = localIdentity()
-      initPersonas(identity)
+      initPersonas(identity, ['personal', 'bitcoiner', 'work'])
       expect(isPersonasInitialised()).toBe(true)
 
       destroyPersonas()
@@ -164,7 +173,7 @@ describe('persona module', () => {
       expect(isPersonasInitialised()).toBe(false)
 
       const identity = localIdentity()
-      initPersonas(identity)
+      initPersonas(identity, ['personal', 'bitcoiner', 'work'])
       expect(isPersonasInitialised()).toBe(true)
 
       destroyPersonas()

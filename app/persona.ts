@@ -61,13 +61,17 @@ export function initPersonas(
 
   _masterRoot = fromNsec(hexToBytes(identity.privkey))
 
-  const allNames: string[] = [...DEFAULT_PERSONA_NAMES, ...(customNames ?? [])]
+  // Only derive personas the user has explicitly created (passed via customNames
+  // or already in state). DEFAULT_PERSONA_NAMES is for recovery scanning, not
+  // for auto-populating the UI — users should create their own personas.
   const result: Record<string, AppPersona> = {}
 
-  for (const name of allNames) {
-    const persona = derivePersona(_masterRoot, name, 0)
-    _personaCache.set(cacheKey(name, 0), persona)
-    result[name] = toAppPersona(persona)
+  if (customNames && customNames.length > 0) {
+    for (const name of customNames) {
+      const persona = derivePersona(_masterRoot, name, 0)
+      _personaCache.set(cacheKey(name, 0), persona)
+      result[name] = toAppPersona(persona)
+    }
   }
 
   return result
