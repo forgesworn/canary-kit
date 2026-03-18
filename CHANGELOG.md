@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/forgesworn/canary-kit/compare/v1.3.0...v1.4.0) (2026-03-18)
+
+
+### Features
+
+* live vault subscription for instant cross-device sync ([cccade9](https://github.com/forgesworn/canary-kit/commit/cccade99782957234440f9681ed6011c635d48e5))
+
 # [1.3.0](https://github.com/forgesworn/canary-kit/compare/v1.2.0...v1.3.0) (2026-03-18)
 
 
