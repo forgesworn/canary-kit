@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/forgesworn/canary-kit/compare/v1.2.0...v1.3.0) (2026-03-18)
+
+
+### Features
+
+* vault sync for NIP-07 (browser extension) users ([ff35bfa](https://github.com/forgesworn/canary-kit/commit/ff35bfa1c5defc77c74ace65f6140388c3fab233))
+
 # [1.2.0](https://github.com/forgesworn/canary-kit/compare/v1.1.0...v1.2.0) (2026-03-18)
 
 
