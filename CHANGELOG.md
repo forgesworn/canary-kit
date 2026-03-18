@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/forgesworn/canary-kit/compare/v1.0.1...v1.0.2) (2026-03-18)
+
+
+### Bug Fixes
+
+* version display, mobile UX, vault sync, and push server ([cd81a3c](https://github.com/forgesworn/canary-kit/commit/cd81a3ca5187da3583a95e29e7d9913416569a4a))
+
 ## [1.0.1](https://github.com/forgesworn/canary-kit/compare/v1.0.0...v1.0.1) (2026-03-18)
 
 
