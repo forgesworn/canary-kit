@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/forgesworn/canary-kit/compare/v1.0.5...v1.1.0) (2026-03-18)
+
+
+### Features
+
+* add manual "Sync Groups" button to sidebar ([c1201bf](https://github.com/forgesworn/canary-kit/commit/c1201bf26a13db60e66b51772faf8b3ffc064f61))
+
 ## [1.0.5](https://github.com/forgesworn/canary-kit/compare/v1.0.4...v1.0.5) (2026-03-18)
 
 
