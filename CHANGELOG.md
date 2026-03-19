@@ -1,3 +1,10 @@
+# [2.6.0](https://github.com/forgesworn/canary-kit/compare/v2.5.5...v2.6.0) (2026-03-19)
+
+
+### Features
+
+* add account node type, recovery root modal, and developer derivation tool ([52903dd](https://github.com/forgesworn/canary-kit/commit/52903dde27e7fa0a6b59124dde16bf3f83cd44ae))
+
 ## [2.5.5](https://github.com/forgesworn/canary-kit/compare/v2.5.4...v2.5.5) (2026-03-19)
 
 
