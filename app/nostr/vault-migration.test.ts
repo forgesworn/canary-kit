@@ -73,7 +73,7 @@ describe('vault v3 format', () => {
     expect(result.personas.p3.name).toBe('personal')
   })
 
-  it('rejects v1 vault — returns empty', () => {
+  it('migrates v1 vault — defaults personaName to personal, assigns ids', () => {
     const v1Json = JSON.stringify({
       version: 1,
       groups: {
@@ -82,17 +82,17 @@ describe('vault v3 format', () => {
           name: 'Old Group',
           seed: 'b'.repeat(64),
           members: ['1'.repeat(64)],
-          personaName: 'personal',
         },
       },
     })
 
     const result = deserialiseVault(v1Json)
-    expect(result.groups).toEqual({})
-    expect(result.personas).toEqual({})
+    expect(Object.keys(result.groups)).toHaveLength(1)
+    // personaName should be migrated to personaId (empty since no personas in v1)
+    expect(result.groups.g1).toBeDefined()
   })
 
-  it('rejects v2 vault — returns empty', () => {
+  it('migrates v2 vault — converts persona array to tree, personaName to personaId', () => {
     const v2Json = JSON.stringify({
       version: 2,
       groups: { g1: { id: 'g1', name: 'V2 Group', personaName: 'test' } },
@@ -100,18 +100,27 @@ describe('vault v3 format', () => {
     })
 
     const result = deserialiseVault(v2Json)
-    expect(result.groups).toEqual({})
-    expect(result.personas).toEqual({})
+    // Groups should be preserved
+    expect(result.groups.g1).toBeDefined()
+    expect(result.groups.g1.name).toBe('V2 Group')
+    // Personas should be converted from array to record with ids
+    const personaEntries = Object.values(result.personas)
+    expect(personaEntries).toHaveLength(1)
+    expect(personaEntries[0].name).toBe('test')
+    expect(personaEntries[0].id).toBeTruthy()
+    expect(personaEntries[0].children).toEqual({})
+    // Group personaId should map to the migrated persona's id
+    expect(result.groups.g1.personaId).toBe(personaEntries[0].id)
   })
 
-  it('rejects unversioned vault — returns empty', () => {
+  it('migrates unversioned vault — treats as v1', () => {
     const json = JSON.stringify({
       groups: { g1: { id: 'g1', name: 'Ancient Group' } },
     })
 
     const result = deserialiseVault(json)
-    expect(result.groups).toEqual({})
-    expect(result.personas).toEqual({})
+    expect(result.groups.g1).toBeDefined()
+    expect(result.groups.g1.name).toBe('Ancient Group')
   })
 
   it('handles malformed JSON gracefully', () => {

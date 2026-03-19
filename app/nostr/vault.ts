@@ -5,6 +5,7 @@ import { finalizeEvent, verifyEvent } from 'nostr-tools/pure'
 import { encrypt as nip44encrypt, decrypt as nip44decrypt, getConversationKey } from 'nostr-tools/nip44'
 import { getPool, getReadRelayUrls, getWriteRelayUrls } from './connect.js'
 import type { AppGroup, AppPersona } from '../types.js'
+import { generatePersonaId } from '../persona-tree.js'
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -92,9 +93,46 @@ export function deserialiseVault(json: string): VaultData {
       }
     }
 
-    // v1/v2 or unversioned — outdated format
-    console.warn('[canary:vault] Vault format outdated (version:', parsed.version ?? 'none', ') — please update all devices')
-    return { groups: {}, personas: {}, deletedGroupIds: [] }
+    // v1/v2 or unversioned — migrate to v3 format
+    console.info('[canary:vault] Migrating vault from version', parsed.version ?? 1, 'to v3')
+
+    const groups = parsed.groups as Record<string, any>
+
+    // Default personaName to 'personal' for v1 groups missing it
+    for (const group of Object.values(groups)) {
+      if (!group.personaName && !group.personaId) {
+        group.personaName = 'personal'
+      }
+    }
+
+    // Migrate personas from array to tree keyed by id
+    const personaArray: any[] = Array.isArray(parsed.personas) ? parsed.personas : []
+    const personaTree: Record<string, AppPersona> = {}
+    const nameToId: Record<string, string> = {}
+
+    for (const p of personaArray) {
+      const id = generatePersonaId()
+      nameToId[p.name] = id
+      personaTree[id] = {
+        ...p,
+        id,
+        children: {},
+      }
+    }
+
+    // Migrate groups: personaName → personaId
+    for (const group of Object.values(groups) as any[]) {
+      if (group.personaName && !group.personaId) {
+        group.personaId = nameToId[group.personaName] ?? ''
+        delete group.personaName
+      }
+    }
+
+    return {
+      groups: groups as Record<string, AppGroup>,
+      personas: personaTree,
+      deletedGroupIds: Array.isArray(parsed.deletedGroupIds) ? parsed.deletedGroupIds : [],
+    }
   } catch {
     return { groups: {}, personas: {}, deletedGroupIds: [] }
   }
