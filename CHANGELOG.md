@@ -1,3 +1,11 @@
+# [2.5.0](https://github.com/forgesworn/canary-kit/compare/v2.4.0...v2.5.0) (2026-03-19)
+
+
+### Features
+
+* tree-driven detail panel replaces card list in identities view ([7c5f4eb](https://github.com/forgesworn/canary-kit/commit/7c5f4eb3c7443783ea4b15bb8a7ba79b74c33279))
+* tree-driven detail panel replaces card list in identities view ([446fe74](https://github.com/forgesworn/canary-kit/commit/446fe74ce0b6009bb2749c8fbe94ca94b6f16e3e))
+
 # [2.4.0](https://github.com/forgesworn/canary-kit/compare/v2.3.0...v2.4.0) (2026-03-18)
 
 
