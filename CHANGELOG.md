@@ -1,3 +1,10 @@
+## [2.6.1](https://github.com/forgesworn/canary-kit/compare/v2.6.0...v2.6.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* increase e2e dismissNsecBackup timeouts and use toBeHidden assertion ([75e08b9](https://github.com/forgesworn/canary-kit/commit/75e08b96c404f47fd6079ce21de8af8c156a6ce3))
+
 # [2.6.0](https://github.com/forgesworn/canary-kit/compare/v2.5.5...v2.6.0) (2026-03-19)
 
 
