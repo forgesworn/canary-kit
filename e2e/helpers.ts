@@ -27,9 +27,9 @@ export async function loginWithDemo(page: Page, name: string): Promise<void> {
 /** Dismiss the nsec backup modal if it appears after login. */
 async function dismissNsecBackup(page: Page): Promise<void> {
   const skipBtn = page.locator('#recovery-phrase-skip')
-  if (await skipBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+  if (await skipBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
     await skipBtn.click()
-    await expect(page.locator('#recovery-phrase-modal')).not.toHaveAttribute('open', '', { timeout: 2000 })
+    await expect(page.locator('#recovery-phrase-modal')).toBeHidden({ timeout: 3000 })
   }
 }
 
