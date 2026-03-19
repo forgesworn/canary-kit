@@ -159,6 +159,21 @@ export async function fetchOwnProfile(): Promise<void> {
   if (!pool || !identity?.pubkey) return
 
   const pk = identity.pubkey
+
+  // If a group member fetch already retrieved this profile, apply it immediately
+  const alreadyCached = _cache.get(pk)
+  if (alreadyCached) {
+    const displayName = alreadyCached.display_name || alreadyCached.name
+    const picture = alreadyCached.picture
+    const updates: Record<string, string> = {}
+    if (displayName && identity.displayName !== displayName) updates.displayName = displayName
+    if (picture && identity.picture !== picture) updates.picture = picture
+    if (Object.keys(updates).length > 0) {
+      update({ identity: { ...identity, ...updates } })
+    }
+    return
+  }
+
   if (_pending.has(pk)) return
   // Clear cache so we always get a fresh profile after login/switch
   _cache.delete(pk)
