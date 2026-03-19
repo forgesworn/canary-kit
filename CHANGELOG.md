@@ -1,3 +1,10 @@
+## [2.5.2](https://github.com/forgesworn/canary-kit/compare/v2.5.1...v2.5.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* migrate v2 vaults to v3 instead of rejecting — preserves groups, personas, display names ([c1fc318](https://github.com/forgesworn/canary-kit/commit/c1fc3184f7b89e5cd80cfc2ceaefcd60f3787427))
+
 ## [2.5.1](https://github.com/forgesworn/canary-kit/compare/v2.5.0...v2.5.1) (2026-03-19)
 
 
