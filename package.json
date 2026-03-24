@@ -143,5 +143,9 @@
     "@scure/bip39": "^2.0.1",
     "nsec-tree": "^1.4.0",
     "spoken-token": "^2.0.2"
+  },
+  "funding": {
+    "type": "lightning",
+    "url": "lightning:thedonkey@strike.me"
   }
 }
