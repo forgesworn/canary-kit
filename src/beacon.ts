@@ -101,7 +101,7 @@ async function aesGcmDecrypt(key: Uint8Array, content: string): Promise<Uint8Arr
 // Beacon Payload
 // ---------------------------------------------------------------------------
 
-/** Decrypted content of a kind 20800 location beacon event. */
+/** Decrypted content of an encrypted location beacon (kind 20078 signal). */
 export interface BeaconPayload {
   geohash: string
   precision: number
@@ -180,7 +180,7 @@ export async function decryptBeacon(
 /** Duress propagation scope. */
 export type DuressScope = 'group' | 'persona' | 'master'
 
-/** Decrypted content of a duress alert beacon (kind 20800, AES-GCM encrypted). */
+/** Decrypted content of a duress alert beacon (kind 20078 signal, AES-GCM encrypted). */
 export interface DuressAlert {
   type: 'duress'
   member: string

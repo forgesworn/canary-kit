@@ -100,19 +100,18 @@ Session methods:
 
 ### canary-kit/nostr
 
-Unsigned Nostr event builders for the CANARY protocol (NIP-CANARY). Sign events with your preferred Nostr library.
+Unsigned Nostr event builders for SSG (Simple Shared Secret) groups. Uses standard Nostr kinds — no custom event kinds. Sign events with your preferred Nostr library.
 
-- KINDS — { group: 38800, seedDistribution: 28800, memberUpdate: 38801, reseed: 28801, wordUsed: 28802, beacon: 20800 }
-- buildGroupEvent(params) → UnsignedEvent
-- buildSeedDistributionEvent(params) → UnsignedEvent
-- buildMemberUpdateEvent(params) → UnsignedEvent
-- buildReseedEvent(params) → UnsignedEvent
-- buildWordUsedEvent(params) → UnsignedEvent
-- buildBeaconEvent(params) → UnsignedEvent
+- KINDS — { groupState: 30078, signal: 20078, giftWrap: 1059 }
+- buildGroupStateEvent(params) → UnsignedEvent — kind 30078, d-tag `ssg/<groupId>`, p-tags for members, NIP-32 labels
+- buildStoredSignalEvent(params) → UnsignedEvent — kind 30078, d-tag `ssg/<SHA256(groupId)>:<signalType>`, 7-day expiration
+- buildSignalEvent(params) → UnsignedEvent — kind 20078 ephemeral, d-tag `ssg/<SHA256(groupId)>`, t-tag for signal type
+- buildRumourEvent(params) → UnsignedEvent — kind 14 rumour for NIP-17 gift wrapping (seed distribution, reseed, member updates)
+- hashGroupId(groupId) → string — SHA-256 hash a group ID for privacy-preserving d-tags
 
 ### canary-kit/beacon
 
-AES-256-GCM encrypted location beacons and duress alerts for Nostr kind 20800 events.
+AES-256-GCM encrypted location beacons and duress alerts. Beacons are published as kind 20078 ephemeral signal events.
 
 - deriveBeaconKey(seedHex) → Uint8Array
 - encryptBeacon(key, geohash, precision) → Promise\<string\>

@@ -32,7 +32,7 @@ Coercion-resistant spoken verification. Extends `spoken-token` with duress, live
 - `src/sync-crypto.ts` — AES-256-GCM envelope encryption for sync messages
 - `src/presets.ts` — threat-profile presets (family, field-ops, enterprise)
 - `src/beacon.ts` — encrypted location beacons and duress alerts
-- `src/nostr.ts` — Nostr event builders (6 event kinds)
+- `src/nostr.ts` — Nostr event builders (kinds 30078, 20078, NIP-17 gift wrap)
 - `src/wordlist.ts` — re-exports spoken-token en-v1 wordlist
 - `src/counter.ts` — re-exports spoken-token time-based counter
 - `src/crypto.ts` — re-exports spoken-token crypto utilities

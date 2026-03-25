@@ -38,7 +38,7 @@ import { deriveToken, deriveDuressToken, verifyToken, deriveLivenessToken, deriv
 import { encodeAsWords, encodeAsPin, encodeAsHex, encodeToken } from 'canary-kit/encoding'
 import { createSession, generateSeed, deriveSeed, SESSION_PRESETS } from 'canary-kit/session'
 import { WORDLIST, WORDLIST_SIZE, getWord, indexOf } from 'canary-kit/wordlist'
-import { KINDS, buildGroupEvent, buildSeedDistributionEvent, buildMemberUpdateEvent, buildReseedEvent, buildWordUsedEvent, buildBeaconEvent } from 'canary-kit/nostr'
+import { KINDS, buildGroupStateEvent, buildStoredSignalEvent, buildSignalEvent, buildRumourEvent, hashGroupId } from 'canary-kit/nostr'
 import { deriveBeaconKey, encryptBeacon, decryptBeacon, buildDuressAlert, encryptDuressAlert, decryptDuressAlert } from 'canary-kit/beacon'
 import { applySyncMessage, decodeSyncMessage, encodeSyncMessage, deriveGroupKey, deriveGroupSigningKey, hashGroupTag, encryptEnvelope, decryptEnvelope } from 'canary-kit/sync'
 ```
@@ -177,7 +177,7 @@ interface Session {
 
 // ── Beacon ────────────────────────────────────────────────────────────────────
 
-/** Decrypted content of a kind 20800 location beacon event. */
+/** Decrypted content of an encrypted location beacon (kind 20078 signal). */
 interface BeaconPayload {
   geohash: string
   precision: number
@@ -1007,117 +1007,126 @@ WORDLIST[2047]  // 'zoo'
 
 ## canary-kit/nostr
 
-Nostr event builders for the CANARY NIP. All builders return unsigned events (`UnsignedEvent`) — sign with your own Nostr library (e.g. `nostr-tools`).
+Nostr event builders for SSG (Simple Shared Secret) groups. Uses standard Nostr kinds — no custom event kinds. All builders return unsigned events (`UnsignedEvent`) — sign with your own Nostr library (e.g. `nostr-tools`).
+
+Three event kinds are used:
+- **kind 30078** (parameterised replaceable) — group state and stored signals. The d-tag uses the `ssg/` namespace prefix.
+- **kind 20078** (ephemeral) — real-time signals between group members.
+- **kind 14** (rumour / unsigned inner event) — NIP-17 gift-wrapped DMs carrying seed distribution, reseed, and other private payloads.
 
 ### KINDS
 
 ```typescript
 const KINDS = {
-  group:            38_800,  // replaceable — group announcement
-  seedDistribution: 28_800,  // ephemeral — seed delivery to member
-  memberUpdate:     38_801,  // replaceable — add/remove member
-  reseed:           28_801,  // ephemeral — new seed broadcast
-  wordUsed:         28_802,  // ephemeral — burn-after-use notification
-  beacon:           20_800,  // ephemeral — encrypted location beacon
+  groupState: 30_078,  // parameterised replaceable — group state and stored signals
+  signal:     20_078,  // ephemeral — real-time signals
+  giftWrap:    1_059,  // NIP-17 gift wrap (consumer wraps kind 14 rumours)
 } as const
 ```
 
-### buildGroupEvent(params)
+### buildGroupStateEvent(params)
 
-Build a kind 38800 group announcement event.
+Build an unsigned kind 30078 group state event. The d-tag uses plaintext `ssg/<groupId>` since content is NIP-44 encrypted. Includes NIP-32 labels for the SSG namespace and p-tags for each member.
 
 ```typescript
-buildGroupEvent(params: GroupEventParams): UnsignedEvent
+buildGroupStateEvent(params: GroupStateEventParams): UnsignedEvent
 
-buildGroupEvent({
+interface GroupStateEventParams {
+  groupId: string
+  members: string[]           // hex pubkeys
+  encryptedContent: string    // NIP-44 encrypted group config
+  rotationInterval?: number   // seconds between word rotations
+  tolerance?: number          // counter tolerance window
+  expiration?: number         // NIP-40 expiration (unix seconds)
+}
+
+buildGroupStateEvent({
   groupId: 'alpine-team-1',
-  name: 'Alpine Team',
   members: ['<alice-pubkey>', '<bob-pubkey>'],
+  encryptedContent: '<NIP-44 encrypted group config>',
   rotationInterval: 86_400,
-  wordCount: 2,
-  wordlist: 'en-v1',
-  encryptedContent: '<NIP-44 encrypted group metadata>',
-  expiration: Math.floor(Date.now() / 1000) + 30 * 86_400,  // 30 days
+  tolerance: 1,
+  expiration: Math.floor(Date.now() / 1000) + 30 * 86_400,
 })
-// { kind: 38800, content: '...', tags: [['d','alpine-team-1'],['name','Alpine Team'],['p','<alice>'],['p','<bob>'],['rotation','86400'],['words','2'],['wordlist','en-v1'],['expiration','...']], created_at: ... }
+// { kind: 30078, content: '...', tags: [['d','ssg/alpine-team-1'],['p','<alice>'],['p','<bob>'],['L','ssg'],['l','group','ssg'],['rotation','86400'],['tolerance','1'],['expiration','...']], created_at: ... }
 ```
 
-### buildSeedDistributionEvent(params)
+### buildStoredSignalEvent(params)
 
-Build a kind 28800 seed distribution event, sent privately to each member.
-
-```typescript
-buildSeedDistributionEvent(params: SeedDistributionParams): UnsignedEvent
-
-buildSeedDistributionEvent({
-  recipientPubkey: '<alice-pubkey>',
-  groupEventId: '<kind-38800-event-id>',
-  encryptedContent: '<NIP-44 encrypted seed for alice>',
-})
-// { kind: 28800, content: '...', tags: [['p','<alice>'],['e','<group-id>']], created_at: ... }
-```
-
-### buildMemberUpdateEvent(params)
-
-Build a kind 38801 member update event.
+Build an unsigned kind 30078 stored signal event. The d-tag uses a SHA-256 hash of the group ID (for privacy) scoped by signal type: `ssg/<SHA256(groupId)>:<signalType>`. Includes a 7-day NIP-40 expiration tag.
 
 ```typescript
-buildMemberUpdateEvent(params: MemberUpdateParams): UnsignedEvent
+buildStoredSignalEvent(params: StoredSignalEventParams): UnsignedEvent
 
-buildMemberUpdateEvent({
+interface StoredSignalEventParams {
+  groupId: string
+  signalType: string          // e.g. 'counter-advance', 'word-used'
+  encryptedContent: string
+}
+
+buildStoredSignalEvent({
   groupId: 'alpine-team-1',
-  action: 'add',
-  memberPubkey: '<charlie-pubkey>',
-  reseed: true,
-  encryptedContent: '<encrypted update content>',
+  signalType: 'counter-advance',
+  encryptedContent: '<encrypted signal payload>',
 })
-// { kind: 38801, ... tags: [['d','alpine-team-1'],['action','add'],['p','<charlie>'],['reseed','true']], ... }
+// { kind: 30078, content: '...', tags: [['d','ssg/<hash>:counter-advance'],['expiration','...']], created_at: ... }
 ```
 
-### buildReseedEvent(params)
+### buildSignalEvent(params)
 
-Build a kind 28801 reseed event.
-
-```typescript
-buildReseedEvent(params: ReseedParams): UnsignedEvent
-
-buildReseedEvent({
-  groupEventId: '<kind-38800-event-id>',
-  reason: 'member_removed',
-  encryptedContent: '<NIP-44 encrypted new seed>',
-})
-// { kind: 28801, ... tags: [['e','<group-id>'],['reason','member_removed']], ... }
-```
-
-Valid reason values: `'member_removed'` | `'compromise'` | `'scheduled'` | `'duress'`
-
-### buildWordUsedEvent(params)
-
-Build a kind 28802 word-used (burn-after-use) notification event.
+Build an unsigned kind 20078 ephemeral signal event. The d-tag uses a SHA-256 hash of the group ID (for privacy). A t-tag carries the signal type. No expiration tag — ephemeral events are not stored by relays.
 
 ```typescript
-buildWordUsedEvent(params: WordUsedParams): UnsignedEvent
+buildSignalEvent(params: SignalEventParams): UnsignedEvent
 
-buildWordUsedEvent({
-  groupEventId: '<kind-38800-event-id>',
-  encryptedContent: '<encrypted burn notification>',
-})
-// { kind: 28802, ... tags: [['e','<group-id>']], ... }
-```
+interface SignalEventParams {
+  groupId: string
+  signalType: string          // e.g. 'beacon', 'word-used', 'counter-advance'
+  encryptedContent: string
+}
 
-### buildBeaconEvent(params)
-
-Build a kind 20800 encrypted location beacon event.
-
-```typescript
-buildBeaconEvent(params: BeaconEventParams): UnsignedEvent
-
-buildBeaconEvent({
+buildSignalEvent({
   groupId: 'alpine-team-1',
+  signalType: 'beacon',
   encryptedContent: '<AES-256-GCM encrypted beacon payload>',
-  expiration: Math.floor(Date.now() / 1000) + 3600,  // 1 hour
 })
-// { kind: 20800, ... tags: [['h','alpine-team-1'],['expiration','...']], ... }
+// { kind: 20078, content: '...', tags: [['d','ssg/<hash>'],['t','beacon']], created_at: ... }
+```
+
+### buildRumourEvent(params)
+
+Build an unsigned kind 14 rumour event for NIP-17 gift wrapping. The consumer must set the `pubkey` field before computing the event ID, then seal (NIP-44 encrypt + kind 13) and gift-wrap (kind 1059) the rumour.
+
+Used for seed distribution, reseed notifications, and member updates — anything that must be sent privately to a specific member.
+
+```typescript
+buildRumourEvent(params: RumourEventParams): UnsignedEvent
+
+interface RumourEventParams {
+  recipientPubkey: string     // 64-char hex pubkey
+  subject: string             // e.g. 'ssg:seed-distribution', 'ssg:reseed', 'ssg:member-update'
+  encryptedContent: string    // NIP-44 encrypted payload
+  groupEventId?: string       // optional reference to the group state event
+}
+
+buildRumourEvent({
+  recipientPubkey: '<alice-pubkey>',
+  subject: 'ssg:seed-distribution',
+  encryptedContent: '<NIP-44 encrypted seed>',
+  groupEventId: '<group-state-event-id>',
+})
+// { kind: 14, content: '...', tags: [['p','<alice>'],['subject','ssg:seed-distribution'],['e','<group-id>']], created_at: ... }
+```
+
+### hashGroupId(groupId)
+
+SHA-256 hash a group ID for use in d-tags where privacy matters.
+
+```typescript
+hashGroupId(groupId: string): string
+
+hashGroupId('alpine-team-1')
+// '3a7f...' (64-char hex)
 ```
 
 ---
@@ -1223,16 +1232,15 @@ Used with `createSession({ preset: '...' })`.
 
 ## Nostr Event Kinds
 
-| Kind | Type | Name | Description |
-|---|---|---|---|
-| 38800 | Replaceable | `group` | Group announcement with member list and configuration |
-| 28800 | Ephemeral | `seedDistribution` | Encrypted seed delivery to a specific member |
-| 38801 | Replaceable | `memberUpdate` | Add or remove a group member (with optional reseed) |
-| 28801 | Ephemeral | `reseed` | New seed broadcast after compromise or member removal |
-| 28802 | Ephemeral | `wordUsed` | Burn-after-use notification — advance counter for all members |
-| 20800 | Ephemeral | `beacon` | AES-256-GCM encrypted location beacon |
+Uses standard Nostr kinds — no custom event kinds.
 
-Replaceable events (38xxx) use the `d` tag for addressability. Ephemeral events (28xxx, 20xxx) are not stored by relays.
+| Kind | Type | KINDS key | Description |
+|---|---|---|---|
+| 30078 | Parameterised replaceable | `groupState` | Group state (d-tag `ssg/<groupId>`) and stored signals (d-tag `ssg/<hash>:<signalType>`) |
+| 20078 | Ephemeral | `signal` | Real-time signals between group members (beacon, word-used, counter-advance) |
+| 14 → 1059 | NIP-17 gift wrap | `giftWrap` | Seed distribution, reseed, member updates (kind 14 rumour sealed + wrapped) |
+
+Kind 30078 events use the `ssg/` d-tag namespace prefix. Kind 20078 events hash the group ID in the d-tag for privacy. Kind 14 rumours are sealed (kind 13) and gift-wrapped (kind 1059) by the consumer — the library builds the unsigned rumour only.
 
 ---
 
@@ -1350,15 +1358,15 @@ state = removeMember(state, '<charlie-pubkey>')
 
 ### Nostr Group Integration
 
-Publish group state and encrypted seeds to Nostr relays so all members can synchronise.
+Publish group state and encrypted seeds to Nostr relays so all members can synchronise. Uses standard Nostr kinds (30078, 20078, NIP-17 gift wrap) — no custom event kinds.
 
 ```typescript
-import { createGroup, syncCounter, deriveBeaconKey, encryptBeacon } from 'canary-kit'
+import { createGroup, deriveBeaconKey, encryptBeacon } from 'canary-kit'
 import {
   KINDS,
-  buildGroupEvent,
-  buildSeedDistributionEvent,
-  buildBeaconEvent,
+  buildGroupStateEvent,
+  buildSignalEvent,
+  buildRumourEvent,
 } from 'canary-kit/nostr'
 
 // 1. Create the group
@@ -1368,37 +1376,34 @@ let state = createGroup({
   preset: 'field-ops',
 })
 
-// 2. Publish a kind 38800 group event (encrypted content via NIP-44)
-const groupEvent = buildGroupEvent({
+// 2. Publish a kind 30078 group state event (encrypted content via NIP-44)
+const groupEvent = buildGroupStateEvent({
   groupId: 'alpine-team-1',
-  name: state.name,
   members: state.members,
-  rotationInterval: state.rotationInterval,
-  wordCount: state.wordCount,
-  wordlist: state.wordlist,
   encryptedContent: '<NIP-44 encrypted group config>',
-  expiration: Math.floor(Date.now() / 1000) + 30 * 86_400,
+  rotationInterval: state.rotationInterval,
 })
 // sign and publish groupEvent to relays
 
-// 3. Send seed to each member via kind 28800 (one event per member)
+// 3. Send seed to each member via NIP-17 gift wrap (kind 14 rumour → seal → wrap)
 for (const memberPubkey of state.members) {
-  const seedEvent = buildSeedDistributionEvent({
+  const rumour = buildRumourEvent({
     recipientPubkey: memberPubkey,
-    groupEventId: '<signed-group-event-id>',
+    subject: 'ssg:seed-distribution',
     encryptedContent: '<NIP-44 encrypted seed for this member>',
+    groupEventId: '<signed-group-event-id>',
   })
-  // sign and publish seedEvent
+  // set pubkey, compute id, then seal (kind 13) and gift-wrap (kind 1059)
 }
 
-// 4. Publish periodic location beacons (kind 20800)
+// 4. Publish periodic location beacons as kind 20078 ephemeral signals
 const beaconKey = deriveBeaconKey(state.seed)
 const encryptedBeacon = await encryptBeacon(beaconKey, 'gcpvjb', 6)
 
-const beaconEvent = buildBeaconEvent({
+const beaconEvent = buildSignalEvent({
   groupId: 'alpine-team-1',
+  signalType: 'beacon',
   encryptedContent: encryptedBeacon,
-  expiration: Math.floor(Date.now() / 1000) + state.beaconInterval * 2,
 })
 // sign and publish beaconEvent
 

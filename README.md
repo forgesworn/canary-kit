@@ -150,7 +150,7 @@ import { createSession } from 'canary-kit/session'    // just sessions
 import { deriveToken } from 'canary-kit/token'         // just derivation
 import { encodeAsWords } from 'canary-kit/encoding'    // just encoding
 import { WORDLIST } from 'canary-kit/wordlist'          // just the wordlist
-import { buildGroupEvent } from 'canary-kit/nostr'     // just Nostr
+import { buildGroupStateEvent } from 'canary-kit/nostr' // just Nostr
 import { encryptBeacon } from 'canary-kit/beacon'      // just beacons
 import { applySyncMessage } from 'canary-kit/sync'     // just sync protocol
 ```
@@ -174,7 +174,7 @@ See [SECURITY.md](SECURITY.md) for vulnerability disclosure and known limitation
 | `canary-kit/token` | `deriveToken`, `verifyToken`, `deriveDuressToken`, `deriveLivenessToken` |
 | `canary-kit/encoding` | `encodeAsWords`, `encodeAsPin`, `encodeAsHex` |
 | `canary-kit` | `createGroup`, `getCurrentWord`, `verifyWord`, `addMember`, `reseed` |
-| `canary-kit/nostr` | `buildGroupEvent`, `buildBeaconEvent`, + 4 more builders |
+| `canary-kit/nostr` | `buildGroupStateEvent`, `buildSignalEvent`, `buildStoredSignalEvent`, `buildRumourEvent` |
 | `canary-kit/beacon` | `encryptBeacon`, `decryptBeacon`, `buildDuressAlert` |
 | `canary-kit/sync` | `applySyncMessage`, `encodeSyncMessage`, `deriveGroupKey` |
 | `canary-kit/wordlist` | `WORDLIST`, `getWord`, `indexOf` |
@@ -187,14 +187,11 @@ The full protocol specification is in [CANARY.md](CANARY.md). The Nostr binding 
 
 | Event | Kind | Type |
 |---|---|---|
-| Group announcement | `38800` | Replaceable |
-| Seed distribution | `28800` | Ephemeral |
-| Member update | `38801` | Replaceable |
-| Reseed | `28801` | Ephemeral |
-| Word used | `28802` | Ephemeral |
-| Encrypted location beacon | `20800` | Ephemeral |
+| Group state / stored signals | `30078` | Parameterised replaceable |
+| Real-time signals | `20078` | Ephemeral |
+| Seed distribution / member updates | `14` → `1059` | NIP-17 gift wrap (kind 14 rumour sealed + wrapped) |
 
-Content is encrypted with **NIP-44**. Events may carry a **NIP-40** `expiration` tag.
+Content is encrypted with **NIP-44**. Group state events use the `ssg/` d-tag namespace. Seed distribution and member updates use **NIP-17** gift wrapping (kind 14 rumour → kind 13 seal → kind 1059 gift wrap). Events may carry a **NIP-40** `expiration` tag.
 
 ## For AI Assistants
 

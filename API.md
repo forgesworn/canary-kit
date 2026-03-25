@@ -181,29 +181,26 @@ The wordlist (`en-v1`) is derived from BIP-39 English, filtered for verbal verif
 
 ```typescript
 import {
-  buildGroupEvent,
-  buildSeedDistributionEvent,
-  buildMemberUpdateEvent,
-  buildReseedEvent,
-  buildWordUsedEvent,
-  buildBeaconEvent,
+  buildGroupStateEvent,
+  buildStoredSignalEvent,
+  buildSignalEvent,
+  buildRumourEvent,
+  hashGroupId,
   KINDS,
   type UnsignedEvent,
 } from 'canary-kit/nostr'
 ```
 
-All builders return an `UnsignedEvent`. Sign with your own Nostr library.
+All builders return an `UnsignedEvent`. Sign with your own Nostr library. Uses standard Nostr kinds — no custom event kinds.
 
 | Builder | Kind | Description |
 |---|---|---|
-| `buildGroupEvent(params)` | `38800` | Replaceable event announcing a group and its configuration |
-| `buildSeedDistributionEvent(params)` | `28800` | Ephemeral event delivering the encrypted seed to a recipient |
-| `buildMemberUpdateEvent(params)` | `38801` | Replaceable event recording a member add or remove |
-| `buildReseedEvent(params)` | `28801` | Ephemeral event signalling a seed rotation |
-| `buildWordUsedEvent(params)` | `28802` | Ephemeral event recording that a verification word was consumed |
-| `buildBeaconEvent(params)` | `20800` | Ephemeral event carrying an encrypted location beacon |
+| `buildGroupStateEvent(params)` | `30078` | Parameterised replaceable group state with `ssg/` d-tag namespace |
+| `buildStoredSignalEvent(params)` | `30078` | Parameterised replaceable stored signal with hashed d-tag and 7-day expiration |
+| `buildSignalEvent(params)` | `20078` | Ephemeral real-time signal (beacon, word-used, counter-advance) |
+| `buildRumourEvent(params)` | `14` | NIP-17 rumour for seed distribution, reseed, and member updates (consumer wraps in kind 1059) |
 
-`KINDS` exports all six kind numbers as named constants.
+`KINDS` exports `{ groupState: 30078, signal: 20078, giftWrap: 1059 }`. `hashGroupId(groupId)` returns a SHA-256 hash for privacy-preserving d-tags.
 
 ## Beacon & Duress Alerts
 
