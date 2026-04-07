@@ -1,10 +1,4 @@
 {
-  "projectTitle": "canary-kit",
-  "description": "CANARY protocol — deepfake-proof, coercion-resistant identity verification. Open protocol, minimal dependencies.",
-  "excludeFolders": ["node_modules", "dist", "coverage", "src", "app", ".github", ".changeset", "docs/assets", "docs/plans", "docs/superpowers"],
-  "rules": [
-    "CANARY extends spoken-token with duress detection — a wrong token signals coercion without alerting the coercer.",
-    "Verification is bilateral — both parties prove liveness, not just the subject.",
-    "Group verification supports M-of-N threshold checks."
-  ]
+  "url": "https://context7.com/forgesworn/canary-kit",
+  "public_key": "pk_vdoXns3QEblb1693KnlDH"
 }
