@@ -131,7 +131,44 @@ All functions are pure — they return new state without mutating the input.
 | `advanceCounter(state: GroupState)` | Increments the usage offset (burn-after-use rotation) |
 | `reseed(state: GroupState)` | Generates a fresh seed and resets the usage offset |
 | `addMember(state: GroupState, pubkey: string)` | Adds a member; idempotent if already present |
-| `removeMember(state: GroupState, pubkey: string)` | Removes a member and immediately reseeds |
+| `removeMember(state: GroupState, pubkey: string)` | Removes a member (does NOT reseed -- old seed still valid) |
+| `removeMemberAndReseed(state: GroupState, pubkey: string)` | Removes a member and immediately reseeds (recommended) |
+| `dissolveGroup(state: GroupState)` | Zeroes the seed and clears all members |
+| `syncCounter(state: GroupState, nowSec?: number)` | Refreshes counter to current time window (monotonic, never regresses) |
+
+**GroupConfig fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Group name (required) |
+| `members` | `string[]` | Nostr pubkeys, 64-char hex (required) |
+| `preset` | `PresetName` | Named threat-profile preset (optional) |
+| `creator` | `string` | Pubkey of the group creator -- only the creator is admin at bootstrap. Must be in `members`. Without a creator, `admins` is empty and all privileged sync operations are silently rejected. |
+| `rotationInterval` | `number` | Seconds; overrides preset value |
+| `wordCount` | `1 \| 2 \| 3` | Words per challenge; overrides preset value |
+| `tolerance` | `number` | Counter tolerance for verification: accept tokens within +/-tolerance counter values (default: 1) |
+| `beaconInterval` | `number` | Beacon broadcast interval in seconds (default: 300) |
+| `beaconPrecision` | `number` | Geohash precision for normal beacons 1--11 (default: 6) |
+
+**GroupState fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Group name |
+| `seed` | `string` | 64-char hex (256-bit shared secret) |
+| `members` | `string[]` | Current member pubkeys |
+| `admins` | `string[]` | Pubkeys with admin privileges (reseed, add/remove others) |
+| `rotationInterval` | `number` | Seconds between automatic word rotation |
+| `wordCount` | `1 \| 2 \| 3` | Words per challenge |
+| `counter` | `number` | Time-based counter at last sync |
+| `usageOffset` | `number` | Burn-after-use offset on top of counter |
+| `tolerance` | `number` | Counter tolerance for verification |
+| `epoch` | `number` | Monotonic epoch -- increments on reseed (replay protection) |
+| `consumedOps` | `string[]` | Consumed operation IDs within current epoch |
+| `consumedOpsFloor` | `number?` | Timestamp floor for replay protection after consumedOps eviction |
+| `createdAt` | `number` | Unix timestamp of group creation |
+| `beaconInterval` | `number` | Seconds between beacon broadcasts |
+| `beaconPrecision` | `number` | Geohash precision (1--11) |
 
 ## Threat-Profile Presets
 
@@ -217,27 +254,53 @@ import {
 ```typescript
 import {
   applySyncMessage,
+  applySyncMessageWithResult,
   decodeSyncMessage,
   encodeSyncMessage,
   deriveGroupKey,
-  deriveGroupSigningKey,
+  deriveGroupIdentity,
   hashGroupTag,
   encryptEnvelope,
   decryptEnvelope,
+  PROTOCOL_VERSION,
   type SyncMessage,
-  type SyncResult,
+  type SyncApplyResult,
+  type SyncTransport,
+  type EventSigner,
 } from 'canary-kit/sync'
 ```
 
-Transport-agnostic state synchronisation for group membership, counter advancement, reseeds, beacons, and duress alerts. Messages are validated against an authority model with 6 invariants (admin checks, epoch ordering, replay protection, counter bounds).
+Transport-agnostic state synchronisation for group membership, counter advancement, reseeds, beacons, and duress alerts. Messages are validated against an authority model with 6 invariants (admin checks, epoch ordering, replay protection, counter bounds). See [COOKBOOK.md](COOKBOOK.md) for complete workflow examples.
+
+| Function | Signature | Description |
+|---|---|---|
+| `applySyncMessage` | `(state, msg, nowSec?, sender?) → GroupState` | Apply a sync message. Returns new state, or the same reference if rejected. |
+| `applySyncMessageWithResult` | `(state, msg, nowSec?, sender?) → SyncApplyResult` | Same as above but returns `{ state, applied }` for observability. |
+| `decodeSyncMessage` | `(json: string) → SyncMessage` | Parse and validate a JSON sync message. Throws on invalid input. |
+| `encodeSyncMessage` | `(msg: SyncMessage) → string` | Serialise a sync message to JSON (injects `protocolVersion`). |
+
+**Important:** `applySyncMessage` silently returns unchanged state when a message is rejected (wrong epoch, replay, missing sender, etc.). Use `applySyncMessageWithResult` when you need to distinguish accepted from rejected messages for logging or alerting.
+
+**Sender requirements:**
+- Privileged actions (member-join of others, member-leave of others, reseed, state-snapshot) require `sender` to be in `group.admins`.
+- `counter-advance` requires `sender` to be in `group.members`.
+- Omitting `sender` for these operations causes silent rejection.
+
+```typescript
+interface SyncApplyResult {
+  state: GroupState
+  applied: boolean
+}
+```
 
 | Message type | Description |
 |---|---|
-| `member-join` | Add a member (admin-only) |
-| `member-leave` | Remove a member or self-leave |
+| `member-join` | Add a member (admin-only, or self-join if sender is the pubkey) |
+| `member-leave` | Remove a member (admin-only) or self-leave |
 | `counter-advance` | Advance the group counter (burn-after-use) |
-| `reseed` | Distribute a new seed with epoch bump |
-| `beacon` | Encrypted location heartbeat |
-| `duress-alert` | Silent duress location alert |
-| `liveness-checkin` | Dead man's switch heartbeat |
-| `state-snapshot` | Full state sync for new/rejoining members |
+| `reseed` | Distribute a new seed with epoch bump (admin-only) |
+| `beacon` | Encrypted location heartbeat (fire-and-forget) |
+| `duress-alert` | Silent duress location alert (fire-and-forget) |
+| `duress-clear` | Clear a duress alert |
+| `liveness-checkin` | Dead man's switch heartbeat (fire-and-forget) |
+| `state-snapshot` | Full state sync for new/rejoining members (admin-only) |

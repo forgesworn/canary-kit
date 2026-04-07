@@ -40,7 +40,7 @@ import { createSession, generateSeed, deriveSeed, SESSION_PRESETS } from 'canary
 import { WORDLIST, WORDLIST_SIZE, getWord, indexOf } from 'canary-kit/wordlist'
 import { KINDS, buildGroupStateEvent, buildStoredSignalEvent, buildSignalEvent, buildRumourEvent, hashGroupId } from 'canary-kit/nostr'
 import { deriveBeaconKey, encryptBeacon, decryptBeacon, buildDuressAlert, encryptDuressAlert, decryptDuressAlert } from 'canary-kit/beacon'
-import { applySyncMessage, decodeSyncMessage, encodeSyncMessage, deriveGroupKey, deriveGroupSigningKey, hashGroupTag, encryptEnvelope, decryptEnvelope } from 'canary-kit/sync'
+import { applySyncMessage, applySyncMessageWithResult, decodeSyncMessage, encodeSyncMessage, deriveGroupKey, deriveGroupIdentity, hashGroupTag, encryptEnvelope, decryptEnvelope, PROTOCOL_VERSION, type SyncApplyResult, type SyncTransport, type EventSigner } from 'canary-kit/sync'
 ```
 
 ---
@@ -107,8 +107,10 @@ interface GroupConfig {
   rotationInterval?: number            // Seconds; overrides preset value
   wordCount?: 1 | 2 | 3               // Words per challenge; overrides preset value
   wordlist?: string                    // Wordlist identifier (default: 'en-v1')
+  tolerance?: number                   // Counter tolerance for verification (default: 1)
   beaconInterval?: number              // Beacon broadcast interval in seconds (default: 300)
   beaconPrecision?: number             // Geohash precision for normal beacons 1–11 (default: 6)
+  creator?: string                     // Pubkey of group creator — only the creator is admin at bootstrap. Must be in members. Without creator, admins is empty and all privileged sync ops are silently rejected.
 }
 
 /** Serialisable persistent state for a canary group. */
@@ -116,14 +118,19 @@ interface GroupState {
   name: string
   seed: string                         // 64-char hex (256-bit shared secret)
   members: string[]                    // Nostr pubkeys (64-char hex)
+  admins: string[]                     // Pubkeys with admin privileges (reseed, add/remove others). Set via GroupConfig.creator.
   rotationInterval: number             // Seconds
   wordCount: 1 | 2 | 3
   wordlist: string                     // e.g. 'en-v1'
   counter: number                      // Time-based counter at last sync
   usageOffset: number                  // Burn-after-use offset on top of counter
+  tolerance: number                    // Counter tolerance for verification
   createdAt: number                    // Unix timestamp
   beaconInterval: number               // Seconds
   beaconPrecision: number              // 1–11
+  epoch: number                        // Monotonic epoch — increments on reseed. Used for replay protection.
+  consumedOps: string[]                // Consumed operation IDs within current epoch. Cleared on epoch bump.
+  consumedOpsFloor?: number            // Timestamp floor: reject messages at or below this value (replay protection after consumedOps eviction)
 }
 
 // ── Group Presets ─────────────────────────────────────────────────────────────
@@ -429,14 +436,39 @@ const updated = addMember(state, '<charlie-pubkey>')
 
 ### removeMember(state, pubkey)
 
-Remove a member from the group and immediately reseed to invalidate the old shared secret. Returns new state — does not mutate.
+Remove a member from the group's member list. Does NOT reseed — the removed member still possesses the old seed. Use `removeMemberAndReseed()` instead unless you have a specific reason not to. Returns new state — does not mutate.
 
 ```typescript
 removeMember(state: GroupState, pubkey: string): GroupState
 
 const updated = removeMember(state, '<alice-pubkey>')
+// updated.seed === state.seed  (NOT reseeded — old seed still valid)
+// updated.members does not include alice
+```
+
+### removeMemberAndReseed(state, pubkey)
+
+Remove a member and immediately reseed, atomically invalidating the old seed. This is the recommended way to remove members — ensures forward secrecy by preventing the removed member from deriving future tokens or decrypting future beacons. Returns new state — does not mutate.
+
+```typescript
+removeMemberAndReseed(state: GroupState, pubkey: string): GroupState
+
+const updated = removeMemberAndReseed(state, '<alice-pubkey>')
 // updated.seed !== state.seed  (reseeded)
 // updated.members does not include alice
+```
+
+### dissolveGroup(state)
+
+Dissolve a group, zeroing the seed and clearing all members. Preserves name and timestamps for audit trail. Callers MUST also delete the persisted record (IndexedDB, localStorage, backend) after calling this. Returns new state — does not mutate.
+
+```typescript
+dissolveGroup(state: GroupState): GroupState
+
+const dissolved = dissolveGroup(state)
+// dissolved.seed === '0'.repeat(64)
+// dissolved.members === []
+// dissolved.admins === []
 ```
 
 ### syncCounter(state, nowSec?)
@@ -1159,26 +1191,53 @@ type SyncMessage =
   | { type: 'liveness-checkin'; pubkey: string; timestamp: number; opId: string }
   | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; admins: string[]; epoch: number; opId: string; timestamp: number; prevEpochSeed?: string }
 
-interface SyncResult {
-  state: GroupState
-  applied: boolean
-  reason?: string
+/** Result of applying a sync message, indicating whether it was accepted. */
+interface SyncApplyResult {
+  state: GroupState                    // The resulting group state (unchanged if rejected)
+  applied: boolean                     // Whether the message was applied
+}
+
+/** Minimal interface any sync transport must implement. */
+interface SyncTransport {
+  send(groupId: string, message: SyncMessage, recipients?: string[]): Promise<void>
+  subscribe(groupId: string, onMessage: (msg: SyncMessage, sender: string) => void): () => void
+  disconnect(): void
+}
+
+/** Abstracts event signing and NIP-44 encryption for transports that need it. */
+interface EventSigner {
+  pubkey: string
+  sign(event: unknown): Promise<unknown>
+  encrypt(plaintext: string, recipientPubkey: string): Promise<string>
+  decrypt(ciphertext: string, senderPubkey: string): Promise<string>
 }
 ```
 
 ### Functions
 
 ```typescript
-decodeSyncMessage(json: string): SyncMessage        // Parse and validate a JSON sync message
-encodeSyncMessage(msg: SyncMessage): string          // Serialise a sync message to JSON
-applySyncMessage(state: GroupState, msg: SyncMessage, sender?: string): SyncResult  // Apply a validated message to group state
+decodeSyncMessage(json: string): SyncMessage                              // Parse and validate a JSON sync message. Throws on invalid input or wrong protocolVersion.
+encodeSyncMessage(msg: SyncMessage): string                               // Serialise a sync message to JSON. Injects protocolVersion automatically.
+applySyncMessage(state: GroupState, msg: SyncMessage, nowSec?: number, sender?: string): GroupState  // Apply a sync message. Returns new state, or SAME REFERENCE if rejected (silent rejection).
+applySyncMessageWithResult(state: GroupState, msg: SyncMessage, nowSec?: number, sender?: string): SyncApplyResult  // Same as applySyncMessage but returns { state, applied } for observability.
 ```
+
+**IMPORTANT — silent rejection:** `applySyncMessage` returns the unchanged GroupState reference when a message is rejected. Common causes of silent rejection:
+- Privileged action without sender, or sender not in `group.admins` (I1)
+- Replayed opId already in `consumedOps` (I2)
+- Epoch mismatch: non-reseed ops must match local epoch (I3), reseed must be local epoch + 1 (I4)
+- Stale epoch for any privileged op (I6)
+- `counter-advance` without sender, or sender not in `group.members`
+- `counter-advance` that would regress the effective counter (monotonic)
+- Fire-and-forget messages older than 5 minutes or >60s in the future
+
+Use `applySyncMessageWithResult` when you need to log or alert on rejected messages.
 
 ### Envelope Encryption
 
 ```typescript
 deriveGroupKey(seed: string): Uint8Array             // Derive AES-256-GCM group key from seed
-deriveGroupSigningKey(seed: string): Uint8Array      // Derive HMAC signing key from seed
+deriveGroupIdentity(seed: string): Uint8Array      // Derive HMAC signing key from seed
 hashGroupTag(groupId: string): string                // Privacy-preserving group tag hash
 encryptEnvelope(key: Uint8Array, plaintext: string): Promise<string>  // AES-256-GCM encrypt
 decryptEnvelope(key: Uint8Array, ciphertext: string): Promise<string> // AES-256-GCM decrypt
@@ -1351,8 +1410,8 @@ state = advanceCounter(state)  // next call will use a different word
 state = addMember(state, '<diana-pubkey>')
 // Distribute new seed to diana via encrypted Nostr DM
 
-// Remove a compromised member (auto-reseeds)
-state = removeMember(state, '<charlie-pubkey>')
+// Remove a compromised member and reseed atomically
+state = removeMemberAndReseed(state, '<charlie-pubkey>')
 // Distribute new state.seed to remaining members
 ```
 

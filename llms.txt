@@ -25,14 +25,16 @@ Core derivation:
 - verifyWord(spokenWord, seedHex, memberPubkeys, counter, wordCount?) → VerifyResult
 
 Group lifecycle:
-- createGroup(config) → GroupState
+- createGroup(config) → GroupState (config.creator sets initial admin; without creator, admins is empty)
 - getCurrentWord(state) → string
 - getCurrentDuressWord(state, memberPubkey) → string
 - advanceCounter(state) → GroupState
 - reseed(state) → GroupState
 - addMember(state, pubkey) → GroupState
-- removeMember(state, pubkey) → GroupState
-- syncCounter(state, nowSec?) → GroupState
+- removeMember(state, pubkey) → GroupState (does NOT reseed)
+- removeMemberAndReseed(state, pubkey) → GroupState (recommended: removes + reseeds atomically)
+- dissolveGroup(state) → GroupState (zeroes seed, clears members)
+- syncCounter(state, nowSec?) → GroupState (refreshes counter to current time window, monotonic)
 
 Counter:
 - getCounter(timestampSec, rotationIntervalSec?) → number
@@ -124,18 +126,23 @@ Types: BeaconPayload ({ geohash, precision, timestamp }), DuressAlert ({ type, m
 
 ### canary-kit/sync
 
-Transport-agnostic group state synchronisation. Authority model with 6 invariants, replay protection, epoch boundaries.
+Transport-agnostic group state synchronisation. Authority model with 6 invariants, replay protection, epoch boundaries. See COOKBOOK.md for complete workflow examples.
 
-- decodeSyncMessage(json) → SyncMessage (validates and parses)
-- encodeSyncMessage(msg) → string (serialises to JSON)
-- applySyncMessage(state, msg, sender?) → SyncResult ({ state, applied, reason? })
+- decodeSyncMessage(json) → SyncMessage (validates and parses; throws on invalid input)
+- encodeSyncMessage(msg) → string (serialises to JSON; injects protocolVersion)
+- applySyncMessage(state, msg, nowSec?, sender?) → GroupState (apply a sync message; returns same reference if rejected)
+- applySyncMessageWithResult(state, msg, nowSec?, sender?) → SyncApplyResult ({ state, applied }) (same as above but indicates acceptance)
 - deriveGroupKey(seed) → Uint8Array (AES-256-GCM group key)
-- deriveGroupSigningKey(seed) → Uint8Array (HMAC signing key)
+- deriveGroupIdentity(seed) → Uint8Array (group identity key)
 - hashGroupTag(groupId) → string (privacy-preserving group tag)
 - encryptEnvelope(key, plaintext) → Promise<string> (AES-256-GCM)
 - decryptEnvelope(key, ciphertext) → Promise<string> (AES-256-GCM)
 
-Message types: member-join, member-leave, counter-advance, reseed, beacon, duress-alert, liveness-checkin, state-snapshot
+IMPORTANT: applySyncMessage silently returns unchanged state when rejected. Privileged actions (member-join of others, reseed, state-snapshot) require sender in group.admins. counter-advance requires sender in group.members. Omitting sender causes silent rejection. Set creator in createGroup() to populate admins.
+
+Message types: member-join, member-leave, counter-advance, reseed, beacon, duress-alert, duress-clear, liveness-checkin, state-snapshot
+
+Types: SyncApplyResult ({ state: GroupState, applied: boolean }), SyncTransport (interface for pluggable transports), EventSigner (interface for Nostr signing)
 
 ## Quick Examples
 
