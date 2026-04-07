@@ -28,3 +28,6 @@ playwright-report/
 # Recording output
 docs/record/output/
 .superpowers/
+
+# Local AI agent settings
+.claude/
