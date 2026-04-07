@@ -1,3 +1,10 @@
+## [2.7.1](https://github.com/forgesworn/canary-kit/compare/v2.7.0...v2.7.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* update SECURITY.md supported versions (1.x → 2.x) ([8482096](https://github.com/forgesworn/canary-kit/commit/8482096dd43ffc7e2dee81730fd25ed823b8122b))
+
 # [2.7.0](https://github.com/forgesworn/canary-kit/compare/v2.6.2...v2.7.0) (2026-03-27)
 
 
