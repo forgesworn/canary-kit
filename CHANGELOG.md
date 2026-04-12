@@ -14,6 +14,14 @@
 
 # [2.7.0](https://github.com/forgesworn/canary-kit/compare/v2.6.2...v2.7.0) (2026-03-27)
 
+## 2.7.3 (2026-04-12)
+
+### Bug Fixes
+
+- bump hono and @hono/node-server in push-server (security) (deps)
+
+
+
 
 ### Features
 
