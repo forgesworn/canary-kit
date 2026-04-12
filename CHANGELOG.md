@@ -1,3 +1,10 @@
+## [2.7.2](https://github.com/forgesworn/canary-kit/compare/v2.7.1...v2.7.2) (2026-04-12)
+
+
+### Bug Fixes
+
+* resolve development dependency vulnerabilities ([2885f96](https://github.com/forgesworn/canary-kit/commit/2885f9647c861fa8cd180a188cc70a5033ef50de))
+
 ## [2.7.1](https://github.com/forgesworn/canary-kit/compare/v2.7.0...v2.7.1) (2026-04-07)
 
 
