@@ -70,7 +70,7 @@ Be extra careful when modifying:
 
 ## Release & Versioning
 
-**Automated via semantic-release** — version bumps and npm publishing happen automatically when you push to `main`.
+**Automated via [forgesworn/anvil](https://github.com/forgesworn/anvil)** — `auto-release.yml` reads conventional commits on push to `main`, bumps the version, and creates a GitHub Release; `release.yml` then runs the pre-publish gates and publishes to npm via OIDC trusted publishing.
 
 | Type | Example | Version Bump |
 |------|---------|--------------|
@@ -79,4 +79,4 @@ Be extra careful when modifying:
 | `BREAKING CHANGE:` | In commit body | Major (x.0.0) |
 | `chore:`, `docs:`, `refactor:` | `docs: update README` | None |
 
-Tests must pass before release. GitHub Actions uses OIDC trusted publishing.
+Tests must pass before release.
