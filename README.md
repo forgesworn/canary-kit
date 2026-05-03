@@ -129,7 +129,7 @@ getCurrentWord(group)  // "falcon"
 
 **Automatic rotation.** Configurable intervals — 30 seconds for phone calls, 7 days for family groups.
 
-**Minimal dependencies.** Core crypto is pure JavaScript. Only `@scure/bip32` and `@scure/bip39` for mnemonic key recovery. Requires `globalThis.crypto` (Web Crypto API): all browsers, Node.js 22+, Deno, and edge runtimes.
+**Minimal dependencies.** Core crypto is pure JavaScript. Only `@scure/bip32` and `@scure/bip39` for mnemonic key recovery. Requires `globalThis.crypto` (Web Crypto API): all browsers, Node.js 24+, Deno, and edge runtimes.
 
 **Protocol-grade.** Formal specification with published test vectors and a curated 2048-word spoken-clarity wordlist.
 
@@ -137,7 +137,7 @@ getCurrentWord(group)  // "falcon"
 
 | Runtime | Version | Notes |
 |---------|---------|-------|
-| Node.js | 22+ | Full support (`globalThis.crypto` required) |
+| Node.js | 24+ | Full support (`globalThis.crypto` required) |
 | Deno | 1.x+ | Full support |
 | Bun | 1.x+ | Full support |
 | Browsers | All modern | Chrome, Firefox, Safari, Edge |
