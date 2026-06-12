@@ -18,7 +18,7 @@
     "@hono/node-server": "^1.13.0"
   },
   "devDependencies": {
-    "tsx": "^4.19.0",
+    "tsx": "^4.22.4",
     "@types/web-push": "^3.6.4"
   }
 }
