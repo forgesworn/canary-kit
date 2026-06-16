@@ -17,7 +17,7 @@ import type { AppIdentity, SignetLoginMethod } from '../types.js'
 import { DEFAULT_WRITE_RELAY } from '../types.js'
 
 export const SIGNET_APP_NAME = 'CANARY'
-const CANARY_SIGNER_METHODS: LoginPickerMethod[] = ['nip07', 'bunker', 'nostrconnect', 'nsec']
+const CANARY_SIGNER_METHODS: LoginPickerMethod[] = ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec']
 const CANARY_ADVANCED_SIGNER_METHODS: LoginPickerMethod[] = ['bunker', 'nostrconnect', 'nsec']
 const CANARY_NOSTR_CONNECT_PERMS = ['sign_event', 'nip44_encrypt', 'nip44_decrypt']
 

@@ -1,10 +1,21 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SignetSession } from 'signet-login'
+
+const signetLoginMock = vi.hoisted(() => vi.fn())
+const signetLogoutMock = vi.hoisted(() => vi.fn())
+
+vi.mock('signet-login', () => ({
+  login: signetLoginMock,
+  logout: signetLogoutMock,
+  restoreSession: vi.fn(),
+}))
+
 import {
   canUseIdentitySigner,
   identityFromSignetSession,
   identitySignerLabel,
   isExternalSignerIdentity,
+  signInWithSignet,
   signetMethodLabel,
 } from './signet.js'
 import type { AppIdentity } from '../types.js'
@@ -49,6 +60,11 @@ function makeSession(overrides: Partial<SignetSession> = {}): SignetSession {
 }
 
 describe('Signet identity adapter', () => {
+  beforeEach(() => {
+    signetLoginMock.mockReset()
+    signetLogoutMock.mockReset()
+  })
+
   it('maps a Signet session to the legacy external signer identity shape', () => {
     const identity = identityFromSignetSession(makeSession())
 
@@ -78,5 +94,19 @@ describe('Signet identity adapter', () => {
     expect(signetMethodLabel('nip07')).toBe('Browser extension')
     expect(signetMethodLabel('bunker')).toBe('NIP-46 bunker')
     expect(identitySignerLabel({ pubkey: PUBKEY, signerType: 'nip07', signerMethod: 'bunker' })).toBe('Signet (NIP-46 bunker)')
+  })
+
+  it('exposes Local Signet and Remote Signet in the Canary login picker', async () => {
+    signetLoginMock.mockResolvedValue(makeSession())
+
+    await expect(signInWithSignet({ theme: 'dark' })).resolves.toMatchObject({
+      pubkey: PUBKEY,
+      signerMethod: 'bunker',
+    })
+
+    expect(signetLoginMock).toHaveBeenCalledWith(expect.objectContaining({
+      methods: ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec'],
+      advancedMethods: ['bunker', 'nostrconnect', 'nsec'],
+    }))
   })
 })
