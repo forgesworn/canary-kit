@@ -160,6 +160,49 @@ describe('persistState — clean-install PIN regression', () => {
     })
   })
 
+  it('restores known relays and preserves disabled/default read-only choices', () => {
+    store.set('canary:settings', JSON.stringify({
+      theme: 'dark',
+      pinEnabled: false,
+      autoLockMinutes: 5,
+      knownRelays: ['wss://relay.trotters.cc', 'wss://nos.lol', 'wss://relay.example.com'],
+      defaultRelays: [],
+      defaultReadRelays: ['wss://nos.lol'],
+      defaultWriteRelays: [],
+    }))
+
+    restoreState()
+
+    expect(getState().settings.knownRelays).toEqual([
+      'wss://relay.trotters.cc/',
+      'wss://nos.lol/',
+      'wss://relay.example.com/',
+    ])
+    expect(getState().settings.defaultReadRelays).toEqual(['wss://nos.lol/'])
+    expect(getState().settings.defaultWriteRelays).toEqual([])
+    expect(getState().settings.defaultRelays).toEqual([])
+  })
+
+  it('restores group known relays without re-enabling disabled relay arrays', () => {
+    const group = freshState().groups['test-group']
+    store.set('canary:groups', JSON.stringify({
+      'test-group': {
+        ...group,
+        knownRelays: ['wss://relay.example.com'],
+        relays: [],
+        readRelays: [],
+        writeRelays: [],
+      },
+    }))
+
+    restoreState()
+
+    expect(getState().groups['test-group'].knownRelays).toEqual(['wss://relay.example.com/'])
+    expect(getState().groups['test-group'].readRelays).toEqual([])
+    expect(getState().groups['test-group'].writeRelays).toEqual([])
+    expect(getState().groups['test-group'].relays).toEqual([])
+  })
+
   it('encrypts groups, identity, and active group when PIN is enabled', async () => {
     const mnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
     const { pubkey, privkey } = mnemonicToKeypair(mnemonic)

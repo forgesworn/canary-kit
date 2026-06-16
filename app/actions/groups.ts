@@ -11,6 +11,7 @@ import {
 
 import { getState, update, updateGroup } from '../state.js'
 import { broadcastAction, reRegisterGroup } from '../sync.js'
+import { dedupeRelays } from '../types.js'
 import type { AppGroup } from '../types.js'
 
 /**
@@ -62,6 +63,11 @@ export function createNewGroup(name: string, preset: PresetName, memberPubkey?: 
   const settings = getState().settings
   const readRelays = [...(settings.defaultReadRelays ?? settings.defaultRelays)]
   const writeRelays = [...(settings.defaultWriteRelays ?? settings.defaultRelays)]
+  const knownRelays = dedupeRelays([
+    ...(settings.knownRelays ?? []),
+    ...readRelays,
+    ...writeRelays,
+  ])
 
   const PRESET_ENCODING: Record<string, 'words' | 'pin' | 'hex'> = {
     family: 'words',
@@ -77,6 +83,7 @@ export function createNewGroup(name: string, preset: PresetName, memberPubkey?: 
     relays: writeRelays,
     readRelays,
     writeRelays,
+    knownRelays,
     encodingFormat: PRESET_ENCODING[preset] ?? 'words',
     usedInvites: [],
     latestInviteIssuedAt: 0,

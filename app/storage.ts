@@ -1,7 +1,7 @@
 // app/storage.ts — localStorage persistence layer with optional PIN encryption
 
 import type { AppState, AppGroup, AppIdentity, AppSettings } from './types.js'
-import { WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY } from './types.js'
+import { dedupeRelays, WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY } from './types.js'
 import { getState, loadState, subscribe } from './state.js'
 import { deriveKey, encrypt, decrypt, generateSalt, encodeSalt, decodeSalt } from './crypto/pin.js'
 import { validateMnemonic } from './mnemonic.js'
@@ -44,10 +44,13 @@ export function isPinKeyLoaded(): boolean {
 
 // ── Default values (used when data is absent or corrupt) ───────
 
+const DEFAULT_KNOWN_RELAYS = dedupeRelays([DEFAULT_WRITE_RELAY, ...WELL_KNOWN_READ_RELAYS])
+
 const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   pinEnabled: true,
   autoLockMinutes: 5,
+  knownRelays: DEFAULT_KNOWN_RELAYS,
   defaultRelays: [DEFAULT_WRITE_RELAY],
   defaultReadRelays: [...WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY],
   defaultWriteRelays: [DEFAULT_WRITE_RELAY],
@@ -139,34 +142,53 @@ async function decryptLegacyGroups(
 }
 
 function migrateGroupRelays(group: Partial<AppGroup>): Pick<AppGroup, 'readRelays' | 'writeRelays'> {
-  if (group.readRelays?.length || group.writeRelays?.length) {
+  if (Array.isArray(group.readRelays) || Array.isArray(group.writeRelays)) {
     return {
-      readRelays: group.readRelays ?? [],
-      writeRelays: group.writeRelays ?? [],
+      readRelays: cleanRelayList(group.readRelays, []),
+      writeRelays: cleanRelayList(group.writeRelays, []),
     }
   }
 
   const legacyRelays = group.relays ?? []
   const writeRelays = legacyRelays.length > 0 ? legacyRelays : [DEFAULT_WRITE_RELAY]
-  const readSet = new Set<string>([...WELL_KNOWN_READ_RELAYS, ...writeRelays])
+  const readRelays = dedupeRelays([...WELL_KNOWN_READ_RELAYS, ...writeRelays])
   return {
-    readRelays: Array.from(readSet),
-    writeRelays,
+    readRelays,
+    writeRelays: cleanRelayList(writeRelays, []),
   }
 }
 
+function cleanRelayList(value: unknown, fallback: readonly string[]): string[] {
+  if (!Array.isArray(value)) return [...fallback]
+  return dedupeRelays(value.filter((url): url is string => typeof url === 'string'))
+}
+
 function mergeSettings(raw: Partial<AppSettings> | null): AppSettings {
-  const merged: AppSettings = { ...DEFAULT_SETTINGS, ...(raw ?? {}) }
-  if (!merged.defaultRelays?.length) {
-    merged.defaultRelays = [...DEFAULT_SETTINGS.defaultRelays]
+  const input = raw ?? {}
+  const defaultRelays = cleanRelayList(input.defaultRelays, DEFAULT_SETTINGS.defaultRelays)
+  const defaultReadRelays = cleanRelayList(input.defaultReadRelays, DEFAULT_SETTINGS.defaultReadRelays)
+  const defaultWriteRelays = cleanRelayList(input.defaultWriteRelays, DEFAULT_SETTINGS.defaultWriteRelays)
+  const knownFallback = dedupeRelays([
+    ...DEFAULT_KNOWN_RELAYS,
+    ...defaultRelays,
+    ...defaultReadRelays,
+    ...defaultWriteRelays,
+  ])
+  const knownRelays = dedupeRelays([
+    ...cleanRelayList(input.knownRelays, input.knownRelays === undefined ? knownFallback : []),
+    ...defaultRelays,
+    ...defaultReadRelays,
+    ...defaultWriteRelays,
+  ])
+
+  return {
+    ...DEFAULT_SETTINGS,
+    ...input,
+    knownRelays,
+    defaultRelays,
+    defaultReadRelays,
+    defaultWriteRelays,
   }
-  if (!merged.defaultReadRelays?.length) {
-    merged.defaultReadRelays = [...DEFAULT_SETTINGS.defaultReadRelays]
-  }
-  if (!merged.defaultWriteRelays?.length) {
-    merged.defaultWriteRelays = [...DEFAULT_SETTINGS.defaultWriteRelays]
-  }
-  return merged
 }
 
 function normaliseGroups(raw: unknown): Record<string, AppGroup> {
@@ -177,6 +199,12 @@ function normaliseGroups(raw: unknown): Record<string, AppGroup> {
     if (!isRecord(group) || typeof group.name !== 'string') continue
 
     const relayConfig = migrateGroupRelays(group as Partial<AppGroup>)
+    const knownRelays = dedupeRelays([
+      ...cleanRelayList((group as Partial<AppGroup>).knownRelays, []),
+      ...cleanRelayList((group as Partial<AppGroup>).relays, []),
+      ...relayConfig.readRelays,
+      ...relayConfig.writeRelays,
+    ])
     validGroups[id] = {
       ...(group as AppGroup),
       id,
@@ -214,6 +242,7 @@ function normaliseGroups(raw: unknown): Record<string, AppGroup> {
       nostrEnabled: typeof group.nostrEnabled === 'boolean'
         ? group.nostrEnabled
         : relayConfig.writeRelays.length > 0 || relayConfig.readRelays.length > 0,
+      knownRelays,
       ...relayConfig,
     }
   }

@@ -1,8 +1,8 @@
 // app/panels/settings.ts — Group settings drawer
 
 import { getState, updateGroup, update } from '../state.js'
-import { groupMode, allRelaysForGroup, WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY } from '../types.js'
-import type { AppPersona } from '../types.js'
+import { dedupeRelays, groupMode } from '../types.js'
+import type { AppGroup, AppPersona } from '../types.js'
 import { deleteGroup, reseedGroup, compromiseReseed, validateGroupImport } from '../actions/groups.js'
 import { createPersona } from '../persona.js'
 import { personaBadgeHtml } from '../components/persona-picker.js'
@@ -22,6 +22,57 @@ function isAllowedRelayUrl(url: string): boolean {
     } catch { return false }
   }
   return false
+}
+
+type GroupRelayMode = 'off' | 'read' | 'readwrite'
+
+function cleanRelayList(urls: readonly string[] | undefined): string[] {
+  return dedupeRelays((urls ?? []).filter(isAllowedRelayUrl))
+}
+
+function knownGroupRelays(group: Pick<AppGroup, 'knownRelays' | 'relays' | 'readRelays' | 'writeRelays'>): string[] {
+  return dedupeRelays([
+    ...cleanRelayList(group.knownRelays),
+    ...cleanRelayList(group.relays),
+    ...cleanRelayList(group.readRelays),
+    ...cleanRelayList(group.writeRelays),
+  ])
+}
+
+function groupRelayMode(group: Pick<AppGroup, 'readRelays' | 'writeRelays'>, url: string): GroupRelayMode {
+  const read = cleanRelayList(group.readRelays).includes(url)
+  const write = cleanRelayList(group.writeRelays).includes(url)
+  if (read && write) return 'readwrite'
+  if (read) return 'read'
+  return 'off'
+}
+
+function shortRelayUrl(url: string): string {
+  return url.replace(/^wss?:\/\//, '').replace(/\/$/, '')
+}
+
+function renderGroupRelayRows(group: AppGroup): string {
+  const relays = knownGroupRelays(group)
+  if (relays.length === 0) {
+    return '<li class="login-relay-empty">No relays configured.</li>'
+  }
+
+  return relays.map((url) => {
+    const mode = groupRelayMode(group, url)
+    const enabled = mode !== 'off'
+    const selectValue = mode === 'read' ? 'read' : 'readwrite'
+    return `
+      <li class="login-relay-item" data-group-relay-row="${escapeHtml(url)}">
+        <button class="login-relay-toggle" data-group-relay-toggle="${escapeHtml(url)}" type="button" aria-pressed="${enabled}">${enabled ? 'On' : 'Off'}</button>
+        <span class="login-relay-url" title="${escapeHtml(url)}">${escapeHtml(shortRelayUrl(url))}</span>
+        <select class="input login-relay-mode" data-group-relay-mode="${escapeHtml(url)}" aria-label="Relay mode for ${escapeHtml(shortRelayUrl(url))}" ${enabled ? '' : 'disabled'}>
+          <option value="readwrite"${selectValue === 'readwrite' ? ' selected' : ''}>Read/write</option>
+          <option value="read"${selectValue === 'read' ? ' selected' : ''}>Read</option>
+        </select>
+        <button class="btn btn--ghost btn--sm login-relay-delete" data-group-relay-delete="${escapeHtml(url)}" type="button" aria-label="Delete relay">×</button>
+      </li>
+    `
+  }).join('')
 }
 
 // ── Drawer state persistence across re-renders ─────────────────
@@ -146,48 +197,24 @@ export function renderSettings(container: HTMLElement): void {
               <span class="settings-hint">Loading identity…</span>
             </div>
 
-            <!-- Write relays (publishing) -->
+            <!-- Relay policy -->
             <div class="nostr-relays">
-              <span class="input-label">Write Relays <span class="settings-hint" style="font-weight:normal;">(publishing)</span></span>
-              <ul class="relay-list" id="write-relay-list">
-                ${(group.writeRelays ?? []).map((url, i) => `
-                  <li class="relay-item">
-                    <span class="relay-url">${escapeHtml(url)}</span>
-                    <button class="btn btn--ghost btn--sm write-relay-remove" data-relay-index="${i}" aria-label="Remove write relay">✕</button>
-                  </li>
-                `).join('')}
+              <span class="input-label">Relays</span>
+              <p class="settings-hint" style="margin: 0.25rem 0 0.5rem 0;">Choose which relays this group reads from and writes to.</p>
+              <ul class="login-relay-list" id="group-relay-list">
+                ${renderGroupRelayRows(group)}
               </ul>
-              <div class="relay-add-row">
+              <div class="login-relay-add">
                 <input
-                  class="input relay-add-input"
-                  id="write-relay-add-input"
+                  class="input login-relay-add__input"
+                  id="group-relay-add-input"
                   type="url"
                   placeholder="wss://relay.example.com"
                 >
-                <button class="btn btn--ghost btn--sm" id="write-relay-add-btn">Add</button>
+                <button class="btn btn--ghost btn--sm" id="group-relay-add-btn">Add</button>
+                <button class="btn btn--ghost btn--sm" id="group-relay-reset-btn">Reset</button>
               </div>
-            </div>
-
-            <!-- Read relays (subscriptions/discovery) -->
-            <div class="nostr-relays" style="margin-top: 0.5rem;">
-              <span class="input-label">Read Relays <span class="settings-hint" style="font-weight:normal;">(subscriptions)</span></span>
-              <ul class="relay-list" id="read-relay-list">
-                ${(group.readRelays ?? []).map((url, i) => `
-                  <li class="relay-item">
-                    <span class="relay-url">${escapeHtml(url)}</span>
-                    <button class="btn btn--ghost btn--sm read-relay-remove" data-relay-index="${i}" aria-label="Remove read relay">✕</button>
-                  </li>
-                `).join('')}
-              </ul>
-              <div class="relay-add-row">
-                <input
-                  class="input relay-add-input"
-                  id="read-relay-add-input"
-                  type="url"
-                  placeholder="wss://relay.example.com"
-                >
-                <button class="btn btn--ghost btn--sm" id="read-relay-add-btn">Add</button>
-              </div>
+              <p class="settings-hint login-status-text" id="group-relay-status"></p>
             </div>
 
             <!-- Connection status -->
@@ -314,66 +341,113 @@ export function renderSettings(container: HTMLElement): void {
     }
   }
 
-  // Remove a write relay by index.
-  container.querySelectorAll<HTMLButtonElement>('.write-relay-remove').forEach(btn => {
+  function setGroupRelayMode(url: string, mode: GroupRelayMode): void {
+    const normalised = dedupeRelays([url])[0] ?? url
+    const current = getState().groups[activeGroupId!]
+    if (!current) return
+
+    const readRelays = cleanRelayList(current.readRelays).filter((relay) => relay !== normalised)
+    const writeRelays = cleanRelayList(current.writeRelays).filter((relay) => relay !== normalised)
+
+    if (mode === 'read' || mode === 'readwrite') {
+      readRelays.push(normalised)
+    }
+    if (mode === 'readwrite') {
+      writeRelays.push(normalised)
+    }
+
+    const nextWriteRelays = dedupeRelays(writeRelays)
+    updateGroup(activeGroupId!, {
+      knownRelays: dedupeRelays([...knownGroupRelays(current), normalised]),
+      relays: nextWriteRelays,
+      readRelays: dedupeRelays(readRelays),
+      writeRelays: nextWriteRelays,
+    })
+    reconnectIfNeeded()
+  }
+
+  function deleteGroupRelay(url: string): void {
+    const current = getState().groups[activeGroupId!]
+    if (!current) return
+
+    const knownRelays = knownGroupRelays(current).filter((relay) => relay !== url)
+    const readRelays = cleanRelayList(current.readRelays).filter((relay) => relay !== url)
+    const writeRelays = cleanRelayList(current.writeRelays).filter((relay) => relay !== url)
+
+    updateGroup(activeGroupId!, {
+      knownRelays,
+      relays: writeRelays,
+      readRelays,
+      writeRelays,
+    })
+    reconnectIfNeeded()
+  }
+
+  function resetGroupRelays(): void {
+    const { settings } = getState()
+    const readRelays = cleanRelayList(settings.defaultReadRelays ?? settings.defaultRelays)
+    const writeRelays = cleanRelayList(settings.defaultWriteRelays ?? settings.defaultRelays)
+    updateGroup(activeGroupId!, {
+      knownRelays: dedupeRelays([
+        ...cleanRelayList(settings.knownRelays),
+        ...readRelays,
+        ...writeRelays,
+      ]),
+      relays: writeRelays,
+      readRelays,
+      writeRelays,
+    })
+    reconnectIfNeeded()
+  }
+
+  container.querySelectorAll<HTMLButtonElement>('[data-group-relay-toggle]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const idx = Number(btn.dataset.relayIndex)
-      const writeRelays = [...(getState().groups[activeGroupId!]?.writeRelays ?? [])]
-      writeRelays.splice(idx, 1)
-      updateGroup(activeGroupId!, { writeRelays })
-      reconnectIfNeeded()
+      const url = btn.dataset.groupRelayToggle
+      if (!url) return
+      const current = getState().groups[activeGroupId!]
+      if (!current) return
+      const nextMode: GroupRelayMode = groupRelayMode(current, url) === 'off' ? 'readwrite' : 'off'
+      setGroupRelayMode(url, nextMode)
+      showToast(`${shortRelayUrl(url)} ${nextMode === 'off' ? 'disabled' : 'enabled'}.`, 'info')
     })
   })
 
-  // Remove a read relay by index.
-  container.querySelectorAll<HTMLButtonElement>('.read-relay-remove').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = Number(btn.dataset.relayIndex)
-      const readRelays = [...(getState().groups[activeGroupId!]?.readRelays ?? [])]
-      readRelays.splice(idx, 1)
-      updateGroup(activeGroupId!, { readRelays })
-      reconnectIfNeeded()
+  container.querySelectorAll<HTMLSelectElement>('[data-group-relay-mode]').forEach(select => {
+    select.addEventListener('change', () => {
+      const url = select.dataset.groupRelayMode
+      if (!url) return
+      const mode = select.value === 'read' ? 'read' : 'readwrite'
+      setGroupRelayMode(url, mode)
+      showToast(`${shortRelayUrl(url)} set to ${mode === 'read' ? 'read only' : 'read/write'}.`, 'info')
     })
   })
 
-  // Add a write relay.
-  document.getElementById('write-relay-add-btn')!.addEventListener('click', () => {
-    const input = document.getElementById('write-relay-add-input') as HTMLInputElement
-    const url = input.value.trim()
-    if (!isAllowedRelayUrl(url)) { input.focus(); return }
-    const writeRelays = [...(getState().groups[activeGroupId!]?.writeRelays ?? [])]
-    if (!writeRelays.includes(url)) {
-      writeRelays.push(url)
-      updateGroup(activeGroupId!, { writeRelays })
-      input.value = ''
-      reconnectIfNeeded()
-    } else {
-      input.value = ''
-    }
+  container.querySelectorAll<HTMLButtonElement>('[data-group-relay-delete]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const url = btn.dataset.groupRelayDelete
+      if (!url) return
+      deleteGroupRelay(url)
+      showToast(`${shortRelayUrl(url)} deleted.`, 'info')
+    })
   })
 
-  // Add a read relay.
-  document.getElementById('read-relay-add-btn')!.addEventListener('click', () => {
-    const input = document.getElementById('read-relay-add-input') as HTMLInputElement
-    const url = input.value.trim()
-    if (!isAllowedRelayUrl(url)) { input.focus(); return }
-    const readRelays = [...(getState().groups[activeGroupId!]?.readRelays ?? [])]
-    if (!readRelays.includes(url)) {
-      readRelays.push(url)
-      updateGroup(activeGroupId!, { readRelays })
-      input.value = ''
-      reconnectIfNeeded()
-    } else {
-      input.value = ''
-    }
+  document.getElementById('group-relay-add-btn')?.addEventListener('click', () => {
+    const input = document.getElementById('group-relay-add-input') as HTMLInputElement | null
+    const rawUrl = input?.value.trim()
+    const url = rawUrl ? dedupeRelays([rawUrl])[0] ?? rawUrl : ''
+    if (!url || !isAllowedRelayUrl(url)) { input?.focus(); return }
+    setGroupRelayMode(url, 'readwrite')
+    if (input) input.value = ''
+    showToast(`${shortRelayUrl(url)} added.`, 'info')
   })
 
-  // Allow adding via Enter key.
-  document.getElementById('write-relay-add-input')!.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('write-relay-add-btn')!.click()
+  document.getElementById('group-relay-reset-btn')?.addEventListener('click', () => {
+    resetGroupRelays()
+    showToast('Group relays reset to defaults.', 'info')
   })
-  document.getElementById('read-relay-add-input')!.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('read-relay-add-btn')!.click()
+
+  document.getElementById('group-relay-add-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('group-relay-add-btn')?.click()
   })
 
   // ── Populate Nostr identity on load ──────────────────────────

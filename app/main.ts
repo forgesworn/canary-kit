@@ -37,8 +37,6 @@ import { showCallVerify } from './components/call-verify.js'
 import { assertRemoteInviteToken, decodeWelcomePayload, decryptWelcomeEnvelope } from './crypto/remote-invite.js'
 import { sendJoinRequest, fetchInviteToken } from './nostr/invite-relay.js'
 import { resolveSigner } from './nostr/signer.js'
-import { decode as nip19decode } from 'nostr-tools/nip19'
-import { getPublicKey } from 'nostr-tools/pure'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
 import { fetchVault, fetchVaultNip07, publishVault, publishVaultNip07, mergeVaultGroups, subscribeToVault, unsubscribeFromVault } from './nostr/vault.js'
 import { initPersonas, initPersonasFromTree, destroyPersonas } from './persona.js'
@@ -70,6 +68,114 @@ function preserveMnemonic(nextIdentity: AppIdentity, previousIdentity: AppIdenti
     return { ...nextIdentity, mnemonic: previousIdentity.mnemonic }
   }
   return nextIdentity
+}
+
+type LoginRelayMode = 'off' | 'read' | 'readwrite'
+
+const BUNDLED_LOGIN_RELAYS = dedupeRelays([DEFAULT_WRITE_RELAY, ...WELL_KNOWN_READ_RELAYS])
+
+function cleanRelaySettingsList(urls: readonly string[] | undefined): string[] {
+  return dedupeRelays((urls ?? []).filter(isAllowedRelayUrl))
+}
+
+function knownLoginRelays(settings = getState().settings): string[] {
+  const known = settings.knownRelays === undefined ? BUNDLED_LOGIN_RELAYS : settings.knownRelays
+  return dedupeRelays([
+    ...cleanRelaySettingsList(known),
+    ...cleanRelaySettingsList(settings.defaultRelays),
+    ...cleanRelaySettingsList(settings.defaultReadRelays),
+    ...cleanRelaySettingsList(settings.defaultWriteRelays),
+  ])
+}
+
+function relayMode(url: string, settings = getState().settings): LoginRelayMode {
+  const read = cleanRelaySettingsList(settings.defaultReadRelays).includes(url)
+  const write = cleanRelaySettingsList(settings.defaultWriteRelays).includes(url)
+  if (read && write) return 'readwrite'
+  if (read) return 'read'
+  return 'off'
+}
+
+function setLoginRelayMode(url: string, mode: LoginRelayMode): void {
+  const normalised = dedupeRelays([url])[0] ?? url
+  const settings = getState().settings
+  const knownRelays = dedupeRelays([...knownLoginRelays(settings), normalised])
+  const readRelays = cleanRelaySettingsList(settings.defaultReadRelays).filter((relay) => relay !== normalised)
+  const writeRelays = cleanRelaySettingsList(settings.defaultWriteRelays).filter((relay) => relay !== normalised)
+
+  if (mode === 'read' || mode === 'readwrite') {
+    readRelays.push(normalised)
+  }
+  if (mode === 'readwrite') {
+    writeRelays.push(normalised)
+  }
+
+  const nextWriteRelays = dedupeRelays(writeRelays)
+  update({
+    settings: {
+      ...settings,
+      knownRelays,
+      defaultRelays: nextWriteRelays,
+      defaultReadRelays: dedupeRelays(readRelays),
+      defaultWriteRelays: nextWriteRelays,
+    },
+  })
+}
+
+function deleteLoginRelay(url: string): void {
+  const settings = getState().settings
+  const knownRelays = knownLoginRelays(settings).filter((relay) => relay !== url)
+  const defaultReadRelays = cleanRelaySettingsList(settings.defaultReadRelays).filter((relay) => relay !== url)
+  const defaultWriteRelays = cleanRelaySettingsList(settings.defaultWriteRelays).filter((relay) => relay !== url)
+  update({
+    settings: {
+      ...settings,
+      knownRelays,
+      defaultRelays: defaultWriteRelays,
+      defaultReadRelays,
+      defaultWriteRelays,
+    },
+  })
+}
+
+function resetLoginRelays(): void {
+  update({
+    settings: {
+      ...getState().settings,
+      knownRelays: BUNDLED_LOGIN_RELAYS,
+      defaultRelays: [DEFAULT_WRITE_RELAY],
+      defaultReadRelays: dedupeRelays([...WELL_KNOWN_READ_RELAYS, DEFAULT_WRITE_RELAY]),
+      defaultWriteRelays: [DEFAULT_WRITE_RELAY],
+    },
+  })
+}
+
+function shortRelayUrl(url: string): string {
+  return url.replace(/^wss?:\/\//, '').replace(/\/$/, '')
+}
+
+function renderLoginRelayRows(): string {
+  const relays = knownLoginRelays()
+  if (relays.length === 0) {
+    return '<li class="login-relay-empty">No relays configured.</li>'
+  }
+
+  return relays.map((url) => {
+    const mode = relayMode(url)
+    const enabled = mode !== 'off'
+    const selectValue = mode === 'read' ? 'read' : 'readwrite'
+    return `
+      <li class="login-relay-item" data-relay-row="${escapeHtml(url)}">
+        <button class="login-relay-toggle" data-relay-toggle="${escapeHtml(url)}" type="button" aria-pressed="${enabled}">${enabled ? 'On' : 'Off'}</button>
+        <span class="login-relay-url" title="${escapeHtml(url)}">${escapeHtml(shortRelayUrl(url))}</span>
+        <select class="input login-relay-mode" data-relay-mode="${escapeHtml(url)}" aria-label="Relay mode for ${escapeHtml(shortRelayUrl(url))}" ${enabled ? '' : 'disabled'}>
+          <option value="readwrite"${selectValue === 'readwrite' ? ' selected' : ''}>Read/write</option>
+          <option value="read"${selectValue === 'read' ? ' selected' : ''}>Read</option>
+        </select>
+        <button class="btn btn--ghost btn--sm login-relay-delete" data-relay-delete="${escapeHtml(url)}" type="button" aria-label="Delete relay">×</button>
+      </li>
+    `
+  }).join('')
 }
 
 function staleGroupStateError(
@@ -1736,76 +1842,73 @@ function showLoginScreen(): void {
       <h1 class="lock-screen__brand">CANARY</h1>
       <p class="lock-screen__hint">Deepfake-proof identity verification</p>
 
-      <div style="width: 100%; max-width: 360px; margin-top: 1.5rem;">
+      <div class="login-panel">
 
-        <div style="background: var(--bg-raised); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem;">
-          <p class="input-label__text" style="margin-bottom: 0.5rem;">Quick Start</p>
-          <p class="settings-hint" style="margin-bottom: 0.5rem;">No Nostr account needed. Enter your name to get started.</p>
-          <form id="offline-form" autocomplete="off" style="display: flex; gap: 0.375rem;">
-            <input class="input" type="text" id="offline-name" placeholder="Enter your name" required style="flex: 1; font-size: 0.875rem; padding: 0.5rem;" />
-            <button class="btn btn--primary" type="submit">Go</button>
-          </form>
-        </div>
+        <div class="login-options">
+          <section class="login-card login-card--featured">
+            <div>
+              <p class="input-label__text">Connect with Nostr</p>
+              <p class="settings-hint">Sync groups across devices via relays.</p>
+            </div>
+            <button class="btn btn--primary login-card__action" id="login-signet" type="button">Sign in with Signet</button>
+          </section>
 
-        <div style="background: var(--bg-raised); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; margin-bottom: 1rem;">
-          <p class="input-label__text" style="margin-bottom: 0.5rem;">Recover Account</p>
-
-          <div style="display: flex; gap: 0; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border);">
-            <button id="tab-recovery-phrase" type="button" class="btn btn--ghost btn--sm" style="border-bottom: 2px solid var(--accent); border-radius: 0; padding: 0.375rem 0.75rem; font-size: 0.75rem; opacity: 1;">Recovery Phrase</button>
-            <button id="tab-shamir-shares" type="button" class="btn btn--ghost btn--sm" style="border-bottom: 2px solid transparent; border-radius: 0; padding: 0.375rem 0.75rem; font-size: 0.75rem; opacity: 0.6;">Shamir Shares</button>
-          </div>
-
-          <div id="panel-recovery-phrase">
-            <p class="settings-hint" style="margin-bottom: 0.5rem;">Paste your 12-word recovery phrase to restore your account.</p>
-            <form id="mnemonic-login-form" autocomplete="off" style="display: flex; flex-direction: column; gap: 0.375rem;">
-              <textarea class="input" id="login-mnemonic" placeholder="Enter your 12 recovery words..." rows="3" style="width: 100%; font-size: 0.8rem; resize: none; padding: 0.5rem; font-family: var(--font-mono, monospace);"></textarea>
-              <button class="btn btn--primary" type="submit">Recover account</button>
+          <section class="login-card">
+            <div>
+              <p class="input-label__text">Quick Start</p>
+              <p class="settings-hint">No Nostr account needed. Enter your name to get started.</p>
+            </div>
+            <form id="offline-form" class="login-inline-form" autocomplete="off">
+              <input class="input login-inline-form__input" type="text" id="offline-name" placeholder="Enter your name" required />
+              <button class="btn btn--primary" type="submit">Start</button>
             </form>
-          </div>
-
-          <div id="panel-shamir-shares" style="display: none;">
-            <p class="settings-hint" style="margin-bottom: 0.5rem;">Paste Shamir shares one at a time to reconstruct your recovery phrase.</p>
-            <div style="display: flex; flex-direction: column; gap: 0.375rem;">
-              <textarea class="input" id="shamir-share-input" placeholder="Paste a Shamir share (word list)..." rows="3" style="width: 100%; font-size: 0.8rem; resize: none; padding: 0.5rem; font-family: var(--font-mono, monospace);"></textarea>
-              <button class="btn btn--primary" id="shamir-add-share" type="button">Add share</button>
-              <p class="settings-hint" id="shamir-status" style="margin: 0; font-size: 0.75rem;"></p>
-              <ul id="shamir-share-list" style="list-style: none; padding: 0; margin: 0;"></ul>
-              <button class="btn btn--primary" id="shamir-recover" type="button" disabled style="margin-top: 0.25rem;">Recover</button>
-            </div>
-          </div>
+          </section>
         </div>
 
-        <div style="background: var(--bg-raised); border: 1px solid var(--border); border-radius: 6px; padding: 1rem;">
-          <p class="input-label__text" style="margin-bottom: 0.5rem;">Connect with Nostr</p>
-          <p class="settings-hint" style="margin-bottom: 0.5rem;">Sync groups across devices via relays.</p>
+        <details class="login-card login-details">
+          <summary class="login-details__summary">Recover Account</summary>
+          <div class="login-details__body">
+            <div class="login-tabs">
+              <button id="tab-recovery-phrase" type="button" class="btn btn--ghost btn--sm login-tabs__btn login-tabs__btn--active">Recovery Phrase</button>
+              <button id="tab-shamir-shares" type="button" class="btn btn--ghost btn--sm login-tabs__btn">Shamir Shares</button>
+            </div>
 
-          <form id="nsec-login-form" autocomplete="off" style="display: flex; flex-direction: column; gap: 0.375rem;">
-            <input class="input" type="password" id="login-nsec" placeholder="nsec1..." autocomplete="off" style="width: 100%; font-size: 0.875rem; padding: 0.5rem;" />
-            <button class="btn btn--primary" type="submit">Login with nsec</button>
-          </form>
+            <div id="panel-recovery-phrase">
+              <p class="settings-hint">Paste your 12-word recovery phrase to restore your account.</p>
+              <form id="mnemonic-login-form" class="login-stack-form" autocomplete="off">
+                <textarea class="input login-secret-input" id="login-mnemonic" placeholder="Enter your 12 recovery words..." rows="3"></textarea>
+                <button class="btn btn--primary" type="submit">Recover account</button>
+              </form>
+            </div>
 
-          <button class="btn" id="login-signet" type="button" style="width: 100%; margin-top: 0.5rem;">Sign in with Signet</button>
-
-          <details style="margin-top: 0.75rem;">
-            <summary class="settings-hint" style="cursor: pointer; user-select: none;">Relays</summary>
-            <div style="margin-top: 0.375rem;">
-              <p class="settings-hint" style="font-size: 0.7rem; margin: 0 0 0.25rem 0;">Write relay (publishing)</p>
-              <ul id="login-relay-list" style="list-style: none; padding: 0; margin: 0 0 0.375rem 0;">
-                ${(getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays).map((url, i) => `
-                  <li style="display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.25rem;">
-                    <span class="settings-hint" style="flex: 1; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0;">${escapeHtml(url)}</span>
-                    <button class="btn btn--ghost btn--sm login-relay-remove" data-relay-index="${i}" type="button" style="padding: 0 0.25rem; font-size: 0.7rem;">✕</button>
-                  </li>
-                `).join('')}
-              </ul>
-              <div style="display: flex; gap: 0.25rem;">
-                <input class="input" type="url" id="login-relay-input" placeholder="wss://relay.example.com" style="flex: 1; font-size: 0.75rem; padding: 0.375rem;" />
-                <button class="btn btn--ghost btn--sm" id="login-relay-add" type="button">Add</button>
+            <div id="panel-shamir-shares" style="display: none;">
+              <p class="settings-hint">Paste Shamir shares one at a time to reconstruct your recovery phrase.</p>
+              <div class="login-stack-form">
+                <textarea class="input login-secret-input" id="shamir-share-input" placeholder="Paste a Shamir share (word list)..." rows="3"></textarea>
+                <button class="btn btn--primary" id="shamir-add-share" type="button">Add share</button>
+                <p class="settings-hint login-status-text" id="shamir-status"></p>
+                <ul id="shamir-share-list" class="login-share-list"></ul>
+                <button class="btn btn--primary" id="shamir-recover" type="button" disabled>Recover</button>
               </div>
-              <p class="settings-hint" style="font-size: 0.7rem; margin: 0.5rem 0 0 0;">Read relays: ${WELL_KNOWN_READ_RELAYS.map(r => escapeHtml(r.replace('wss://', ''))).join(', ')} + write relay(s)</p>
             </div>
-          </details>
-        </div>
+          </div>
+        </details>
+
+        <details class="login-card login-details">
+          <summary class="login-details__summary">Relays</summary>
+          <div class="login-details__body">
+            <p class="settings-hint login-relay-label">Choose which relays CANARY reads from and writes to.</p>
+            <ul id="login-relay-list" class="login-relay-list">
+              ${renderLoginRelayRows()}
+            </ul>
+            <div class="login-relay-add">
+              <input class="input login-relay-add__input" type="url" id="login-relay-input" placeholder="wss://relay.example.com" />
+              <button class="btn btn--ghost btn--sm" id="login-relay-add" type="button">Add</button>
+              <button class="btn btn--ghost btn--sm" id="login-relay-reset" type="button">Reset</button>
+            </div>
+            <p class="settings-hint login-status-text" id="login-relay-status"></p>
+          </div>
+        </details>
 
       </div>
     </div>
@@ -1890,19 +1993,15 @@ function showLoginScreen(): void {
   tabPhrase.addEventListener('click', () => {
     panelPhrase.style.display = ''
     panelShamir.style.display = 'none'
-    tabPhrase.style.borderBottomColor = 'var(--accent)'
-    tabPhrase.style.opacity = '1'
-    tabShamir.style.borderBottomColor = 'transparent'
-    tabShamir.style.opacity = '0.6'
+    tabPhrase.classList.add('login-tabs__btn--active')
+    tabShamir.classList.remove('login-tabs__btn--active')
   })
 
   tabShamir.addEventListener('click', () => {
     panelPhrase.style.display = 'none'
     panelShamir.style.display = ''
-    tabShamir.style.borderBottomColor = 'var(--accent)'
-    tabShamir.style.opacity = '1'
-    tabPhrase.style.borderBottomColor = 'transparent'
-    tabPhrase.style.opacity = '0.6'
+    tabShamir.classList.add('login-tabs__btn--active')
+    tabPhrase.classList.remove('login-tabs__btn--active')
   })
 
   // ── Shamir share recovery ───
@@ -1999,24 +2098,6 @@ function showLoginScreen(): void {
     }
   })
 
-  // nsec form submit
-  app.querySelector<HTMLFormElement>('#nsec-login-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const input = app.querySelector<HTMLInputElement>('#login-nsec')
-    const nsec = input?.value.trim()
-    if (!nsec) return
-    try {
-      const currentIdentity = getState().identity
-      const decoded = nip19decode(nsec)
-      if (decoded.type !== 'nsec') { alert('Not a valid nsec.'); return }
-      const privkeyBytes = decoded.data as Uint8Array
-      const privkey = bytesToHex(privkeyBytes)
-      const pubkey = getPublicKey(privkeyBytes)
-      update({ identity: preserveMnemonic({ pubkey, privkey, signerType: 'local', displayName: 'You' }, currentIdentity) })
-      await bootApp()
-    } catch (err) { alert(err instanceof Error ? err.message : 'Invalid nsec format.') }
-  })
-
   // Signet login
   app.querySelector('#login-signet')?.addEventListener('click', async () => {
     try {
@@ -2031,45 +2112,70 @@ function showLoginScreen(): void {
     } catch (err) { alert(err instanceof Error ? err.message : 'Signet rejected the request.') }
   })
 
-  // ── Relay list editor on login screen (manages defaultWriteRelays) ───
+  // ── Relay list editor on login screen ───
   function rerenderRelayList(): void {
     const list = app.querySelector<HTMLUListElement>('#login-relay-list')
     if (!list) return
-    const relays = getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays
-    list.innerHTML = relays.map((url, i) => `
-      <li style="display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.25rem;">
-        <span class="settings-hint" style="flex: 1; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0;">${escapeHtml(url)}</span>
-        <button class="btn btn--ghost btn--sm login-relay-remove" data-relay-index="${i}" type="button" style="padding: 0 0.25rem; font-size: 0.7rem;">✕</button>
-      </li>
-    `).join('')
-    wireRelayRemoveButtons()
+    list.innerHTML = renderLoginRelayRows()
+    wireRelayControls()
   }
 
-  function wireRelayRemoveButtons(): void {
-    app.querySelectorAll<HTMLButtonElement>('.login-relay-remove').forEach(btn => {
+  function setRelayStatus(message: string): void {
+    const status = app.querySelector<HTMLParagraphElement>('#login-relay-status')
+    if (status) status.textContent = message
+  }
+
+  function wireRelayControls(): void {
+    app.querySelectorAll<HTMLButtonElement>('[data-relay-toggle]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const idx = Number(btn.dataset.relayIndex)
-        const writeRelays = [...(getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays)]
-        writeRelays.splice(idx, 1)
-        update({ settings: { ...getState().settings, defaultWriteRelays: writeRelays, defaultRelays: writeRelays } })
+        const url = btn.dataset.relayToggle
+        if (!url) return
+        const nextMode: LoginRelayMode = relayMode(url) === 'off' ? 'readwrite' : 'off'
+        setLoginRelayMode(url, nextMode)
+        setRelayStatus(nextMode === 'off' ? `Disabled ${shortRelayUrl(url)}.` : `Enabled ${shortRelayUrl(url)}.`)
+        rerenderRelayList()
+      })
+    })
+
+    app.querySelectorAll<HTMLSelectElement>('[data-relay-mode]').forEach(select => {
+      select.addEventListener('change', () => {
+        const url = select.dataset.relayMode
+        if (!url) return
+        const mode = select.value === 'read' ? 'read' : 'readwrite'
+        setLoginRelayMode(url, mode)
+        setRelayStatus(`${shortRelayUrl(url)} set to ${mode === 'read' ? 'read only' : 'read/write'}.`)
+        rerenderRelayList()
+      })
+    })
+
+    app.querySelectorAll<HTMLButtonElement>('[data-relay-delete]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const url = btn.dataset.relayDelete
+        if (!url) return
+        deleteLoginRelay(url)
+        setRelayStatus(`Deleted ${shortRelayUrl(url)}.`)
         rerenderRelayList()
       })
     })
   }
 
-  wireRelayRemoveButtons()
+  wireRelayControls()
 
   app.querySelector('#login-relay-add')?.addEventListener('click', () => {
     const input = app.querySelector<HTMLInputElement>('#login-relay-input')
-    const url = input?.value.trim()
+    const rawUrl = input?.value.trim()
+    const url = rawUrl ? dedupeRelays([rawUrl])[0] ?? rawUrl : ''
     if (!url || !isAllowedRelayUrl(url)) return
-    const writeRelays = [...(getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays)]
-    if (!writeRelays.includes(url)) {
-      writeRelays.push(url)
-      update({ settings: { ...getState().settings, defaultWriteRelays: writeRelays, defaultRelays: writeRelays } })
-      rerenderRelayList()
-    }
+    setLoginRelayMode(url, 'readwrite')
+    setRelayStatus(`Added ${shortRelayUrl(url)}.`)
+    rerenderRelayList()
     if (input) input.value = ''
+  })
+
+  app.querySelector('#login-relay-reset')?.addEventListener('click', () => {
+    resetLoginRelays()
+    setRelayStatus('Restored bundled relays.')
+    rerenderRelayList()
   })
 
   app.querySelector('#login-relay-input')?.addEventListener('keydown', (e) => {

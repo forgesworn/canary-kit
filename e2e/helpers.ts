@@ -1,5 +1,7 @@
 // e2e/helpers.ts — Reusable test actions for CANARY demo app
 import { type Page, expect } from '@playwright/test'
+import { decode as nip19decode } from 'nostr-tools/nip19'
+import { getPublicKey } from 'nostr-tools/pure'
 
 // ── Login flows ──────────────────────────────────────────────
 
@@ -13,9 +15,58 @@ export async function loginOffline(page: Page, name: string): Promise<void> {
 
 /** Login with an nsec key. */
 export async function loginWithNsec(page: Page, nsec: string): Promise<void> {
-  await page.fill('#login-nsec', nsec)
-  await page.click('#nsec-login-form button[type="submit"]')
+  const decoded = nip19decode(nsec)
+  if (decoded.type !== 'nsec') throw new Error('Expected an nsec private key')
+  const privkeyBytes = decoded.data
+  const privkey = bytesToHex(privkeyBytes)
+  const pubkey = getPublicKey(privkeyBytes)
+
+  await page.addInitScript(({ pubkey, privkey }) => {
+    const bundledWriteRelay = 'wss://relay.trotters.cc'
+    const bundledReadRelays = [
+      'wss://nos.lol',
+      'wss://relay.damus.io',
+      'wss://relay.nostr.band',
+      'wss://relay.primal.net',
+      'wss://relay.ditto.pub',
+    ]
+    const rawSettings = localStorage.getItem('canary:settings')
+    const settings = rawSettings ? JSON.parse(rawSettings) : {}
+    const existingWriteRelays = Array.isArray(settings.defaultWriteRelays)
+      ? settings.defaultWriteRelays
+      : Array.isArray(settings.defaultRelays)
+        ? settings.defaultRelays
+        : []
+    const writeRelays = existingWriteRelays.length > 0 ? existingWriteRelays : [bundledWriteRelay]
+    const existingReadRelays = Array.isArray(settings.defaultReadRelays) ? settings.defaultReadRelays : []
+    const readRelays = existingReadRelays.length > 0
+      ? existingReadRelays
+      : [...bundledReadRelays, ...writeRelays]
+    const knownRelays = Array.isArray(settings.knownRelays) && settings.knownRelays.length > 0
+      ? settings.knownRelays
+      : [...readRelays, ...writeRelays]
+    localStorage.setItem('canary:identity', JSON.stringify({
+      pubkey,
+      privkey,
+      signerType: 'local',
+      displayName: 'You',
+    }))
+    localStorage.setItem('canary:settings', JSON.stringify({
+      ...settings,
+      knownRelays,
+      defaultRelays: writeRelays,
+      defaultReadRelays: readRelays,
+      defaultWriteRelays: writeRelays,
+    }))
+  }, { pubkey, privkey })
+
+  await page.reload()
   await page.waitForSelector('#sidebar', { timeout: 5000 })
+  await dismissNsecBackup(page)
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 /** Login using a named demo account button. */
@@ -462,6 +513,7 @@ export async function seedRelayUrl(page: Page, relayUrl: string): Promise<void> 
   await page.addInitScript((url: string) => {
     const raw = localStorage.getItem('canary:settings')
     const settings = raw ? JSON.parse(raw) : {}
+    settings.knownRelays = [url]
     settings.defaultRelays = [url]
     settings.defaultReadRelays = [url]
     settings.defaultWriteRelays = [url]

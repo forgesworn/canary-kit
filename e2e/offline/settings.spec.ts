@@ -137,6 +137,35 @@ test.describe('Settings panel', () => {
     expect(word).toBeTruthy()
   })
 
+  test('group relay manager can disable, set read-only, add, and delete relays', async ({ cleanPage: page }) => {
+    await openSettings(page)
+
+    const writeRow = page.locator('.login-relay-item', { hasText: 'relay.trotters.cc' })
+    await expect(writeRow.locator('.login-relay-toggle')).toHaveText('On')
+    await expect(writeRow.locator('.login-relay-mode')).toHaveValue('readwrite')
+
+    await writeRow.locator('.login-relay-mode').selectOption('read')
+    await expect(writeRow.locator('.login-relay-mode')).toHaveValue('read')
+    await expect.poll(async () => {
+      const state = await getGroupState(page)
+      return {
+        read: (state.readRelays as string[]).some((url) => url.includes('relay.trotters.cc')),
+        write: (state.writeRelays as string[]).some((url) => url.includes('relay.trotters.cc')),
+      }
+    }).toEqual({ read: true, write: false })
+
+    await writeRow.locator('.login-relay-toggle').click()
+    await expect(writeRow.locator('.login-relay-toggle')).toHaveText('Off')
+
+    await page.fill('#group-relay-add-input', 'wss://relay.example.com')
+    await page.click('#group-relay-add-btn')
+    const customRow = page.locator('.login-relay-item', { hasText: 'relay.example.com' })
+    await expect(customRow).toBeVisible()
+    await expect(customRow.locator('.login-relay-mode')).toHaveValue('readwrite')
+    await customRow.locator('.login-relay-delete').click()
+    await expect(customRow).toHaveCount(0)
+  })
+
   test('settings drawer stays open after state change', async ({ cleanPage: page }) => {
     await openSettings(page)
     await expect(page.locator('#settings-body')).toBeVisible()

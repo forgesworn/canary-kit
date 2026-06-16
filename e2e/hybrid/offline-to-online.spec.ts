@@ -8,17 +8,18 @@ test.describe('Hybrid: offline to online', () => {
     mockRelay,
   }) => {
     await loginOffline(page, 'Alice')
-    await createGroup(page, 'Hybrid Group')
+    await createGroup(page, 'Hybrid Group', { mode: 'offline' })
 
-    // Beacon panel shows but with offline message (relay not connected)
-    await expect(page.locator('#beacon-container')).toContainText('Map unavailable', { timeout: 5000 })
+    // Beacon panel stays hidden until the group has relays.
+    await expect(page.locator('#beacon-container')).toBeHidden({ timeout: 5000 })
 
     // Add relay to the group's relays array and reload
     await page.addInitScript((relayUrl: string) => {
       const raw = localStorage.getItem('canary:groups')
       if (!raw) return
       const groups = JSON.parse(raw)
-      for (const g of Object.values(groups) as Array<{ relays?: string[]; readRelays?: string[]; writeRelays?: string[] }>) {
+      for (const g of Object.values(groups) as Array<{ relays?: string[]; readRelays?: string[]; writeRelays?: string[]; knownRelays?: string[] }>) {
+        g.knownRelays = [relayUrl]
         g.relays = [relayUrl]
         g.readRelays = [relayUrl]
         g.writeRelays = [relayUrl]

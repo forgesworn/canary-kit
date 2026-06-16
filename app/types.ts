@@ -4,9 +4,11 @@ import type { GroupState } from 'canary-kit'
 
 /** Well-known public relays used for reading (discovery, profiles, subscriptions). */
 export const WELL_KNOWN_READ_RELAYS: readonly string[] = [
-  'wss://relay.damus.io',
   'wss://nos.lol',
+  'wss://relay.damus.io',
   'wss://relay.nostr.band',
+  'wss://relay.primal.net',
+  'wss://relay.ditto.pub',
 ]
 
 /** The sole relay used for writing (publishing events). */
@@ -26,6 +28,8 @@ export interface AppGroup extends GroupState {
   readRelays: string[]
   /** Relay URLs used for writing (publishing events). Constrained to trusted relays. */
   writeRelays: string[]
+  /** Every relay shown in the group relay manager, including disabled entries. */
+  knownRelays?: string[]
   /** Preferred output encoding for token display. */
   encodingFormat: 'words' | 'pin' | 'hex'
   /** Nonces of invites that have already been consumed. */
@@ -143,6 +147,8 @@ export interface AppSettings {
   theme: 'dark' | 'light'
   pinEnabled: boolean
   autoLockMinutes: number
+  /** Every relay shown in the global relay manager, including disabled entries. */
+  knownRelays?: string[]
   /** @deprecated Use defaultReadRelays/defaultWriteRelays instead. Kept for migration. */
   defaultRelays: string[]
   /** Default read relay URLs for new online groups and profile discovery. */

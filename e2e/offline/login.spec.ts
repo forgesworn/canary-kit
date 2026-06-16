@@ -1,15 +1,15 @@
 // e2e/offline/login.spec.ts — Login screen tests
 import { test, expect } from '../fixtures.js'
-import { loginOffline, loginWithNsec } from '../helpers.js'
-
-// Demo account nsec for testing (Alice)
-const ALICE_NSEC = 'nsec1vuhg9nandn0kas2w9uuvztwyla2fp7enfzz0emt6ly4gs6p5q3mqc6c6w5'
+import { loginOffline } from '../helpers.js'
 
 test.describe('Login screen', () => {
   test('shows login screen with no prior state', async ({ cleanPage: page }) => {
     await expect(page.locator('.lock-screen')).toBeVisible()
-    await expect(page.locator('text=CANARY')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'CANARY' })).toBeVisible()
     await expect(page.locator('#offline-form')).toBeVisible()
+    await expect(page.locator('#login-signet')).toBeVisible()
+    await expect(page.locator('#login-nsec')).toHaveCount(0)
+    await expect(page.locator('#nsec-login-form')).toHaveCount(0)
   })
 
   test('offline start creates identity and shows main app', async ({ cleanPage: page }) => {
@@ -24,40 +24,26 @@ test.describe('Login screen', () => {
     await expect(page.locator('.identity-badge__name')).toHaveText('Alice')
   })
 
-  test('nsec login with valid key creates identity', async ({ cleanPage: page }) => {
-    await loginWithNsec(page, ALICE_NSEC)
-    await expect(page.locator('#sidebar')).toBeVisible()
-  })
+  test('relay manager can disable, set read-only, add, and delete relays', async ({ cleanPage: page }) => {
+    await page.locator('.login-details__summary', { hasText: 'Relays' }).click()
 
-  test('nsec login with invalid key shows error', async ({ cleanPage: page }) => {
-    // Capture the alert dialog message, accept it immediately to avoid blocking
-    let dialogMessage = ''
-    page.once('dialog', async (dialog) => {
-      dialogMessage = dialog.message()
-      await dialog.accept()
-    })
-    await page.fill('#login-nsec', 'not-a-real-nsec')
-    await page.click('#nsec-login-form button[type="submit"]')
-    // Wait for the dialog to appear and be handled
-    await page.waitForTimeout(500)
-    expect(dialogMessage).toBeTruthy()
-    // Login screen should still be visible
-    await expect(page.locator('.lock-screen')).toBeVisible()
-  })
+    const writeRow = page.locator('.login-relay-item', { hasText: 'relay.trotters.cc' })
+    await expect(writeRow.locator('.login-relay-toggle')).toHaveText('On')
+    await expect(writeRow.locator('.login-relay-mode')).toHaveValue('readwrite')
 
-  test('can retry login after invalid nsec error', async ({ cleanPage: page }) => {
-    // First attempt with invalid nsec — existing test verifies the alert appears
-    page.once('dialog', async dialog => await dialog.accept())
-    await page.fill('#login-nsec', 'not-a-real-nsec')
-    await page.click('#nsec-login-form button[type="submit"]')
-    await page.waitForTimeout(300)
+    await writeRow.locator('.login-relay-mode').selectOption('read')
+    await expect(writeRow.locator('.login-relay-mode')).toHaveValue('read')
 
-    // The login screen should still be visible (not crashed)
-    await expect(page.locator('.lock-screen')).toBeVisible()
+    await writeRow.locator('.login-relay-toggle').click()
+    await expect(writeRow.locator('.login-relay-toggle')).toHaveText('Off')
 
-    // Should be able to use offline login as fallback
-    await loginOffline(page, 'Fallback')
-    await expect(page.locator('#sidebar')).toBeVisible()
+    await page.fill('#login-relay-input', 'wss://relay.example.com')
+    await page.click('#login-relay-add')
+    const customRow = page.locator('.login-relay-item', { hasText: 'relay.example.com' })
+    await expect(customRow).toBeVisible()
+    await expect(customRow.locator('.login-relay-mode')).toHaveValue('readwrite')
+    await customRow.locator('.login-relay-delete').click()
+    await expect(customRow).toHaveCount(0)
   })
 
   test('preserves #inv/ hash through offline login flow', async ({ cleanPage: page }) => {

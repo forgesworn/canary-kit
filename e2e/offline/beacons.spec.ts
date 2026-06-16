@@ -3,11 +3,10 @@ import { test, expect } from '../fixtures.js'
 import { loginOffline, createGroup, switchGroup } from '../helpers.js'
 
 test.describe('Beacons panel', () => {
-  test('beacon panel shows "Map unavailable offline" without relay connection', async ({ cleanPage: page }) => {
+  test('beacon panel stays hidden for offline groups without relay connection', async ({ cleanPage: page }) => {
     await loginOffline(page, 'Tester')
     await createGroup(page, 'Offline Group', { mode: 'offline' })
-    // Beacon panel is always rendered but shows offline message when relay is unreachable
-    await expect(page.locator('#beacon-container')).toContainText('Map unavailable offline')
+    await expect(page.locator('#beacon-container')).toBeHidden()
   })
 
   test('beacon panel visible for online groups', async ({ cleanPage: page }) => {
