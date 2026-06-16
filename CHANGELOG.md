@@ -14,6 +14,14 @@
 
 # [2.7.0](https://github.com/forgesworn/canary-kit/compare/v2.6.2...v2.7.0) (2026-03-27)
 
+## 2.7.5 (2026-06-16)
+
+### Bug Fixes
+
+- use signet login for external signers
+
+
+
 ## 2.7.4 (2026-06-16)
 
 ### Bug Fixes
