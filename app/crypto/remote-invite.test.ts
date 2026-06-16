@@ -3,9 +3,11 @@
 
 import { describe, it, expect } from 'vitest'
 import { schnorr } from '@noble/curves/secp256k1.js'
+import { finalizeEvent } from 'nostr-tools/pure'
 import { bytesToHex, hexToBytes } from 'canary-kit/crypto'
 import {
   createRemoteInviteToken,
+  createRemoteInviteTokenWithNip07,
   assertRemoteInviteToken,
   createWelcomeEnvelope,
   decryptWelcomeEnvelope,
@@ -70,12 +72,25 @@ describe('createRemoteInviteToken', () => {
     expect(token.inviteId).toMatch(/^[0-9a-f]{32}$/)
 
     // No seed field
-    expect((token as Record<string, unknown>).seed).toBeUndefined()
+    expect((token as unknown as Record<string, unknown>).seed).toBeUndefined()
 
     // adminSig is 128-char hex (64 bytes)
     expect(token.adminSig).toMatch(/^[0-9a-f]{128}$/)
 
     // Should pass full validation
+    expect(() => assertRemoteInviteToken(token)).not.toThrow()
+  })
+
+  it('creates a valid seedless invite token with a NIP-07 signer', async () => {
+    const token = await createRemoteInviteTokenWithNip07({
+      groupName: 'Test Group',
+      groupId: 'test-group-1',
+      adminPubkey: ADMIN_PUBKEY,
+      relays: ['wss://relay.example.com'],
+      signEvent: async (template) => finalizeEvent(template, hexToBytes(ADMIN_PRIVKEY)),
+    })
+
+    expect(token.adminSig).toMatch(/^[0-9a-f]{128}$/)
     expect(() => assertRemoteInviteToken(token)).not.toThrow()
   })
 })

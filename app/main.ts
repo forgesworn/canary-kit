@@ -34,7 +34,7 @@ import { renderSettings } from './panels/settings.js'
 import { renderCallSimulation, destroyCallSimulation } from './views/call-simulation.js'
 import { renderIdentities } from './views/identities.js'
 import { showCallVerify } from './components/call-verify.js'
-import { assertRemoteInviteToken, decryptWelcomeEnvelope } from './crypto/remote-invite.js'
+import { assertRemoteInviteToken, decodeWelcomePayload, decryptWelcomeEnvelope } from './crypto/remote-invite.js'
 import { sendJoinRequest, fetchInviteToken } from './nostr/invite-relay.js'
 import { resolveSigner, hasNip07 } from './nostr/signer.js'
 import { decode as nip19decode } from 'nostr-tools/nip19'
@@ -758,20 +758,35 @@ function showBinaryJoinScreen(b64url: string): void {
 
 // ── Remote join screen (joiner side) ────────────────────────────
 
-function acceptWelcomeEnvelope(
+async function acceptWelcomeEnvelope(
   envelope: string,
   token: { adminPubkey: string; inviteId: string },
   dialog: HTMLDialogElement,
-): void {
+): Promise<void> {
   const { identity } = getState()
-  if (!identity?.pubkey || !identity?.privkey) return
+  if (!identity?.pubkey) return
 
-  const welcome = decryptWelcomeEnvelope({
-    envelope,
-    joinerPrivkey: identity.privkey,
-    adminPubkey: token.adminPubkey,
-    expectedInviteId: token.inviteId,
-  })
+  const welcome = identity.privkey
+    ? decryptWelcomeEnvelope({
+        envelope,
+        joinerPrivkey: identity.privkey,
+        adminPubkey: token.adminPubkey,
+        expectedInviteId: token.inviteId,
+      })
+    : identity.signerType === 'nip07'
+      ? await (async () => {
+          const decrypt = (window as any).nostr?.nip44?.decrypt
+          if (typeof decrypt !== 'function') {
+            throw new Error('NIP-07 extension does not support NIP-44 decryption.')
+          }
+          const plaintext = await decrypt.call((window as any).nostr.nip44, token.adminPubkey, envelope)
+          return decodeWelcomePayload(plaintext, token.inviteId)
+        })()
+      : null
+
+  if (!welcome) {
+    throw new Error('No local key or NIP-07 signer — cannot decrypt welcome message.')
+  }
 
   // Build AppGroup from welcome payload
   const id = welcome.groupId
@@ -855,7 +870,7 @@ function acceptWelcomeEnvelope(
 
 function showRelayJoinScreen(inviteId: string): void {
   const { identity, settings } = getState()
-  if (!identity?.pubkey || !identity?.privkey) {
+  if (!identity?.pubkey || (!identity.privkey && identity.signerType !== 'nip07')) {
     showToast('No local identity — create or import one first.', 'error')
     return
   }
@@ -927,9 +942,9 @@ function showRelayJoinScreen(inviteId: string): void {
             adminPubkey: token.adminPubkey,
             readRelays: joinReadRelays,
             writeRelays: joinWriteRelays,
-            onWelcome(envelope) {
+            async onWelcome(envelope) {
               try {
-                acceptWelcomeEnvelope(envelope, token, d)
+                await acceptWelcomeEnvelope(envelope, token, d)
               } catch {
                 if (statusEl) {
                   statusEl.textContent = 'Failed to join — welcome message could not be decrypted.'
@@ -975,7 +990,7 @@ function showRemoteJoinScreen(tokenPayload: string): void {
 
     const token = parsed
     const { identity, settings } = getState()
-    if (!identity?.pubkey || !identity?.privkey) {
+    if (!identity?.pubkey || (!identity.privkey && identity.signerType !== 'nip07')) {
       showToast('No local identity — create or import one first.', 'error')
       return
     }
@@ -1033,7 +1048,7 @@ function showRemoteJoinScreen(tokenPayload: string): void {
     // Auto-exchange over relay if relays are available
     if (relays.length > 0) {
       void ensureTransport(readRelays, writeRelays).then(() => {
-        const statusEl = d.querySelector('#remote-join-relay-status')
+        const statusEl = d.querySelector<HTMLElement>('#remote-join-relay-status')
         if (statusEl) statusEl.textContent = 'Waiting for admin to send group key...'
 
         cleanupRelay = sendJoinRequest({
@@ -1041,9 +1056,9 @@ function showRemoteJoinScreen(tokenPayload: string): void {
           adminPubkey: token.adminPubkey,
           readRelays,
           writeRelays,
-          onWelcome(envelope) {
+          async onWelcome(envelope) {
             try {
-              acceptWelcomeEnvelope(envelope, token, d)
+              await acceptWelcomeEnvelope(envelope, token, d)
             } catch (err) {
               if (statusEl) {
                 statusEl.textContent = 'Auto-join failed — paste welcome message manually.'
@@ -1084,7 +1099,7 @@ function showRemoteJoinScreen(tokenPayload: string): void {
 
       try {
         cleanupRelay()
-        acceptWelcomeEnvelope(envelope, token, d)
+        await acceptWelcomeEnvelope(envelope, token, d)
       } catch (err) {
         if (errorEl) {
           errorEl.textContent = err instanceof Error ? err.message : 'Failed to decrypt welcome message.'

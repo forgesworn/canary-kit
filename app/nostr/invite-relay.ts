@@ -15,8 +15,85 @@ import { finalizeEvent, verifyEvent } from 'nostr-tools/pure'
 import { encrypt as nip44encrypt, decrypt as nip44decrypt, getConversationKey } from 'nostr-tools/nip44'
 import { hexToBytes } from 'canary-kit/crypto'
 import type { RemoteInviteToken } from '../crypto/remote-invite.js'
+import type { AppIdentity } from '../types.js'
 
 const HANDSHAKE_KIND = 25519
+
+type EventTemplate = {
+  kind: number
+  created_at: number
+  tags: string[][]
+  content: string
+}
+
+type SignedEvent = EventTemplate & {
+  id: string
+  pubkey: string
+  sig: string
+}
+
+function getNip07Provider(): any | null {
+  if (typeof window === 'undefined') return null
+  return (window as any).nostr ?? null
+}
+
+async function signEvent(identity: AppIdentity, template: EventTemplate): Promise<SignedEvent> {
+  if (identity.privkey) {
+    return finalizeEvent(template, hexToBytes(identity.privkey)) as SignedEvent
+  }
+
+  if (identity.signerType === 'nip07') {
+    const provider = getNip07Provider()
+    if (typeof provider?.signEvent !== 'function') {
+      throw new Error('NIP-07 signer is not available.')
+    }
+    const signed = await provider.signEvent(template)
+    if (!signed || signed.pubkey !== identity.pubkey) {
+      throw new Error('NIP-07 signer used a different public key.')
+    }
+    return signed as SignedEvent
+  }
+
+  throw new Error('No local key or NIP-07 signer available.')
+}
+
+async function encryptTo(identity: AppIdentity, peerPubkey: string, plaintext: string): Promise<string> {
+  if (identity.privkey) {
+    const convKey = getConversationKey(hexToBytes(identity.privkey), peerPubkey)
+    return nip44encrypt(plaintext, convKey)
+  }
+
+  if (identity.signerType === 'nip07') {
+    const provider = getNip07Provider()
+    if (typeof provider?.nip44?.encrypt !== 'function') {
+      throw new Error('NIP-07 extension does not support NIP-44 encryption.')
+    }
+    return provider.nip44.encrypt(peerPubkey, plaintext)
+  }
+
+  throw new Error('No local key or NIP-07 encryption available.')
+}
+
+async function decryptFrom(identity: AppIdentity, peerPubkey: string, ciphertext: string): Promise<string> {
+  if (identity.privkey) {
+    const convKey = getConversationKey(hexToBytes(identity.privkey), peerPubkey)
+    return nip44decrypt(ciphertext, convKey)
+  }
+
+  if (identity.signerType === 'nip07') {
+    const provider = getNip07Provider()
+    if (typeof provider?.nip44?.decrypt !== 'function') {
+      throw new Error('NIP-07 extension does not support NIP-44 decryption.')
+    }
+    return provider.nip44.decrypt(peerPubkey, ciphertext)
+  }
+
+  throw new Error('No local key or NIP-07 decryption available.')
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
 
 // ── Joiner side ────────────────────────────────────────────────
 
@@ -42,68 +119,70 @@ export interface JoinRequestOpts {
 export function sendJoinRequest(opts: JoinRequestOpts): () => void {
   const pool = getPool()
   const { identity } = getState()
-  if (!pool || !identity?.pubkey || !identity?.privkey) {
+  if (!pool || !identity?.pubkey) {
     opts.onError('No relay pool or identity available.')
     return () => {}
   }
 
   const { inviteId, adminPubkey, readRelays, writeRelays, onWelcome, onError } = opts
-  const joinerPrivkey = identity.privkey
-  const joinerPubkey = identity.pubkey
-
-  // Combine read + write for subscription coverage
   const allRelays = Array.from(new Set([...readRelays, ...writeRelays]))
+  let closed = false
+  let sub: { close(): void } | null = null
+  let timer: ReturnType<typeof setTimeout> | null = null
 
-  // Encrypt join request to admin
-  const convKey = getConversationKey(hexToBytes(joinerPrivkey), adminPubkey)
-  const payload = JSON.stringify({ type: 'join-request', inviteId })
-  const encrypted = nip44encrypt(payload, convKey)
+  void (async () => {
+    try {
+      const payload = JSON.stringify({ type: 'join-request', inviteId })
+      const encrypted = await encryptTo(identity, adminPubkey, payload)
+      const event = await signEvent(identity, {
+        kind: HANDSHAKE_KIND,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [['d', inviteId], ['p', adminPubkey]],
+        content: encrypted,
+      })
+      if (closed) return
 
-  // Publish join request event
-  const event = finalizeEvent({
-    kind: HANDSHAKE_KIND,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [['d', inviteId], ['p', adminPubkey]],
-    content: encrypted,
-  }, hexToBytes(joinerPrivkey))
+      Promise.allSettled(pool.publish(writeRelays, event as any)).catch(() => {})
 
-  // Publish to write relays only
-  Promise.allSettled(pool.publish(writeRelays, event as any)).catch(() => {})
+      sub = pool.subscribeMany(
+        allRelays,
+        { kinds: [HANDSHAKE_KIND], '#d': [inviteId], authors: [adminPubkey] } as any,
+        {
+          onevent(ev) {
+            if (!verifyEvent(ev)) return
+            if (typeof ev.content === 'string' && ev.content.length > 65536) return
+            void (async () => {
+              try {
+                const decrypted = await decryptFrom(identity, adminPubkey, ev.content)
+                const msg = JSON.parse(decrypted)
+                if (msg.type === 'welcome' && msg.inviteId === inviteId && msg.envelope) {
+                  onWelcome(msg.envelope)
+                  sub?.close()
+                }
+              } catch {
+                // Not for us or malformed — ignore
+              }
+            })()
+          },
+          oneose() {
+            // Keep subscription open waiting for the welcome
+          },
+        },
+      )
 
-  // Subscribe for welcome response on all relays
-  const sub = pool.subscribeMany(
-    allRelays,
-    { kinds: [HANDSHAKE_KIND], '#d': [inviteId], authors: [adminPubkey] } as any,
-    {
-      onevent(ev) {
-        if (!verifyEvent(ev)) return
-        if (typeof ev.content === 'string' && ev.content.length > 65536) return
-        try {
-          const decrypted = nip44decrypt(ev.content, convKey)
-          const msg = JSON.parse(decrypted)
-          if (msg.type === 'welcome' && msg.inviteId === inviteId && msg.envelope) {
-            onWelcome(msg.envelope)
-            sub.close()
-          }
-        } catch {
-          // Not for us or malformed — ignore
-        }
-      },
-      oneose() {
-        // Keep subscription open waiting for the welcome
-      },
-    },
-  )
-
-  // Auto-timeout after 2 minutes
-  const timer = setTimeout(() => {
-    sub.close()
-    onError('Timed out waiting for welcome message from admin.')
-  }, 120_000)
+      timer = setTimeout(() => {
+        sub?.close()
+        onError('Timed out waiting for welcome message from admin.')
+      }, 120_000)
+    } catch (err) {
+      if (!closed) onError(errorMessage(err))
+    }
+  })()
 
   return () => {
-    clearTimeout(timer)
-    sub.close()
+    closed = true
+    if (timer) clearTimeout(timer)
+    sub?.close()
   }
 }
 
@@ -130,15 +209,12 @@ export interface ListenForJoinOpts {
 export function listenForJoinRequests(opts: ListenForJoinOpts): () => void {
   const pool = getPool()
   const { identity } = getState()
-  if (!pool || !identity?.pubkey || !identity?.privkey) {
+  if (!pool || !identity?.pubkey) {
     opts.onError('No relay pool or identity available.')
     return () => {}
   }
 
   const { inviteId, readRelays, writeRelays, onJoinRequest, onError } = opts
-  const adminPrivkey = identity.privkey
-
-  // Subscribe on all relays (read + write) for full coverage
   const allRelays = Array.from(new Set([...readRelays, ...writeRelays]))
 
   const sub = pool.subscribeMany(
@@ -148,16 +224,17 @@ export function listenForJoinRequests(opts: ListenForJoinOpts): () => void {
       onevent(ev) {
         if (!verifyEvent(ev)) return
         if (typeof ev.content === 'string' && ev.content.length > 65536) return
-        try {
-          const convKey = getConversationKey(hexToBytes(adminPrivkey), ev.pubkey)
-          const decrypted = nip44decrypt(ev.content, convKey)
-          const msg = JSON.parse(decrypted)
-          if (msg.type === 'join-request' && msg.inviteId === inviteId) {
-            onJoinRequest(ev.pubkey)
+        void (async () => {
+          try {
+            const decrypted = await decryptFrom(identity, ev.pubkey, ev.content)
+            const msg = JSON.parse(decrypted)
+            if (msg.type === 'join-request' && msg.inviteId === inviteId) {
+              onJoinRequest(ev.pubkey)
+            }
+          } catch {
+            // Not for us or malformed — ignore
           }
-        } catch {
-          // Not for us or malformed — ignore
-        }
+        })()
       },
       oneose() {
         // Keep subscription open
@@ -190,25 +267,22 @@ export interface SendWelcomeOpts {
 /**
  * Publish the welcome envelope to the relay for the joiner to pick up.
  */
-export function sendWelcomeOverRelay(opts: SendWelcomeOpts): void {
+export async function sendWelcomeOverRelay(opts: SendWelcomeOpts): Promise<void> {
   const pool = getPool()
   const { identity } = getState()
-  if (!pool || !identity?.privkey) return
+  if (!pool || !identity?.pubkey) return
 
   const { inviteId, joinerPubkey, envelope, writeRelays } = opts
 
-  const convKey = getConversationKey(hexToBytes(identity.privkey), joinerPubkey)
   const payload = JSON.stringify({ type: 'welcome', inviteId, envelope })
-  const encrypted = nip44encrypt(payload, convKey)
-
-  const event = finalizeEvent({
+  const encrypted = await encryptTo(identity, joinerPubkey, payload)
+  const event = await signEvent(identity, {
     kind: HANDSHAKE_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags: [['d', inviteId], ['p', joinerPubkey]],
     content: encrypted,
-  }, hexToBytes(identity.privkey))
-
-  Promise.allSettled(pool.publish(writeRelays, event as any)).catch(() => {})
+  })
+  await Promise.allSettled(pool.publish(writeRelays, event as any))
 }
 
 // ── Relay-based invite discovery ──────────────────────────────
@@ -228,20 +302,25 @@ export function publishInviteToken(opts: {
 }): void {
   const pool = getPool()
   const { identity } = getState()
-  if (!pool || !identity?.privkey) return
+  if (!pool || !identity?.pubkey) return
 
   const { token, writeRelays } = opts
   const content = JSON.stringify(token)
 
-  const expiration = String(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60)
-  const event = finalizeEvent({
-    kind: INVITE_PUBLISH_KIND,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [['d', token.inviteId], ['expiration', expiration]],
-    content,
-  }, hexToBytes(identity.privkey))
-
-  Promise.allSettled(pool.publish(writeRelays, event as any)).catch(() => {})
+  void (async () => {
+    try {
+      const expiration = String(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60)
+      const event = await signEvent(identity, {
+        kind: INVITE_PUBLISH_KIND,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [['d', token.inviteId], ['expiration', expiration]],
+        content,
+      })
+      Promise.allSettled(pool.publish(writeRelays, event as any)).catch(() => {})
+    } catch (err) {
+      console.warn('[canary:invite] Failed to publish invite token:', err)
+    }
+  })()
 }
 
 /**

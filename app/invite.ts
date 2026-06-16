@@ -6,8 +6,9 @@ import { deriveToken } from 'canary-kit/token'
 import type { TokenEncoding } from 'canary-kit/encoding'
 import { PROTOCOL_VERSION } from 'canary-kit/sync'
 import { schnorr } from '@noble/curves/secp256k1.js'
+import { getEventHash } from 'nostr-tools/pure'
 import { getState, updateGroup } from './state.js'
-import type { AppGroup } from './types.js'
+import type { AppGroup, AppIdentity } from './types.js'
 import { jsonToBase64, base64ToJson, jsonToBase64url } from './utils/base64.js'
 
 /** Allow wss:// relays, plus ws:// only for localhost development. */
@@ -203,14 +204,106 @@ export function signInvite(payload: InvitePayload, privkey: string): string {
   return bytesToHex(schnorr.sign(hash, hexToBytes(privkey)))
 }
 
+const INVITE_SIGNATURE_KIND = 27234
+
+interface NostrEventTemplate {
+  kind: number
+  created_at: number
+  tags: string[][]
+  content: string
+}
+
+interface NostrSignedEvent extends NostrEventTemplate {
+  id?: string
+  pubkey: string
+  sig: string
+}
+
+/** @internal Exported for tests — not part of the public API. */
+export function inviteSignatureEventTemplate(payload: InvitePayload): NostrEventTemplate {
+  return {
+    kind: INVITE_SIGNATURE_KIND,
+    created_at: payload.issuedAt,
+    tags: [
+      ['client', 'canary-kit'],
+      ['canary-protocol', 'invite-v1'],
+      ['g', payload.groupId],
+      ['nonce', payload.nonce],
+    ],
+    content: new TextDecoder().decode(inviteCanonicalBytes(payload)),
+  }
+}
+
+function inviteSignatureEventHash(payload: InvitePayload): Uint8Array {
+  const template = inviteSignatureEventTemplate(payload)
+  const id = getEventHash({ ...template, pubkey: payload.inviterPubkey })
+  return hexToBytes(id)
+}
+
+function assertNostrSignedEvent(
+  signed: unknown,
+  expectedPubkey: string,
+  expectedTemplate: NostrEventTemplate,
+): asserts signed is NostrSignedEvent {
+  const ev = signed as Partial<NostrSignedEvent> | null
+  if (!ev || typeof ev !== 'object') {
+    throw new Error('NIP-07 signer returned an invalid event.')
+  }
+  if (ev.pubkey !== expectedPubkey) {
+    throw new Error('NIP-07 signer used a different public key.')
+  }
+  if (typeof ev.sig !== 'string' || !HEX_128_RE.test(ev.sig)) {
+    throw new Error('NIP-07 signer returned an invalid signature.')
+  }
+  const expectedId = getEventHash({ ...expectedTemplate, pubkey: expectedPubkey })
+  if (ev.id && ev.id !== expectedId) {
+    throw new Error('NIP-07 signer returned a signature for a different event.')
+  }
+}
+
+function getNip07SignEvent(): ((event: NostrEventTemplate) => Promise<unknown>) | null {
+  if (typeof window === 'undefined') return null
+  const signEvent = (window as any).nostr?.signEvent
+  return typeof signEvent === 'function'
+    ? (event: NostrEventTemplate) => signEvent.call((window as any).nostr, event)
+    : null
+}
+
+/** @internal Exported for tests — not part of the public API. */
+export async function signInviteWithNip07(
+  payload: InvitePayload,
+  signEvent: (event: NostrEventTemplate) => Promise<unknown> = getNip07SignEvent() ?? (() => Promise.reject(new Error('NIP-07 signer is not available.'))),
+): Promise<string> {
+  const template = inviteSignatureEventTemplate(payload)
+  const signed = await signEvent(template)
+  assertNostrSignedEvent(signed, payload.inviterPubkey, template)
+  return signed.sig
+}
+
 /**
  * Verify the invite signature against the claimed inviter pubkey.
  */
 /** @internal Exported for contract testing — not part of the public API. */
 export function verifyInviteSig(payload: InvitePayload): boolean {
-  const canonical = inviteCanonicalBytes(payload)
-  const hash = sha256(canonical)
-  return schnorr.verify(hexToBytes(payload.inviterSig), hash, hexToBytes(payload.inviterPubkey))
+  try {
+    const canonical = inviteCanonicalBytes(payload)
+    const hash = sha256(canonical)
+    if (schnorr.verify(hexToBytes(payload.inviterSig), hash, hexToBytes(payload.inviterPubkey))) {
+      return true
+    }
+  } catch {
+    // Try the NIP-07 signature form below.
+  }
+
+  try {
+    return schnorr.verify(
+      hexToBytes(payload.inviterSig),
+      inviteSignatureEventHash(payload),
+      hexToBytes(payload.inviterPubkey),
+    )
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -243,6 +336,56 @@ export function confirmCodeFromPayload(payload: InvitePayload): string {
 
 // ── Public API ─────────────────────────────────────────────────
 
+function assertInviteAuthorised(identity: AppIdentity | null | undefined, group: AppGroup): asserts identity is AppIdentity & { pubkey: string } {
+  if (!identity?.pubkey) {
+    throw new Error('No identity — sign in first.')
+  }
+  if (!group.admins.includes(identity.pubkey)) {
+    throw new Error(`Not authorised — you are not an admin of "${group.name}".`)
+  }
+}
+
+function buildInvitePayload(group: AppGroup, inviterPubkey: string): InvitePayload {
+  const nonce = randomNonce()
+  const issuedAt = Math.floor(Date.now() / 1000)
+
+  return {
+    groupId: group.id,
+    seed: group.seed,
+    groupName: group.name,
+    rotationInterval: group.rotationInterval,
+    wordCount: group.wordCount,
+    wordlist: group.wordlist,
+    counter: group.counter,
+    usageOffset: group.usageOffset,
+    nonce,
+    beaconInterval: group.beaconInterval,
+    beaconPrecision: group.beaconPrecision,
+    members: [...group.members],
+    relays: [...(group.writeRelays ?? group.relays ?? [])],
+    encodingFormat: group.encodingFormat ?? 'words',
+    tolerance: group.tolerance ?? 1,
+    issuedAt,
+    expiresAt: issuedAt + INVITE_MAX_AGE_SEC,
+    epoch: group.epoch ?? 0,
+    admins: [...(group.admins ?? [])],
+    protocolVersion: PROTOCOL_VERSION,
+    inviterPubkey,
+    inviterSig: '',
+    memberNames: { ...group.memberNames },
+  }
+}
+
+async function signInviteForIdentity(payload: InvitePayload, identity: AppIdentity): Promise<string> {
+  if (identity.privkey) {
+    return signInvite(payload, identity.privkey)
+  }
+  if (identity.signerType === 'nip07') {
+    return signInviteWithNip07(payload)
+  }
+  throw new Error('Invite creation requires a local key or a NIP-07 signer.')
+}
+
 /**
  * Create an invite for the given group.
  *
@@ -254,47 +397,13 @@ export function confirmCodeFromPayload(payload: InvitePayload): string {
  * @returns `confirmCode` — 3 space-separated words (e.g. "apple river castle") to read aloud for out-of-band confirmation.
  */
 export function createInvite(group: AppGroup): { payload: string; confirmCode: string } {
-  // Only admins can create invites
   const { identity } = getState()
-  if (!identity?.pubkey) {
-    throw new Error('No identity — sign in first.')
-  }
+  assertInviteAuthorised(identity, group)
   if (!identity.privkey) {
-    throw new Error('Invite creation requires a local key (nsec). NIP-07 extensions cannot sign invites.')
-  }
-  if (!group.admins.includes(identity.pubkey)) {
-    throw new Error(`Not authorised — you are not an admin of "${group.name}".`)
+    throw new Error('Invite creation requires a local key (nsec). Use the extension-compatible invite flow in the app.')
   }
 
-  const nonce = randomNonce()
-  const issuedAt = Math.floor(Date.now() / 1000)
-
-  const invitePayload: InvitePayload = {
-    groupId: group.id,
-    seed: group.seed,
-    groupName: group.name,
-    rotationInterval: group.rotationInterval,
-    wordCount: group.wordCount,
-    wordlist: group.wordlist,
-    counter: group.counter,
-    usageOffset: group.usageOffset,
-    nonce,
-    beaconInterval: group.beaconInterval,
-    beaconPrecision: group.beaconPrecision,
-    members: [...group.members],
-    relays: [...(group.writeRelays ?? group.relays ?? [])],
-    encodingFormat: group.encodingFormat ?? 'words',
-    tolerance: group.tolerance ?? 1,
-    issuedAt,
-    expiresAt: issuedAt + INVITE_MAX_AGE_SEC,
-    epoch: group.epoch ?? 0,
-    admins: [...(group.admins ?? [])],
-    protocolVersion: PROTOCOL_VERSION,
-    inviterPubkey: identity.pubkey,
-    inviterSig: '', // placeholder — computed below
-    memberNames: { ...group.memberNames },
-  }
-
+  const invitePayload = buildInvitePayload(group, identity.pubkey)
   invitePayload.inviterSig = signInvite(invitePayload, identity.privkey)
 
   const payload = jsonToBase64(invitePayload)
@@ -303,52 +412,48 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
   return { payload, confirmCode }
 }
 
+/** Create an invite using either a local key or a NIP-07 signer. */
+export async function createInviteAsync(group: AppGroup): Promise<{ payload: string; confirmCode: string }> {
+  const { identity } = getState()
+  assertInviteAuthorised(identity, group)
+
+  const invitePayload = buildInvitePayload(group, identity.pubkey)
+  invitePayload.inviterSig = await signInviteForIdentity(invitePayload, identity)
+
+  return {
+    payload: jsonToBase64(invitePayload),
+    confirmCode: confirmCodeFromPayload(invitePayload),
+  }
+}
+
 /**
  * Create an invite and return the raw payload + confirmation code.
  * Used by the QR path which binary-packs the payload instead of JSON-encoding it.
  */
 export function createInviteRaw(group: AppGroup): { payload: InvitePayload; confirmCode: string } {
   const { identity } = getState()
-  if (!identity?.pubkey) {
-    throw new Error('No identity — sign in first.')
-  }
+  assertInviteAuthorised(identity, group)
   if (!identity.privkey) {
-    throw new Error('Invite creation requires a local key (nsec). NIP-07 extensions cannot sign invites.')
-  }
-  if (!group.admins.includes(identity.pubkey)) {
-    throw new Error(`Not authorised — you are not an admin of "${group.name}".`)
+    throw new Error('Invite creation requires a local key (nsec). Use the extension-compatible invite flow in the app.')
   }
 
-  const nonce = randomNonce()
-  const issuedAt = Math.floor(Date.now() / 1000)
-
-  const invitePayload: InvitePayload = {
-    groupId: group.id,
-    seed: group.seed,
-    groupName: group.name,
-    rotationInterval: group.rotationInterval,
-    wordCount: group.wordCount,
-    wordlist: group.wordlist,
-    counter: group.counter,
-    usageOffset: group.usageOffset,
-    nonce,
-    beaconInterval: group.beaconInterval,
-    beaconPrecision: group.beaconPrecision,
-    members: [...group.members],
-    relays: [...(group.writeRelays ?? group.relays ?? [])],
-    encodingFormat: group.encodingFormat ?? 'words',
-    tolerance: group.tolerance ?? 1,
-    issuedAt,
-    expiresAt: issuedAt + INVITE_MAX_AGE_SEC,
-    epoch: group.epoch ?? 0,
-    admins: [...(group.admins ?? [])],
-    protocolVersion: PROTOCOL_VERSION,
-    inviterPubkey: identity.pubkey,
-    inviterSig: '',
-    memberNames: { ...group.memberNames },
-  }
-
+  const invitePayload = buildInvitePayload(group, identity.pubkey)
   invitePayload.inviterSig = signInvite(invitePayload, identity.privkey)
+  const confirmCode = confirmCodeFromPayload(invitePayload)
+
+  return { payload: invitePayload, confirmCode }
+}
+
+/**
+ * Create a raw invite using either a local key or a NIP-07 signer.
+ * Used by the UI QR path.
+ */
+export async function createInviteRawAsync(group: AppGroup): Promise<{ payload: InvitePayload; confirmCode: string }> {
+  const { identity } = getState()
+  assertInviteAuthorised(identity, group)
+
+  const invitePayload = buildInvitePayload(group, identity.pubkey)
+  invitePayload.inviterSig = await signInviteForIdentity(invitePayload, identity)
   const confirmCode = confirmCodeFromPayload(invitePayload)
 
   return { payload: invitePayload, confirmCode }
@@ -637,6 +742,7 @@ export function endInviteSession(): void {
 
 import {
   createRemoteInviteToken,
+  createRemoteInviteTokenWithNip07,
   createWelcomeEnvelope,
   type WelcomePayload,
 } from './crypto/remote-invite.js'
@@ -651,19 +757,60 @@ export interface RemoteInviteSession {
 
 let _activeRemoteSession: RemoteInviteSession | null = null
 
-export function startRemoteInviteSession(group: AppGroup): RemoteInviteSession {
-  const { identity } = getState()
+function getRemoteInviteRelays(group: AppGroup): string[] {
+  return group.writeRelays?.length
+    ? [...group.writeRelays]
+    : [...(getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays)]
+}
+
+function assertRemoteInviteAuthorised(identity: AppIdentity | null | undefined, group: AppGroup): asserts identity is AppIdentity & { pubkey: string } {
   if (!identity?.pubkey) {
     throw new Error('No identity — sign in first.')
-  }
-  if (!identity.privkey) {
-    throw new Error('Invite creation requires a local key (nsec). NIP-07 extensions cannot sign invites.')
   }
   if (!group.admins.includes(identity.pubkey)) {
     throw new Error(`Not authorised — you are not an admin of "${group.name}".`)
   }
+}
 
-  const relays = group.writeRelays?.length ? [...group.writeRelays] : [...(getState().settings.defaultWriteRelays ?? getState().settings.defaultRelays)]
+function buildWelcomePayload(group: AppGroup, inviteId: string): WelcomePayload {
+  return {
+    inviteId,
+    seed: group.seed,
+    counter: group.counter,
+    usageOffset: group.usageOffset,
+    epoch: group.epoch ?? 0,
+    wordCount: group.wordCount,
+    rotationInterval: group.rotationInterval,
+    groupId: group.id,
+    groupName: group.name,
+    wordlist: group.wordlist,
+    beaconInterval: group.beaconInterval,
+    beaconPrecision: group.beaconPrecision,
+    encodingFormat: group.encodingFormat ?? 'words',
+    tolerance: group.tolerance ?? 1,
+    members: [...group.members],
+    admins: [...(group.admins ?? [])],
+    relays: [...(group.writeRelays ?? group.relays ?? [])],
+    memberNames: group.memberNames ? { ...group.memberNames } : undefined,
+  }
+}
+
+function getNip44Encrypt(): ((recipientPubkey: string, plaintext: string) => Promise<string>) | null {
+  if (typeof window === 'undefined') return null
+  const encrypt = (window as any).nostr?.nip44?.encrypt
+  return typeof encrypt === 'function'
+    ? (recipientPubkey: string, plaintext: string) => encrypt.call((window as any).nostr.nip44, recipientPubkey, plaintext)
+    : null
+}
+
+export function startRemoteInviteSession(group: AppGroup): RemoteInviteSession {
+  const { identity } = getState()
+  assertRemoteInviteAuthorised(identity, group)
+  if (!identity.privkey) {
+    throw new Error('Invite creation requires a local key (nsec). Use the extension-compatible invite flow in the app.')
+  }
+
+  const relays = getRemoteInviteRelays(group)
 
   const token = createRemoteInviteToken({
     groupName: group.name,
@@ -684,6 +831,50 @@ export function startRemoteInviteSession(group: AppGroup): RemoteInviteSession {
   return _activeRemoteSession
 }
 
+export async function startRemoteInviteSessionAsync(group: AppGroup): Promise<RemoteInviteSession> {
+  const { identity } = getState()
+  assertRemoteInviteAuthorised(identity, group)
+
+  const relays = getRemoteInviteRelays(group)
+  const token = identity.privkey
+    ? createRemoteInviteToken({
+        groupName: group.name,
+        groupId: group.id,
+        adminPubkey: identity.pubkey,
+        adminPrivkey: identity.privkey,
+        relays,
+      })
+    : identity.signerType === 'nip07'
+      ? await createRemoteInviteTokenWithNip07({
+          groupName: group.name,
+          groupId: group.id,
+          adminPubkey: identity.pubkey,
+          relays,
+          signEvent: signEvent => signInviteWithNip07Event(signEvent),
+        })
+      : null
+
+  if (!token) {
+    throw new Error('Invite creation requires a local key or a NIP-07 signer.')
+  }
+
+  _activeRemoteSession = {
+    groupId: group.id,
+    tokenPayload: jsonToBase64url(token),
+    inviteId: token.inviteId,
+  }
+
+  return _activeRemoteSession
+}
+
+function signInviteWithNip07Event(event: NostrEventTemplate): Promise<unknown> {
+  const signEvent = getNip07SignEvent()
+  if (!signEvent) {
+    return Promise.reject(new Error('NIP-07 signer is not available.'))
+  }
+  return signEvent(event)
+}
+
 export function createRemoteWelcomeEnvelope(group: AppGroup, joinerPubkey: string): string {
   const { identity } = getState()
   if (!identity?.privkey) {
@@ -693,32 +884,42 @@ export function createRemoteWelcomeEnvelope(group: AppGroup, joinerPubkey: strin
     throw new Error('No active remote invite session — cannot create welcome envelope.')
   }
 
-  const welcome: WelcomePayload = {
-    inviteId: _activeRemoteSession.inviteId,
-    seed: group.seed,
-    counter: group.counter,
-    usageOffset: group.usageOffset,
-    epoch: group.epoch ?? 0,
-    wordCount: group.wordCount,
-    rotationInterval: group.rotationInterval,
-    groupId: group.id,
-    groupName: group.name,
-    wordlist: group.wordlist,
-    beaconInterval: group.beaconInterval,
-    beaconPrecision: group.beaconPrecision,
-    encodingFormat: group.encodingFormat ?? 'words',
-    tolerance: group.tolerance ?? 1,
-    members: [...group.members],
-    admins: [...(group.admins ?? [])],
-    relays: [...(group.writeRelays ?? group.relays ?? [])],
-    memberNames: group.memberNames ? { ...group.memberNames } : undefined,
-  }
+  const welcome = buildWelcomePayload(group, _activeRemoteSession.inviteId)
 
   return createWelcomeEnvelope({
     welcome,
     adminPrivkey: identity.privkey,
     joinerPubkey,
   })
+}
+
+export async function createRemoteWelcomeEnvelopeAsync(group: AppGroup, joinerPubkey: string): Promise<string> {
+  const { identity } = getState()
+  if (!identity?.pubkey) {
+    throw new Error('No identity — sign in first.')
+  }
+  if (!_activeRemoteSession) {
+    throw new Error('No active remote invite session — cannot create welcome envelope.')
+  }
+
+  const welcome = buildWelcomePayload(group, _activeRemoteSession.inviteId)
+  if (identity.privkey) {
+    return createWelcomeEnvelope({
+      welcome,
+      adminPrivkey: identity.privkey,
+      joinerPubkey,
+    })
+  }
+
+  if (identity.signerType === 'nip07') {
+    const encrypt = getNip44Encrypt()
+    if (!encrypt) {
+      throw new Error('NIP-07 extension does not support NIP-44 encryption.')
+    }
+    return encrypt(joinerPubkey, JSON.stringify(welcome))
+  }
+
+  throw new Error('No local key or NIP-07 signer — cannot create welcome envelope.')
 }
 
 export function getRemoteInviteSession(): RemoteInviteSession | null {

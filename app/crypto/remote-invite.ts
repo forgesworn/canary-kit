@@ -9,6 +9,7 @@
 
 import { sha256, bytesToHex, hexToBytes } from 'canary-kit/crypto'
 import { schnorr } from '@noble/curves/secp256k1.js'
+import { getEventHash } from 'nostr-tools/pure'
 import { encrypt as nip44encrypt, decrypt as nip44decrypt, getConversationKey } from 'nostr-tools/nip44'
 
 // ── Regex patterns ──────────────────────────────────────────────
@@ -25,9 +26,10 @@ export interface RemoteInviteToken {
   groupId: string
   adminPubkey: string
   inviteId: string      // 16-byte random hex nonce
+  issuedAt?: number     // unix seconds; present on tokens signed via NIP-07
   expiresAt: number     // unix seconds
   relays: string[]      // relay URLs so the joiner connects to the same relays
-  adminSig: string      // Schnorr sig over SHA-256(canonical JSON of other fields)
+  adminSig: string      // raw Schnorr sig or deterministic Nostr-event sig over the token
 }
 
 /** Message 3: the group state sent encrypted to joiner. */
@@ -67,6 +69,84 @@ function canonicalBytes(token: RemoteInviteToken): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(sorted))
 }
 
+const REMOTE_INVITE_SIGNATURE_KIND = 27235
+
+interface NostrEventTemplate {
+  kind: number
+  created_at: number
+  tags: string[][]
+  content: string
+}
+
+interface NostrSignedEvent extends NostrEventTemplate {
+  id?: string
+  pubkey: string
+  sig: string
+}
+
+/** @internal Exported for tests; not part of the public app API. */
+export function remoteInviteSignatureEventTemplate(token: RemoteInviteToken): NostrEventTemplate {
+  return {
+    kind: REMOTE_INVITE_SIGNATURE_KIND,
+    created_at: token.issuedAt ?? Math.max(0, token.expiresAt - 86400),
+    tags: [
+      ['client', 'canary-kit'],
+      ['canary-protocol', 'remote-invite-v1'],
+      ['g', token.groupId],
+      ['d', token.inviteId],
+    ],
+    content: new TextDecoder().decode(canonicalBytes(token)),
+  }
+}
+
+function remoteInviteSignatureEventHash(token: RemoteInviteToken): Uint8Array {
+  const template = remoteInviteSignatureEventTemplate(token)
+  const id = getEventHash({ ...template, pubkey: token.adminPubkey })
+  return hexToBytes(id)
+}
+
+function verifyRemoteInviteSig(token: RemoteInviteToken): boolean {
+  try {
+    const hash = sha256(canonicalBytes(token))
+    if (schnorr.verify(hexToBytes(token.adminSig), hash, hexToBytes(token.adminPubkey))) {
+      return true
+    }
+  } catch {
+    // Try the NIP-07 signature form below.
+  }
+
+  try {
+    return schnorr.verify(
+      hexToBytes(token.adminSig),
+      remoteInviteSignatureEventHash(token),
+      hexToBytes(token.adminPubkey),
+    )
+  } catch {
+    return false
+  }
+}
+
+function assertNostrSignedEvent(
+  signed: unknown,
+  expectedPubkey: string,
+  expectedTemplate: NostrEventTemplate,
+): asserts signed is NostrSignedEvent {
+  const ev = signed as Partial<NostrSignedEvent> | null
+  if (!ev || typeof ev !== 'object') {
+    throw new Error('NIP-07 signer returned an invalid event.')
+  }
+  if (ev.pubkey !== expectedPubkey) {
+    throw new Error('NIP-07 signer used a different public key.')
+  }
+  if (typeof ev.sig !== 'string' || !HEX_128_RE.test(ev.sig)) {
+    throw new Error('NIP-07 signer returned an invalid signature.')
+  }
+  const expectedId = getEventHash({ ...expectedTemplate, pubkey: expectedPubkey })
+  if (ev.id && ev.id !== expectedId) {
+    throw new Error('NIP-07 signer returned a signature for a different event.')
+  }
+}
+
 // ── Message 1: Create invite token ──────────────────────────────
 
 export interface CreateRemoteInviteOpts {
@@ -96,13 +176,15 @@ export function createRemoteInviteToken(opts: CreateRemoteInviteOpts): RemoteInv
   const inviteIdBytes = new Uint8Array(16)
   crypto.getRandomValues(inviteIdBytes)
   const inviteId = bytesToHex(inviteIdBytes)
+  const issuedAt = Math.floor(Date.now() / 1000)
 
   const token: RemoteInviteToken = {
     groupName,
     groupId,
     adminPubkey,
     inviteId,
-    expiresAt: Math.floor(Date.now() / 1000) + expiresInSec,
+    issuedAt,
+    expiresAt: issuedAt + expiresInSec,
     relays: [...relays],
     adminSig: '', // placeholder — will be replaced after signing
   }
@@ -110,6 +192,55 @@ export function createRemoteInviteToken(opts: CreateRemoteInviteOpts): RemoteInv
   // Sign SHA-256(canonical JSON)
   const hash = sha256(canonicalBytes(token))
   token.adminSig = bytesToHex(schnorr.sign(hash, hexToBytes(adminPrivkey)))
+
+  return token
+}
+
+export interface CreateRemoteInviteWithNip07Opts {
+  groupName: string
+  groupId: string
+  adminPubkey: string
+  relays: string[]
+  signEvent: (event: NostrEventTemplate) => Promise<unknown>
+  expiresInSec?: number
+}
+
+/**
+ * Create a seedless invite token signed by a NIP-07 signer.
+ * The signature is a deterministic Nostr event signature over the same
+ * canonical token fields, so verifiers can prove admin key control without
+ * requiring the raw admin nsec.
+ */
+export async function createRemoteInviteTokenWithNip07(opts: CreateRemoteInviteWithNip07Opts): Promise<RemoteInviteToken> {
+  const {
+    groupName,
+    groupId,
+    adminPubkey,
+    relays,
+    signEvent,
+    expiresInSec = 86400,
+  } = opts
+
+  const inviteIdBytes = new Uint8Array(16)
+  crypto.getRandomValues(inviteIdBytes)
+  const inviteId = bytesToHex(inviteIdBytes)
+  const issuedAt = Math.floor(Date.now() / 1000)
+
+  const token: RemoteInviteToken = {
+    groupName,
+    groupId,
+    adminPubkey,
+    inviteId,
+    issuedAt,
+    expiresAt: issuedAt + expiresInSec,
+    relays: [...relays],
+    adminSig: '',
+  }
+
+  const template = remoteInviteSignatureEventTemplate(token)
+  const signed = await signEvent(template)
+  assertNostrSignedEvent(signed, adminPubkey, template)
+  token.adminSig = signed.sig
 
   return token
 }
@@ -152,16 +283,17 @@ export function assertRemoteInviteToken(raw: unknown): asserts raw is RemoteInvi
   if (typeof t.expiresAt !== 'number' || !Number.isFinite(t.expiresAt)) {
     throw new Error('expiresAt must be a finite number')
   }
+  if (t.issuedAt !== undefined && (typeof t.issuedAt !== 'number' || !Number.isFinite(t.issuedAt))) {
+    throw new Error('issuedAt must be a finite number')
+  }
   const now = Math.floor(Date.now() / 1000)
   if (t.expiresAt <= now) {
     throw new Error('Remote invite token has expired')
   }
 
-  // Verify Schnorr signature
+  // Verify raw Schnorr signatures from local keys and NIP-07 event signatures.
   const token = raw as RemoteInviteToken
-  const hash = sha256(canonicalBytes(token))
-  const valid = schnorr.verify(hexToBytes(token.adminSig), hash, hexToBytes(token.adminPubkey))
-  if (!valid) {
+  if (!verifyRemoteInviteSig(token)) {
     throw new Error('Remote invite token signature is invalid')
   }
 }
@@ -200,6 +332,14 @@ export function decryptWelcomeEnvelope(opts: DecryptWelcomeEnvelopeOpts): Welcom
   const { envelope, joinerPrivkey, adminPubkey, expectedInviteId } = opts
   const conversationKey = getConversationKey(hexToBytes(joinerPrivkey), adminPubkey)
   const plaintext = nip44decrypt(envelope, conversationKey)
+  return decodeWelcomePayload(plaintext, expectedInviteId)
+}
+
+/**
+ * Decode and validate decrypted welcome plaintext.
+ * Used by both local-key and NIP-07 decryption paths.
+ */
+export function decodeWelcomePayload(plaintext: string, expectedInviteId: string): WelcomePayload {
   const payload = JSON.parse(plaintext) as WelcomePayload
 
   // Validate inviteId binding — prevents replay of stale welcome envelopes

@@ -64,19 +64,22 @@ export function getTransport(): SyncTransport | null {
 export async function ensureTransport(readRelays: string[], writeRelays?: string[], groupId?: string): Promise<void> {
   const { identity } = getState()
   const effectiveWrite = writeRelays ?? readRelays
-  if (!identity || !identity.privkey || (readRelays.length === 0 && effectiveWrite.length === 0)) return
+  const canConnect = !!identity?.privkey || identity?.signerType === 'nip07'
+  if (!identity || !canConnect || (readRelays.length === 0 && effectiveWrite.length === 0)) return
 
   try {
     connectRelays(readRelays, effectiveWrite)
 
-    if (!_transport) {
-      initSync(new NostrSyncTransport(readRelays, effectiveWrite, identity.pubkey, identity.privkey))
-    } else if (_transport instanceof NostrSyncTransport) {
-      // Keep the transport's relay URLs in sync with the pool
-      _transport.updateRelays(readRelays, effectiveWrite)
+    if (identity.privkey) {
+      if (!_transport) {
+        initSync(new NostrSyncTransport(readRelays, effectiveWrite, identity.pubkey, identity.privkey))
+      } else if (_transport instanceof NostrSyncTransport) {
+        // Keep the transport's relay URLs in sync with the pool
+        _transport.updateRelays(readRelays, effectiveWrite)
+      }
     }
 
-    if (groupId) {
+    if (groupId && _transport) {
       subscribeToGroup(groupId)
     }
 

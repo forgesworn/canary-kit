@@ -4,8 +4,8 @@ import { getState, updateGroup } from '../state.js'
 import { addGroupMember, removeGroupMember } from '../actions/groups.js'
 import {
   verifyJoinToken,
-  createInviteRaw,
-  startRemoteInviteSession, createRemoteWelcomeEnvelope, endRemoteInviteSession,
+  createInviteRawAsync,
+  startRemoteInviteSessionAsync, createRemoteWelcomeEnvelopeAsync, endRemoteInviteSession,
   endInviteSession,
 } from '../invite.js'
 import { packInvite } from '../utils/binary-invite.js'
@@ -163,9 +163,10 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
       </div>
     `
     d.querySelector<HTMLButtonElement>('#remote-back-2')?.addEventListener('click', backFn)
-    d.querySelector<HTMLButtonElement>('#remote-next-2')?.addEventListener('click', () => {
+    d.querySelector<HTMLButtonElement>('#remote-next-2')?.addEventListener('click', async () => {
       const input = d.querySelector<HTMLInputElement>('#remote-joincode-input')
       const errorEl = d.querySelector<HTMLElement>('#remote-joincode-error')
+      const btn = d.querySelector<HTMLButtonElement>('#remote-next-2')
       const joinerPubkey = input?.value.trim() ?? ''
 
       if (!/^[0-9a-f]{64}$/.test(joinerPubkey)) {
@@ -177,14 +178,22 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
       }
 
       try {
+        if (btn) {
+          btn.disabled = true
+          btn.textContent = 'Generating...'
+        }
         const currentGroup = getState().groups[group.id]
         if (!currentGroup) throw new Error('Group not found.')
-        const envelope = createRemoteWelcomeEnvelope(currentGroup, joinerPubkey)
+        const envelope = await createRemoteWelcomeEnvelopeAsync(currentGroup, joinerPubkey)
         renderStep3(envelope, joinerPubkey)
       } catch (err) {
         if (errorEl) {
           errorEl.textContent = err instanceof Error ? err.message : 'Failed to create welcome envelope.'
           errorEl.style.display = ''
+        }
+        if (btn) {
+          btn.disabled = false
+          btn.textContent = 'Generate Welcome'
         }
       }
     })
@@ -236,12 +245,12 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
 
   // ── QR path ──────────────────────────────────────────────────
 
-  function renderQRPath(): void {
+  async function renderQRPath(): Promise<void> {
     let payload: import('../invite.js').InvitePayload
     let confirmCode: string
     let packed: Uint8Array
     try {
-      const result = createInviteRaw(group)
+      const result = await createInviteRawAsync(group)
       payload = result.payload
       confirmCode = result.confirmCode
       packed = packInvite(payload)
@@ -282,10 +291,10 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
 
   // ── Secure Channel path ──────────────────────────────────────
 
-  function renderRemotePath(): void {
+  async function renderRemotePath(): Promise<void> {
     let remoteSession: import('../invite.js').RemoteInviteSession
     try {
-      remoteSession = startRemoteInviteSession(group)
+      remoteSession = await startRemoteInviteSessionAsync(group)
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to create remote invite.', 'error')
       return
@@ -348,14 +357,14 @@ export function showInviteModal(group: import('../types.js').AppGroup, options?:
         inviteId: remoteSession.inviteId,
         readRelays,
         writeRelays,
-        onJoinRequest(joinerPubkey) {
+        async onJoinRequest(joinerPubkey) {
           cleanupListener()
           try {
             const currentGroup = getState().groups[group.id]
             if (!currentGroup) return
-            const envelope = createRemoteWelcomeEnvelope(currentGroup, joinerPubkey)
+            const envelope = await createRemoteWelcomeEnvelopeAsync(currentGroup, joinerPubkey)
 
-            sendWelcomeOverRelay({
+            await sendWelcomeOverRelay({
               inviteId: remoteSession.inviteId,
               joinerPubkey,
               envelope,

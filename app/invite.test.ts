@@ -3,6 +3,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { schnorr } from '@noble/curves/secp256k1.js'
+import { finalizeEvent } from 'nostr-tools/pure'
 import { sha256, bytesToHex, hexToBytes } from 'canary-kit/crypto'
 import { jsonToBase64, base64ToJson } from './utils/base64.js'
 import { indexOf } from 'canary-kit/wordlist'
@@ -10,6 +11,7 @@ import { deriveToken } from 'canary-kit/token'
 import {
   assertInvitePayload,
   inviteCanonicalBytes,
+  inviteSignatureEventTemplate,
   signInvite,
   verifyInviteSig,
   confirmCodeFromPayload,
@@ -66,6 +68,15 @@ describe('invite signature verification', () => {
     expect(verifyInviteSig(payload)).toBe(true)
   })
 
+  it('accepts a valid NIP-07 event-signed invite', () => {
+    const payload = makeValidPayload()
+    payload.inviterSig = ''
+    const signed = finalizeEvent(inviteSignatureEventTemplate(payload), hexToBytes(ADMIN_PRIVKEY))
+    payload.inviterSig = signed.sig
+
+    expect(verifyInviteSig(payload)).toBe(true)
+  })
+
   it('rejects an invite signed with a different key', () => {
     const payload = makeValidPayload()
     // Replace signature with one from non-admin key
@@ -91,6 +102,16 @@ describe('invite signature verification', () => {
   it('rejects a tampered payload (member added after signing)', () => {
     const payload = makeValidPayload()
     payload.members = [...payload.members, NON_ADMIN_PUBKEY]
+    expect(verifyInviteSig(payload)).toBe(false)
+  })
+
+  it('rejects a tampered NIP-07 event-signed invite', () => {
+    const payload = makeValidPayload()
+    payload.inviterSig = ''
+    const signed = finalizeEvent(inviteSignatureEventTemplate(payload), hexToBytes(ADMIN_PRIVKEY))
+    payload.inviterSig = signed.sig
+    payload.counter = 999
+
     expect(verifyInviteSig(payload)).toBe(false)
   })
 })

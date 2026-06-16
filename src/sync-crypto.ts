@@ -126,7 +126,7 @@ export async function decryptEnvelope(groupKey: Uint8Array, encoded: string): Pr
     plaintextBuf = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },
       cryptoKey,
-      ciphertextWithTag as BufferSource,
+      ciphertextWithTag,
     )
   } catch {
     throw new Error('decryptEnvelope: decryption failed — wrong key or tampered data')
