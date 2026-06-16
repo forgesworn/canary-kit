@@ -40,7 +40,10 @@ function isUsableCanarySigner(signer: SignetSigner): boolean {
 
 function signerCapabilityError(method?: string): Error {
   const label = method ? signetMethodLabel(method as SignetLoginMethod) : 'Signet'
-  return new Error(`${label} signed you in, but it cannot sign events and decrypt NIP-44 messages for CANARY.`)
+  return new Error(
+    `${label} proved your identity, but CANARY also needs a live signer connection to sign events and decrypt NIP-44 invite messages. ` +
+    'Keep Signet open on its signing screen and try again, or choose Browser extension, Connect a Nostr signer, or Paste bunker URI.',
+  )
 }
 
 function methodForReconnect(identity: AppIdentity): LoginPickerMethod | undefined {

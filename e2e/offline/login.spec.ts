@@ -46,6 +46,20 @@ test.describe('Login screen', () => {
     await expect(customRow).toHaveCount(0)
   })
 
+  test('secure invite link shows invite-aware Signet login', async ({ cleanPage: page }) => {
+    await page.goto('/#j/0123456789abcdef0123456789abcdef')
+
+    await expect(page.locator('.lock-screen')).toBeVisible()
+    await expect(page.locator('.lock-screen__hint')).toHaveText('Secure group invitation')
+    await expect(page.locator('.login-invite__label')).toHaveText('Secure invite')
+    await expect(page.locator('.login-invite__title')).toHaveText('You have been invited to a CANARY group')
+    await expect(page.getByText('Sign in with Signet to request the group key over relays.')).toBeVisible()
+    await expect(page.locator('#login-signet')).toHaveText('Join with Signet')
+    await expect(page.getByText('Use Signet to keep your key in your signer while CANARY joins the group.')).toBeVisible()
+    await expect(page.locator('#login-nsec')).toHaveCount(0)
+    await expect(page.locator('#nsec-login-form')).toHaveCount(0)
+  })
+
   test('preserves #inv/ hash through offline login flow', async ({ cleanPage: page }) => {
     // Navigate to a URL with a binary invite hash (fake payload — too short to decode)
     await page.goto('/#inv/dGVzdA==')

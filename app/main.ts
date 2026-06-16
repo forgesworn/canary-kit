@@ -178,6 +178,92 @@ function renderLoginRelayRows(): string {
   }).join('')
 }
 
+interface LoginInviteContext {
+  label: string
+  title: string
+  hint: string
+  signetButton: string
+  quickStartHint: string
+}
+
+function loginInviteContext(hash = window.location.hash): LoginInviteContext | null {
+  if (hash.startsWith('#j/')) {
+    const inviteId = hash.slice(3)
+    if (!/^[0-9a-f]{32}$/.test(inviteId)) return null
+    return {
+      label: 'Secure invite',
+      title: 'You have been invited to a CANARY group',
+      hint: 'Sign in with Signet to request the group key over relays.',
+      signetButton: 'Join with Signet',
+      quickStartHint: 'No Nostr account needed. Enter your name to create a local identity and continue joining.',
+    }
+  }
+
+  if (hash.startsWith('#remote/')) {
+    let tokenPayload = hash.slice(8)
+    try {
+      tokenPayload = decodeURIComponent(tokenPayload)
+    } catch {
+      // Base64url invite tokens are already URL-safe.
+    }
+
+    try {
+      const token = base64urlToJson(tokenPayload)
+      assertRemoteInviteToken(token)
+      return {
+        label: 'Remote invite',
+        title: `Join ${token.groupName}`,
+        hint: 'Sign in with Signet to decrypt the welcome message and add this group.',
+        signetButton: 'Join with Signet',
+        quickStartHint: 'No Nostr account needed. Enter your name to create a local identity and continue joining.',
+      }
+    } catch {
+      return {
+        label: 'Remote invite',
+        title: 'You have been invited to a CANARY group',
+        hint: 'Sign in with Signet to continue joining.',
+        signetButton: 'Join with Signet',
+        quickStartHint: 'No Nostr account needed. Enter your name to create a local identity and continue joining.',
+      }
+    }
+  }
+
+  if (hash.startsWith('#inv/')) {
+    try {
+      const invite = unpackInvite(base64urlToBytes(hash.slice(5)))
+      return {
+        label: 'In-person invite',
+        title: `Join ${invite.groupName}`,
+        hint: 'Sign in first, then enter the confirmation words from the admin.',
+        signetButton: 'Continue with Signet',
+        quickStartHint: 'No Nostr account needed. Enter your name to create a local identity and continue joining.',
+      }
+    } catch {
+      return {
+        label: 'In-person invite',
+        title: 'You have been invited to a CANARY group',
+        hint: 'Sign in first, then enter the confirmation words from the admin.',
+        signetButton: 'Continue with Signet',
+        quickStartHint: 'No Nostr account needed. Enter your name to create a local identity and continue joining.',
+      }
+    }
+  }
+
+  return null
+}
+
+let _loginHashRefreshWired = false
+
+function wireLoginHashRefresh(): void {
+  if (_loginHashRefreshWired) return
+  _loginHashRefreshWired = true
+  window.addEventListener('hashchange', () => {
+    if (getState().identity?.pubkey) return
+    if (!document.querySelector('.login-panel')) return
+    showLoginScreen()
+  })
+}
+
 function staleGroupStateError(
   existingGroup: AppGroup | undefined,
   incoming: { epoch?: number; counter?: number; latestInviteIssuedAt?: number },
@@ -1834,29 +1920,36 @@ function showRecoveryPhraseModal(mnemonic: string): void {
 
 function showLoginScreen(): void {
   const app = document.getElementById('app')!
-
-
+  const inviteContext = loginInviteContext()
+  wireLoginHashRefresh()
 
   app.innerHTML = `
     <div class="lock-screen">
       <h1 class="lock-screen__brand">CANARY</h1>
-      <p class="lock-screen__hint">Deepfake-proof identity verification</p>
+      <p class="lock-screen__hint">${inviteContext ? 'Secure group invitation' : 'Deepfake-proof identity verification'}</p>
 
       <div class="login-panel">
+        ${inviteContext ? `
+          <section class="login-invite">
+            <p class="login-invite__label">${escapeHtml(inviteContext.label)}</p>
+            <p class="login-invite__title">${escapeHtml(inviteContext.title)}</p>
+            <p class="settings-hint">${escapeHtml(inviteContext.hint)}</p>
+          </section>
+        ` : ''}
 
         <div class="login-options">
           <section class="login-card login-card--featured">
             <div>
-              <p class="input-label__text">Connect with Nostr</p>
-              <p class="settings-hint">Sync groups across devices via relays.</p>
+              <p class="input-label__text">${inviteContext ? 'Join with Nostr' : 'Connect with Nostr'}</p>
+              <p class="settings-hint">${inviteContext ? 'Use Signet to keep your key in your signer while CANARY joins the group.' : 'Sync groups across devices via relays.'}</p>
             </div>
-            <button class="btn btn--primary login-card__action" id="login-signet" type="button">Sign in with Signet</button>
+            <button class="btn btn--primary login-card__action" id="login-signet" type="button">${escapeHtml(inviteContext?.signetButton ?? 'Sign in with Signet')}</button>
           </section>
 
           <section class="login-card">
             <div>
               <p class="input-label__text">Quick Start</p>
-              <p class="settings-hint">No Nostr account needed. Enter your name to get started.</p>
+              <p class="settings-hint">${escapeHtml(inviteContext?.quickStartHint ?? 'No Nostr account needed. Enter your name to get started.')}</p>
             </div>
             <form id="offline-form" class="login-inline-form" autocomplete="off">
               <input class="input login-inline-form__input" type="text" id="offline-name" placeholder="Enter your name" required />

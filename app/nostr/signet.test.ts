@@ -63,6 +63,7 @@ describe('Signet identity adapter', () => {
   beforeEach(() => {
     signetLoginMock.mockReset()
     signetLogoutMock.mockReset()
+    signetLogoutMock.mockResolvedValue(undefined)
   })
 
   it('maps a Signet session to the legacy external signer identity shape', () => {
@@ -108,5 +109,24 @@ describe('Signet identity adapter', () => {
       methods: ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec'],
       advancedMethods: ['bunker', 'nostrconnect', 'nsec'],
     }))
+  })
+
+  it('rejects auth-only Signet sessions because CANARY needs NIP-44 decrypt', async () => {
+    const authOnly = makeSession({
+      method: 'redirect',
+      signer: {
+        pubkey: PUBKEY,
+        method: 'redirect',
+        capabilities: { canSignEvents: false, hasNip44: false },
+        signEvent: async () => {
+          throw new Error('auth-only')
+        },
+        close: async () => {},
+      },
+    })
+    signetLoginMock.mockResolvedValue(authOnly)
+
+    await expect(signInWithSignet()).rejects.toThrow(/live signer connection.*NIP-44 invite messages/)
+    expect(signetLogoutMock).toHaveBeenCalledWith(authOnly)
   })
 })

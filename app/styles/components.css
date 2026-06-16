@@ -1839,6 +1839,40 @@ select.input option {
   gap: 0.75rem;
 }
 
+.login-invite {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.login-invite__label,
+.login-invite__title {
+  margin: 0;
+}
+
+.login-invite__label {
+  color: var(--amber-400);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.login-invite__title {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 0.375rem;
+}
+
+.login-invite .settings-hint {
+  margin: 0.375rem 0 0;
+}
+
 .login-card {
   background: var(--bg-raised);
   border: 1px solid var(--border);
