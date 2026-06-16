@@ -14,6 +14,14 @@
 
 # [2.7.0](https://github.com/forgesworn/canary-kit/compare/v2.6.2...v2.7.0) (2026-03-27)
 
+## 2.8.3 (2026-06-16)
+
+### Bug Fixes
+
+- improve invite Signet login flow
+
+
+
 ## 2.8.2 (2026-06-16)
 
 ### Bug Fixes
