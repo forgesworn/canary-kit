@@ -14,6 +14,14 @@
 
 # [2.7.0](https://github.com/forgesworn/canary-kit/compare/v2.6.2...v2.7.0) (2026-03-27)
 
+## 2.8.0 (2026-06-16)
+
+### Features
+
+- add relay policy controls
+
+
+
 ## 2.7.6 (2026-06-16)
 
 ### Bug Fixes
