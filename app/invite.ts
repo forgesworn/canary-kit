@@ -10,6 +10,7 @@ import { getEventHash } from 'nostr-tools/pure'
 import { getState, updateGroup } from './state.js'
 import type { AppGroup, AppIdentity } from './types.js'
 import { jsonToBase64, base64ToJson, jsonToBase64url } from './utils/base64.js'
+import { encryptWithSignet, isExternalSignerIdentity, signEventWithSignet } from './nostr/signet.js'
 
 /** Allow wss:// relays, plus ws:// only for localhost development. */
 function isAllowedRelayUrl(url: string): boolean {
@@ -247,32 +248,24 @@ function assertNostrSignedEvent(
 ): asserts signed is NostrSignedEvent {
   const ev = signed as Partial<NostrSignedEvent> | null
   if (!ev || typeof ev !== 'object') {
-    throw new Error('NIP-07 signer returned an invalid event.')
+    throw new Error('External signer returned an invalid event.')
   }
   if (ev.pubkey !== expectedPubkey) {
-    throw new Error('NIP-07 signer used a different public key.')
+    throw new Error('External signer used a different public key.')
   }
   if (typeof ev.sig !== 'string' || !HEX_128_RE.test(ev.sig)) {
-    throw new Error('NIP-07 signer returned an invalid signature.')
+    throw new Error('External signer returned an invalid signature.')
   }
   const expectedId = getEventHash({ ...expectedTemplate, pubkey: expectedPubkey })
   if (ev.id && ev.id !== expectedId) {
-    throw new Error('NIP-07 signer returned a signature for a different event.')
+    throw new Error('External signer returned a signature for a different event.')
   }
-}
-
-function getNip07SignEvent(): ((event: NostrEventTemplate) => Promise<unknown>) | null {
-  if (typeof window === 'undefined') return null
-  const signEvent = (window as any).nostr?.signEvent
-  return typeof signEvent === 'function'
-    ? (event: NostrEventTemplate) => signEvent.call((window as any).nostr, event)
-    : null
 }
 
 /** @internal Exported for tests — not part of the public API. */
 export async function signInviteWithNip07(
   payload: InvitePayload,
-  signEvent: (event: NostrEventTemplate) => Promise<unknown> = getNip07SignEvent() ?? (() => Promise.reject(new Error('NIP-07 signer is not available.'))),
+  signEvent: (event: NostrEventTemplate) => Promise<unknown> = () => Promise.reject(new Error('Signet signer is not available.')),
 ): Promise<string> {
   const template = inviteSignatureEventTemplate(payload)
   const signed = await signEvent(template)
@@ -380,10 +373,13 @@ async function signInviteForIdentity(payload: InvitePayload, identity: AppIdenti
   if (identity.privkey) {
     return signInvite(payload, identity.privkey)
   }
-  if (identity.signerType === 'nip07') {
-    return signInviteWithNip07(payload)
+  if (isExternalSignerIdentity(identity)) {
+    const template = inviteSignatureEventTemplate(payload)
+    const signed = await signEventWithSignet(identity, template, { interactive: true })
+    assertNostrSignedEvent(signed, payload.inviterPubkey, template)
+    return signed.sig
   }
-  throw new Error('Invite creation requires a local key or a NIP-07 signer.')
+  throw new Error('Invite creation requires a local key or a Signet signer.')
 }
 
 /**
@@ -412,7 +408,7 @@ export function createInvite(group: AppGroup): { payload: string; confirmCode: s
   return { payload, confirmCode }
 }
 
-/** Create an invite using either a local key or a NIP-07 signer. */
+/** Create an invite using either a local key or a Signet signer. */
 export async function createInviteAsync(group: AppGroup): Promise<{ payload: string; confirmCode: string }> {
   const { identity } = getState()
   assertInviteAuthorised(identity, group)
@@ -445,7 +441,7 @@ export function createInviteRaw(group: AppGroup): { payload: InvitePayload; conf
 }
 
 /**
- * Create a raw invite using either a local key or a NIP-07 signer.
+ * Create a raw invite using either a local key or a Signet signer.
  * Used by the UI QR path.
  */
 export async function createInviteRawAsync(group: AppGroup): Promise<{ payload: InvitePayload; confirmCode: string }> {
@@ -795,14 +791,6 @@ function buildWelcomePayload(group: AppGroup, inviteId: string): WelcomePayload 
   }
 }
 
-function getNip44Encrypt(): ((recipientPubkey: string, plaintext: string) => Promise<string>) | null {
-  if (typeof window === 'undefined') return null
-  const encrypt = (window as any).nostr?.nip44?.encrypt
-  return typeof encrypt === 'function'
-    ? (recipientPubkey: string, plaintext: string) => encrypt.call((window as any).nostr.nip44, recipientPubkey, plaintext)
-    : null
-}
-
 export function startRemoteInviteSession(group: AppGroup): RemoteInviteSession {
   const { identity } = getState()
   assertRemoteInviteAuthorised(identity, group)
@@ -844,18 +832,18 @@ export async function startRemoteInviteSessionAsync(group: AppGroup): Promise<Re
         adminPrivkey: identity.privkey,
         relays,
       })
-    : identity.signerType === 'nip07'
+    : isExternalSignerIdentity(identity)
       ? await createRemoteInviteTokenWithNip07({
           groupName: group.name,
           groupId: group.id,
           adminPubkey: identity.pubkey,
           relays,
-          signEvent: signEvent => signInviteWithNip07Event(signEvent),
+          signEvent: event => signEventWithSignet(identity, event, { interactive: true }),
         })
       : null
 
   if (!token) {
-    throw new Error('Invite creation requires a local key or a NIP-07 signer.')
+    throw new Error('Invite creation requires a local key or a Signet signer.')
   }
 
   _activeRemoteSession = {
@@ -865,14 +853,6 @@ export async function startRemoteInviteSessionAsync(group: AppGroup): Promise<Re
   }
 
   return _activeRemoteSession
-}
-
-function signInviteWithNip07Event(event: NostrEventTemplate): Promise<unknown> {
-  const signEvent = getNip07SignEvent()
-  if (!signEvent) {
-    return Promise.reject(new Error('NIP-07 signer is not available.'))
-  }
-  return signEvent(event)
 }
 
 export function createRemoteWelcomeEnvelope(group: AppGroup, joinerPubkey: string): string {
@@ -911,15 +891,11 @@ export async function createRemoteWelcomeEnvelopeAsync(group: AppGroup, joinerPu
     })
   }
 
-  if (identity.signerType === 'nip07') {
-    const encrypt = getNip44Encrypt()
-    if (!encrypt) {
-      throw new Error('NIP-07 extension does not support NIP-44 encryption.')
-    }
-    return encrypt(joinerPubkey, JSON.stringify(welcome))
+  if (isExternalSignerIdentity(identity)) {
+    return encryptWithSignet(identity, joinerPubkey, JSON.stringify(welcome), { interactive: true })
   }
 
-  throw new Error('No local key or NIP-07 signer — cannot create welcome envelope.')
+  throw new Error('No local key or Signet signer — cannot create welcome envelope.')
 }
 
 export function getRemoteInviteSession(): RemoteInviteSession | null {

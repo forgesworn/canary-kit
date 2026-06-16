@@ -7,6 +7,7 @@ import { getGroupIdentity, isPersonasInitialised } from './persona.js'
 import { connectRelays, isConnected, getRelayCount, waitForConnection } from './nostr/connect.js'
 import { GroupSigner } from './nostr/signer.js'
 import { NostrSyncTransport } from './nostr/adapter.js'
+import { canUseIdentitySigner } from './nostr/signet.js'
 import { updateRelayStatus, flashSyncing } from './components/header.js'
 import { showToast } from './components/toast.js'
 import { recordCheckin, startLivenessHeartbeat, stopLivenessHeartbeat } from './components/liveness.js'
@@ -64,7 +65,7 @@ export function getTransport(): SyncTransport | null {
 export async function ensureTransport(readRelays: string[], writeRelays?: string[], groupId?: string): Promise<void> {
   const { identity } = getState()
   const effectiveWrite = writeRelays ?? readRelays
-  const canConnect = !!identity?.privkey || identity?.signerType === 'nip07'
+  const canConnect = canUseIdentitySigner(identity)
   if (!identity || !canConnect || (readRelays.length === 0 && effectiveWrite.length === 0)) return
 
   try {
@@ -127,7 +128,7 @@ export function reRegisterGroup(groupId: string): void {
   if (!identity?.privkey || !group?.seed) return
 
   _transport.unregisterGroup(groupId)
-  if (!isPersonasInitialised()) return // NIP-07 or not yet initialised
+  if (!isPersonasInitialised()) return // external signer or not yet initialised
   const groupIdentity = getGroupIdentity(group.personaId, groupId, group.epoch)
   const signer = new GroupSigner(groupIdentity)
   _transport.registerGroup(groupId, group.seed, signer, group.members, _recoveryOptions(groupId))
@@ -228,7 +229,7 @@ export function subscribeToGroup(groupId: string): void {
     const { identity, groups } = getState()
     const group = groups[groupId]
     if (identity?.privkey && group?.seed) {
-      if (!isPersonasInitialised()) return // NIP-07 or not yet initialised
+      if (!isPersonasInitialised()) return // external signer or not yet initialised
       const groupIdentity = getGroupIdentity(group.personaId, groupId, group.epoch)
       const signer = new GroupSigner(groupIdentity)
       ;(_transport as NostrSyncTransport).registerGroup(groupId, group.seed, signer, group.members, _recoveryOptions(groupId))

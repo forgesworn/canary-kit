@@ -14,6 +14,7 @@ import { escapeHtml } from '../utils/escape.js'
 import { identityNodeLabel, identityNodeType } from '../types.js'
 import type { AppPersona, AppGroup, IdentityNodeType } from '../types.js'
 import type { DerivationPathSegment } from '../persona.js'
+import { identitySignerLabel } from '../nostr/signet.js'
 
 // ── Module state ──────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ function identityCapabilityStatus(): { label: string; detail: string; recoveryBa
     return { label: 'No identity', detail: 'Create or restore a mnemonic-backed root to use the identity tree and recovery features.', recoveryBacked: false }
   }
   if (identity.signerType === 'nip07') {
-    return { label: 'Extension managed', detail: 'Your browser extension keeps the root secret private, so canary-kit cannot derive or back up the tree here.', recoveryBacked: false }
+    return { label: 'Signet managed', detail: 'Your external signer keeps the root secret private, so canary-kit cannot derive or back up the tree here.', recoveryBacked: false }
   }
   if (identity.mnemonic) {
     return { label: 'Mnemonic-backed root', detail: 'This root supports the full nsec-tree workflow: derived personas, derived accounts, proofs, and phrase/Shamir recovery.', recoveryBacked: true }
@@ -866,13 +867,14 @@ const STYLES = `
   }
 `
 
-// ── Render: NIP-07 fallback ──────────────────────────────────
+// ── Render: external signer fallback ─────────────────────────
 
 function renderNip07Fallback(): string {
   const { identity, groups } = getState()
   const pubkey = identity?.pubkey ?? ''
   const npubShort = pubkey ? `${pubkey.slice(0, 8)}\u2026${pubkey.slice(-4)}` : 'unknown'
   const groupCount = Object.keys(groups).length
+  const signerLabel = identitySignerLabel(identity)
 
   return `
     <div class="id-nip07">
@@ -881,19 +883,19 @@ function renderNip07Fallback(): string {
           <div class="id-nip07__icon">\u{1F511}</div>
           <div>
             <div style="font-weight: 600; font-size: 0.9375rem;">Your Identity</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(npubShort)} \u00B7 NIP-07 extension \u00B7 ${groupCount} group${groupCount !== 1 ? 's' : ''}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(npubShort)} \u00B7 ${escapeHtml(signerLabel)} \u00B7 ${groupCount} group${groupCount !== 1 ? 's' : ''}</div>
           </div>
         </div>
       </div>
 
       <div class="id-nip07__why">
         <h3>Why can\u2019t I manage personas?</h3>
-        <p>Your NIP-07 browser extension keeps your private key secure by never exposing it to apps. This is good security \u2014 but it means canary-kit cannot derive sub-identities from your key.</p>
-        <p>Personas, Shamir backup, nsec export, and linkage proofs all require the raw private key for cryptographic derivation. Your extension only allows signing and encryption.</p>
+        <p>Your external signer keeps your private key secure by never exposing it to apps. This is good security \u2014 but it means canary-kit cannot derive sub-identities from your key.</p>
+        <p>Personas, Shamir backup, nsec export, and linkage proofs all require the raw private key for cryptographic derivation. Your signer only allows signing and encryption.</p>
         <p>To use persona features, create a new account with a recovery phrase or import an existing one.</p>
         <details>
           <summary>Technical detail</summary>
-          <p style="margin: 0.5rem 0 0; line-height: 1.5;">nsec-tree derives child keys via <code>HMAC-SHA256(master_key, purpose)</code>. NIP-07 extensions expose <code>signEvent()</code> and <code>nip44.encrypt()</code> but not the raw key bytes. A future NIP could add <code>deriveChild(purpose, index)</code> to bridge this gap.</p>
+          <p style="margin: 0.5rem 0 0; line-height: 1.5;">nsec-tree derives child keys via <code>HMAC-SHA256(master_key, purpose)</code>. Signet signers expose <code>signEvent()</code> and <code>nip44.encrypt()</code> but not the raw key bytes. A future NIP could add <code>deriveChild(purpose, index)</code> to bridge this gap.</p>
         </details>
       </div>
     </div>

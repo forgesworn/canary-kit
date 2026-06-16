@@ -36,7 +36,7 @@ import { renderIdentities } from './views/identities.js'
 import { showCallVerify } from './components/call-verify.js'
 import { assertRemoteInviteToken, decodeWelcomePayload, decryptWelcomeEnvelope } from './crypto/remote-invite.js'
 import { sendJoinRequest, fetchInviteToken } from './nostr/invite-relay.js'
-import { resolveSigner, hasNip07 } from './nostr/signer.js'
+import { resolveSigner } from './nostr/signer.js'
 import { decode as nip19decode } from 'nostr-tools/nip19'
 import { getPublicKey } from 'nostr-tools/pure'
 import { broadcastAction, ensureTransport, subscribeToAllGroups, teardownSync } from './sync.js'
@@ -44,6 +44,7 @@ import { fetchVault, fetchVaultNip07, publishVault, publishVaultNip07, mergeVaul
 import { initPersonas, initPersonasFromTree, destroyPersonas } from './persona.js'
 import { findById } from './persona-tree.js'
 import { fetchPersonaProfiles, publishPersonaProfile } from './nostr/profiles.js'
+import { canUseIdentitySigner, decryptWithSignet, identitySignerLabel, isExternalSignerIdentity, signInWithSignet } from './nostr/signet.js'
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
 import { escapeHtml } from './utils/escape.js'
@@ -773,19 +774,15 @@ async function acceptWelcomeEnvelope(
         adminPubkey: token.adminPubkey,
         expectedInviteId: token.inviteId,
       })
-    : identity.signerType === 'nip07'
+    : isExternalSignerIdentity(identity)
       ? await (async () => {
-          const decrypt = (window as any).nostr?.nip44?.decrypt
-          if (typeof decrypt !== 'function') {
-            throw new Error('NIP-07 extension does not support NIP-44 decryption.')
-          }
-          const plaintext = await decrypt.call((window as any).nostr.nip44, token.adminPubkey, envelope)
+          const plaintext = await decryptWithSignet(identity, token.adminPubkey, envelope, { interactive: true })
           return decodeWelcomePayload(plaintext, token.inviteId)
         })()
       : null
 
   if (!welcome) {
-    throw new Error('No local key or NIP-07 signer — cannot decrypt welcome message.')
+    throw new Error('No local key or Signet signer — cannot decrypt welcome message.')
   }
 
   // Build AppGroup from welcome payload
@@ -870,7 +867,7 @@ async function acceptWelcomeEnvelope(
 
 function showRelayJoinScreen(inviteId: string): void {
   const { identity, settings } = getState()
-  if (!identity?.pubkey || (!identity.privkey && identity.signerType !== 'nip07')) {
+  if (!identity?.pubkey || !canUseIdentitySigner(identity)) {
     showToast('No local identity — create or import one first.', 'error')
     return
   }
@@ -990,7 +987,7 @@ function showRemoteJoinScreen(tokenPayload: string): void {
 
     const token = parsed
     const { identity, settings } = getState()
-    if (!identity?.pubkey || (!identity.privkey && identity.signerType !== 'nip07')) {
+    if (!identity?.pubkey || !canUseIdentitySigner(identity)) {
       showToast('No local identity — create or import one first.', 'error')
       return
     }
@@ -1382,7 +1379,7 @@ function wireGlobalEvents(): void {
 }
 
 // ── Local identity ────────────────────────────────────────────
-// Always generates a local keypair. NIP-07 is opt-in via settings.
+// Always generates a local keypair. Signet is opt-in via the login/account UI.
 
 async function ensureLocalIdentity(): Promise<void> {
   let { identity } = getState()
@@ -1419,10 +1416,10 @@ function startLiveVaultSync(): void {
         const { decryptVault } = await import('./nostr/vault.js')
         return decryptVault(ct, identity.privkey!, identity.pubkey)
       }
-    : identity.signerType === 'nip07'
+    : isExternalSignerIdentity(identity)
       ? async (ct: string) => {
           try {
-            return await (window as any).nostr.nip44.decrypt(identity.pubkey, ct) as string
+            return await decryptWithSignet(identity, identity.pubkey, ct, { interactive: false })
           } catch { return null }
         }
       : null
@@ -1484,8 +1481,9 @@ async function bootSync(): Promise<void> {
     return
   }
 
-  if (!hasPrivkey && identity?.signerType !== 'nip07') {
-    console.warn('[canary:boot] No privkey and no NIP-07 — sync disabled')
+  const hasExternalSigner = isExternalSignerIdentity(identity)
+  if (!hasPrivkey && !hasExternalSigner) {
+    console.warn('[canary:boot] No privkey and no Signet signer — sync disabled')
     showToast('Sync disabled — no private key', 'warning', 5000)
     return
   }
@@ -1567,18 +1565,18 @@ async function bootSync(): Promise<void> {
         }
       }).catch((err) => console.error('[canary:push] Re-registration failed:', err))
     }
-  } else if (identity?.signerType === 'nip07') {
-    // NIP-07: relay connection + vault sync via browser extension
+  } else if (hasExternalSigner) {
+    // Signet: relay connection + vault sync via external signer
     const { connectRelays, waitForConnection } = await import('./nostr/connect.js')
     connectRelays(allReadRelays, allWriteRelays)
 
-    // Vault sync via NIP-07 NIP-44
+    // Vault sync via Signet NIP-44
     try {
       await waitForConnection()
-      console.info('[canary:vault] NIP-07 vault sync starting...')
-      const vaultData = await fetchVaultNip07(identity.pubkey)
+      console.info('[canary:vault] Signet vault sync starting...')
+      const vaultData = await fetchVaultNip07(identity.pubkey, identity, { interactive: false })
       const vaultGroups = vaultData?.groups
-      console.info('[canary:vault] NIP-07 vault result:', vaultGroups ? `${Object.keys(vaultGroups).length} group(s)` : 'null')
+      console.info('[canary:vault] Signet vault result:', vaultGroups ? `${Object.keys(vaultGroups).length} group(s)` : 'null')
       if (vaultGroups && Object.keys(vaultGroups).length > 0) {
         const { groups: localGroups } = getState()
         const merged = mergeVaultGroups(localGroups, vaultGroups, getState().deletedGroupIds)
@@ -1598,7 +1596,7 @@ async function bootSync(): Promise<void> {
           }
         }
       }
-      // Merge vault persona metadata (NIP-07 has no local keys, so just metadata)
+      // Merge vault persona metadata (external signers have no local derivation keys).
       if (vaultData?.personas && Object.keys(vaultData.personas).length > 0) {
         const { personas: currentPersonas } = getState()
         const updated = { ...currentPersonas }
@@ -1612,13 +1610,13 @@ async function bootSync(): Promise<void> {
         update({ personas: updated })
       }
     } catch (err) {
-      console.warn('[canary:vault] NIP-07 vault sync failed:', err)
+      console.warn('[canary:vault] Signet vault sync failed:', err)
     }
 
     startLiveVaultSync()
     showToast(`Connected to ${totalRelays} relay(s)`, 'success', 2000)
   } else {
-    // No privkey and no NIP-07 — minimal relay connection
+    // No privkey and no Signet signer — minimal relay connection
     const { connectRelays } = await import('./nostr/connect.js')
     connectRelays(allReadRelays, allWriteRelays)
     showToast(`Connected to ${totalRelays} relay(s)`, 'success', 2000)
@@ -1786,7 +1784,7 @@ function showLoginScreen(): void {
             <button class="btn btn--primary" type="submit">Login with nsec</button>
           </form>
 
-          <button class="btn" id="login-nip07" type="button" style="width: 100%; margin-top: 0.5rem;">Use Browser Extension (NIP-07)</button>
+          <button class="btn" id="login-signet" type="button" style="width: 100%; margin-top: 0.5rem;">Sign in with Signet</button>
 
           <details style="margin-top: 0.75rem;">
             <summary class="settings-hint" style="cursor: pointer; user-select: none;">Relays</summary>
@@ -2019,18 +2017,18 @@ function showLoginScreen(): void {
     } catch (err) { alert(err instanceof Error ? err.message : 'Invalid nsec format.') }
   })
 
-  // NIP-07 extension
-  app.querySelector('#login-nip07')?.addEventListener('click', async () => {
-    if (!hasNip07()) {
-      alert('No Nostr extension found. Install Alby, nos2x, or another NIP-07 extension and reload.')
-      return
-    }
+  // Signet login
+  app.querySelector('#login-signet')?.addEventListener('click', async () => {
     try {
       const currentIdentity = getState().identity
-      const pubkey = await (window as any).nostr.getPublicKey()
-      update({ identity: preserveMnemonic({ pubkey, signerType: 'nip07', displayName: 'You' }, currentIdentity) })
+      const signedIn = await signInWithSignet({
+        theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark',
+        displayNameFallback: currentIdentity?.displayName ?? 'You',
+      })
+      if (!signedIn) return
+      update({ identity: preserveMnemonic(signedIn, currentIdentity) })
       await bootApp()
-    } catch { alert('Extension rejected the request.') }
+    } catch (err) { alert(err instanceof Error ? err.message : 'Signet rejected the request.') }
   })
 
   // ── Relay list editor on login screen (manages defaultWriteRelays) ───
@@ -2196,7 +2194,7 @@ const VAULT_DEBOUNCE_MS = 30_000
 function scheduleVaultPublish(): void {
   const { identity, groups } = getState()
   if (!identity?.pubkey) return
-  if (!identity.privkey && identity.signerType !== 'nip07') return
+  if (!canUseIdentitySigner(identity)) return
   if (Object.keys(groups).length === 0) return
 
   if (_vaultTimer) clearTimeout(_vaultTimer)
@@ -2205,8 +2203,8 @@ function scheduleVaultPublish(): void {
     if (!id?.pubkey || Object.keys(g).length === 0) return
     if (id.privkey) {
       publishVault(g, id.privkey, id.pubkey, p, d)
-    } else if (id.signerType === 'nip07') {
-      publishVaultNip07(g, id.pubkey, p, d)
+    } else if (isExternalSignerIdentity(id)) {
+      publishVaultNip07(g, id.pubkey, p, d, id, { interactive: false })
     }
   }, VAULT_DEBOUNCE_MS)
 }
@@ -2218,8 +2216,8 @@ function publishVaultNow(): void {
 
   const publish = identity.privkey
     ? publishVault(groups, identity.privkey, identity.pubkey, personas, deletedGroupIds)
-    : identity.signerType === 'nip07'
-      ? publishVaultNip07(groups, identity.pubkey, personas, deletedGroupIds)
+    : isExternalSignerIdentity(identity)
+      ? publishVaultNip07(groups, identity.pubkey, personas, deletedGroupIds, identity, { interactive: false })
       : null
 
   publish
@@ -2240,22 +2238,22 @@ async function manualVaultSync(): Promise<void> {
     showToast('No identity — cannot sync', 'error')
     return
   }
-  if (!identity.privkey && identity.signerType !== 'nip07') {
-    showToast('No private key or extension — cannot sync', 'error')
+  if (!canUseIdentitySigner(identity)) {
+    showToast('No private key or Signet signer — cannot sync', 'error')
     return
   }
 
-  const isNip07 = !identity.privkey && identity.signerType === 'nip07'
+  const isSignet = isExternalSignerIdentity(identity)
   const shortPk = identity.pubkey.slice(0, 8)
-  showToast(`Syncing as ${shortPk}\u2026${isNip07 ? ' (NIP-07)' : ''}`, 'info', 3000)
-  console.info(`[canary:vault] Manual sync for pubkey ${shortPk} (${isNip07 ? 'NIP-07' : 'local key'})`)
+  showToast(`Syncing as ${shortPk}\u2026${isSignet ? ` (${identitySignerLabel(identity)})` : ''}`, 'info', 3000)
+  console.info(`[canary:vault] Manual sync for pubkey ${shortPk} (${isSignet ? identitySignerLabel(identity) : 'local key'})`)
 
   try {
     // Publish local state first so the other device can pick it up
     const { deletedGroupIds } = getState()
     if (Object.keys(groups).length > 0) {
-      if (isNip07) {
-        await publishVaultNip07(groups, identity.pubkey, personas, deletedGroupIds)
+      if (isSignet) {
+        await publishVaultNip07(groups, identity.pubkey, personas, deletedGroupIds, identity, { interactive: true })
       } else {
         await publishVault(groups, identity.privkey!, identity.pubkey, personas, deletedGroupIds)
       }
@@ -2264,8 +2262,8 @@ async function manualVaultSync(): Promise<void> {
     // Fetch remote vault and merge
     const { waitForConnection } = await import('./nostr/connect.js')
     await waitForConnection()
-    const vaultData = isNip07
-      ? await fetchVaultNip07(identity.pubkey)
+    const vaultData = isSignet
+      ? await fetchVaultNip07(identity.pubkey, identity, { interactive: true })
       : await fetchVault(identity.privkey!, identity.pubkey)
     const vaultGroups = vaultData?.groups
 

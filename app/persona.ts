@@ -74,13 +74,13 @@ function validateDerivationIndex(index: number | undefined): number {
  * default persona set plus any custom names, and populates the cache.
  * Returns AppPersona records keyed by id, suitable for storing in AppState.
  *
- * If the identity has no privkey (NIP-07 signer), returns an empty record.
+ * If the identity has no privkey (external signer), returns an empty record.
  */
 export function initPersonas(
   identity: AppIdentity,
   customNames?: string[],
 ): Record<string, AppPersona> {
-  // NIP-07 signers have no local privkey — personas require key material
+  // External signers have no local privkey — personas require key material.
   if (!identity.privkey || identity.signerType === 'nip07') {
     return {}
   }

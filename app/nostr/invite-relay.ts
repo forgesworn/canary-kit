@@ -16,6 +16,7 @@ import { encrypt as nip44encrypt, decrypt as nip44decrypt, getConversationKey } 
 import { hexToBytes } from 'canary-kit/crypto'
 import type { RemoteInviteToken } from '../crypto/remote-invite.js'
 import type { AppIdentity } from '../types.js'
+import { decryptWithSignet, encryptWithSignet, isExternalSignerIdentity, signEventWithSignet } from './signet.js'
 
 const HANDSHAKE_KIND = 25519
 
@@ -32,29 +33,20 @@ type SignedEvent = EventTemplate & {
   sig: string
 }
 
-function getNip07Provider(): any | null {
-  if (typeof window === 'undefined') return null
-  return (window as any).nostr ?? null
-}
-
 async function signEvent(identity: AppIdentity, template: EventTemplate): Promise<SignedEvent> {
   if (identity.privkey) {
     return finalizeEvent(template, hexToBytes(identity.privkey)) as SignedEvent
   }
 
-  if (identity.signerType === 'nip07') {
-    const provider = getNip07Provider()
-    if (typeof provider?.signEvent !== 'function') {
-      throw new Error('NIP-07 signer is not available.')
-    }
-    const signed = await provider.signEvent(template)
+  if (isExternalSignerIdentity(identity)) {
+    const signed = await signEventWithSignet(identity, template, { interactive: true })
     if (!signed || signed.pubkey !== identity.pubkey) {
-      throw new Error('NIP-07 signer used a different public key.')
+      throw new Error('Signet signer used a different public key.')
     }
     return signed as SignedEvent
   }
 
-  throw new Error('No local key or NIP-07 signer available.')
+  throw new Error('No local key or Signet signer available.')
 }
 
 async function encryptTo(identity: AppIdentity, peerPubkey: string, plaintext: string): Promise<string> {
@@ -63,15 +55,11 @@ async function encryptTo(identity: AppIdentity, peerPubkey: string, plaintext: s
     return nip44encrypt(plaintext, convKey)
   }
 
-  if (identity.signerType === 'nip07') {
-    const provider = getNip07Provider()
-    if (typeof provider?.nip44?.encrypt !== 'function') {
-      throw new Error('NIP-07 extension does not support NIP-44 encryption.')
-    }
-    return provider.nip44.encrypt(peerPubkey, plaintext)
+  if (isExternalSignerIdentity(identity)) {
+    return encryptWithSignet(identity, peerPubkey, plaintext, { interactive: true })
   }
 
-  throw new Error('No local key or NIP-07 encryption available.')
+  throw new Error('No local key or Signet encryption available.')
 }
 
 async function decryptFrom(identity: AppIdentity, peerPubkey: string, ciphertext: string): Promise<string> {
@@ -80,15 +68,11 @@ async function decryptFrom(identity: AppIdentity, peerPubkey: string, ciphertext
     return nip44decrypt(ciphertext, convKey)
   }
 
-  if (identity.signerType === 'nip07') {
-    const provider = getNip07Provider()
-    if (typeof provider?.nip44?.decrypt !== 'function') {
-      throw new Error('NIP-07 extension does not support NIP-44 decryption.')
-    }
-    return provider.nip44.decrypt(peerPubkey, ciphertext)
+  if (isExternalSignerIdentity(identity)) {
+    return decryptWithSignet(identity, peerPubkey, ciphertext, { interactive: true })
   }
 
-  throw new Error('No local key or NIP-07 decryption available.')
+  throw new Error('No local key or Signet decryption available.')
 }
 
 function errorMessage(err: unknown): string {

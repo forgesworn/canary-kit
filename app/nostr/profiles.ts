@@ -254,7 +254,7 @@ function hexToBytes(hex: string): Uint8Array {
  * Publishes to PROFILE_RELAYS + the configured write relay so other
  * members can discover the user's display name.
  *
- * Skipped for NIP-07 users (their extension manages kind 0).
+ * Skipped for external signer users (their signer/app manages kind 0).
  */
 export function publishKind0(name: string, privkeyHex: string): void {
   // Delay slightly so relay connections can establish after bootApp()

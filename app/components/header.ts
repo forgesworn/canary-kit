@@ -1,7 +1,6 @@
 // app/components/header.ts — Header component: brand, theme toggle, relay status, identity
 
 import { getState, update } from '../state.js'
-import { hasNip07 } from '../nostr/signer.js'
 import { teardownSync } from '../sync.js'
 import { isConnected, getRelayCount } from '../nostr/connect.js'
 import type { AppIdentity } from '../types.js'
@@ -10,6 +9,7 @@ import { getPublicKey } from 'nostr-tools/pure'
 import { hexToBytes } from 'canary-kit/crypto'
 import { escapeHtml } from '../utils/escape.js'
 import { renderPersonaPicker, wirePersonaPicker } from './persona-picker.js'
+import { identitySignerLabel, logoutSignetSession, signInWithSignet } from '../nostr/signet.js'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -276,7 +276,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
   const { identity } = getState()
   const pk = identity?.pubkey ?? ''
   const shortPk = pk ? `${pk.slice(0, 8)}\u2026${pk.slice(-8)}` : 'None'
-  const signerLabel = identity?.signerType === 'nip07' ? 'Extension (NIP-07)' : 'Local key'
+  const signerLabel = identitySignerLabel(identity)
 
   const popover = document.createElement('div')
   popover.id = 'identity-popover'
@@ -327,7 +327,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
           </form>
         </div>
 
-        <button class="btn btn--sm" id="nip07-connect-btn" type="button" style="width: 100%;">Use Browser Extension (NIP-07)</button>
+        <button class="btn btn--sm" id="signet-connect-btn" type="button" style="width: 100%;">Sign in with Signet</button>
       </div>
     </details>
   `
@@ -337,6 +337,7 @@ function showIdentityPopover(anchor: HTMLElement): void {
   // Logout
   popover.querySelector('#identity-logout-btn')?.addEventListener('click', () => {
     teardownSync()
+    void logoutSignetSession()
     update({ identity: null, groups: {}, activeGroupId: null })
     popover.remove()
     window.location.reload()
@@ -418,26 +419,22 @@ function showIdentityPopover(anchor: HTMLElement): void {
     if (loginWithNsec(input.value)) popover.remove()
   })
 
-  // Connect NIP-07
-  popover.querySelector('#nip07-connect-btn')?.addEventListener('click', async () => {
-    if (!hasNip07()) {
-      alert('No Nostr extension found. Install Alby, nos2x, or another NIP-07 extension and reload.')
-      return
-    }
+  // Connect Signet
+  popover.querySelector('#signet-connect-btn')?.addEventListener('click', async () => {
     try {
       teardownSync()
-      const pubkey = await (window as any).nostr.getPublicKey()
-      const newIdentity = preserveMnemonic({
-        pubkey,
-        signerType: 'nip07',
-        displayName: identity?.displayName ?? 'You',
-      }, identity)
+      const signedIn = await signInWithSignet({
+        theme: currentTheme(),
+        displayNameFallback: identity?.displayName ?? 'You',
+      })
+      if (!signedIn) return
+      const newIdentity = preserveMnemonic(signedIn, identity)
       update({ identity: newIdentity, groups: {}, activeGroupId: null })
       updateIdentityDisplay()
       document.dispatchEvent(new CustomEvent('canary:resync'))
       popover.remove()
-    } catch {
-      alert('Extension rejected the request.')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Signet rejected the request.')
     }
   })
 

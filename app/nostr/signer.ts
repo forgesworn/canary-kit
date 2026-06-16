@@ -1,4 +1,4 @@
-// app/nostr/signer.ts — EventSigner implementations: NIP-07, local keypair, and group-derived identity
+// app/nostr/signer.ts — EventSigner implementations for local keypair and group-derived identity
 
 import type { EventSigner } from 'canary-kit/sync'
 import type { Identity } from 'nsec-tree/core'
@@ -20,25 +20,6 @@ function hexToBytes(hex: string): Uint8Array {
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-// ── NIP-07 Signer ──────────────────────────────────────────────
-
-/** Delegates signing and encryption to a NIP-07 browser extension (Alby, nos2x). */
-export class Nip07Signer implements EventSigner {
-  constructor(public readonly pubkey: string) {}
-
-  async sign(event: unknown): Promise<unknown> {
-    return (window as any).nostr.signEvent(event)
-  }
-
-  async encrypt(plaintext: string, recipientPubkey: string): Promise<string> {
-    return (window as any).nostr.nip44.encrypt(recipientPubkey, plaintext)
-  }
-
-  async decrypt(ciphertext: string, senderPubkey: string): Promise<string> {
-    return (window as any).nostr.nip44.decrypt(senderPubkey, ciphertext)
-  }
 }
 
 // ── Local Key Signer ──────────────────────────────────────────
@@ -93,14 +74,9 @@ export class GroupSigner {
 
 // ── Signer resolution ──────────────────────────────────────────
 
-/** Check if a NIP-07 extension is available. */
-export function hasNip07(): boolean {
-  return typeof (window as any).nostr?.signEvent === 'function'
-}
-
 /**
  * Resolve a local keypair signer.
- * Always uses a local keypair — NIP-07 is opt-in via settings.
+ * Always uses a local keypair — Signet-backed signers are opt-in via login.
  * Generates a new keypair if no privkey is provided.
  */
 export async function resolveSigner(

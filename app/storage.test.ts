@@ -142,6 +142,24 @@ describe('persistState — clean-install PIN regression', () => {
     expect(JSON.parse(writtenGroups!)).toHaveProperty('test-group')
   })
 
+  it('restores the Signet login method for external signer identities', () => {
+    store.set('canary:identity', JSON.stringify({
+      pubkey: 'a'.repeat(64),
+      signerType: 'nip07',
+      signerMethod: 'bunker',
+      displayName: 'Alice',
+    }))
+
+    restoreState()
+
+    expect(getState().identity).toMatchObject({
+      pubkey: 'a'.repeat(64),
+      signerType: 'nip07',
+      signerMethod: 'bunker',
+      displayName: 'Alice',
+    })
+  })
+
   it('encrypts groups, identity, and active group when PIN is enabled', async () => {
     const mnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
     const { pubkey, privkey } = mnemonicToKeypair(mnemonic)

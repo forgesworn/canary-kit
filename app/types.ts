@@ -122,14 +122,19 @@ export interface AppPersona {
   archived?: boolean
 }
 
+export type SignetLoginMethod = 'nip07' | 'redirect' | 'bunker' | 'nsec' | 'amber'
+
 /** The local identity (Nostr keypair) for this device. */
 export interface AppIdentity {
   pubkey: string
-  privkey?: string          // hex, stored locally when no NIP-07 extension
+  privkey?: string          // hex, stored locally when no external signer is used
   nsec?: string
   mnemonic?: string
   displayName?: string
   picture?: string           // kind 0 profile picture URL
+  /** Actual Signet login backend when signerType is the legacy external-signer value. */
+  signerMethod?: SignetLoginMethod
+  /** 'nip07' is the legacy persisted value for external Signet-managed signers. */
   signerType: 'nip07' | 'local'
 }
 

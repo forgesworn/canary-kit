@@ -4,8 +4,9 @@
 import { finalizeEvent, verifyEvent } from 'nostr-tools/pure'
 import { encrypt as nip44encrypt, decrypt as nip44decrypt, getConversationKey } from 'nostr-tools/nip44'
 import { getPool, getReadRelayUrls, getWriteRelayUrls } from './connect.js'
-import type { AppGroup, AppPersona } from '../types.js'
+import type { AppGroup, AppIdentity, AppPersona } from '../types.js'
 import { generatePersonaId } from '../persona-tree.js'
+import { decryptWithSignet, encryptWithSignet, signEventWithSignet } from './signet.js'
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -325,15 +326,14 @@ export async function fetchVault(
   })
 }
 
-// ── NIP-07 Vault (browser extension signing + encryption) ───────
+// ── Signet Vault (external signer signing + encryption) ───────
 
-/** Check if NIP-07 extension supports NIP-44. */
-function hasNip07Nip44(): boolean {
-  return !!(window as any).nostr?.nip44?.encrypt && !!(window as any).nostr?.nip44?.decrypt
+interface SignetVaultOptions {
+  interactive?: boolean
 }
 
 /**
- * Publish vault using NIP-07 for signing and NIP-44 encryption.
+ * Publish vault using Signet for signing and NIP-44 encryption.
  * Self-encrypts by passing the user's own pubkey as the recipient.
  */
 export async function publishVaultNip07(
@@ -341,16 +341,17 @@ export async function publishVaultNip07(
   pubkey: string,
   personas: Record<string, AppPersona> = {},
   deletedGroupIds: string[] = [],
+  identity: AppIdentity = { pubkey, signerType: 'nip07', signerMethod: 'nip07' },
+  options: SignetVaultOptions = {},
 ): Promise<void> {
   const pool = getPool()
   if (!pool) throw new Error('No relay pool — connect first')
-  if (!hasNip07Nip44()) throw new Error('NIP-07 extension does not support NIP-44')
 
   const writeRelays = getWriteRelayUrls()
   if (writeRelays.length === 0) throw new Error('No write relays configured')
 
   const json = serialiseVault(groups, personas, deletedGroupIds)
-  const ciphertext: string = await (window as any).nostr.nip44.encrypt(pubkey, json)
+  const ciphertext = await encryptWithSignet(identity, pubkey, json, options)
 
   const now = Math.floor(Date.now() / 1000)
   const template = {
@@ -363,32 +364,30 @@ export async function publishVaultNip07(
     content: ciphertext,
   }
 
-  const signed = await (window as any).nostr.signEvent(template)
+  const signed = await signEventWithSignet(identity, template, options)
 
-  console.info(`[canary:vault] Publishing vault via NIP-07 (${Object.keys(groups).length} groups) to`, writeRelays)
+  console.info(`[canary:vault] Publishing vault via Signet (${Object.keys(groups).length} groups) to`, writeRelays)
   document.dispatchEvent(new CustomEvent('canary:vault-syncing'))
   const results = await Promise.allSettled(pool.publish(writeRelays, signed))
   const ok = results.filter(r => r.status === 'fulfilled').length
   const fail = results.filter(r => r.status === 'rejected').length
-  console.info(`[canary:vault] NIP-07 publish results: ${ok} OK, ${fail} failed`)
+  console.info(`[canary:vault] Signet publish results: ${ok} OK, ${fail} failed`)
   document.dispatchEvent(new CustomEvent('canary:vault-synced', {
     detail: { timestamp: now },
   }))
 }
 
 /**
- * Fetch and decrypt vault using NIP-07 for NIP-44 decryption.
+ * Fetch and decrypt vault using Signet for NIP-44 decryption.
  */
 export async function fetchVaultNip07(
   pubkey: string,
+  identity: AppIdentity = { pubkey, signerType: 'nip07', signerMethod: 'nip07' },
+  options: SignetVaultOptions = {},
 ): Promise<VaultData | null> {
   const pool = getPool()
   if (!pool) {
     console.warn('[canary:vault] fetchVaultNip07: no pool')
-    return null
-  }
-  if (!hasNip07Nip44()) {
-    console.warn('[canary:vault] fetchVaultNip07: extension lacks NIP-44')
     return null
   }
 
@@ -398,7 +397,7 @@ export async function fetchVaultNip07(
     return null
   }
 
-  console.info(`[canary:vault] Fetching vault via NIP-07 from`, readRelays, 'for', pubkey.slice(0, 8))
+  console.info(`[canary:vault] Fetching vault via Signet from`, readRelays, 'for', pubkey.slice(0, 8))
 
   return new Promise<VaultData | null>((resolve) => {
     let resolved = false
@@ -411,7 +410,7 @@ export async function fetchVaultNip07(
         console.warn('[canary:vault] fetchVaultNip07 timed out after 10s')
         if (bestEvent) {
           try {
-            const plaintext: string = await (window as any).nostr.nip44.decrypt(pubkey, bestEvent.content)
+            const plaintext = await decryptWithSignet(identity, pubkey, bestEvent.content, options)
             const data = deserialiseVault(plaintext)
             if (Object.keys(data.groups).length > 0) {
               resolve(data)
@@ -430,7 +429,7 @@ export async function fetchVaultNip07(
         onevent(event) {
           if (!verifyEvent(event)) return
           if (typeof event.content === 'string' && event.content.length > 262144) return
-          console.info(`[canary:vault] NIP-07 received vault event created_at=${event.created_at}`)
+          console.info(`[canary:vault] Signet received vault event created_at=${event.created_at}`)
           if (!bestEvent || event.created_at > bestEvent.created_at) {
             bestEvent = event
           }
@@ -441,19 +440,19 @@ export async function fetchVaultNip07(
             clearTimeout(timeout)
             sub.close()
             if (bestEvent) {
-              console.info('[canary:vault] NIP-07 EOSE — decrypting vault event')
+              console.info('[canary:vault] Signet EOSE — decrypting vault event')
               try {
-                const plaintext: string = await (window as any).nostr.nip44.decrypt(pubkey, bestEvent.content)
+                const plaintext = await decryptWithSignet(identity, pubkey, bestEvent.content, options)
                 const data = deserialiseVault(plaintext)
                 if (Object.keys(data.groups).length > 0) {
                   resolve(data)
                   return
                 }
               } catch (err) {
-                console.warn('[canary:vault] NIP-07 vault decryption failed:', err)
+                console.warn('[canary:vault] Signet vault decryption failed:', err)
               }
             } else {
-              console.info('[canary:vault] NIP-07 EOSE — no vault event found')
+              console.info('[canary:vault] Signet EOSE — no vault event found')
             }
             resolve(null)
           }

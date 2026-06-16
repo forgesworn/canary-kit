@@ -223,6 +223,10 @@ function normaliseGroups(raw: unknown): Record<string, AppGroup> {
 
 function normaliseIdentity(raw: unknown): AppIdentity | null {
   if (!isRecord(raw) || typeof raw.pubkey !== 'string') return null
+  const signerMethod = typeof raw.signerMethod === 'string' &&
+    ['nip07', 'redirect', 'bunker', 'nsec', 'amber'].includes(raw.signerMethod)
+    ? raw.signerMethod as AppIdentity['signerMethod']
+    : undefined
 
   return {
     pubkey: raw.pubkey,
@@ -231,6 +235,7 @@ function normaliseIdentity(raw: unknown): AppIdentity | null {
     mnemonic: typeof raw.mnemonic === 'string' ? raw.mnemonic : undefined,
     displayName: typeof raw.displayName === 'string' ? raw.displayName : undefined,
     picture: typeof raw.picture === 'string' ? raw.picture : undefined,
+    signerMethod,
     signerType: raw.signerType === 'nip07' ? 'nip07' : 'local',
   }
 }

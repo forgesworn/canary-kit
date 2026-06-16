@@ -376,7 +376,7 @@ export function renderSettings(container: HTMLElement): void {
     if (e.key === 'Enter') document.getElementById('read-relay-add-btn')!.click()
   })
 
-  // ── Populate NIP-07 identity on load ─────────────────────────
+  // ── Populate Nostr identity on load ──────────────────────────
 
   if (group.nostrEnabled) {
     void populateNostrIdentity()
