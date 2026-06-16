@@ -8,6 +8,7 @@ import {
 import type {
   EventTemplate,
   LoginMethod,
+  LoginPickerMethod,
   NostrEvent,
   SignetSession,
   SignetSigner,
@@ -16,11 +17,14 @@ import type { AppIdentity, SignetLoginMethod } from '../types.js'
 import { DEFAULT_WRITE_RELAY } from '../types.js'
 
 export const SIGNET_APP_NAME = 'CANARY'
+const CANARY_SIGNER_METHODS: LoginPickerMethod[] = ['nip07', 'bunker', 'nostrconnect', 'nsec']
+const CANARY_ADVANCED_SIGNER_METHODS: LoginPickerMethod[] = ['bunker', 'nostrconnect', 'nsec']
+const CANARY_NOSTR_CONNECT_PERMS = ['sign_event', 'nip44_encrypt', 'nip44_decrypt']
 
 let _activeSession: SignetSession | null = null
 
 export interface SignetLoginRequest {
-  preferredMethod?: LoginMethod
+  preferredMethod?: LoginPickerMethod
   theme?: 'light' | 'dark' | 'auto'
   displayNameFallback?: string
 }
@@ -39,8 +43,9 @@ function signerCapabilityError(method?: string): Error {
   return new Error(`${label} signed you in, but it cannot sign events and decrypt NIP-44 messages for CANARY.`)
 }
 
-function methodForReconnect(identity: AppIdentity): LoginMethod | undefined {
+function methodForReconnect(identity: AppIdentity): LoginPickerMethod | undefined {
   if (!identity.signerMethod || identity.signerMethod === 'redirect') return 'nip07'
+  if (identity.signerMethod === 'amber') return 'nip07'
   return identity.signerMethod as LoginMethod
 }
 
@@ -93,6 +98,10 @@ export async function signInWithSignet(options: SignetLoginRequest = {}): Promis
     theme: options.theme ?? 'auto',
     timeout: 120_000,
     preferredMethod: options.preferredMethod,
+    methods: CANARY_SIGNER_METHODS,
+    advancedMethods: CANARY_ADVANCED_SIGNER_METHODS,
+    relayUrls: [DEFAULT_WRITE_RELAY],
+    nostrConnectPerms: CANARY_NOSTR_CONNECT_PERMS,
   })
   if (!session) return null
 
