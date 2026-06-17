@@ -28,6 +28,10 @@ const CANARY_NOSTR_CONNECT_RELAYS = [
 
 let _activeSession: SignetSession | null = null
 
+type CanarySignetTestWindow = Window & {
+  __CANARY_SIGNET_TEST_RELAYS__?: unknown
+}
+
 export interface SignetLoginRequest {
   preferredMethod?: LoginPickerMethod
   theme?: 'light' | 'dark' | 'auto'
@@ -41,6 +45,14 @@ export interface SignetSignerRequest {
 
 function isUsableCanarySigner(signer: SignetSigner): boolean {
   return signer.capabilities.canSignEvents && signer.capabilities.hasNip44 && !!signer.nip44
+}
+
+function nostrConnectRelays(): string[] {
+  if (typeof window === 'undefined') return CANARY_NOSTR_CONNECT_RELAYS
+  const override = (window as CanarySignetTestWindow).__CANARY_SIGNET_TEST_RELAYS__
+  if (!Array.isArray(override)) return CANARY_NOSTR_CONNECT_RELAYS
+  const relays = override.filter((relay): relay is string => typeof relay === 'string' && /^wss?:\/\//.test(relay))
+  return relays.length > 0 ? relays : CANARY_NOSTR_CONNECT_RELAYS
 }
 
 function signerCapabilityError(method?: string): Error {
@@ -108,7 +120,7 @@ export async function signInWithSignet(options: SignetLoginRequest = {}): Promis
     preferredMethod: options.preferredMethod,
     methods: CANARY_SIGNER_METHODS,
     advancedMethods: CANARY_ADVANCED_SIGNER_METHODS,
-    relayUrls: CANARY_NOSTR_CONNECT_RELAYS,
+    relayUrls: nostrConnectRelays(),
     nostrConnectPerms: CANARY_NOSTR_CONNECT_PERMS,
   })
   if (!session) return null

@@ -16,12 +16,24 @@ interface Subscription {
   filters: Record<string, unknown>
 }
 
+interface MockRelayOptions {
+  dropLimitZeroLiveEvents?: boolean
+}
+
 export class MockRelay {
   private wss: WebSocketServer | null = null
   private events: StoredEvent[] = []
   private subs = new Map<string, Subscription[]>()
+  private waiters: Array<{
+    predicate: (filter: Record<string, unknown>) => boolean
+    resolve: () => void
+    reject: (err: Error) => void
+    timer: ReturnType<typeof setTimeout>
+  }> = []
   debug = false
   private _connCount = 0
+
+  constructor(private readonly options: MockRelayOptions = {}) {}
 
   get port(): number {
     const addr = this.wss?.address()
@@ -48,6 +60,10 @@ export class MockRelay {
   async stop(): Promise<void> {
     return new Promise((resolve) => {
       if (!this.wss) return resolve()
+      for (const waiter of [...this.waiters]) {
+        clearTimeout(waiter.timer)
+        waiter.reject(new Error('relay-stopped'))
+      }
       for (const client of this.wss.clients) {
         client.close()
       }
@@ -62,6 +78,34 @@ export class MockRelay {
 
   reset(): void {
     this.events = []
+  }
+
+  waitForSubscription(
+    predicate: (filter: Record<string, unknown>) => boolean,
+    timeoutMs = 2_000,
+  ): Promise<void> {
+    for (const subs of this.subs.values()) {
+      for (const sub of subs) {
+        if (predicate(sub.filters)) return Promise.resolve()
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      const waiter = {
+        predicate,
+        resolve: () => {
+          clearTimeout(waiter.timer)
+          this.removeWaiter(waiter)
+          resolve()
+        },
+        reject: (err: Error) => {
+          this.removeWaiter(waiter)
+          reject(err)
+        },
+        timer: setTimeout(() => waiter.reject(new Error('subscription-timeout')), timeoutMs),
+      }
+      this.waiters.push(waiter)
+    })
   }
 
   private handleConnection(ws: WebSocket): void {
@@ -110,6 +154,7 @@ export class MockRelay {
       for (const sub of subs) {
         if (sub.ws === sender) continue
         if (sub.ws.readyState !== 1) continue
+        if (this.options.dropLimitZeroLiveEvents && sub.filters.limit === 0) continue
         if (this.matchesFilter(event, sub.filters)) {
           sub.ws.send(JSON.stringify(['EVENT', subId, event]))
           delivered++
@@ -125,10 +170,13 @@ export class MockRelay {
     const existing = this.subs.get(subId) ?? []
     existing.push({ ws, filters: filter })
     this.subs.set(subId, existing)
+    this.notifyWaiters(filter)
 
-    for (const event of this.events) {
-      if (this.matchesFilter(event, filter)) {
-        ws.send(JSON.stringify(['EVENT', subId, event]))
+    if (filter.limit !== 0) {
+      for (const event of this.events) {
+        if (this.matchesFilter(event, filter)) {
+          ws.send(JSON.stringify(['EVENT', subId, event]))
+        }
       }
     }
 
@@ -147,8 +195,14 @@ export class MockRelay {
   }
 
   private matchesFilter(event: StoredEvent, filter: Record<string, unknown>): boolean {
+    if (Array.isArray(filter.ids)) {
+      if (!filter.ids.includes(event.id)) return false
+    }
     if (Array.isArray(filter.kinds)) {
       if (!filter.kinds.includes(event.kind)) return false
+    }
+    if (Array.isArray(filter.authors)) {
+      if (!filter.authors.includes(event.pubkey)) return false
     }
     if (typeof filter.since === 'number') {
       if (event.created_at < filter.since) return false
@@ -170,5 +224,16 @@ export class MockRelay {
     }
 
     return true
+  }
+
+  private notifyWaiters(filter: Record<string, unknown>): void {
+    for (const waiter of [...this.waiters]) {
+      if (waiter.predicate(filter)) waiter.resolve()
+    }
+  }
+
+  private removeWaiter(waiter: MockRelay['waiters'][number]): void {
+    const index = this.waiters.indexOf(waiter)
+    if (index >= 0) this.waiters.splice(index, 1)
   }
 }
