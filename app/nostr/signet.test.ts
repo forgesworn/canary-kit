@@ -107,7 +107,7 @@ describe('Signet identity adapter', () => {
 
     expect(signetLoginMock).toHaveBeenCalledWith(expect.objectContaining({
       methods: ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec'],
-      advancedMethods: ['bunker', 'nostrconnect', 'nsec'],
+      advancedMethods: ['bunker', 'nsec'],
     }))
   })
 
