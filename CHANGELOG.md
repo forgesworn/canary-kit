@@ -14,6 +14,14 @@
 
 # [2.7.0](https://github.com/forgesworn/canary-kit/compare/v2.6.2...v2.7.0) (2026-03-27)
 
+## 2.8.6 (2026-06-17)
+
+### Bug Fixes
+
+- use public relay for nostrconnect pairing
+
+
+
 ## 2.8.5 (2026-06-17)
 
 ### Bug Fixes
