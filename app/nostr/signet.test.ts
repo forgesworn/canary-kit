@@ -108,6 +108,12 @@ describe('Signet identity adapter', () => {
     expect(signetLoginMock).toHaveBeenCalledWith(expect.objectContaining({
       methods: ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec'],
       advancedMethods: ['bunker', 'nsec'],
+      relayUrl: 'wss://relay.trotters.cc',
+      relayUrls: [
+        'wss://relay.primal.net',
+        'wss://relay.trotters.cc',
+        'wss://nos.lol',
+      ],
     }))
   })
 

@@ -20,6 +20,11 @@ export const SIGNET_APP_NAME = 'CANARY'
 const CANARY_SIGNER_METHODS: LoginPickerMethod[] = ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec']
 const CANARY_ADVANCED_SIGNER_METHODS: LoginPickerMethod[] = ['bunker', 'nsec']
 const CANARY_NOSTR_CONNECT_PERMS = ['sign_event', 'nip44_encrypt', 'nip44_decrypt']
+const CANARY_NOSTR_CONNECT_RELAYS = [
+  'wss://relay.primal.net',
+  DEFAULT_WRITE_RELAY,
+  'wss://nos.lol',
+]
 
 let _activeSession: SignetSession | null = null
 
@@ -103,7 +108,7 @@ export async function signInWithSignet(options: SignetLoginRequest = {}): Promis
     preferredMethod: options.preferredMethod,
     methods: CANARY_SIGNER_METHODS,
     advancedMethods: CANARY_ADVANCED_SIGNER_METHODS,
-    relayUrls: [DEFAULT_WRITE_RELAY],
+    relayUrls: CANARY_NOSTR_CONNECT_RELAYS,
     nostrConnectPerms: CANARY_NOSTR_CONNECT_PERMS,
   })
   if (!session) return null
