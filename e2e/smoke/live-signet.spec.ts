@@ -19,7 +19,7 @@ test.describe('Canary Signet production smoke', () => {
     await expect(nostrConnectChoice).toBeVisible()
     await nostrConnectChoice.click()
 
-    await expect(page.locator('#signet-login-nc-status')).toContainText('Waiting for signer to connect')
+    await expect(page.locator('#signet-login-nc-status')).toContainText(/NostrConnect URI ready|Connecting to NostrConnect relay|Connected to relay|Waiting for signer/)
 
     const nostrConnectUri = page.locator('#signet-login-nc-uri')
     const nostrConnectQr = page.locator('#signet-login-nc-qr')
@@ -31,8 +31,8 @@ test.describe('Canary Signet production smoke', () => {
 
     const diagnostics = page.locator('#canary-signet-diagnostics')
     await expect(diagnostics).toBeVisible()
-    await expect(diagnostics.locator('[data-diagnostic="state"]')).toContainText('Waiting')
-    await expect(diagnostics.locator('[data-diagnostic="message"]')).toContainText('Waiting for signer to connect')
+    await expect(diagnostics.locator('[data-diagnostic="state"]')).toContainText(/URI ready|Connecting relay|Relay connected|Waiting/)
+    await expect(diagnostics.locator('[data-diagnostic="message"]')).toContainText(/NostrConnect URI ready|Connecting to NostrConnect relay|Connected to relay|Waiting for signer/)
     await expect(diagnostics.locator('[data-diagnostic="timeout"]')).toContainText('request window')
     await expect(diagnostics.locator('[data-action="canary-copy-nostrconnect"]')).toBeVisible()
     await expect(diagnostics.locator('[data-action="canary-retry-nostrconnect"]')).toBeVisible()

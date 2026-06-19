@@ -59,8 +59,8 @@ test.describe('Login screen', () => {
 
     const diagnostics = page.locator('#canary-signet-diagnostics')
     await expect(diagnostics).toBeVisible()
-    await expect(diagnostics.locator('[data-diagnostic="state"]')).toContainText('Waiting')
-    await expect(diagnostics.locator('[data-diagnostic="message"]')).toContainText('Waiting for signer to connect')
+    await expect(diagnostics.locator('[data-diagnostic="state"]')).toContainText(/URI ready|Connecting relay|Relay connected|Waiting/)
+    await expect(diagnostics.locator('[data-diagnostic="message"]')).toContainText(/NostrConnect URI ready|Connecting to NostrConnect relay|Connected to relay|Waiting for signer/)
     await expect(diagnostics.locator('[data-diagnostic="timeout"]')).toContainText('request window')
     await expect(diagnostics.locator('[data-diagnostic-relay]')).toHaveText(new URL(mockRelay.url).host)
     await expect(diagnostics.locator('[data-action="canary-copy-nostrconnect"]')).toBeVisible()

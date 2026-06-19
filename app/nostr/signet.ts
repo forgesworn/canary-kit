@@ -10,6 +10,7 @@ import type {
   LoginMethod,
   LoginPickerMethod,
   NostrEvent,
+  NostrConnectStatusHandler,
   SignetSession,
   SignetSigner,
 } from 'signet-login'
@@ -37,6 +38,7 @@ export interface SignetLoginRequest {
   preferredMethod?: LoginPickerMethod
   theme?: 'light' | 'dark' | 'auto'
   displayNameFallback?: string
+  onNostrConnectStatus?: NostrConnectStatusHandler
 }
 
 export interface SignetSignerRequest {
@@ -123,6 +125,7 @@ export async function signInWithSignet(options: SignetLoginRequest = {}): Promis
     advancedMethods: CANARY_ADVANCED_SIGNER_METHODS,
     relayUrls: getSignetNostrConnectRelays(),
     nostrConnectPerms: CANARY_NOSTR_CONNECT_PERMS,
+    onNostrConnectStatus: options.onNostrConnectStatus,
   })
   if (!session) return null
 

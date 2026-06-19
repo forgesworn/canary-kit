@@ -7,6 +7,7 @@ import './styles/theme.css'
 import './styles/layout.css'
 import './styles/components.css'
 
+import type { NostrConnectStatus } from 'signet-login'
 import {
   initStorage,
   restoreState,
@@ -182,6 +183,44 @@ function signetDiagnosticState(status: string): string {
   return 'Waiting for signer'
 }
 
+function signetDiagnosticStateFromStatus(status: NostrConnectStatus): string {
+  switch (status.type) {
+    case 'uri-created': return 'URI ready'
+    case 'relay-connecting': return 'Connecting relay'
+    case 'relay-connected': return 'Relay connected'
+    case 'signer-seen': return 'Signer seen'
+    case 'request-sent': return status.method === 'connect' ? 'Confirming signer' : 'Signer request sent'
+    case 'response-received': return status.phase === 'pairing' ? 'Signer approved' : 'Signer responded'
+    case 'timeout': return 'Timed out'
+    case 'error': return 'Relay or signer error'
+  }
+}
+
+function signetDiagnosticMessageFromStatus(status: NostrConnectStatus): string {
+  switch (status.type) {
+    case 'uri-created':
+      return 'NostrConnect URI ready. Scan or copy it into Signet.'
+    case 'relay-connecting':
+      return 'Connecting to NostrConnect relay.'
+    case 'relay-connected':
+      return `Connected to relay${status.relay ? ` ${shortRelayUrl(status.relay)}` : ''}. Waiting for signer approval.`
+    case 'signer-seen':
+      return 'Signer event received. Verifying approval.'
+    case 'request-sent':
+      return status.method === 'connect'
+        ? 'Signer approved. Confirming the NIP-46 connection.'
+        : `Sent ${status.method ?? 'NIP-46'} request to signer.`
+    case 'response-received':
+      return status.phase === 'pairing'
+        ? 'Signer approval received. Preparing signer session.'
+        : `Signer responded${status.method ? ` to ${status.method}` : ''}.`
+    case 'timeout':
+      return status.message ? `Timed out: ${status.message}` : 'Timed out waiting for signer.'
+    case 'error':
+      return status.message ? `Error: ${status.message}` : 'NostrConnect failed.'
+  }
+}
+
 function focusAndSelectUri(input: HTMLInputElement | HTMLTextAreaElement): void {
   input.focus()
   input.select()
@@ -207,10 +246,16 @@ async function copyNostrConnectUri(input: HTMLInputElement | HTMLTextAreaElement
   return 'selected'
 }
 
-function wireSignetNostrConnectDiagnostics(): () => void {
+function wireSignetNostrConnectDiagnostics(): { onStatus: (status: NostrConnectStatus) => void; stop: () => void } {
   const startedAt = Date.now()
   let stopped = false
   let intervalId: number | undefined
+  let latestStatus: NostrConnectStatus | null = null
+
+  const onStatus = (status: NostrConnectStatus): void => {
+    latestStatus = status
+    sync()
+  }
 
   const sync = (): void => {
     if (stopped) return
@@ -234,14 +279,24 @@ function wireSignetNostrConnectDiagnostics(): () => void {
     const uri = uriInput.value.trim()
     const relays = relaysFromNostrConnectUri(uri)
     const fallbackRelays = getSignetNostrConnectRelays()
-    const displayedRelays = relays.length > 0 ? relays : fallbackRelays
-    const statusText = statusEl.textContent?.trim() || 'Waiting for signer to connect'
-    const remainingSeconds = Math.max(0, Math.ceil((CANARY_NOSTR_CONNECT_TIMEOUT_MS - (Date.now() - startedAt)) / 1000))
+    const statusRelays = latestStatus?.relays.filter((relay) => /^wss?:\/\//.test(relay)) ?? []
+    const displayedRelays = statusRelays.length > 0 ? statusRelays : (relays.length > 0 ? relays : fallbackRelays)
+    const statusText = latestStatus
+      ? signetDiagnosticMessageFromStatus(latestStatus)
+      : (statusEl.textContent?.trim() || 'Waiting for signer to connect')
+    const stateText = latestStatus ? signetDiagnosticStateFromStatus(latestStatus) : signetDiagnosticState(statusText)
+    const timeoutMs = latestStatus?.timeoutMs ?? CANARY_NOSTR_CONNECT_TIMEOUT_MS
+    const remainingSeconds = Math.max(0, Math.ceil((timeoutMs - (Date.now() - startedAt)) / 1000))
     const timeoutText = remainingSeconds > 0
       ? `${remainingSeconds}s request window`
       : 'Request may have expired'
     const renderKey = JSON.stringify([
+      latestStatus?.type,
+      latestStatus?.phase,
+      latestStatus?.method,
+      latestStatus?.relay,
       statusText,
+      stateText,
       timeoutText,
       displayedRelays,
     ])
@@ -251,7 +306,7 @@ function wireSignetNostrConnectDiagnostics(): () => void {
     panel.innerHTML = `
       <div class="signet-diagnostics__header">
         <span class="signet-diagnostics__label">NostrConnect diagnostics</span>
-        <strong class="signet-diagnostics__state" data-diagnostic="state">${escapeHtml(signetDiagnosticState(statusText))}</strong>
+        <strong class="signet-diagnostics__state" data-diagnostic="state">${escapeHtml(stateText)}</strong>
       </div>
       <dl class="signet-diagnostics__grid">
         <div>
@@ -300,11 +355,12 @@ function wireSignetNostrConnectDiagnostics(): () => void {
   intervalId = window.setInterval(sync, 1000)
   sync()
 
-  return () => {
+  const stop = (): void => {
     stopped = true
     observer.disconnect()
     if (intervalId !== undefined) window.clearInterval(intervalId)
   }
+  return { onStatus, stop }
 }
 
 function renderLoginRelayRows(): string {
@@ -2346,12 +2402,13 @@ function showLoginScreen(): void {
 
   // Signet login
   app.querySelector('#login-signet')?.addEventListener('click', async () => {
-    const stopDiagnostics = wireSignetNostrConnectDiagnostics()
+    const diagnostics = wireSignetNostrConnectDiagnostics()
     try {
       const currentIdentity = getState().identity
       const signedIn = await signInWithSignet({
         theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark',
         displayNameFallback: currentIdentity?.displayName ?? 'You',
+        onNostrConnectStatus: diagnostics.onStatus,
       })
       if (!signedIn) return
       update({ identity: preserveMnemonic(signedIn, currentIdentity) })
@@ -2359,7 +2416,7 @@ function showLoginScreen(): void {
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Signet rejected the request.')
     } finally {
-      stopDiagnostics()
+      diagnostics.stop()
     }
   })
 
