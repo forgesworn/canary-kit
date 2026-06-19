@@ -68,6 +68,7 @@
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "check:signet-login": "node tools/check-signet-login-version.mjs",
+    "check:signet-conformance": "node tools/check-signet-conformance.mjs",
     "bench": "vitest bench",
     "demo": "npm run build:app && serve docs -l 8787",
     "build:single": "vite build --config vite.singlefile.config.ts && cp dist-single/index.html canary.html && echo '✓ canary.html ready'",

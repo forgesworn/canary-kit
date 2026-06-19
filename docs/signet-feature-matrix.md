@@ -2,6 +2,8 @@
 
 Canary is the reference consumer for Signet Access. A Signet feature is only considered production-ready for Canary when there is an automated gate proving the user-facing integration works.
 
+The enforced source for this table is `conformance/signet-feature-conformance.json`; CI runs `npm run check:signet-conformance` so new required features cannot be added without a mapped regression gate.
+
 Status key:
 
 - **Covered**: implemented and guarded by automated tests.

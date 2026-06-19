@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "referenceConsumer": "canary-kit",
+  "matrixDoc": "docs/signet-feature-matrix.md",
+  "features": [
+    {
+      "id": "nip07",
+      "label": "NIP-07 browser extension",
+      "requiredForCanary": true,
+      "projects": {
+        "signetLogin": "covered",
+        "canary": "covered",
+        "mySignet": "not-applicable"
+      },
+      "gates": [
+        { "type": "file", "path": "app/nostr/signet.test.ts" },
+        { "type": "npmScript", "name": "test" },
+        { "type": "workflow", "path": ".github/workflows/ci.yml", "contains": "npx vitest run --coverage" }
+      ]
+    },
+    {
+      "id": "amber",
+      "label": "Amber / NIP-55",
+      "requiredForCanary": false,
+      "decision": "SDK covered, not exposed in Canary because Canary requires a live signer with NIP-44.",
+      "projects": {
+        "signetLogin": "sdk-covered",
+        "canary": "sdk-covered",
+        "mySignet": "not-applicable"
+      },
+      "gates": [
+        { "type": "external", "repo": "signet-login", "command": "npm test", "description": "Amber URL/callback coverage lives in the SDK." }
+      ]
+    },
+    {
+      "id": "signet-remote-qr",
+      "label": "Signet remote QR",
+      "requiredForCanary": true,
+      "projects": {
+        "signetLogin": "covered",
+        "canary": "covered",
+        "mySignet": "covered"
+      },
+      "gates": [
+        { "type": "file", "path": "app/nostr/signet.test.ts" },
+        { "type": "file", "path": "e2e/smoke/live-signet.spec.ts" },
+        { "type": "npmScript", "name": "test:e2e:live-smoke" }
+      ]
+    },
+    {
+      "id": "nostrconnect",
+      "label": "NostrConnect",
+      "requiredForCanary": true,
+      "projects": {
+        "signetLogin": "covered",
+        "canary": "covered",
+        "mySignet": "covered"
+      },
+      "gates": [
+        { "type": "file", "path": "e2e/protocol/signet-nostrconnect.spec.ts" },
+        { "type": "file", "path": "e2e/real-relay/cross-app-nostrconnect-real-relay.spec.ts" },
+        { "type": "npmScript", "name": "test:e2e:signet" },
+        { "type": "npmScript", "name": "test:e2e:real-relay" },
+        { "type": "workflow", "path": ".github/workflows/ci.yml", "contains": "Run Signet NostrConnect browser regression" }
+      ]
+    },
+    {
+      "id": "bunker-restore",
+      "label": "bunker restore",
+      "requiredForCanary": true,
+      "projects": {
+        "signetLogin": "covered",
+        "canary": "covered",
+        "mySignet": "covered"
+      },
+      "gates": [
+        { "type": "file", "path": "e2e/protocol/signet-nostrconnect.spec.ts" },
+        { "type": "npmScript", "name": "test:e2e:signet" }
+      ]
+    },
+    {
+      "id": "nsec-fallback",
+      "label": "nsec fallback",
+      "requiredForCanary": true,
+      "projects": {
+        "signetLogin": "covered",
+        "canary": "covered",
+        "mySignet": "not-applicable"
+      },
+      "gates": [
+        { "type": "file", "path": "e2e/protocol/signet-feature-surface.spec.ts" },
+        { "type": "npmScript", "name": "test:e2e:protocol" }
+      ]
+    },
+    {
+      "id": "storage-session-restore",
+      "label": "storage/session restore",
+      "requiredForCanary": true,
+      "projects": {
+        "signetLogin": "covered",
+        "canary": "covered",
+        "mySignet": "covered"
+      },
+      "gates": [
+        { "type": "file", "path": "app/nostr/signet.test.ts" },
+        { "type": "file", "path": "e2e/protocol/signet-nostrconnect.spec.ts" },
+        { "type": "npmScript", "name": "test:e2e:signet" }
+      ]
+    },
+    {
+      "id": "logout-clear-state",
+      "label": "logout/clear state",
+      "requiredForCanary": true,
+      "projects": {
+        "signetLogin": "covered",
+        "canary": "covered",
+        "mySignet": "covered"
+      },
+      "gates": [
+        { "type": "file", "path": "app/nostr/signet.test.ts" },
+        { "type": "npmScript", "name": "test" }
+      ]
+    },
+    {
+      "id": "nip44-present-missing",
+      "label": "NIP-44 present/missing behavior",
+      "requiredForCanary": true,
+      "projects": {
+        "signetLogin": "covered",
+        "canary": "covered",
+        "mySignet": "covered"
+      },
+      "gates": [
+        { "type": "file", "path": "app/nostr/signet.test.ts" },
+        { "type": "file", "path": "e2e/protocol/signet-nostrconnect.spec.ts" },
+        { "type": "npmScript", "name": "test:e2e:signet" }
+      ]
+    },
+    {
+      "id": "timeout-abort-diagnostics",
+      "label": "timeout/abort/error diagnostics",
+      "requiredForCanary": true,
+      "projects": {
+        "signetLogin": "covered",
+        "canary": "covered",
+        "mySignet": "covered"
+      },
+      "gates": [
+        { "type": "file", "path": "e2e/protocol/signet-nostrconnect.spec.ts" },
+        { "type": "npmScript", "name": "test:e2e:signet" }
+      ]
+    },
+    {
+      "id": "mobile-copy-paste-fallback",
+      "label": "mobile copy/paste fallback",
+      "requiredForCanary": true,
+      "projects": {
+        "signetLogin": "covered",
+        "canary": "covered",
+        "mySignet": "covered"
+      },
+      "gates": [
+        { "type": "file", "path": "e2e/protocol/signet-nostrconnect.spec.ts" },
+        { "type": "file", "path": "e2e/protocol/signet-feature-surface.spec.ts" },
+        { "type": "npmScript", "name": "test:e2e:signet:webkit" },
+        { "type": "workflow", "path": ".github/workflows/ci.yml", "contains": "Run Signet WebKit regression" }
+      ]
+    }
+  ]
+}
