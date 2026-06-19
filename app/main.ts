@@ -42,7 +42,15 @@ import { fetchVault, fetchVaultNip07, publishVault, publishVaultNip07, mergeVaul
 import { initPersonas, initPersonasFromTree, destroyPersonas } from './persona.js'
 import { findById } from './persona-tree.js'
 import { fetchPersonaProfiles, publishPersonaProfile } from './nostr/profiles.js'
-import { canUseIdentitySigner, decryptWithSignet, identitySignerLabel, isExternalSignerIdentity, signInWithSignet } from './nostr/signet.js'
+import {
+  CANARY_NOSTR_CONNECT_TIMEOUT_MS,
+  canUseIdentitySigner,
+  decryptWithSignet,
+  getSignetNostrConnectRelays,
+  identitySignerLabel,
+  isExternalSignerIdentity,
+  signInWithSignet,
+} from './nostr/signet.js'
 import { showToast } from './components/toast.js'
 import { showDuressAlert } from './components/duress-alert.js'
 import { escapeHtml } from './utils/escape.js'
@@ -152,6 +160,151 @@ function resetLoginRelays(): void {
 
 function shortRelayUrl(url: string): string {
   return url.replace(/^wss?:\/\//, '').replace(/\/$/, '')
+}
+
+function relaysFromNostrConnectUri(uri: string): string[] {
+  try {
+    const parsed = new URL(uri)
+    const relays = parsed.searchParams.getAll('relay').filter((relay) => /^wss?:\/\//.test(relay))
+    return dedupeRelays(relays)
+  } catch {
+    return []
+  }
+}
+
+function signetDiagnosticState(status: string): string {
+  const normalised = status.toLowerCase()
+  if (normalised.includes('connected') || normalised.includes('signed in')) return 'Connected'
+  if (normalised.includes('selected')) return 'URI ready'
+  if (normalised.includes('error') || normalised.includes('failed') || normalised.includes('could not') || status.startsWith('✗')) {
+    return 'Relay or signer error'
+  }
+  return 'Waiting for signer'
+}
+
+function focusAndSelectUri(input: HTMLInputElement | HTMLTextAreaElement): void {
+  input.focus()
+  input.select()
+  input.setSelectionRange(0, input.value.length)
+}
+
+async function copyNostrConnectUri(input: HTMLInputElement | HTMLTextAreaElement): Promise<'copied' | 'selected'> {
+  const uri = input.value
+  try {
+    if (!uri) throw new Error('empty-uri')
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(uri)
+      return 'copied'
+    }
+    focusAndSelectUri(input)
+    if (typeof document.execCommand === 'function' && document.execCommand('copy')) {
+      return 'copied'
+    }
+  } catch {
+    // Fall through to manual selection.
+  }
+  focusAndSelectUri(input)
+  return 'selected'
+}
+
+function wireSignetNostrConnectDiagnostics(): () => void {
+  const startedAt = Date.now()
+  let stopped = false
+  let intervalId: number | undefined
+
+  const sync = (): void => {
+    if (stopped) return
+
+    const dialog = document.querySelector<HTMLElement>('#signet-login-dialog')
+    const statusEl = dialog?.querySelector<HTMLElement>('#signet-login-nc-status')
+    const uriInput = dialog?.querySelector<HTMLInputElement | HTMLTextAreaElement>('#signet-login-nc-uri')
+    if (!dialog || !statusEl || !uriInput) return
+
+    let panel = dialog.querySelector<HTMLElement>('#canary-signet-diagnostics')
+    if (!panel) {
+      panel = document.createElement('section')
+      panel.id = 'canary-signet-diagnostics'
+      panel.className = 'signet-diagnostics'
+      panel.setAttribute('aria-live', 'polite')
+      panel.setAttribute('aria-label', 'NostrConnect diagnostics')
+      const anchor = uriInput.parentElement ?? statusEl
+      anchor.insertAdjacentElement('afterend', panel)
+    }
+
+    const uri = uriInput.value.trim()
+    const relays = relaysFromNostrConnectUri(uri)
+    const fallbackRelays = getSignetNostrConnectRelays()
+    const displayedRelays = relays.length > 0 ? relays : fallbackRelays
+    const statusText = statusEl.textContent?.trim() || 'Waiting for signer to connect'
+    const remainingSeconds = Math.max(0, Math.ceil((CANARY_NOSTR_CONNECT_TIMEOUT_MS - (Date.now() - startedAt)) / 1000))
+    const timeoutText = remainingSeconds > 0
+      ? `${remainingSeconds}s request window`
+      : 'Request may have expired'
+    const renderKey = JSON.stringify([
+      statusText,
+      timeoutText,
+      displayedRelays,
+    ])
+    if (panel.dataset.renderKey === renderKey) return
+    panel.dataset.renderKey = renderKey
+
+    panel.innerHTML = `
+      <div class="signet-diagnostics__header">
+        <span class="signet-diagnostics__label">NostrConnect diagnostics</span>
+        <strong class="signet-diagnostics__state" data-diagnostic="state">${escapeHtml(signetDiagnosticState(statusText))}</strong>
+      </div>
+      <dl class="signet-diagnostics__grid">
+        <div>
+          <dt>Message</dt>
+          <dd data-diagnostic="message">${escapeHtml(statusText)}</dd>
+        </div>
+        <div>
+          <dt>Timeout</dt>
+          <dd data-diagnostic="timeout">${escapeHtml(timeoutText)}</dd>
+        </div>
+      </dl>
+      <div class="signet-diagnostics__relays">
+        <span>Relays in this URI</span>
+        <ul data-diagnostic="relay-list">
+          ${displayedRelays.map((relay) => `<li data-diagnostic-relay title="${escapeHtml(relay)}">${escapeHtml(shortRelayUrl(relay))}</li>`).join('')}
+        </ul>
+      </div>
+      <div class="signet-diagnostics__actions">
+        <button class="btn btn--ghost btn--sm" data-action="canary-copy-nostrconnect" type="button">Copy URI</button>
+        <button class="btn btn--ghost btn--sm" data-action="canary-retry-nostrconnect" type="button">Retry</button>
+      </div>
+      <p class="signet-diagnostics__hint">
+        If Signet cannot reach a relay, use Retry to mint a fresh URI or copy the URI into the signer manually.
+      </p>
+    `
+
+    panel.querySelector<HTMLButtonElement>('[data-action="canary-copy-nostrconnect"]')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget as HTMLButtonElement
+      const result = await copyNostrConnectUri(uriInput)
+      button.textContent = result === 'copied' ? 'Copied' : 'URI selected'
+      window.setTimeout(() => {
+        if (button.isConnected) button.textContent = 'Copy URI'
+      }, 1500)
+    })
+
+    panel.querySelector<HTMLButtonElement>('[data-action="canary-retry-nostrconnect"]')?.addEventListener('click', () => {
+      dialog.querySelector<HTMLButtonElement>('[data-action="back"]')?.click()
+      window.setTimeout(() => {
+        document.querySelector<HTMLButtonElement>('#signet-login-dialog button[data-choice="nostrconnect"]')?.click()
+      }, 80)
+    })
+  }
+
+  const observer = new MutationObserver(sync)
+  observer.observe(document.body, { childList: true, subtree: true })
+  intervalId = window.setInterval(sync, 1000)
+  sync()
+
+  return () => {
+    stopped = true
+    observer.disconnect()
+    if (intervalId !== undefined) window.clearInterval(intervalId)
+  }
 }
 
 function renderLoginRelayRows(): string {
@@ -2193,6 +2346,7 @@ function showLoginScreen(): void {
 
   // Signet login
   app.querySelector('#login-signet')?.addEventListener('click', async () => {
+    const stopDiagnostics = wireSignetNostrConnectDiagnostics()
     try {
       const currentIdentity = getState().identity
       const signedIn = await signInWithSignet({
@@ -2202,7 +2356,11 @@ function showLoginScreen(): void {
       if (!signedIn) return
       update({ identity: preserveMnemonic(signedIn, currentIdentity) })
       await bootApp()
-    } catch (err) { alert(err instanceof Error ? err.message : 'Signet rejected the request.') }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Signet rejected the request.')
+    } finally {
+      stopDiagnostics()
+    }
   })
 
   // ── Relay list editor on login screen ───

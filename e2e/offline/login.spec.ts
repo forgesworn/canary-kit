@@ -46,6 +46,30 @@ test.describe('Login screen', () => {
     await expect(customRow).toHaveCount(0)
   })
 
+  test('NostrConnect login exposes relay diagnostics and recovery actions', async ({ cleanPage: page, mockRelay }) => {
+    await page.evaluate((relayUrl) => {
+      ;(window as typeof window & { __CANARY_SIGNET_TEST_RELAYS__?: string[] }).__CANARY_SIGNET_TEST_RELAYS__ = [
+        relayUrl,
+      ]
+    }, mockRelay.url)
+
+    await page.locator('#login-signet').click()
+    await expect(page.locator('#signet-login-dialog')).toBeVisible()
+    await page.locator('#signet-login-dialog button[data-choice="nostrconnect"]').click()
+
+    const diagnostics = page.locator('#canary-signet-diagnostics')
+    await expect(diagnostics).toBeVisible()
+    await expect(diagnostics.locator('[data-diagnostic="state"]')).toContainText('Waiting')
+    await expect(diagnostics.locator('[data-diagnostic="message"]')).toContainText('Waiting for signer to connect')
+    await expect(diagnostics.locator('[data-diagnostic="timeout"]')).toContainText('request window')
+    await expect(diagnostics.locator('[data-diagnostic-relay]')).toHaveText(new URL(mockRelay.url).host)
+    await expect(diagnostics.locator('[data-action="canary-copy-nostrconnect"]')).toBeVisible()
+    await expect(diagnostics.locator('[data-action="canary-retry-nostrconnect"]')).toBeVisible()
+
+    const uri = await page.locator('#signet-login-nc-uri').inputValue()
+    expect(uri).toContain(`relay=${encodeURIComponent(mockRelay.url)}`)
+  })
+
   test('secure invite link shows invite-aware Signet login', async ({ cleanPage: page }) => {
     await page.goto('/#j/0123456789abcdef0123456789abcdef')
 

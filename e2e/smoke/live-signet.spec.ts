@@ -28,6 +28,15 @@ test.describe('Canary Signet production smoke', () => {
     await expect(nostrConnectQr).toBeVisible()
     await expect(nostrConnectUri).toBeVisible()
     await expect(copyButton).toBeVisible()
+
+    const diagnostics = page.locator('#canary-signet-diagnostics')
+    await expect(diagnostics).toBeVisible()
+    await expect(diagnostics.locator('[data-diagnostic="state"]')).toContainText('Waiting')
+    await expect(diagnostics.locator('[data-diagnostic="message"]')).toContainText('Waiting for signer to connect')
+    await expect(diagnostics.locator('[data-diagnostic="timeout"]')).toContainText('request window')
+    await expect(diagnostics.locator('[data-action="canary-copy-nostrconnect"]')).toBeVisible()
+    await expect(diagnostics.locator('[data-action="canary-retry-nostrconnect"]')).toBeVisible()
+
     await expect
       .poll(async () => nostrConnectUri.inputValue(), { message: 'nostrconnect URI should be generated' })
       .toMatch(/^nostrconnect:\/\/[0-9a-f]{64}\?.*relay=/)
@@ -39,7 +48,9 @@ test.describe('Canary Signet production smoke', () => {
     expect(uriBox!.y).toBeGreaterThan(qrBox!.y + qrBox!.height - 1)
 
     const parsed = new URL(await nostrConnectUri.inputValue())
-    expect(parsed.searchParams.getAll('relay').every(relay => /^wss?:\/\//.test(relay))).toBe(true)
+    const relays = parsed.searchParams.getAll('relay')
+    expect(relays.every(relay => /^wss?:\/\//.test(relay))).toBe(true)
+    await expect(diagnostics.locator('[data-diagnostic-relay]')).toHaveCount(relays.length)
 
     await copyButton.click()
     await expect(copyButton).toHaveText(/Copied|URI selected/)

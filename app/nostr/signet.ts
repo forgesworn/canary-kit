@@ -20,6 +20,7 @@ export const SIGNET_APP_NAME = 'CANARY'
 const CANARY_SIGNER_METHODS: LoginPickerMethod[] = ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec']
 const CANARY_ADVANCED_SIGNER_METHODS: LoginPickerMethod[] = ['bunker', 'nsec']
 const CANARY_NOSTR_CONNECT_PERMS = ['sign_event', 'nip44_encrypt', 'nip44_decrypt']
+export const CANARY_NOSTR_CONNECT_TIMEOUT_MS = 120_000
 const CANARY_NOSTR_CONNECT_RELAYS = [
   'wss://relay.primal.net',
   DEFAULT_WRITE_RELAY,
@@ -47,12 +48,12 @@ function isUsableCanarySigner(signer: SignetSigner): boolean {
   return signer.capabilities.canSignEvents && signer.capabilities.hasNip44 && !!signer.nip44
 }
 
-function nostrConnectRelays(): string[] {
-  if (typeof window === 'undefined') return CANARY_NOSTR_CONNECT_RELAYS
+export function getSignetNostrConnectRelays(): string[] {
+  if (typeof window === 'undefined') return [...CANARY_NOSTR_CONNECT_RELAYS]
   const override = (window as CanarySignetTestWindow).__CANARY_SIGNET_TEST_RELAYS__
-  if (!Array.isArray(override)) return CANARY_NOSTR_CONNECT_RELAYS
+  if (!Array.isArray(override)) return [...CANARY_NOSTR_CONNECT_RELAYS]
   const relays = override.filter((relay): relay is string => typeof relay === 'string' && /^wss?:\/\//.test(relay))
-  return relays.length > 0 ? relays : CANARY_NOSTR_CONNECT_RELAYS
+  return relays.length > 0 ? relays : [...CANARY_NOSTR_CONNECT_RELAYS]
 }
 
 function signerCapabilityError(method?: string): Error {
@@ -116,11 +117,11 @@ export async function signInWithSignet(options: SignetLoginRequest = {}): Promis
     appName: SIGNET_APP_NAME,
     relayUrl: DEFAULT_WRITE_RELAY,
     theme: options.theme ?? 'auto',
-    timeout: 120_000,
+    timeout: CANARY_NOSTR_CONNECT_TIMEOUT_MS,
     preferredMethod: options.preferredMethod,
     methods: CANARY_SIGNER_METHODS,
     advancedMethods: CANARY_ADVANCED_SIGNER_METHODS,
-    relayUrls: nostrConnectRelays(),
+    relayUrls: getSignetNostrConnectRelays(),
     nostrConnectPerms: CANARY_NOSTR_CONNECT_PERMS,
   })
   if (!session) return null

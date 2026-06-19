@@ -11,6 +11,7 @@ vi.mock('signet-login', () => ({
 }))
 
 import {
+  CANARY_NOSTR_CONNECT_TIMEOUT_MS,
   canUseIdentitySigner,
   identityFromSignetSession,
   identitySignerLabel,
@@ -109,6 +110,7 @@ describe('Signet identity adapter', () => {
       methods: ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec'],
       advancedMethods: ['bunker', 'nsec'],
       relayUrl: 'wss://relay.trotters.cc',
+      timeout: CANARY_NOSTR_CONNECT_TIMEOUT_MS,
       relayUrls: [
         'wss://relay.primal.net',
         'wss://relay.trotters.cc',
