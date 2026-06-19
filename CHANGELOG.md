@@ -14,6 +14,14 @@
 
 # [2.7.0](https://github.com/forgesworn/canary-kit/compare/v2.6.2...v2.7.0) (2026-03-27)
 
+## 2.9.0 (2026-06-19)
+
+### Features
+
+- add nostrconnect relay diagnostics
+
+
+
 ## 2.8.7 (2026-06-17)
 
 ### Bug Fixes
