@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test'
 
+const liveBaseURL = process.env.PLAYWRIGHT_BASE_URL
+const localBaseURL = 'http://localhost:5173'
+
 export default defineConfig({
   testDir: '.',
   timeout: 30_000,
@@ -7,12 +10,14 @@ export default defineConfig({
   workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
 
-  webServer: {
-    command: 'npm run dev',
-    port: 5173,
-    reuseExistingServer: true,
-    cwd: '..',
-  },
+  webServer: liveBaseURL
+    ? undefined
+    : {
+        command: 'npm run dev',
+        port: 5173,
+        reuseExistingServer: true,
+        cwd: '..',
+      },
 
   projects: [
     {
@@ -31,10 +36,14 @@ export default defineConfig({
       name: 'hybrid',
       testDir: './hybrid',
     },
+    {
+      name: 'smoke',
+      testDir: './smoke',
+    },
   ],
 
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: liveBaseURL ?? localBaseURL,
     bypassCSP: true,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',

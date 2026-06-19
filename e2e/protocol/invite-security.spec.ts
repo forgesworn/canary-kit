@@ -1,6 +1,7 @@
 // e2e/protocol/invite-security.spec.ts — Invite tampering and security tests
 import { test, expect } from '../fixtures.js'
 import { loginOffline, createGroup, createInvite } from '../helpers.js'
+import type { BrowserContext } from '@playwright/test'
 
 /** Decode the binary invite from a #inv/ URL. */
 function decodeInviteUrl(url: string): Uint8Array {
@@ -73,123 +74,135 @@ test.describe('Invite security', () => {
   test('tampered payload (modified seed) — signature invalid', async ({ browser }) => {
     const baseURL = 'http://localhost:5173'
     const ctxA = await browser.newContext({ baseURL })
-    const pageA = await ctxA.newPage()
-    await pageA.goto('/')
-    await loginOffline(pageA, 'Alice')
-    await createGroup(pageA, 'Security Test')
-    const { inviteUrl, confirmCode } = await createInvite(pageA)
+    let ctxB: BrowserContext | undefined
+    try {
+      const pageA = await ctxA.newPage()
+      await pageA.goto('/')
+      await loginOffline(pageA, 'Alice')
+      await createGroup(pageA, 'Security Test')
+      const { inviteUrl, confirmCode } = await createInvite(pageA)
 
-    // Tamper with the seed (bytes 1–32) — flipping any bit invalidates the Schnorr signature
-    const bytes = decodeInviteUrl(inviteUrl)
-    bytes[1] ^= 0xff
-    const tamperedUrl = encodeInviteUrl(bytes, inviteUrl)
+      // Tamper with the seed (bytes 1–32) — flipping any bit invalidates the Schnorr signature
+      const bytes = decodeInviteUrl(inviteUrl)
+      bytes[1] ^= 0xff
+      const tamperedUrl = encodeInviteUrl(bytes, inviteUrl)
 
-    const ctxB = await browser.newContext({ baseURL })
-    const pageB = await ctxB.newPage()
-    await pageB.goto('/')
+      ctxB = await browser.newContext({ baseURL })
+      const pageB = await ctxB.newPage()
+      await pageB.goto('/')
 
-    const alertMsg = await expectInviteRejection(pageB, tamperedUrl, confirmCode, 'Bob')
-    // Either an alert was shown or the modal remains open — both indicate rejection
-    const modalStillOpen = await pageB.locator('#binary-join-modal[open]').isVisible().catch(() => false)
-    expect(alertMsg || modalStillOpen).toBeTruthy()
-
-    await ctxA.close()
-    await ctxB.close()
+      const alertMsg = await expectInviteRejection(pageB, tamperedUrl, confirmCode, 'Bob')
+      // Either an alert was shown or the modal remains open — both indicate rejection
+      const modalStillOpen = await pageB.locator('#binary-join-modal[open]').isVisible().catch(() => false)
+      expect(alertMsg || modalStillOpen).toBeTruthy()
+    } finally {
+      await ctxB?.close().catch(() => {})
+      await ctxA.close().catch(() => {})
+    }
   })
 
   test('tampered payload (modified members) — signature invalid', async ({ browser }) => {
     const baseURL = 'http://localhost:5173'
     const ctxA = await browser.newContext({ baseURL })
-    const pageA = await ctxA.newPage()
-    await pageA.goto('/')
-    await loginOffline(pageA, 'Alice')
-    await createGroup(pageA, 'Security Test')
-    const { inviteUrl, confirmCode } = await createInvite(pageA)
+    let ctxB: BrowserContext | undefined
+    try {
+      const pageA = await ctxA.newPage()
+      await pageA.goto('/')
+      await loginOffline(pageA, 'Alice')
+      await createGroup(pageA, 'Security Test')
+      const { inviteUrl, confirmCode } = await createInvite(pageA)
 
-    // Tamper with the first member pubkey byte (member data starts after byte 177)
-    // Layout: ...byte 176 (protocolVersion), byte 177 (memberCount), bytes 178+ (member pubkeys)
-    const bytes = decodeInviteUrl(inviteUrl)
-    const memberStart = 178 // first byte of the first member pubkey
-    if (memberStart < bytes.length) {
-      bytes[memberStart] ^= 0xff
+      // Tamper with the first member pubkey byte (member data starts after byte 177)
+      // Layout: ...byte 176 (protocolVersion), byte 177 (memberCount), bytes 178+ (member pubkeys)
+      const bytes = decodeInviteUrl(inviteUrl)
+      const memberStart = 178 // first byte of the first member pubkey
+      if (memberStart < bytes.length) {
+        bytes[memberStart] ^= 0xff
+      }
+      const tamperedUrl = encodeInviteUrl(bytes, inviteUrl)
+
+      ctxB = await browser.newContext({ baseURL })
+      const pageB = await ctxB.newPage()
+      await pageB.goto('/')
+
+      const alertMsg = await expectInviteRejection(pageB, tamperedUrl, confirmCode, 'Bob')
+      const modalStillOpen = await pageB.locator('#binary-join-modal[open]').isVisible().catch(() => false)
+      expect(alertMsg || modalStillOpen).toBeTruthy()
+    } finally {
+      await ctxB?.close().catch(() => {})
+      await ctxA.close().catch(() => {})
     }
-    const tamperedUrl = encodeInviteUrl(bytes, inviteUrl)
-
-    const ctxB = await browser.newContext({ baseURL })
-    const pageB = await ctxB.newPage()
-    await pageB.goto('/')
-
-    const alertMsg = await expectInviteRejection(pageB, tamperedUrl, confirmCode, 'Bob')
-    const modalStillOpen = await pageB.locator('#binary-join-modal[open]').isVisible().catch(() => false)
-    expect(alertMsg || modalStillOpen).toBeTruthy()
-
-    await ctxA.close()
-    await ctxB.close()
   })
 
   test('wrong confirm code is rejected', async ({ browser }) => {
     const baseURL = 'http://localhost:5173'
     const ctxA = await browser.newContext({ baseURL })
-    const pageA = await ctxA.newPage()
-    await pageA.goto('/')
-    await loginOffline(pageA, 'Alice')
-    await createGroup(pageA, 'Security Test')
-    const { inviteUrl } = await createInvite(pageA)
+    let ctxB: BrowserContext | undefined
+    try {
+      const pageA = await ctxA.newPage()
+      await pageA.goto('/')
+      await loginOffline(pageA, 'Alice')
+      await createGroup(pageA, 'Security Test')
+      const { inviteUrl } = await createInvite(pageA)
 
-    const ctxB = await browser.newContext({ baseURL })
-    const pageB = await ctxB.newPage()
-    await pageB.goto('/')
+      ctxB = await browser.newContext({ baseURL })
+      const pageB = await ctxB.newPage()
+      await pageB.goto('/')
 
-    // Supply an entirely wrong confirm code — the CANARY word check should fail
-    const alertMsg = await expectInviteRejection(pageB, inviteUrl, 'wrong code here', 'Bob')
-    const modalStillOpen = await pageB.locator('#binary-join-modal[open]').isVisible().catch(() => false)
-    expect(alertMsg || modalStillOpen).toBeTruthy()
-
-    await ctxA.close()
-    await ctxB.close()
+      // Supply an entirely wrong confirm code — the CANARY word check should fail
+      const alertMsg = await expectInviteRejection(pageB, inviteUrl, 'wrong code here', 'Bob')
+      const modalStillOpen = await pageB.locator('#binary-join-modal[open]').isVisible().catch(() => false)
+      expect(alertMsg || modalStillOpen).toBeTruthy()
+    } finally {
+      await ctxB?.close().catch(() => {})
+      await ctxA.close().catch(() => {})
+    }
   })
 
   test('tampered version byte is rejected', async ({ browser }) => {
     const baseURL = 'http://localhost:5173'
     const ctxA = await browser.newContext({ baseURL })
-    const pageA = await ctxA.newPage()
-    await pageA.goto('/')
-    await loginOffline(pageA, 'Alice')
-    await createGroup(pageA, 'Security Test')
-    const { inviteUrl } = await createInvite(pageA)
+    let ctxB: BrowserContext | undefined
+    try {
+      const pageA = await ctxA.newPage()
+      await pageA.goto('/')
+      await loginOffline(pageA, 'Alice')
+      await createGroup(pageA, 'Security Test')
+      const { inviteUrl } = await createInvite(pageA)
 
-    // Set the outer version byte (byte 0) to an unsupported value
-    const bytes = decodeInviteUrl(inviteUrl)
-    bytes[0] = 99
-    const tamperedUrl = encodeInviteUrl(bytes, inviteUrl)
+      // Set the outer version byte (byte 0) to an unsupported value
+      const bytes = decodeInviteUrl(inviteUrl)
+      bytes[0] = 99
+      const tamperedUrl = encodeInviteUrl(bytes, inviteUrl)
 
-    const ctxB = await browser.newContext({ baseURL })
-    const pageB = await ctxB.newPage()
-    await pageB.goto('/')
-    await loginOffline(pageB, 'Bob')
+      ctxB = await browser.newContext({ baseURL })
+      const pageB = await ctxB.newPage()
+      await pageB.goto('/')
+      await loginOffline(pageB, 'Bob')
 
-    // Track any console errors from the app
-    const consoleErrors: string[] = []
-    pageB.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text())
-    })
+      // Track any console errors from the app
+      const consoleErrors: string[] = []
+      pageB.on('console', (msg) => {
+        if (msg.type() === 'error') consoleErrors.push(msg.text())
+      })
 
-    // The app shows a toast error when the version byte is invalid,
-    // because unpackInvite() throws before the join modal is created.
-    const hash = new URL(tamperedUrl).hash
-    await pageB.goto(`/${hash}`)
-    await pageB.waitForTimeout(1500)
+      // The app shows a toast error when the version byte is invalid,
+      // because unpackInvite() throws before the join modal is created.
+      const hash = new URL(tamperedUrl).hash
+      await pageB.goto(`/${hash}`)
+      await pageB.waitForTimeout(1500)
 
-    // The join modal should NOT be open (the error is caught before it renders)
-    const modalVisible = await pageB.locator('#binary-join-modal[open]').isVisible().catch(() => false)
-    expect(modalVisible).toBe(false)
+      // The join modal should NOT be open (the error is caught before it renders)
+      const modalVisible = await pageB.locator('#binary-join-modal[open]').isVisible().catch(() => false)
+      expect(modalVisible).toBe(false)
 
-    // Verify no group was created for Bob — the sidebar should still show no groups
-    const groupCount = await pageB.locator('.group-list__item').count()
-    expect(groupCount).toBe(0)
-
-    await ctxA.close()
-    await ctxB.close()
+      // Verify no group was created for Bob — the sidebar should still show no groups
+      const groupCount = await pageB.locator('.group-list__item').count()
+      expect(groupCount).toBe(0)
+    } finally {
+      await ctxB?.close().catch(() => {})
+      await ctxA.close().catch(() => {})
+    }
   })
 
   test.fixme('invite signed by non-admin pubkey is rejected', async () => {

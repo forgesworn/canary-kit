@@ -51,3 +51,6 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H 144.126.230.165 >> ~/.ssh/known_hosts
           rsync -avz --delete -e "ssh -i ~/.ssh/deploy_key" docs/ deploy@144.126.230.165:/opt/trotters/canary/
+      - run: npx playwright install --with-deps chromium
+      - name: Run live Canary Signet smoke
+        run: npm run test:e2e:live-smoke
