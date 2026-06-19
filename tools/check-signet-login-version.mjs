@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 const root = resolve(new URL('..', import.meta.url).pathname)
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
 const lock = JSON.parse(readFileSync(resolve(root, 'package-lock.json'), 'utf8'))
+const candidateVersion = process.env.SIGNET_LOGIN_CANDIDATE_VERSION?.trim()
 
 const declaredRange = pkg.devDependencies?.['signet-login'] ?? pkg.dependencies?.['signet-login']
 const lockedVersion = lock.packages?.['node_modules/signet-login']?.version
@@ -17,6 +18,17 @@ if (!declaredRange) {
 if (!lockedVersion) {
   console.error('signet-login is not locked in package-lock.json')
   process.exit(1)
+}
+
+if (candidateVersion) {
+  const installed = JSON.parse(readFileSync(resolve(root, 'node_modules/signet-login/package.json'), 'utf8'))
+  if (installed.version !== candidateVersion) {
+    console.error(`Canary must test the Signet Login candidate ${candidateVersion}; installed ${installed.version}.`)
+    process.exit(1)
+  }
+
+  console.log(`signet-login candidate is installed: ${candidateVersion}`)
+  process.exit(0)
 }
 
 const latest = execFileSync('npm', ['view', 'signet-login', 'version'], {

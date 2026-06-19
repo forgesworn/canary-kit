@@ -12,6 +12,18 @@ on:
         description: Signet Login commit SHA requesting compatibility
         required: false
         type: string
+      signet_login_candidate:
+        description: Build and install the Signet Login candidate package
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      signet_login_package_version:
+        description: Signet Login candidate package version
+        required: false
+        type: string
       request_id:
         description: Compatibility request id
         required: false
@@ -27,13 +39,47 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
+      - name: Check out Signet Login candidate
+        if: ${{ inputs.signet_login_candidate == 'true' }}
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          repository: forgesworn/signet-login
+          ref: ${{ inputs.signet_login_sha || inputs.signet_login_ref || 'main' }}
+          path: signet-login-candidate
+          persist-credentials: false
+
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
           cache: npm
 
+      - name: Build Signet Login candidate package
+        if: ${{ inputs.signet_login_candidate == 'true' }}
+        id: signet_login_candidate
+        working-directory: signet-login-candidate
+        run: |
+          npm ci
+          npm run build
+          mkdir -p "$RUNNER_TEMP/signet-login-candidate"
+          TARBALL="$(npm pack --pack-destination "$RUNNER_TEMP/signet-login-candidate" | tail -n 1)"
+          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+          if [ -n "${{ inputs.signet_login_package_version }}" ] && [ "$VERSION" != "${{ inputs.signet_login_package_version }}" ]; then
+            echo "Expected signet-login ${{ inputs.signet_login_package_version }}, built $VERSION"
+            exit 1
+          fi
+          echo "tarball=$RUNNER_TEMP/signet-login-candidate/$TARBALL" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - run: npm ci
+
+      - name: Install Signet Login candidate
+        if: ${{ inputs.signet_login_candidate == 'true' }}
+        run: npm install --no-save "${{ steps.signet_login_candidate.outputs.tarball }}"
+
       - run: npm run check:signet-login
+        env:
+          SIGNET_LOGIN_CANDIDATE_VERSION: ${{ steps.signet_login_candidate.outputs.version }}
+
       - run: npm run check:signet-conformance
       - run: npm run lint
       - run: npm run typecheck
