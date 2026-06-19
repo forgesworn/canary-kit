@@ -40,6 +40,10 @@ export default defineConfig({
       name: 'smoke',
       testDir: './smoke',
     },
+    {
+      name: 'real-relay',
+      testDir: './real-relay',
+    },
   ],
 
   use: {

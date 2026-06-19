@@ -76,6 +76,7 @@
     "test:e2e:protocol": "playwright test --config e2e/playwright.config.ts --project=protocol",
     "test:e2e:signet": "playwright test --config e2e/playwright.config.ts e2e/protocol/signet-nostrconnect.spec.ts",
     "test:e2e:live-smoke": "PLAYWRIGHT_BASE_URL=https://canary.trotters.cc playwright test --config e2e/playwright.config.ts --project=smoke",
+    "test:e2e:real-relay": "PLAYWRIGHT_BASE_URL=https://canary.trotters.cc SIGNET_BASE_URL=https://mysignet.app playwright test --config e2e/playwright.config.ts --project=real-relay",
     "test:e2e:ui": "playwright test --config e2e/playwright.config.ts --ui",
     "record": "node docs/record/record.js",
     "record:short": "node docs/record/record.js short",
