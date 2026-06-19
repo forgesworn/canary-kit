@@ -18,9 +18,9 @@ import type { AppIdentity, SignetLoginMethod } from '../types.js'
 import { DEFAULT_WRITE_RELAY } from '../types.js'
 
 export const SIGNET_APP_NAME = 'CANARY'
-const CANARY_SIGNER_METHODS: LoginPickerMethod[] = ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec']
-const CANARY_ADVANCED_SIGNER_METHODS: LoginPickerMethod[] = ['bunker', 'nsec']
-const CANARY_NOSTR_CONNECT_PERMS = ['sign_event', 'nip44_encrypt', 'nip44_decrypt']
+export const CANARY_SIGNET_METHODS: LoginPickerMethod[] = ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec']
+export const CANARY_SIGNET_ADVANCED_METHODS: LoginPickerMethod[] = ['bunker', 'nsec']
+export const CANARY_NOSTR_CONNECT_PERMS = ['sign_event', 'nip44_encrypt', 'nip44_decrypt']
 export const CANARY_NOSTR_CONNECT_TIMEOUT_MS = 120_000
 const CANARY_NOSTR_CONNECT_RELAYS = [
   'wss://relay.primal.net',
@@ -121,8 +121,8 @@ export async function signInWithSignet(options: SignetLoginRequest = {}): Promis
     theme: options.theme ?? 'auto',
     timeout: CANARY_NOSTR_CONNECT_TIMEOUT_MS,
     preferredMethod: options.preferredMethod,
-    methods: CANARY_SIGNER_METHODS,
-    advancedMethods: CANARY_ADVANCED_SIGNER_METHODS,
+    methods: CANARY_SIGNET_METHODS,
+    advancedMethods: CANARY_SIGNET_ADVANCED_METHODS,
     relayUrls: getSignetNostrConnectRelays(),
     nostrConnectPerms: CANARY_NOSTR_CONNECT_PERMS,
     onNostrConnectStatus: options.onNostrConnectStatus,

@@ -18,6 +18,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run check:signet-login
       - run: npx playwright install --with-deps chromium
       - name: Run production Canary and Signet through public Nostr relay
         env:

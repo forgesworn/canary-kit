@@ -33,6 +33,15 @@ export default defineConfig({
       testDir: './protocol',
     },
     {
+      name: 'signet-webkit',
+      testDir: './protocol',
+      testMatch: /signet-.*\.spec\.ts/,
+      use: {
+        browserName: 'webkit',
+        viewport: { width: 390, height: 844 },
+      },
+    },
+    {
       name: 'hybrid',
       testDir: './hybrid',
     },

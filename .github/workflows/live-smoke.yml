@@ -22,6 +22,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run check:signet-login
       - run: npx playwright install --with-deps chromium
       - name: Run deployed Canary and Signet smoke
         run: npm run test:e2e:live-smoke

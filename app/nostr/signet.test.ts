@@ -12,12 +12,18 @@ vi.mock('signet-login', () => ({
 
 import {
   CANARY_NOSTR_CONNECT_TIMEOUT_MS,
+  CANARY_NOSTR_CONNECT_PERMS,
+  CANARY_SIGNET_ADVANCED_METHODS,
+  CANARY_SIGNET_METHODS,
   canUseIdentitySigner,
+  clearActiveSignetSession,
+  getSignetSigner,
   identityFromSignetSession,
   identitySignerLabel,
   isExternalSignerIdentity,
   signInWithSignet,
   signetMethodLabel,
+  logoutSignetSession,
 } from './signet.js'
 import type { AppIdentity } from '../types.js'
 
@@ -62,6 +68,7 @@ function makeSession(overrides: Partial<SignetSession> = {}): SignetSession {
 
 describe('Signet identity adapter', () => {
   beforeEach(() => {
+    clearActiveSignetSession()
     signetLoginMock.mockReset()
     signetLogoutMock.mockReset()
     signetLogoutMock.mockResolvedValue(undefined)
@@ -107,10 +114,11 @@ describe('Signet identity adapter', () => {
     })
 
     expect(signetLoginMock).toHaveBeenCalledWith(expect.objectContaining({
-      methods: ['local-signet', 'remote-signet', 'nip07', 'bunker', 'nostrconnect', 'nsec'],
-      advancedMethods: ['bunker', 'nsec'],
+      methods: CANARY_SIGNET_METHODS,
+      advancedMethods: CANARY_SIGNET_ADVANCED_METHODS,
       relayUrl: 'wss://relay.trotters.cc',
       timeout: CANARY_NOSTR_CONNECT_TIMEOUT_MS,
+      nostrConnectPerms: CANARY_NOSTR_CONNECT_PERMS,
       relayUrls: [
         'wss://relay.primal.net',
         'wss://relay.trotters.cc',
@@ -136,5 +144,43 @@ describe('Signet identity adapter', () => {
 
     await expect(signInWithSignet()).rejects.toThrow(/live signer connection.*NIP-44 invite messages/)
     expect(signetLogoutMock).toHaveBeenCalledWith(authOnly)
+  })
+
+  it('rejects Signet sessions that can sign but cannot perform NIP-44', async () => {
+    const missingNip44 = makeSession({
+      method: 'nip07',
+      signer: {
+        pubkey: PUBKEY,
+        method: 'nip07',
+        capabilities: { canSignEvents: true, hasNip44: false },
+        signEvent: async template => ({
+          id: 'd'.repeat(64),
+          pubkey: PUBKEY,
+          kind: template.kind,
+          created_at: template.created_at ?? 1,
+          tags: template.tags ?? [],
+          content: template.content,
+          sig: 'e'.repeat(128),
+        }),
+        close: async () => {},
+      },
+    })
+    signetLoginMock.mockResolvedValue(missingNip44)
+
+    await expect(signInWithSignet()).rejects.toThrow(/live signer connection.*NIP-44 invite messages/)
+    expect(signetLogoutMock).toHaveBeenCalledWith(missingNip44)
+  })
+
+  it('clears the active Signet session on logout before future signer lookups', async () => {
+    const session = makeSession()
+    signetLoginMock.mockResolvedValue(session)
+
+    const identity = await signInWithSignet()
+    expect(identity).not.toBeNull()
+    await expect(getSignetSigner(identity!)).resolves.toBe(session.signer)
+
+    await logoutSignetSession()
+    expect(signetLogoutMock).toHaveBeenCalledWith(session)
+    await expect(getSignetSigner(identity!)).rejects.toThrow(/Signet signer is not available/)
   })
 })
