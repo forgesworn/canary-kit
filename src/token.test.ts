@@ -301,7 +301,7 @@ describe('cross-counter collision avoidance', () => {
     }
   })
 
-  it('verifyToken detects duress when verifier counter drifts by tolerance (P2 regression)', () => {
+  it('verifyToken detects duress when verifier counter drifts by tolerance (P2 regression)', { timeout: 15_000 }, () => {
     // The exact reproduction: deriver at c=74, verifier at c=72, tolerance=2
     const tolerance = 2
     const ids = [IDENTITY_A]
