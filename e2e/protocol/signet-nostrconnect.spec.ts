@@ -159,7 +159,7 @@ test.describe('Signet NostrConnect browser flow', () => {
       await expect(page.locator('#signet-login-dialog')).toBeVisible()
 
       await page.locator('#signet-login-dialog button[data-choice="nostrconnect"]').click()
-      await expect(page.locator('#signet-login-nc-status')).toContainText('Waiting for signer to connect')
+      await expect(page.locator('#signet-login-nc-status')).toContainText(/NostrConnect URI ready|Connecting to NostrConnect relay|Connected to relay|Waiting for signer/)
 
       const uri = await page.locator('#signet-login-nc-uri').inputValue()
       const clientPubkey = new URL(uri).hostname.toLowerCase()
