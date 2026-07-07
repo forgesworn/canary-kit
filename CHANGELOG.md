@@ -14,6 +14,14 @@
 
 # [2.7.0](https://github.com/forgesworn/canary-kit/compare/v2.6.2...v2.7.0) (2026-03-27)
 
+## 2.11.0 (2026-07-07)
+
+### Features
+
+- expose canary verification risk controls
+
+
+
 ## 2.10.0 (2026-06-19)
 
 ### Features
