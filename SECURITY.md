@@ -60,6 +60,25 @@ CANARY's security rests on the secrecy of the shared seed and the properties of 
 - Side-channel attacks inherent to JavaScript runtimes (timing, memory access patterns)
 - An attacker who can observe both parties' tokens in real time
 
+### Accepted Candidate Surface
+
+Short spoken tokens are intended for live, rate-limited verification, not unlimited
+online guessing. A one-word token has 2,048 possible outputs, but CANARY's verifier
+may accept multiple candidates: group fallback tokens plus per-identity normal and
+duress tokens across the tolerance window.
+
+By default the accepted candidate count is:
+
+```
+(1 + 2 * identityCount) * (2 * tolerance + 1)
+```
+
+For example, 100 identities with ±1 tolerance means 603 accepted candidates, or about
+a 25.5% success probability for one random one-word online guess. Large rosters,
+text-based verification, or relaxed tolerance SHOULD use 2+ words, tighter rate
+limits, or a smaller verification roster. Use `estimateCanaryVerificationRisk()` to
+model the exact configuration before deployment.
+
 ### Known Limitations of JavaScript Cryptography
 
 - **No constant-time guarantees.** JavaScript engines may optimise away constant-time patterns. A `timingSafeEqual()` utility is provided and used for all token comparisons. The CANARY threat model (spoken-word verification over voice calls) makes sub-millisecond timing attacks impractical.

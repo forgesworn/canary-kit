@@ -149,7 +149,7 @@
     "@scure/bip32": "^2.0.1",
     "@scure/bip39": "^2.0.1",
     "nsec-tree": "^1.4.0",
-    "spoken-token": "^2.0.2"
+    "spoken-token": "^2.1.0"
   },
   "funding": {
     "type": "lightning",

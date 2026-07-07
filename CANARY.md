@@ -706,10 +706,11 @@ verify(secret, context, counter, input, identities[], tolerance?) ->
   { status: 'invalid' }
 ```
 
-The verification algorithm uses exact-counter-first priority:
+The verification algorithm computes all candidate branches, then applies
+safety-first priority:
 
-1. Derive the verification token at the **exact** counter. If the input matches → `valid`.
-   Same-counter collision avoidance guarantees no ambiguity at this step.
+1. For each identity, derive the per-identity normal token at the **exact** counter
+   and record any match.
 
 2. For each identity, for each counter in the tolerance window
    `[counter - tolerance, ..., counter + tolerance]`:
@@ -717,13 +718,35 @@ The verification algorithm uses exact-counter-first priority:
    Collect all matching identities. If any match →
    `duress` with all matching identities.
 
-3. For each counter in the tolerance window **excluding the exact counter**:
-   derive the verification token. If the input matches → `valid`.
+3. For each identity, for each counter in the tolerance window **excluding the exact
+   counter**, derive the per-identity normal token and record any match.
 
-4. No match → `invalid`.
+4. For each counter in the tolerance window, derive the group-wide normal token
+   for backwards-compatible anonymous verification and record any match.
 
-This ordering ensures that a duress token at the expected counter is never masked by a
-normal token at an adjacent counter (fail-safe).
+5. Return priority is: duress match → exact per-identity normal match → tolerance
+   per-identity normal match → group-wide normal match → `invalid`.
+
+This ordering ensures that a duress token is never masked by a normal token
+(fail-safe). Collision avoidance guarantees that a generated duress token does not
+intentionally overlap with normal candidates in the configured window.
+
+#### Accepted Candidate Surface
+
+Each individual spoken token has the output entropy of its encoding, but a verifier may
+accept more than one candidate. With group fallback enabled, per-identity normal tokens,
+per-identity duress tokens, and tolerance, the default candidate count is:
+
+```
+(1 + 2 * identityCount) * (2 * tolerance + 1)
+```
+
+For one-word tokens this count should be treated as an online-guessing budget. A verifier
+with 100 identities and ±1 tolerance accepts 603 of 2,048 possible words, or about 25.5%
+of random one-word guesses. Deployments with large rosters, text entry, or repeated
+attempts SHOULD use 2+ words and rate limiting. Implementations SHOULD expose an
+estimator equivalent to `estimateCanaryVerificationRisk()` so applications can enforce
+their own thresholds.
 
 #### Multi-Match Attribution
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { verifyWord, type VerifyResult } from './verify.js'
 import { deriveVerificationWord, deriveDuressWord, deriveVerificationPhrase, deriveDuressPhrase } from './derive.js'
+import { MAX_INPUT_CHARS } from './token.js'
 
 const TEST_SEED = 'a'.repeat(64)
 const ALICE = '1'.repeat(64)
@@ -37,6 +38,11 @@ describe('verifyWord', () => {
 
   it('returns failed for unknown word', () => {
     const result = verifyWord('xyznotaword', TEST_SEED, MEMBERS, COUNTER)
+    expect(result.status).toBe('failed')
+  })
+
+  it('returns failed for oversized input before expensive downstream verification', () => {
+    const result = verifyWord('a'.repeat(MAX_INPUT_CHARS + 1), TEST_SEED, MEMBERS, COUNTER)
     expect(result.status).toBe('failed')
   })
 

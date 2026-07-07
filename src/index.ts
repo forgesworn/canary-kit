@@ -17,13 +17,14 @@ export {
 
 // --- CANARY Protocol (universal + duress-aware) ---
 export {
-  MAX_TOLERANCE,
+  MAX_TOLERANCE, MAX_INPUT_CHARS,
   deriveTokenBytes, deriveToken,
   deriveDuressTokenBytes, deriveDuressToken,
-  verifyToken, deriveLivenessToken,
+  verifyToken, estimateCanaryVerificationRisk, deriveLivenessToken,
   deriveDirectionalPair,
   type DirectionalPair,
   type TokenVerifyResult, type VerifyOptions,
+  type CanaryVerificationRiskOptions, type CanaryVerificationRisk,
 } from './token.js'
 
 // --- Group layer ---

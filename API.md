@@ -48,9 +48,11 @@ import {
   deriveToken, deriveTokenBytes,
   deriveDuressToken, deriveDuressTokenBytes,
   verifyToken,
+  estimateCanaryVerificationRisk,
   deriveLivenessToken,
   deriveDirectionalPair,
   type TokenVerifyResult, type VerifyOptions,
+  type CanaryVerificationRisk,
   type DirectionalPair,
 } from 'canary-kit/token'
 
@@ -65,8 +67,14 @@ import {
 | `deriveToken(secret, context, counter, encoding?)` | Derive an encoded verification token |
 | `deriveDuressToken(secret, context, identity, counter, encoding, maxTolerance)` | Derive a duress token for a specific identity |
 | `verifyToken(secret, context, counter, input, identities, options?)` | Verify a token — returns `valid`, `duress` (with matching identities), or `invalid` |
+| `estimateCanaryVerificationRisk(options?)` | Estimate accepted candidates, output space, online guess probability, and effective bits |
 | `deriveLivenessToken(secret, context, identity, counter)` | Derive a liveness heartbeat token for dead man's switch |
 | `deriveDirectionalPair(secret, namespace, roles, counter, encoding?)` | Derive two directional tokens from the same secret |
+
+CANARY verification may accept group fallback tokens, per-identity normal tokens,
+and per-identity duress tokens across the configured tolerance window. Use
+`estimateCanaryVerificationRisk()` when choosing one-word tokens, large rosters,
+or non-zero tolerance.
 
 ## Core Derivation
 
@@ -94,7 +102,10 @@ import { verifyWord, type VerifyResult, type VerifyStatus } from 'canary-kit'
 
 `verifyWord(spokenWord, seedHex, memberPubkeys, counter, wordCount?): VerifyResult`
 
-Checks a spoken word in order: current verification word → each member's duress word → previous window (stale) → failed.
+Checks a spoken word against the group wrapper: current verification word → each
+member's duress word → adjacent verification windows (stale) → failed. The
+underlying universal verifier also understands per-identity normal tokens for
+call/session-style integrations.
 
 ```typescript
 type VerifyStatus = 'verified' | 'duress' | 'stale' | 'failed'

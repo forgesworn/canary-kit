@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { deriveTokenBytes, deriveToken, deriveDuressTokenBytes, deriveDuressToken, verifyToken, deriveLivenessToken } from './token.js'
+import {
+  deriveTokenBytes,
+  deriveToken,
+  deriveDuressTokenBytes,
+  deriveDuressToken,
+  verifyToken,
+  deriveLivenessToken,
+  estimateCanaryVerificationRisk,
+  MAX_INPUT_CHARS,
+} from './token.js'
 import { bytesToHex } from './crypto.js'
 
 const SECRET_1 = '0000000000000000000000000000000000000000000000000000000000000001'
@@ -80,10 +89,22 @@ describe('verifyToken', () => {
       .toThrow('identities array must not exceed 100 entries')
   })
 
+  it('returns invalid for oversized input before expensive candidate comparison', () => {
+    const oversized = 'a'.repeat(MAX_INPUT_CHARS + 1)
+    const result = verifyToken(SECRET_1, 'test', 0, oversized, [IDENTITY_A, IDENTITY_B])
+    expect(result).toEqual({ status: 'invalid' })
+  })
+
   it('returns valid for correct token', () => {
     const token = deriveToken(SECRET_1, 'test', 0)
     const result = verifyToken(SECRET_1, 'test', 0, token, [IDENTITY_A])
     expect(result.status).toBe('valid')
+  })
+
+  it('returns valid with identity for a per-member normal token', () => {
+    const token = deriveToken(SECRET_1, 'test', 0, undefined, IDENTITY_A)
+    const result = verifyToken(SECRET_1, 'test', 0, token, [IDENTITY_A, IDENTITY_B])
+    expect(result).toEqual({ status: 'valid', identities: [IDENTITY_A] })
   })
 
   it('returns duress with identity for duress token', () => {
@@ -145,6 +166,53 @@ describe('verifyToken', () => {
     expect(result.status).toBe('duress')
     expect(result.identities).toEqual([IDENTITY_A])
     expect(result).not.toHaveProperty('identity')
+  })
+})
+
+describe('estimateCanaryVerificationRisk', () => {
+  it('counts group fallback, per-member normal, and duress candidates', () => {
+    const risk = estimateCanaryVerificationRisk({
+      identities: [IDENTITY_A, IDENTITY_B],
+      tolerance: 1,
+    })
+    expect(risk.candidates).toBe(15)
+    expect(risk.groupCandidates).toBe(3)
+    expect(risk.normalIdentityCandidates).toBe(6)
+    expect(risk.duressCandidates).toBe(6)
+    expect(risk.tokenSpace).toBe(2048)
+    expect(risk.singleAttemptSuccessProbability).toBeCloseTo(1 - (1 - 1 / 2048) ** 15, 12)
+  })
+
+  it('models verification without group fallback when requested', () => {
+    const risk = estimateCanaryVerificationRisk({
+      identities: 2,
+      tolerance: 1,
+      includeGroupFallback: false,
+    })
+    expect(risk.candidates).toBe(12)
+    expect(risk.groupCandidates).toBe(0)
+  })
+
+  it('shows the one-word risk surface for a full roster with tolerance', () => {
+    const risk = estimateCanaryVerificationRisk({
+      identities: 100,
+      tolerance: 1,
+    })
+    expect(risk.candidates).toBe(603)
+    expect(risk.singleAttemptSuccessProbability).toBeGreaterThan(0.25)
+    expect(risk.singleAttemptSuccessProbability).toBeLessThan(0.26)
+  })
+
+  it('uses the selected encoding token space', () => {
+    expect(estimateCanaryVerificationRisk({ encoding: { format: 'words', count: 2 } }).tokenSpace).toBe(2048 ** 2)
+    expect(estimateCanaryVerificationRisk({ encoding: { format: 'pin', digits: 6 } }).tokenSpace).toBe(1_000_000)
+    expect(estimateCanaryVerificationRisk({ encoding: { format: 'hex', length: 8 } }).tokenSpace).toBe(16 ** 8)
+  })
+
+  it('throws on invalid risk-estimate parameters', () => {
+    expect(() => estimateCanaryVerificationRisk({ identities: -1 })).toThrow(RangeError)
+    expect(() => estimateCanaryVerificationRisk({ identities: 101 })).toThrow(RangeError)
+    expect(() => estimateCanaryVerificationRisk({ tolerance: 11 })).toThrow(RangeError)
   })
 })
 

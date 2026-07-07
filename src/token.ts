@@ -1,10 +1,12 @@
 // Re-export generic functions from spoken-token
 export { deriveTokenBytes, deriveToken, deriveDirectionalPair, type DirectionalPair } from 'spoken-token'
-export { MAX_TOLERANCE } from 'spoken-token'
+export { MAX_TOLERANCE, MAX_INPUT_CHARS } from 'spoken-token'
 
 import {
   hmacSha256, hexToBytes, concatBytes, timingSafeStringEqual,
   deriveToken as _deriveToken, encodeToken,
+  MAX_TOLERANCE as DEFAULT_MAX_TOLERANCE,
+  MAX_INPUT_CHARS as DEFAULT_MAX_INPUT_CHARS,
   type TokenEncoding, DEFAULT_ENCODING,
 } from 'spoken-token'
 
@@ -171,18 +173,155 @@ export interface VerifyOptions {
   tolerance?: number
 }
 
+/** Options for estimating CANARY duress-aware online guessing surface. */
+export interface CanaryVerificationRiskOptions {
+  /** Output encoding to model (default: single word). */
+  encoding?: TokenEncoding
+  /** Counter tolerance window to model (default: 0). */
+  tolerance?: number
+  /** Identity count or identities array to model (default: 0). */
+  identities?: number | readonly string[]
+  /** Include anonymous group-wide fallback candidates (default: true). */
+  includeGroupFallback?: boolean
+}
+
+/** Estimated online guessing surface for CANARY duress-aware verification. */
+export interface CanaryVerificationRisk {
+  /** Total accepted token candidates for one verification call. */
+  candidates: number
+  /** Anonymous group-wide normal-token candidates. */
+  groupCandidates: number
+  /** Per-identity normal-token candidates. */
+  normalIdentityCandidates: number
+  /** Per-identity duress-token candidates. */
+  duressCandidates: number
+  /** Number of possible values in the selected encoding. */
+  tokenSpace: number
+  /** Probability that one random input lands on any accepted candidate. */
+  singleAttemptSuccessProbability: number
+  /** Effective bits against one random online guess. */
+  effectiveBits: number
+}
+
+function validateTolerance(tolerance: number): void {
+  if (!Number.isInteger(tolerance) || tolerance < 0) {
+    throw new RangeError('Tolerance must be a non-negative integer')
+  }
+  if (tolerance > DEFAULT_MAX_TOLERANCE) {
+    throw new RangeError(`Tolerance must be <= ${DEFAULT_MAX_TOLERANCE}, got ${tolerance}`)
+  }
+}
+
+function validateIdentityCount(identityCount: number): void {
+  if (!Number.isInteger(identityCount) || identityCount < 0) {
+    throw new RangeError('identities count must be a non-negative integer')
+  }
+  if (identityCount > MAX_MEMBERS) {
+    throw new RangeError(`identities array must not exceed ${MAX_MEMBERS} entries, got ${identityCount}`)
+  }
+}
+
+function tokenSpaceForEncoding(encoding: TokenEncoding): number {
+  switch (encoding.format) {
+    case 'words': {
+      const count = encoding.count ?? 1
+      const wordlistSize = encoding.wordlist?.length ?? 2048
+      if (!Number.isInteger(count) || count < 1 || count > 16) {
+        throw new RangeError('Word count must be an integer 1–16')
+      }
+      if (wordlistSize !== 2048) throw new RangeError('Wordlist must contain exactly 2048 entries')
+      return wordlistSize ** count
+    }
+    case 'pin': {
+      const digits = encoding.digits ?? 4
+      if (!Number.isInteger(digits) || digits < 1 || digits > 10) {
+        throw new RangeError('PIN digits must be an integer 1–10')
+      }
+      return 10 ** digits
+    }
+    case 'hex': {
+      const length = encoding.length ?? 8
+      if (!Number.isInteger(length) || length < 1 || length > 64) {
+        throw new RangeError('Hex length must be an integer 1–64')
+      }
+      return 16 ** length
+    }
+    default:
+      throw new Error(`Unsupported encoding format: ${(encoding as { format: string }).format}`)
+  }
+}
+
+function maxInputCharsForEncoding(encoding: TokenEncoding): number {
+  if (encoding.format !== 'words') return DEFAULT_MAX_INPUT_CHARS
+
+  const count = encoding.count ?? 1
+  if (!Number.isInteger(count) || count < 1 || count > 16) {
+    throw new RangeError('Word count must be an integer 1–16')
+  }
+  if (encoding.wordlist !== undefined && encoding.wordlist.length !== 2048) {
+    throw new RangeError('Wordlist must contain exactly 2048 entries')
+  }
+
+  const maxWordLength = encoding.wordlist === undefined
+    ? 8
+    : encoding.wordlist.reduce((max, word) => Math.max(max, word.length), 0)
+  const maxNormalisedLength = count * maxWordLength + Math.max(0, count - 1)
+  return Math.max(DEFAULT_MAX_INPUT_CHARS, maxNormalisedLength + 64)
+}
+
+/**
+ * Estimate the accepted-token surface for CANARY's duress-aware verifier.
+ *
+ * This models the nominal full tolerance window. Near counter 0 or uint32 max,
+ * runtime verification may accept fewer counters due to clamping.
+ */
+export function estimateCanaryVerificationRisk(options: CanaryVerificationRiskOptions = {}): CanaryVerificationRisk {
+  const encoding = options.encoding ?? DEFAULT_ENCODING
+  const tolerance = options.tolerance ?? 0
+  validateTolerance(tolerance)
+
+  const identityCount = typeof options.identities === 'number'
+    ? options.identities
+    : options.identities?.length ?? 0
+  validateIdentityCount(identityCount)
+
+  const windowSize = tolerance * 2 + 1
+  const includeGroupFallback = options.includeGroupFallback ?? true
+  const groupCandidates = includeGroupFallback ? windowSize : 0
+  const normalIdentityCandidates = identityCount * windowSize
+  const duressCandidates = identityCount * windowSize
+  const candidates = groupCandidates + normalIdentityCandidates + duressCandidates
+  const tokenSpace = tokenSpaceForEncoding(encoding)
+  const singleAttemptSuccessProbability = candidates === 0
+    ? 0
+    : -Math.expm1(candidates * Math.log1p(-1 / tokenSpace))
+  const effectiveBits = singleAttemptSuccessProbability === 0
+    ? Infinity
+    : -Math.log2(singleAttemptSuccessProbability)
+
+  return {
+    candidates,
+    groupCandidates,
+    normalIdentityCandidates,
+    duressCandidates,
+    tokenSpace,
+    singleAttemptSuccessProbability,
+    effectiveBits,
+  }
+}
+
 /**
  * CANARY-DURESS: Verify a spoken/entered token against a group.
  *
- * Checks in priority order (exact-counter-first):
- * 1. Normal verification token at exact counter → 'valid'
- * 2. ALL identities' duress tokens (within tolerance window) → 'duress' with all matches
- * 3. Normal verification token at remaining tolerance window → 'valid'
- * 4. No match → 'invalid'
+ * Computes all candidate branches, then returns in safety-first priority:
+ * 1. ALL identities' duress tokens (within tolerance window) → 'duress' with all matches
+ * 2. Per-member normal token at exact counter → 'valid'
+ * 3. Per-member normal token at remaining tolerance window → 'valid'
+ * 4. Group-wide normal token within tolerance window → 'valid'
+ * 5. No match → 'invalid'
  *
- * Exact-counter normal is checked first because same-counter collision avoidance
- * guarantees no ambiguity. Duress across the full window is checked next so that
- * duress at the exact counter is never masked by normal at an adjacent counter.
+ * Group-wide normal tokens are retained as a backwards-compatibility fallback.
+ * Duress wins over normal matches so that a coercion signal is never masked.
  *
  * Per CANARY-DURESS: the verifier MUST check all identities and collect all matches.
  * The verifier MUST NOT short-circuit after the first duress match.
@@ -210,18 +349,12 @@ export function verifyToken(
   identities: string[],
   options?: VerifyOptions,
 ): TokenVerifyResult {
-  const MAX_TOLERANCE_VAL = 10
   const encoding = options?.encoding ?? DEFAULT_ENCODING
   const tolerance = options?.tolerance ?? 0
-  if (!Number.isInteger(tolerance) || tolerance < 0) {
-    throw new RangeError('Tolerance must be a non-negative integer')
-  }
-  if (tolerance > MAX_TOLERANCE_VAL) {
-    throw new RangeError(`Tolerance must be <= ${MAX_TOLERANCE_VAL}, got ${tolerance}`)
-  }
-  if (identities.length > MAX_MEMBERS) {
-    throw new RangeError(`identities array must not exceed ${MAX_MEMBERS} entries, got ${identities.length}`)
-  }
+  validateTolerance(tolerance)
+  validateIdentityCount(identities.length)
+  if (input.length > maxInputCharsForEncoding(encoding)) return { status: 'invalid' }
+
   const normalised = input.toLowerCase().trim().replace(/\s+/g, ' ')
 
   // All branches are computed regardless of which matches first to reduce
@@ -271,9 +404,8 @@ export function verifyToken(
     }
   }
 
-  // Priority: duress always wins unless there's an exact-counter exact-member match
-  // (collision avoidance guarantees no ambiguity at the exact counter).
-  // An exact per-member match that also matches duress → duress wins (safety-first).
+  // Safety-first priority: any duress match wins over normal matches.
+  // Collision avoidance still prevents intentional normal/duress overlap.
   if (duressMatches.length > 0) return { status: 'duress', identities: duressMatches }
   if (exactMember) return { status: 'valid', identities: [exactMember] }
   if (toleranceMember) return { status: 'valid', identities: [toleranceMember] }

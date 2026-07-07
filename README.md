@@ -164,6 +164,7 @@ import { applySyncMessage } from 'canary-kit/sync'     // just sync protocol
 - **Protocol-grade test vectors** — frozen canonical vectors in both CANARY.md and NIP-CANARY.md; any conformant implementation must produce identical results
 - **Timing-safe byte compare** — `timingSafeEqual()` utility provided for constant-time byte operations
 - **Bounded tolerance** — `MAX_TOLERANCE` cap prevents pathological iteration
+- **Candidate-risk estimator** — `estimateCanaryVerificationRisk()` models accepted candidates for roster size, tolerance, and token encoding
 
 See [SECURITY.md](SECURITY.md) for vulnerability disclosure and known limitations. See [CANARY.md](CANARY.md) for the full security analysis.
 
@@ -172,7 +173,7 @@ See [SECURITY.md](SECURITY.md) for vulnerability disclosure and known limitation
 | Subpath export | Key functions |
 |---|---|
 | `canary-kit/session` | `createSession`, `generateSeed`, `deriveSeed` |
-| `canary-kit/token` | `deriveToken`, `verifyToken`, `deriveDuressToken`, `deriveLivenessToken` |
+| `canary-kit/token` | `deriveToken`, `verifyToken`, `deriveDuressToken`, `deriveLivenessToken`, `estimateCanaryVerificationRisk` |
 | `canary-kit/encoding` | `encodeAsWords`, `encodeAsPin`, `encodeAsHex` |
 | `canary-kit` | `createGroup`, `getCurrentWord`, `verifyWord`, `addMember`, `reseed` |
 | `canary-kit/nostr` | `buildGroupStateEvent`, `buildSignalEvent`, `buildStoredSignalEvent`, `buildRumourEvent` |
