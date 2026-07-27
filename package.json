@@ -132,7 +132,7 @@
     "@vitest/coverage-v8": "^4.1.0",
     "eslint": "^10.0.3",
     "geohash-kit": "^1.5.1",
-    "maplibre-gl": "^5.20.2",
+    "maplibre-gl": "^6.0.0",
     "nostr-tools": "^2.23.3",
     "qrcode-generator": "^2.0.4",
     "serve": "^14.2.6",
