@@ -27,6 +27,10 @@ updates:
         dependency-type: development
         update-types: ["patch", "minor"]
     ignore:
+      # nostr-tools >=2.23.11 corrupts the pool's in-use counter under enablePing
+      # and idle-closes relays with reconnection disabled; repos pin 2.23.9.
+      # Remove once nbd-wtf/nostr-tools#539 is fixed and pins are lifted.
+      - dependency-name: "nostr-tools"
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/node"
