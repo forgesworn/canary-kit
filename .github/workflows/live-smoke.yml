@@ -26,7 +26,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Run deployed Canary and Signet smoke
         run: npm run test:e2e:live-smoke
-      - uses: actions/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
         if: failure()
         with:
           name: playwright-live-smoke-report
