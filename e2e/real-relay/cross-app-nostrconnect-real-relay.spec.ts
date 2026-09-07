@@ -13,9 +13,12 @@ async function enterPin(page: Page, pin = DEFAULT_PIN): Promise<void> {
 async function createSignetIdentity(page: Page): Promise<void> {
   await page.goto(SIGNET_BASE_URL)
   await page.getByRole('button', { name: 'I already have a Signet' }).click()
-  await page.getByRole('button', { name: /12 backup words/ }).click()
+  await page.getByRole('button', { name: /recovery words/i }).click()
+  // The recovery screen now defaults to a 19-word phrase; the fixture below is
+  // a 12-word BIP-39 one, so take the legacy branch explicitly.
+  await page.getByRole('button', { name: /older 12-word backup/i }).click()
   await page
-    .getByPlaceholder('word1 word2 word3 ...')
+    .getByPlaceholder('12 words separated by spaces')
     .fill('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about')
   await page.getByRole('button', { name: 'Continue' }).click()
   await page.getByRole('button', { name: 'Use my real name' }).click()
