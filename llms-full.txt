@@ -85,6 +85,29 @@ interface DirectionalPair {
   [role: string]: string
 }
 
+/** Options for estimating CANARY duress-aware online guessing surface. */
+interface CanaryVerificationRiskOptions {
+  /** Output encoding to model (default: single word). */
+  encoding?: TokenEncoding
+  /** Counter tolerance window to model (default: 0). */
+  tolerance?: number
+  /** Identity count or identities array to model (default: 0). */
+  identities?: number | readonly string[]
+  /** Include anonymous group-wide fallback candidates (default: true). */
+  includeGroupFallback?: boolean
+}
+
+/** Estimated online guessing surface for CANARY duress-aware verification. */
+interface CanaryVerificationRisk {
+  candidates: number
+  groupCandidates: number
+  normalIdentityCandidates: number
+  duressCandidates: number
+  tokenSpace: number
+  singleAttemptSuccessProbability: number
+  effectiveBits: number
+}
+
 // ── Group Verification ────────────────────────────────────────────────────────
 
 /** Outcome of group word verification. */
@@ -585,6 +608,32 @@ verifyToken(secret, 'aviva', 42, 'marble', [], { tolerance: 1 })
 // { status: 'valid' }  — accepts tokens from counter 41, 42, or 43
 ```
 
+### estimateCanaryVerificationRisk(options?)
+
+Estimate the online guessing surface for CANARY's duress-aware verifier: how many candidate tokens are accepted for one verification call, and the resulting single-attempt success probability and effective bits. Models the nominal full tolerance window; near counter 0 or uint32 max, runtime verification may accept fewer counters due to clamping.
+
+```typescript
+estimateCanaryVerificationRisk(
+  options?: {
+    encoding?: TokenEncoding,               // default: single word
+    tolerance?: number,                     // default: 0
+    identities?: number | readonly string[], // default: 0
+    includeGroupFallback?: boolean,         // default: true
+  },
+): {
+  candidates: number,
+  groupCandidates: number,
+  normalIdentityCandidates: number,
+  duressCandidates: number,
+  tokenSpace: number,
+  singleAttemptSuccessProbability: number,
+  effectiveBits: number,
+}
+
+estimateCanaryVerificationRisk({ tolerance: 1, identities: 2 })
+// { candidates: 15, ..., effectiveBits: ... }
+```
+
 ### deriveLivenessToken(secret, context, identity, counter)
 
 CANARY-DURESS: Derive a liveness heartbeat token for a dead man's switch. If heartbeats stop arriving, the implementation triggers its DMS response.
@@ -768,7 +817,7 @@ indexOf('unknown')  // -1
 
 The universal CANARY protocol — context-string-based derivation, duress, and liveness. Use this directly when you need fine-grained control (custom context strings, arbitrary identity sets, raw bytes).
 
-All functions from the main barrel (`deriveToken`, `deriveTokenBytes`, `deriveDuressToken`, `deriveDuressTokenBytes`, `verifyToken`, `deriveLivenessToken`) are in this module, plus:
+All functions from the main barrel (`deriveToken`, `deriveTokenBytes`, `deriveDuressToken`, `deriveDuressTokenBytes`, `verifyToken`, `estimateCanaryVerificationRisk`, `deriveLivenessToken`) are in this module, plus:
 
 ### deriveDirectionalPair(secret, namespace, roles, counter, encoding?)
 
@@ -1180,16 +1229,18 @@ Transport-agnostic group state synchronisation with authority model and replay p
 ### Types
 
 ```typescript
-/** A typed, serialisable description of a group state change. */
+/** A typed, serialisable description of a group state change. protocolVersion is injected by encodeSyncMessage. */
 type SyncMessage =
-  | { type: 'member-join'; pubkey: string; displayName?: string; timestamp: number; epoch: number; opId: string }
-  | { type: 'member-leave'; pubkey: string; timestamp: number; epoch: number; opId: string }
-  | { type: 'counter-advance'; counter: number; usageOffset: number; timestamp: number }
-  | { type: 'reseed'; seed: Uint8Array; counter: number; timestamp: number; epoch: number; opId: string; admins: string[]; members: string[] }
-  | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number; opId: string }
-  | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId: string; subject?: string }
-  | { type: 'liveness-checkin'; pubkey: string; timestamp: number; opId: string }
-  | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; admins: string[]; epoch: number; opId: string; timestamp: number; prevEpochSeed?: string }
+  | { type: 'member-join'; pubkey: string; displayName?: string; timestamp: number; epoch: number; opId: string; protocolVersion?: number }
+  | { type: 'member-leave'; pubkey: string; timestamp: number; epoch: number; opId: string; protocolVersion?: number }
+  | { type: 'counter-advance'; counter: number; usageOffset: number; timestamp: number; protocolVersion?: number }
+  | { type: 'reseed'; seed: Uint8Array; counter: number; timestamp: number; epoch: number; opId: string; admins: string[]; members: string[]; protocolVersion?: number }
+  | { type: 'beacon'; lat: number; lon: number; accuracy: number; timestamp: number; opId: string; protocolVersion?: number }
+  | { type: 'duress-alert'; lat: number; lon: number; timestamp: number; opId: string; subject?: string; protocolVersion?: number }
+  | { type: 'duress-clear'; subject: string; timestamp: number; opId: string; protocolVersion?: number }
+  | { type: 'liveness-checkin'; pubkey: string; timestamp: number; opId: string; protocolVersion?: number }
+  // WARNING: seed is a plaintext hex string; this message type MUST be sent inside an encrypted envelope (NIP-44 or AES-GCM via deriveGroupKey/encryptEnvelope).
+  | { type: 'state-snapshot'; seed: string; counter: number; usageOffset: number; members: string[]; admins: string[]; epoch: number; opId: string; timestamp: number; prevEpochSeed?: string; protocolVersion?: number }
 
 /** Result of applying a sync message, indicating whether it was accepted. */
 interface SyncApplyResult {
@@ -1212,6 +1263,8 @@ interface EventSigner {
   decrypt(ciphertext: string, senderPubkey: string): Promise<string>
 }
 ```
+
+`Persona` and `Identity` are re-exported from `nsec-tree` for `deriveGroupIdentity`'s parameter and return types.
 
 ### Functions
 
@@ -1236,9 +1289,9 @@ Use `applySyncMessageWithResult` when you need to log or alert on rejected messa
 ### Envelope Encryption
 
 ```typescript
-deriveGroupKey(seed: string): Uint8Array             // Derive AES-256-GCM group key from seed
-deriveGroupIdentity(seed: string): Uint8Array      // Derive HMAC signing key from seed
-hashGroupTag(groupId: string): string                // Privacy-preserving group tag hash
+deriveGroupKey(seedHex: string): Uint8Array                                         // Derive AES-256-GCM group key from a group seed
+deriveGroupIdentity(persona: Persona, groupId: string, epoch: number): Identity     // Derive a group signing identity from an nsec-tree persona; epoch tracks reseeds
+hashGroupTag(groupId: string): string                                              // Privacy-preserving group tag hash
 encryptEnvelope(key: Uint8Array, plaintext: string): Promise<string>  // AES-256-GCM encrypt
 decryptEnvelope(key: Uint8Array, ciphertext: string): Promise<string> // AES-256-GCM decrypt
 ```

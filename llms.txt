@@ -1,6 +1,6 @@
 # canary-kit
 
-> Spoken secrets. Silent alerts. Dead man's switch. canary-kit is a minimal-dependency TypeScript library for deepfake-proof identity verification — spoken-word tokens derived from shared secrets, with built-in duress signalling, liveness heartbeats, and encrypted location beacons. Open protocol.
+> Spoken secrets. Silent alerts. Dead man's switch. canary-kit is a minimal-dependency TypeScript library for deepfake-proof identity verification: spoken-word tokens derived from shared secrets, with built-in duress signalling, liveness heartbeats, and encrypted location beacons. Open protocol.
 
 Interactive demo: https://canary.trotters.cc/
 GitHub: https://github.com/forgesworn/canary-kit
@@ -39,28 +39,29 @@ Group lifecycle:
 Counter:
 - getCounter(timestampSec, rotationIntervalSec?) → number
 - counterToBytes(counter) → Uint8Array
-- DEFAULT_ROTATION_INTERVAL — 604800 (7 days)
+- DEFAULT_ROTATION_INTERVAL: 604800 (7 days)
 
 Presets:
-- PRESETS — { family, field-ops, enterprise } (wordCount, rotationInterval, description)
-- PresetName — 'family' | 'field-ops' | 'enterprise'
+- PRESETS: { family, field-ops, enterprise } (wordCount, rotationInterval, description)
+- PresetName: 'family' | 'field-ops' | 'enterprise'
 
 Also re-exports all of: canary-kit/token, canary-kit/encoding, canary-kit/beacon, canary-kit/wordlist
 
 ### canary-kit/token
 
-Universal CANARY protocol — context-string-based derivation. Use this to build custom integrations outside the group model.
+Universal CANARY protocol: context-string-based derivation. Use this to build custom integrations outside the group model.
 
 - deriveTokenBytes(secret, context, counter) → Uint8Array
 - deriveToken(secret, context, counter, encoding?) → string
 - deriveDuressTokenBytes(secret, context, identity, counter) → Uint8Array
-- MAX_TOLERANCE — 10 (upper bound for tolerance/maxTolerance)
-- deriveDuressToken(secret, context, identity, counter, encoding, maxTolerance) → string (both required — maxTolerance must match verifier's tolerance)
+- MAX_TOLERANCE: 10 (upper bound for tolerance/maxTolerance)
+- deriveDuressToken(secret, context, identity, counter, encoding, maxTolerance) → string (both required; maxTolerance must match verifier's tolerance)
 - verifyToken(secret, context, counter, input, identities, options?) → TokenVerifyResult
+- estimateCanaryVerificationRisk(options?) → CanaryVerificationRisk (models the online guessing surface for one verification call)
 - deriveLivenessToken(secret, context, identity, counter) → Uint8Array
 - deriveDirectionalPair(secret, namespace, roles, counter, encoding?) → { [role]: string }
 
-Types: TokenVerifyResult ({ status: 'valid' | 'duress' | 'invalid', identities? }), VerifyOptions ({ encoding?, tolerance? })
+Types: TokenVerifyResult ({ status: 'valid' | 'duress' | 'invalid', identities? }), VerifyOptions ({ encoding?, tolerance? }), CanaryVerificationRiskOptions ({ encoding?, tolerance?, identities?, includeGroupFallback? }), CanaryVerificationRisk ({ candidates, groupCandidates, normalIdentityCandidates, duressCandidates, tokenSpace, singleAttemptSuccessProbability, effectiveBits })
 
 ### canary-kit/encoding
 
@@ -70,9 +71,9 @@ Encode raw HMAC bytes into human-readable formats.
 - encodeAsPin(bytes, digits?) → string
 - encodeAsHex(bytes, length?) → string
 - encodeToken(bytes, encoding?) → string
-- DEFAULT_ENCODING — { format: 'words', count: 1 }
+- DEFAULT_ENCODING: { format: 'words', count: 1 }
 
-Type: TokenEncoding — { format: 'words', count?, wordlist? } | { format: 'pin', digits? } | { format: 'hex', length? }
+Type: TokenEncoding: { format: 'words', count?, wordlist? } | { format: 'pin', digits? } | { format: 'hex', length? }
 
 ### canary-kit/session
 
@@ -81,8 +82,8 @@ Role-aware, time-managed two-party verification sessions. Ideal for phone calls 
 - createSession(config) → Session
 - generateSeed() → Uint8Array
 - deriveSeed(masterKey, ...components) → Uint8Array
-- SESSION_PRESETS — { call, handoff } (wordCount, rotationSeconds, tolerance, directional)
-- SessionPresetName — 'call' | 'handoff'
+- SESSION_PRESETS: { call, handoff } (wordCount, rotationSeconds, tolerance, directional)
+- SessionPresetName: 'call' | 'handoff'
 
 Session methods:
 - session.counter(nowSec?) → number
@@ -93,23 +94,23 @@ Session methods:
 
 ### canary-kit/wordlist
 
-2048-word spoken-clarity wordlist (en-v1). Based on BIP-39 English, filtered for verbal clarity — no homophones, no phonetic near-collisions.
+2048-word spoken-clarity wordlist (en-v1). Based on BIP-39 English, filtered for verbal clarity: no homophones, no phonetic near-collisions.
 
-- WORDLIST — readonly string[] (2048 entries)
-- WORDLIST_SIZE — 2048
+- WORDLIST: readonly string[] (2048 entries)
+- WORDLIST_SIZE: 2048
 - getWord(index) → string
 - indexOf(word) → number (-1 if not found)
 
 ### canary-kit/nostr
 
-Unsigned Nostr event builders for SSG (Simple Shared Secret) groups. Uses standard Nostr kinds — no custom event kinds. Sign events with your preferred Nostr library.
+Unsigned Nostr event builders for SSG (Simple Shared Secret) groups. Uses standard Nostr kinds, no custom event kinds. Sign events with your preferred Nostr library.
 
-- KINDS — { groupState: 30078, signal: 20078, giftWrap: 1059 }
-- buildGroupStateEvent(params) → UnsignedEvent — kind 30078, d-tag `ssg/<groupId>`, p-tags for members, NIP-32 labels
-- buildStoredSignalEvent(params) → UnsignedEvent — kind 30078, d-tag `ssg/<SHA256(groupId)>:<signalType>`, 7-day expiration
-- buildSignalEvent(params) → UnsignedEvent — kind 20078 ephemeral, d-tag `ssg/<SHA256(groupId)>`, t-tag for signal type
-- buildRumourEvent(params) → UnsignedEvent — kind 14 rumour for NIP-17 gift wrapping (seed distribution, reseed, member updates)
-- hashGroupId(groupId) → string — SHA-256 hash a group ID for privacy-preserving d-tags
+- KINDS: { groupState: 30078, signal: 20078, giftWrap: 1059 }
+- buildGroupStateEvent(params) → UnsignedEvent: kind 30078, d-tag `ssg/<groupId>`, p-tags for members, NIP-32 labels
+- buildStoredSignalEvent(params) → UnsignedEvent: kind 30078, d-tag `ssg/<SHA256(groupId)>:<signalType>`, 7-day expiration
+- buildSignalEvent(params) → UnsignedEvent: kind 20078 ephemeral, d-tag `ssg/<SHA256(groupId)>`, t-tag for signal type
+- buildRumourEvent(params) → UnsignedEvent: kind 14 rumour for NIP-17 gift wrapping (seed distribution, reseed, member updates)
+- hashGroupId(groupId) → string: SHA-256 hash a group ID for privacy-preserving d-tags
 
 ### canary-kit/beacon
 
@@ -133,7 +134,7 @@ Transport-agnostic group state synchronisation. Authority model with 6 invariant
 - applySyncMessage(state, msg, nowSec?, sender?) → GroupState (apply a sync message; returns same reference if rejected)
 - applySyncMessageWithResult(state, msg, nowSec?, sender?) → SyncApplyResult ({ state, applied }) (same as above but indicates acceptance)
 - deriveGroupKey(seed) → Uint8Array (AES-256-GCM group key)
-- deriveGroupIdentity(seed) → Uint8Array (group identity key)
+- deriveGroupIdentity(persona, groupId, epoch) → Identity (group signing identity, derived via nsec-tree)
 - hashGroupTag(groupId) → string (privacy-preserving group tag)
 - encryptEnvelope(key, plaintext) → Promise<string> (AES-256-GCM)
 - decryptEnvelope(key, ciphertext) → Promise<string> (AES-256-GCM)
@@ -159,7 +160,7 @@ const session = createSession({
   theirIdentity: customerId, // enables duress detection
 })
 
-// The caller speaks session.theirToken() — the agent hears and verifies:
+// The caller speaks session.theirToken(); the agent hears and verifies:
 const result = session.verify(spokenWord)
 // result.status === 'valid' | 'duress' | 'invalid'
 // result.identities → who signalled duress (if any)
