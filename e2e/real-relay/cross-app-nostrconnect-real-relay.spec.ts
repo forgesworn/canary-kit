@@ -23,13 +23,15 @@ async function createSignetIdentity(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Continue' }).click()
   await page.getByRole('button', { name: 'Use my real name' }).click()
   await page.getByPlaceholder('Your name or nickname').fill('Canary Real Relay Signer')
-  await page.getByRole('button', { name: 'Restore My Signet' }).click()
+  await page.getByRole('button', { name: /^Restore My ?Signet$/ }).click()
   await page.getByRole('button', { name: 'Set up now' }).click()
   await page.getByRole('button', { name: /6-digit PIN/ }).click()
   await enterPin(page)
   await enterPin(page)
   await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByText('Canary Real Relay Signer').waitFor({ state: 'visible', timeout: 60_000 })
+  // Home lands on the persona card, with the real-name card further round the ring,
+  // so wait for the card's npub rather than the name entered during restore.
+  await page.getByText(/^npub1/).first().waitFor({ state: 'visible', timeout: 60_000 })
 }
 
 async function unlockWithPin(page: Page): Promise<void> {
