@@ -23,7 +23,7 @@ async function createSignetIdentity(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Continue' }).click()
   await page.getByRole('button', { name: 'Use my real name' }).click()
   await page.getByPlaceholder('Your name or nickname').fill('Canary Real Relay Signer')
-  await page.getByRole('button', { name: 'Restore My Signet' }).click()
+  await page.getByRole('button', { name: /^Restore My ?Signet$/ }).click()
   await page.getByRole('button', { name: 'Set up now' }).click()
   await page.getByRole('button', { name: /6-digit PIN/ }).click()
   await enterPin(page)
