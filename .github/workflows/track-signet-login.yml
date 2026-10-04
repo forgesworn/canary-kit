@@ -1,0 +1,63 @@
+name: Track Signet Login
+
+# Canary must run the latest released signet-login (tools/check-signet-login-version.mjs).
+# Dependabot only moves the lockfile when the new version is inside the declared range,
+# and only weekly, so the guard and the daily smokes go red after every signet-login
+# release. This bumps both before the smokes run. signet-login's release workflow has
+# already run Canary's compatibility suite against the same build before publishing.
+
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: track-signet-login
+  cancel-in-progress: false
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Check for a newer signet-login
+        id: latest
+        run: |
+          if npm run -s check:signet-login; then
+            echo "bump=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bump=true" >> "$GITHUB_OUTPUT"
+            echo "version=$(npm view signet-login version)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Bump signet-login
+        if: steps.latest.outputs.bump == 'true'
+        run: |
+          npm ci
+          npm install "signet-login@^${{ steps.latest.outputs.version }}" --save-dev
+          npm run check:signet-login
+      - name: Test
+        if: steps.latest.outputs.bump == 'true'
+        run: |
+          npm run typecheck
+          npm run build
+          npx vitest run
+      - name: Push and run CI
+        if: steps.latest.outputs.bump == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.latest.outputs.version }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "chore(deps-dev): track signet-login ${VERSION}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # Pushes made with GITHUB_TOKEN start no workflows; a dispatch does.
+          gh workflow run ci.yml --ref "${GITHUB_REF_NAME}"
