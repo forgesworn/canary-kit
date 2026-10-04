@@ -29,7 +29,9 @@ async function createSignetIdentity(page: Page): Promise<void> {
   await enterPin(page)
   await enterPin(page)
   await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByText('Canary Real Relay Signer').waitFor({ state: 'visible', timeout: 60_000 })
+  // Home lands on the persona card, with the real-name card further round the ring,
+  // so wait for the card's npub rather than the name entered during restore.
+  await page.getByText(/^npub1/).first().waitFor({ state: 'visible', timeout: 60_000 })
 }
 
 async function unlockWithPin(page: Page): Promise<void> {
