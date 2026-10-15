@@ -1,5 +1,5 @@
 name: Signet Compatibility
-run-name: Signet compatibility ${{ inputs.signet_login_ref || github.ref_name }}
+run-name: ${{ inputs.signet_login_candidate == 'true' && format('Signet compatibility sha={0} version={1} request={2}', inputs.signet_login_sha || inputs.signet_login_ref || 'main', inputs.signet_login_package_version, inputs.request_id) || github.workflow }}
 
 on:
   workflow_dispatch:
