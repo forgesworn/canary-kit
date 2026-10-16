@@ -14,6 +14,14 @@
 
 # [2.7.0](https://github.com/forgesworn/canary-kit/compare/v2.6.2...v2.7.0) (2026-03-27)
 
+## 2.11.2 (2026-10-16)
+
+### Bug Fixes
+
+- close the re-audit's high-severity doc gaps (#95) (docs)
+
+
+
 ## 2.11.1 (2026-10-16)
 
 ### Bug Fixes
