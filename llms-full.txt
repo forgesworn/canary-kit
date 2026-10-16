@@ -1558,6 +1558,7 @@ const pin = deriveToken(secret, 'my-app:auth', counter, { format: 'pin', digits:
 // e.g. '047291'
 
 // Verify with tolerance (accept ±1 window for clock skew)
+const enteredPin = pin  // stand-in: in practice, the PIN the user typed
 const result = verifyToken(secret, 'my-app:auth', counter, enteredPin, [], {
   encoding: { format: 'pin', digits: 6 },
   tolerance: 1,

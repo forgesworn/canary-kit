@@ -109,6 +109,7 @@ getCurrentDuressWord(group, alicePubkey)  // Alice's duress word, distinct from 
 // counter + usageOffset, after syncCounter() has refreshed it to the current window.
 const synced = syncCounter(group)
 const counter = synced.counter + synced.usageOffset
+const spokenWord = getCurrentWord(synced)  // stand-in: in practice, the word you heard on the call
 verifyWord(spokenWord, synced.seed, synced.members, counter, synced.wordCount, synced.tolerance)
 // { status: 'verified' | 'duress' | 'stale' | 'failed', members?: string[] }
 ```
