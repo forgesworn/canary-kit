@@ -14,6 +14,14 @@
 
 # [2.7.0](https://github.com/forgesworn/canary-kit/compare/v2.6.2...v2.7.0) (2026-03-27)
 
+## 2.11.1 (2026-10-16)
+
+### Bug Fixes
+
+- correct the published docs against the source (#94) (docs)
+
+
+
 ## 2.11.0 (2026-07-07)
 
 ### Features
