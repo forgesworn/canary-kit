@@ -15,17 +15,19 @@ npm install canary-kit
 
 ### canary-kit (main entry)
 
-Re-exports the full API. Includes group lifecycle, presets, and all protocol primitives.
+Re-exports the group, token, encoding, wordlist, counter and beacon APIs, plus group presets. It does NOT re-export `canary-kit/session`, `canary-kit/nostr` or `canary-kit/sync`: import those from their subpaths (`createSession`, `generateSeed`, `deriveSeed` and `SESSION_PRESETS` are only in `canary-kit/session`). `timingSafeEqual` is not exported by canary-kit at all; import it from `spoken-token`.
 
 Core derivation:
 - deriveVerificationWord(seedHex, counter) → string
 - deriveVerificationPhrase(seedHex, counter, wordCount) → string[]
 - deriveDuressWord(seedHex, memberPubkeyHex, counter) → string
 - deriveDuressPhrase(seedHex, memberPubkeyHex, counter, wordCount) → string[]
-- verifyWord(spokenWord, seedHex, memberPubkeys, counter, wordCount?) → VerifyResult
+- verifyWord(spokenWord, seedHex, memberPubkeys, counter, wordCount = 1, tolerance = 1) → VerifyResult
+  - counter: pass the group's effective counter, `state.counter + state.usageOffset` (the counter getCurrentWord(state) derives from), after `syncCounter(state)` has refreshed persisted state. Do not pass `getCounter(now)` alone: it ignores usageOffset, so it fails after advanceCounter. A raw time-based counter is only correct when usageOffset is 0.
+  - wordCount and tolerance: pass `state.wordCount` and `state.tolerance`; the defaults (1 and 1) apply otherwise.
 
 Group lifecycle:
-- createGroup(config) → GroupState (config.creator sets initial admin; without creator, admins is empty)
+- createGroup(config) → GroupState (config.name and config.members are required; members are 64-char lowercase hex pubkeys; config.creator sets initial admin and must be in members; without creator, admins is empty)
 - getCurrentWord(state) → string
 - getCurrentDuressWord(state, memberPubkey) → string
 - advanceCounter(state) → GroupState
@@ -42,10 +44,15 @@ Counter:
 - DEFAULT_ROTATION_INTERVAL: 604800 (7 days)
 
 Presets:
-- PRESETS: { family, field-ops, enterprise } (wordCount, rotationInterval, description)
-- PresetName: 'family' | 'field-ops' | 'enterprise'
+- PRESETS: { family, field-ops, enterprise, event } (wordCount, rotationInterval, description). Group presets for createGroup only; session presets (`call`, `handoff`) are separate and only valid for createSession.
+- PresetName: 'family' | 'field-ops' | 'enterprise' | 'event'
 
-Also re-exports all of: canary-kit/token, canary-kit/encoding, canary-kit/beacon, canary-kit/wordlist
+Types:
+- VerifyResult ({ status: VerifyStatus, members?: string[] }) is what verifyWord returns. VerifyStatus is 'verified' | 'duress' | 'stale' | 'failed'. `members` lists the pubkeys whose duress word matched and is only set when status is 'duress'. This is NOT the same as TokenVerifyResult ({ status: 'valid' | 'duress' | 'invalid', identities? }), which verifyToken and session.verify return.
+- GroupState ({ name, seed, members, rotationInterval, wordCount, wordlist, counter, usageOffset, createdAt, tolerance, beaconInterval, beaconPrecision, admins, epoch, consumedOps, consumedOpsFloor? }): `seed` is a 64-char hex string, `counter` is the time-based counter at last sync, `usageOffset` is the burn-after-use offset added to it, `admins` is empty unless createGroup got a creator. Full field comments are in llms-full.txt.
+- GroupConfig, GroupPreset, VerifyOptions and the other token and beacon types listed in their sections below.
+
+Also re-exports from: canary-kit/token, canary-kit/encoding, canary-kit/beacon, canary-kit/wordlist, and the counter helpers (getCounter, counterToBytes, counterFromEventId, DEFAULT_ROTATION_INTERVAL, MAX_COUNTER_OFFSET)
 
 ### canary-kit/token
 
@@ -149,10 +156,13 @@ Types: SyncApplyResult ({ state: GroupState, applied: boolean }), SyncTransport 
 
 ```typescript
 // --- Session-based phone verification (bank/insurance call centre) ---
-import { createSession } from 'canary-kit/session'
+import { createSession, generateSeed } from 'canary-kit/session'
+
+const sharedSecret = generateSeed() // Uint8Array; generate once and share securely, both sides need the same secret
+const customerId = 'customer-8841' // the other party's identity string
 
 const session = createSession({
-  secret: sharedSecretHex,
+  secret: sharedSecret, // Uint8Array or hex string
   namespace: 'aviva',
   roles: ['caller', 'agent'],
   myRole: 'agent',
@@ -168,14 +178,25 @@ const result = session.verify(spokenWord)
 
 ```typescript
 // --- Group-based family verification (weekly rotating passphrase) ---
-import { createGroup, getCurrentWord, getCurrentDuressWord, verifyWord, getCounter } from 'canary-kit'
+import { createGroup, getCurrentWord, getCurrentDuressWord, syncCounter, verifyWord } from 'canary-kit'
 
-const group = createGroup({ preset: 'family', members: [alicePubkey, bobPubkey] })
+// Pubkeys are 64-char lowercase hex strings (placeholders here)
+const alicePubkey = 'a1'.repeat(32)
+const bobPubkey = 'b2'.repeat(32)
+
+const group = createGroup({
+  name: 'Family', // required
+  preset: 'family',
+  members: [alicePubkey, bobPubkey],
+  creator: alicePubkey, // initial admin; without it admins is empty
+})
 const word = getCurrentWord(group) // e.g. "granite"
 
-// On a call, Alice says the current word. Bob verifies:
-const counter = getCounter(Math.floor(Date.now() / 1000), group.rotationInterval)
-const result = verifyWord(spokenWord, group.seed, group.members, counter, group.wordCount)
+// On a call, Alice says the current word. Bob verifies with the effective counter
+// (counter + usageOffset), the same one getCurrentWord uses, after syncCounter:
+const synced = syncCounter(group)
+const counter = synced.counter + synced.usageOffset
+const result = verifyWord(spokenWord, synced.seed, synced.members, counter, synced.wordCount, synced.tolerance)
 // result.status === 'verified' | 'duress' | 'stale' | 'failed'
 
 // If Alice is under coercion, she says her duress word instead:

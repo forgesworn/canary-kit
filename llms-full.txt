@@ -159,7 +159,7 @@ interface GroupState {
 // ── Group Presets ─────────────────────────────────────────────────────────────
 
 /** Named threat-profile preset identifier. */
-type PresetName = 'family' | 'field-ops' | 'enterprise'
+type PresetName = 'family' | 'field-ops' | 'enterprise' | 'event'
 
 /** A threat-profile preset for group creation. */
 interface GroupPreset {
@@ -288,7 +288,7 @@ interface BeaconEventParams {
 
 ## canary-kit (main)
 
-The barrel export. Covers group management, the CANARY protocol token API, encoding, wordlist, counter, and beacon functions. Omits session-specific exports (`createSession`, `generateSeed`, `deriveSeed`, `SESSION_PRESETS`) — import those from `canary-kit/session`.
+The barrel export. Covers group management, the CANARY protocol token API, encoding, wordlist, counter, and beacon functions. Omits session-specific exports (`createSession`, `generateSeed`, `deriveSeed`, `SESSION_PRESETS`): import those from `canary-kit/session`. Also omits the Nostr event builders (import from `canary-kit/nostr`) and the sync protocol (import from `canary-kit/sync`). `timingSafeEqual` and `timingSafeStringEqual` are not exported by canary-kit; import them from `spoken-token`.
 
 ### deriveVerificationWord(seedHex, counter)
 
@@ -352,7 +352,7 @@ deriveDuressPhrase('a'.repeat(64), 'b'.repeat(64), 42, 2)
 // e.g. ['crystal', 'anchor']
 ```
 
-### verifyWord(spokenWord, seedHex, memberPubkeys, counter, wordCount?)
+### verifyWord(spokenWord, seedHex, memberPubkeys, counter, wordCount?, tolerance?)
 
 Verify a spoken word (or phrase) against the group's current state. Returns a structured result indicating whether verification succeeded, duress was signalled, the token was stale, or no match was found.
 
@@ -363,6 +363,8 @@ Priority order:
 4. Previous window's verification word → `stale`
 5. No match → `failed`
 
+`counter` is the group's effective counter: `state.counter + state.usageOffset`, the same value `getCurrentWord(state)` derives from. Call `syncCounter(state)` first when state has been loaded from storage. A bare `getCounter(nowSec, rotationInterval)` is only equivalent while `usageOffset` is 0; after `advanceCounter` it no longer matches. Pass `state.wordCount` and `state.tolerance` so verification uses the group's settings; the defaults are `wordCount = 1` and `tolerance = 1`.
+
 ```typescript
 verifyWord(
   spokenWord: string,
@@ -370,6 +372,7 @@ verifyWord(
   memberPubkeys: string[],
   counter: number,
   wordCount: 1 | 2 | 3 = 1,
+  tolerance: number = 1,    // accept tokens within ±tolerance counters; throws RangeError above MAX_TOLERANCE
 ): VerifyResult
 
 verifyWord('marble', seed, [alicePubkey, bobPubkey], 42)
@@ -662,6 +665,7 @@ const PRESETS: Readonly<Record<PresetName, Readonly<GroupPreset>>>
 PRESETS['family']     // { wordCount: 1, rotationInterval: 604800, description: '...' }
 PRESETS['field-ops']  // { wordCount: 2, rotationInterval: 86400,  description: '...' }
 PRESETS['enterprise'] // { wordCount: 2, rotationInterval: 172800, description: '...' }
+PRESETS['event']      // { wordCount: 1, rotationInterval: 14400,  description: '...' }
 ```
 
 ### deriveBeaconKey(seedHex)
@@ -1328,6 +1332,7 @@ Used with `createGroup({ preset: '...' })`.
 | `family` | 1 | 7 days (604,800 s) | ~11 bits | Casual family/friend verification. Single word, weekly rotation. Adequate for live voice calls. |
 | `field-ops` | 2 | 24 hours (86,400 s) | ~22 bits | Journalism, activism, field operations. Two-word phrases with daily rotation. Use burn-after-use for maximum protection. |
 | `enterprise` | 2 | 48 hours (172,800 s) | ~22 bits | Corporate incident response. Two-word phrases with 48-hour rotation. Balances security with operational convenience. |
+| `event` | 1 | 4 hours (14,400 s) | ~11 bits | Temporary groups for conferences, festivals and meetups. Single word with 4-hour rotation. |
 
 Explicit `rotationInterval` or `wordCount` fields override the preset value.
 
@@ -1439,7 +1444,10 @@ const aliceDuressWord = getCurrentDuressWord(syncedState, '<alice-pubkey>')
 
 // Verifying what someone said on the call:
 const spoken = 'marble'  // heard on the call
-const result = verifyWord(spoken, syncedState.seed, syncedState.members, syncedState.counter)
+// Pass the effective counter (counter + usageOffset): the one getCurrentWord derives from.
+// syncedState.counter alone is only correct while usageOffset is 0.
+const counter = syncedState.counter + syncedState.usageOffset
+const result = verifyWord(spoken, syncedState.seed, syncedState.members, counter, syncedState.wordCount, syncedState.tolerance)
 
 switch (result.status) {
   case 'verified':
