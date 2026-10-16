@@ -171,6 +171,7 @@ const session = createSession({
 })
 
 // The caller speaks session.theirToken(); the agent hears and verifies:
+const spokenWord = session.theirToken() // stand-in: in practice, the word the caller said
 const result = session.verify(spokenWord)
 // result.status === 'valid' | 'duress' | 'invalid'
 // result.identities → who signalled duress (if any)
@@ -196,6 +197,7 @@ const word = getCurrentWord(group) // e.g. "granite"
 // (counter + usageOffset), the same one getCurrentWord uses, after syncCounter:
 const synced = syncCounter(group)
 const counter = synced.counter + synced.usageOffset
+const spokenWord = getCurrentWord(synced) // stand-in: in practice, the word heard on the call
 const result = verifyWord(spokenWord, synced.seed, synced.members, counter, synced.wordCount, synced.tolerance)
 // result.status === 'verified' | 'duress' | 'stale' | 'failed'
 
