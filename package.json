@@ -54,6 +54,10 @@
     "COOKBOOK.md",
     "NIP-CANARY.md",
     "INTEGRATION.md",
+    "GROUPS.md",
+    "NIP-XX.md",
+    "THREAT-MODEL.md",
+    "REGULATORY.md",
     "SECURITY.md",
     "llms.txt",
     "llms-full.txt"

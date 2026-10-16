@@ -65,45 +65,91 @@ npm install canary-kit
 ### Phone Verification (Insurance, Banking)
 
 ```typescript
-import { createSession } from 'canary-kit/session'
+import { createSession, generateSeed } from 'canary-kit/session'
+
+// Generate once and share with the other party over a secure channel.
+// Both sides must create their session from the same secret.
+const sharedSeed = generateSeed()   // 32-byte Uint8Array
+const customerId = 'customer-8841'  // the other party's identity string
 
 const session = createSession({
-  secret: sharedSeed,
+  secret: sharedSeed,               // Uint8Array or hex string
   namespace: 'aviva',
   roles: ['caller', 'agent'],
   myRole: 'agent',
   preset: 'call',
+  theirIdentity: customerId,        // omit this and duress is never reported
 })
 
 session.myToken()        // "choose" — what I speak
 session.theirToken()     // "bid" — what I expect to hear
-session.verify('bid')    // { status: 'valid' }
+session.verify('bid')    // { status: 'valid' } ('duress' or 'invalid' otherwise)
 ```
 
 ### Family / Team Verification
 
 ```typescript
-import { createGroup, getCurrentWord, verifyWord, getCounter } from 'canary-kit'
+import { createGroup, getCurrentWord, getCurrentDuressWord, syncCounter, verifyWord } from 'canary-kit'
+
+// Member pubkeys must be 64-character lowercase hex strings (placeholders here)
+const alicePubkey = 'a1'.repeat(32)
+const bobPubkey = 'b2'.repeat(32)
 
 const group = createGroup({
   name: 'Family',
   members: [alicePubkey, bobPubkey],
   preset: 'family',
+  creator: alicePubkey,  // initial admin, must be in members; without it admins is empty
 })
 
 getCurrentWord(group)  // "falcon"
+getCurrentDuressWord(group, alicePubkey)  // Alice's duress word, distinct from "falcon"
+
+// Verify what someone says on a call. Use the same counter getCurrentWord uses:
+// counter + usageOffset, after syncCounter() has refreshed it to the current window.
+const synced = syncCounter(group)
+const counter = synced.counter + synced.usageOffset
+verifyWord(spokenWord, synced.seed, synced.members, counter, synced.wordCount, synced.tolerance)
+// { status: 'verified' | 'duress' | 'stale' | 'failed', members?: string[] }
 ```
+
+`createGroup` returns a `GroupState`. The functions that change a group return a new `GroupState` and never mutate the input, so persist the value you get back:
+
+```typescript
+interface GroupState {
+  name: string
+  seed: string              // 64-char hex shared secret: store and transmit it as a secret
+  members: string[]         // 64-char lowercase hex pubkeys
+  admins: string[]          // empty unless createGroup got a creator
+  rotationInterval: number  // seconds
+  wordCount: 1 | 2 | 3
+  wordlist: string          // 'en-v1' unless config.wordlist says otherwise
+  counter: number           // time-based counter at creation or the last syncCounter
+  usageOffset: number       // burn-after-use offset added to counter (advanceCounter)
+  tolerance: number         // accepted counter drift when verifying
+  createdAt: number         // unix seconds
+  beaconInterval: number    // seconds (default 300)
+  beaconPrecision: number   // geohash precision 1-11 (default 6)
+  epoch: number             // starts at 0; set by an applied sync reseed message
+  consumedOps: string[]     // replay protection within the current epoch
+  consumedOpsFloor?: number // timestamp floor for replay protection
+}
+```
+
+Local `reseed` and `removeMemberAndReseed` replace `seed` and reset `usageOffset`; they leave `epoch` and `consumedOps` alone, because only `applySyncMessage` from `canary-kit/sync` changes `epoch` (by applying a reseed message, which also replaces `consumedOps`). `dissolveGroup` zeroes `seed`, empties `members` and `admins`, and clears `usageOffset` and the replay fields. Delete the persisted record yourself afterwards. Field-by-field notes are in [API.md](API.md).
 
 ## Use Cases
 
-| Use case | Preset | Rotation | What it replaces |
-|----------|--------|----------|------------------|
-| Insurance phone calls | `call` | 30 seconds | Security questions |
-| Banking phone calls | `call` | 30 seconds | Voice biometrics, callbacks |
-| Rideshare/delivery handoff | `handoff` | Single-use | Random PINs |
-| Family safety | `family` | 7 days | Static safe words |
-| Journalism / activism | `field-ops` | 24 hours | Nothing (no existing standard) |
-| Enterprise incident response | `enterprise` | 48 hours | Challenge-response over email |
+| Use case | Session preset (`createSession`) | Group preset (`createGroup`) | Rotation | What it replaces |
+|----------|-------|-------|----------|------------------|
+| Insurance phone calls | `call` | n/a | 30 seconds | Security questions |
+| Banking phone calls | `call` | n/a | 30 seconds | Voice biometrics, callbacks |
+| Rideshare/delivery handoff | `handoff` | n/a | Single-use | Random PINs |
+| Family safety | n/a | `family` | 7 days | Static safe words |
+| Journalism / activism | n/a | `field-ops` | 24 hours | Nothing (no existing standard) |
+| Enterprise incident response | n/a | `enterprise` | 48 hours | Challenge-response over email |
+
+Session presets (`call`, `handoff`) are only valid for `createSession`; group presets (`family`, `field-ops`, `enterprise`, `event`) are only valid for `createGroup`, which throws on an unknown preset name. `createSession` does not validate its preset: an unknown name such as `'family'` is silently ignored and the defaults (30 second rotation, tolerance 0) apply.
 
 ## Why Not Just...
 
@@ -129,7 +175,7 @@ getCurrentWord(group)  // "falcon"
 
 **Automatic rotation.** Configurable intervals — 30 seconds for phone calls, 7 days for family groups.
 
-**Minimal dependencies.** Core crypto is pure JavaScript. Only `@scure/bip32` and `@scure/bip39` for mnemonic key recovery. Requires `globalThis.crypto` (Web Crypto API): all browsers, Node.js 24+, Deno, and edge runtimes.
+**Minimal dependencies.** The library imports two runtime packages: `spoken-token` (core derivation, encoding, wordlist, counter and hashing primitives, synchronous pure JavaScript) and `nsec-tree` (group signing identities for `canary-kit/sync`). Beacons and sync envelopes use AES-256-GCM through `globalThis.crypto` (Web Crypto API): all browsers, Node.js 24+, Deno, and edge runtimes. `@scure/bip32`, `@scure/bip39` and `@forgesworn/shamir-words` are also listed in `dependencies`, but only the demo app under `app/` imports them (mnemonic recovery and Shamir shares), not the library in `src/`.
 
 **Protocol-grade.** Formal specification with published test vectors and a curated 2048-word spoken-clarity wordlist.
 
@@ -158,11 +204,11 @@ import { applySyncMessage } from 'canary-kit/sync'     // just sync protocol
 
 ## Security
 
-- **Minimal runtime dependencies** — only `@scure/bip32` and `@scure/bip39` for mnemonic key recovery; core crypto is pure JS
+- **Minimal runtime dependencies**: the library imports only `spoken-token` (derivation primitives) and `nsec-tree` (sync identities); the scure and shamir-words packages are used by the demo app only
 - **Automated publishing** — GitHub Actions with OIDC trusted publishing, no stored tokens
 - **Provenance signed** — npm provenance attestation enabled
 - **Protocol-grade test vectors** — frozen canonical vectors in both CANARY.md and NIP-CANARY.md; any conformant implementation must produce identical results
-- **Timing-safe byte compare** — `timingSafeEqual()` utility provided for constant-time byte operations
+- **Timing-safe comparison**: spoken-word comparisons use `timingSafeStringEqual` from `spoken-token`. `canary-kit` does not re-export `timingSafeEqual` or `timingSafeStringEqual`; add `spoken-token` to your own dependencies and import them from there if you need them: `import { timingSafeEqual } from 'spoken-token'`
 - **Bounded tolerance** — `MAX_TOLERANCE` cap prevents pathological iteration
 - **Candidate-risk estimator** — `estimateCanaryVerificationRisk()` models accepted candidates for roster size, tolerance, and token encoding
 
@@ -175,11 +221,13 @@ See [SECURITY.md](SECURITY.md) for vulnerability disclosure and known limitation
 | `canary-kit/session` | `createSession`, `generateSeed`, `deriveSeed` |
 | `canary-kit/token` | `deriveToken`, `verifyToken`, `deriveDuressToken`, `deriveLivenessToken`, `estimateCanaryVerificationRisk` |
 | `canary-kit/encoding` | `encodeAsWords`, `encodeAsPin`, `encodeAsHex` |
-| `canary-kit` | `createGroup`, `getCurrentWord`, `verifyWord`, `addMember`, `reseed` |
+| `canary-kit` | `createGroup`, `getCurrentWord`, `getCurrentDuressWord`, `verifyWord`, `syncCounter`, `advanceCounter`, `addMember`, `removeMember`, `removeMemberAndReseed`, `reseed`, `dissolveGroup`, `getCounter`, `PRESETS` |
 | `canary-kit/nostr` | `buildGroupStateEvent`, `buildSignalEvent`, `buildStoredSignalEvent`, `buildRumourEvent` |
 | `canary-kit/beacon` | `encryptBeacon`, `decryptBeacon`, `buildDuressAlert` |
 | `canary-kit/sync` | `applySyncMessage`, `encodeSyncMessage`, `deriveGroupKey` |
 | `canary-kit/wordlist` | `WORDLIST`, `getWord`, `indexOf` |
+
+The `canary-kit` main entry re-exports the group, token, encoding, wordlist, counter and beacon APIs. It does not re-export `canary-kit/session`, `canary-kit/nostr` or `canary-kit/sync`; import those from their subpaths.
 
 Full API documentation with signatures, types, and presets: **[API.md](API.md)**
 
