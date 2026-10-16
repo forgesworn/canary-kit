@@ -151,8 +151,8 @@ interface GroupState {
   createdAt: number                    // Unix timestamp
   beaconInterval: number               // Seconds
   beaconPrecision: number              // 1–11
-  epoch: number                        // Monotonic epoch — increments on reseed. Used for replay protection.
-  consumedOps: string[]                // Consumed operation IDs within current epoch. Cleared on epoch bump.
+  epoch: number                        // Monotonic epoch, starts at 0. Set when applySyncMessage applies a reseed message (local reseed() and removeMemberAndReseed() do not change it). Used for replay protection.
+  consumedOps: string[]                // Consumed operation IDs within current epoch. Replaced when a sync reseed message bumps the epoch.
   consumedOpsFloor?: number            // Timestamp floor: reject messages at or below this value (replay protection after consumedOps eviction)
 }
 
@@ -486,7 +486,7 @@ const updated = removeMemberAndReseed(state, '<alice-pubkey>')
 
 ### dissolveGroup(state)
 
-Dissolve a group, zeroing the seed and clearing all members. Preserves name and timestamps for audit trail. Callers MUST also delete the persisted record (IndexedDB, localStorage, backend) after calling this. Returns new state — does not mutate.
+Dissolve a group, zeroing the seed and clearing all members and admins. Also resets usageOffset and clears consumedOps and consumedOpsFloor. Preserves name and timestamps for audit trail. Callers MUST also delete the persisted record (IndexedDB, localStorage, backend) after calling this. Returns new state and does not mutate.
 
 ```typescript
 dissolveGroup(state: GroupState): GroupState

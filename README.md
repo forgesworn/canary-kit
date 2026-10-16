@@ -113,6 +113,31 @@ verifyWord(spokenWord, synced.seed, synced.members, counter, synced.wordCount, s
 // { status: 'verified' | 'duress' | 'stale' | 'failed', members?: string[] }
 ```
 
+`createGroup` returns a `GroupState`. The functions that change a group return a new `GroupState` and never mutate the input, so persist the value you get back:
+
+```typescript
+interface GroupState {
+  name: string
+  seed: string              // 64-char hex shared secret: store and transmit it as a secret
+  members: string[]         // 64-char lowercase hex pubkeys
+  admins: string[]          // empty unless createGroup got a creator
+  rotationInterval: number  // seconds
+  wordCount: 1 | 2 | 3
+  wordlist: string          // 'en-v1' unless config.wordlist says otherwise
+  counter: number           // time-based counter at creation or the last syncCounter
+  usageOffset: number       // burn-after-use offset added to counter (advanceCounter)
+  tolerance: number         // accepted counter drift when verifying
+  createdAt: number         // unix seconds
+  beaconInterval: number    // seconds (default 300)
+  beaconPrecision: number   // geohash precision 1-11 (default 6)
+  epoch: number             // starts at 0; set by an applied sync reseed message
+  consumedOps: string[]     // replay protection within the current epoch
+  consumedOpsFloor?: number // timestamp floor for replay protection
+}
+```
+
+Local `reseed` and `removeMemberAndReseed` replace `seed` and reset `usageOffset`; they leave `epoch` and `consumedOps` alone, because only `applySyncMessage` from `canary-kit/sync` changes `epoch` (by applying a reseed message, which also replaces `consumedOps`). `dissolveGroup` zeroes `seed`, empties `members` and `admins`, and clears `usageOffset` and the replay fields. Delete the persisted record yourself afterwards. Field-by-field notes are in [API.md](API.md).
+
 ## Use Cases
 
 | Use case | Session preset (`createSession`) | Group preset (`createGroup`) | Rotation | What it replaces |

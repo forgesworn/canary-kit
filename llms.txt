@@ -35,7 +35,7 @@ Group lifecycle:
 - addMember(state, pubkey) → GroupState
 - removeMember(state, pubkey) → GroupState (does NOT reseed)
 - removeMemberAndReseed(state, pubkey) → GroupState (recommended: removes + reseeds atomically)
-- dissolveGroup(state) → GroupState (zeroes seed, clears members)
+- dissolveGroup(state) → GroupState (zeroes seed, clears members and admins, resets usageOffset and replay fields; caller must delete the persisted record)
 - syncCounter(state, nowSec?) → GroupState (refreshes counter to current time window, monotonic)
 
 Counter:
@@ -49,7 +49,7 @@ Presets:
 
 Types:
 - VerifyResult ({ status: VerifyStatus, members?: string[] }) is what verifyWord returns. VerifyStatus is 'verified' | 'duress' | 'stale' | 'failed'. `members` lists the pubkeys whose duress word matched and is only set when status is 'duress'. This is NOT the same as TokenVerifyResult ({ status: 'valid' | 'duress' | 'invalid', identities? }), which verifyToken and session.verify return.
-- GroupState ({ name, seed, members, rotationInterval, wordCount, wordlist, counter, usageOffset, createdAt, tolerance, beaconInterval, beaconPrecision, admins, epoch, consumedOps, consumedOpsFloor? }): `seed` is a 64-char hex string, `counter` is the time-based counter at last sync, `usageOffset` is the burn-after-use offset added to it, `admins` is empty unless createGroup got a creator. Full field comments are in llms-full.txt.
+- GroupState ({ name, seed, members, rotationInterval, wordCount, wordlist, counter, usageOffset, createdAt, tolerance, beaconInterval, beaconPrecision, admins, epoch, consumedOps, consumedOpsFloor? }): `seed` is a 64-char hex string, `counter` is the time-based counter at last sync, `usageOffset` is the burn-after-use offset added to it, `admins` is empty unless createGroup got a creator, `epoch` starts at 0 and is changed only by applying a sync reseed message (local reseed and removeMemberAndReseed leave epoch and consumedOps untouched). The full interface with field comments is in llms-full.txt and README.md.
 - GroupConfig, GroupPreset, VerifyOptions and the other token and beacon types listed in their sections below.
 
 Also re-exports from: canary-kit/token, canary-kit/encoding, canary-kit/beacon, canary-kit/wordlist, and the counter helpers (getCounter, counterToBytes, counterFromEventId, DEFAULT_ROTATION_INTERVAL, MAX_COUNTER_OFFSET)
