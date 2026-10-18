@@ -158,5 +158,8 @@
   "funding": {
     "type": "lightning",
     "url": "lightning:profusemeat89@walletofsatoshi.com"
+  },
+  "overrides": {
+    "compression": "^1.8.2"
   }
 }
