@@ -1,69 +1,76 @@
-# Position on scope
+# Position and applicable duties
 
-**Draft — 22 October 2026. Not legal advice; not reviewed by a lawyer. Code:
-`46079244b9c93edac98f184f240d8f86d891a811`. Law note verified 28 September 2026.**
+**Draft — 22 October 2026. Not legal advice; not reviewed by a lawyer.
+Code `b1d33e1b6a1dc5d18a01c8ab173e19356cd2e2ee`.
+Law note verified 28 September 2026.**
 
-## Position today and intended position
+## Position today / intended position
 
-Publisher of a self-contained local software file. The owner expressly selected
-this position. `local/main.ts:90` exports a local Blob download; `local/model.ts:14`
-creates secrets on the device; `vite.local.config.ts:6` selects only the local
-entry point. `tools/build-local.mjs:17` blocks network connections in the final
-file. No hosting registration, deployment or content-transfer endpoint is added.
+Publisher of software today. The owner chose a static phone-first HTTPS website
+with encrypted browser storage and optional device unlock. Both keep the shared
+secret on the devices. `local/main.ts:67` writes ciphertext to localStorage;
+`local/main.ts:212` exports encrypted JSON; `local/qr.ts:46` captures local video
+with audio disabled. `tools/build-local.mjs:17` blocks application connections;
+`:40` writes a static hosting candidate. No account, directory, upload, chat,
+relay, discovery endpoint or default remote server is introduced.
 
-The full repository also contains a larger network-capable application. This
-finding is scoped to the separate local entry point and its bundled dependency
-graph, not to every file or deployment in this repository.
+The broad repository contains a different network-capable app. These findings
+do not classify its deployment, or an origin that also exposes that service.
 
-## What applies
+## Applicable regimes
 
-All section references below are to the
-[GB note](https://github.com/forgesworn/jurisdiction-kit/blob/main/law/gb/online-services.md)
-(verified 28 September 2026).
+All references are to the
+[GB note](https://github.com/forgesworn/jurisdiction-kit/blob/main/law/gb/online-services.md),
+verified 28 September 2026.
 
-| Regime | Finding and evidence |
+| Regime | Scoped finding |
 |---|---|
-| Online Safety Act, §§2.1–2.2 | The statutory user-to-user definition is `[P]`. Applying it here, the local file supplies no service on which one user's content may be encountered by another. The note's static-software publisher reading is `[U]`: a scope judgement, not an Ofcom approval. No illegal-content or children's-access assessment is added for this local file. It neither inherits another messaging app's duties nor changes the duties of an independently operated Kithmoot deployment. `local/main.ts:90`; `tools/build-local.mjs:17`. |
-| Data protection, §§3.1–3.2 | The publisher receives no setup words, spoken words, identifiers or connection logs through the delivered file. This is a code finding, not a blanket data-protection exemption for every actor. The note's controller examples are `[U]`; its Article 13 notice requirements are `[P]`. If a download site is later operated, its connection data and controller position must be settled separately. `local/main.ts:90`, `local/main.ts:129`, `local/index.html:53`. |
-| Device storage, §4 | The note's PECR rule and exceptions are `[P]`; its necessary-app-storage interpretation is `[U]`. This app installs no cookies, localStorage, IndexedDB or service worker. File downloads and clipboard copying occur only on the user's explicit action after the on-screen explanation. No tracking-consent banner is introduced. `local/main.ts:90`, `local/main.ts:123`, `local/main.ts:129`; `local/index.html:46`. |
-| Children, §3.6 | No personal-data service, advertising, profiles or user-content surface is introduced. A minimum age has not been selected on the owner's behalf. The note's uncertainty about unfunded projects remains `[U]`; it is not turned into an age-check requirement here. |
-| Export, §§6–6.1 | Existing MIT notices permit redistribution and are included in the build (`tools/build-local.mjs:19`). The note's public-domain release provision is `[P]`, with other export points `[S]`/`[U]`. The new file has not been published or supplied abroad by this task, so this assessment does not assume that an unpublished addition already meets a public-release condition. This is not an export/end-use or sanctions clearance. |
-| Trading, §8 | There is no purchase, subscription, advertising, donation or payment path in the local entry point. The assessment does not import the full repository's separate funding metadata into this file. `local/index.html:15`. |
+| Online Safety Act, §§2.1–2.2 | The statutory user-to-user definition is `[P]`. No user content reaches another through an operator-hosted endpoint here. Pairing is a private local QR/read-back exchange using independently run copies. The note's no-infrastructure static-software publisher reading remains `[U]`, not Ofcom approval. The ordinary static-site position does not import OSA assessments or age assurance from messaging platforms. `local/model.ts:36`, `local/qr.ts:46`, `tools/build-local.mjs:17`. |
+| Data protection, §§3.1–3.2 | App data is held on the devices, not received by the publisher. Nicknames may be personal data, but no recipient/controller server is introduced for them. The note's controller examples are `[U]`, Article 13 notice contents `[P]`. Any real hosting request data must be assessed separately: collection/roles, retention, recipients and transfers cannot be inferred from a static build. `local/vault.ts:77`, `local/main.ts:67`. |
+| Device storage and PECR, §4 | The statute/exception list is `[P]`; the note's necessary-app-storage reading is `[U]`. Encrypted localStorage is now used expressly to save the service the user requests. There are no analytics or advertising stores. Explain it accurately; no tracking banner is added. Camera capture and optional passkey prompts are user initiated. `local/main.ts:67`, `local/qr.ts:46`, `local/vault.ts:138`. |
+| Children, §3.6 | No user-content service, accounts, advertising or remote profile collection is added. No minimum age is selected on the owner's behalf. The note's uncertainty about unfunded information-society services remains `[U]`, not an invented age-check requirement. |
+| Export, §§6–6.1 | Included MIT/Apache-2.0 notices permit redistribution as their licences specify; notices are bundled (`tools/build-local.mjs:19`). The note's public-domain provision is `[P]`, other aspects `[S]`/`[U]`. New unpublished code is not treated as already publicly released. No export/end-use or sanctions clearance is claimed. |
+| Trading, §8 | No purchase, subscription, payment or donation path is in this entry point. No business identity disclosure or registration is imposed merely because a static tool exists. `local/index.html:15`. |
 
 ## Already in place
 
-An isolated offline build, no accounts or directory, no relays or message
-carriage, no analytics or cookies, no microphone/camera/location access, no
-automatic alerts, explicit secret-file and clipboard explanations, and in-file
-privacy/limitations text. The normal and duress result messages describe
-shared-secret knowledge rather than claiming identity or safety
-(`local/main.ts:142`). Runtime dependencies' MIT notices are bundled.
+No message infrastructure, accounts, trackers or remote-secret backup. Names and
+secrets are encrypted before browser persistence; backups exclude device
+credential metadata and remain encrypted. The camera is optional, local-only and
+bounded; no microphone/location is requested. Device unlock uses actual PRF key
+material with user verification, not a public credential identifier. Unsupported
+providers cannot produce a falsely enabled state. See `local/vault.ts:138`,
+`local/vault.ts:173`, `local/qr.ts:31`, `local/main.ts:292`.
 
-## What is owed next
+The UI describes shared-secret knowledge, a human duress plan and practical
+limits instead of claiming identity certification, safety or automatic dispatch
+(`local/main.ts:274`). No law or security assertion is justified by marketing copy.
 
-No applicable OSA assessment deadline or service fee has been identified for
-this offline-file position. This is a scoped finding, not a declaration that no
-law can ever apply. Retain the code inventory and scope reasoning; keep the
-in-file facts accurate when changing the software. The owner should review these
-drafts before adopting them as the project's public legal position.
+## Owed next
 
-If hosting is added, minimise collection first: no analytics, forms, cookies or
-application endpoints; disable or shorten access logs where the host permits.
-Then verify actual hosting arrangements and finish the conditional inputs in
-`privacy.md`. Do not publish an incomplete hosted-site notice. A message service
-or relay would need a separate assessment against the note's then-current duties,
-costs and deadlines.
+No OSA assessment deadline or service fee has been identified for this selected
+static/offline position. This is not a blanket statement that no law applies.
+Keep the scope record and the code/privacy wording aligned; owner adoption of
+the drafts remains distinct from the code/test results.
+
+Before real HTTPS publication, settle the conditional hosting inputs in
+`privacy.md`. Minimise first: static files only, no analytics, account or contact
+forms; disable/minimise host logs where available; prefer a third-party static
+host rather than new operator-run infrastructure. If the resulting role entails
+Article 13 duties, finish them from verified facts without guessing identity,
+legal basis or retention. The chosen host must actually serve the intended
+security headers. Header generation is not deployment evidence.
+
+Before adding any content transfer, indexing, public member list, relay default,
+payment or server-side backup, repeat the scope check against the then-current
+law notes. Existing OSA watch-list items were read; they do not change this
+local/static functionality into a messaging service by themselves.
 
 ## Not checked
 
-The existing deployed Canary site or other messaging providers; actual host
-logs; foreign law; individual users' processing; export end-use and sanctions;
-consumer-law and Equality Act questions outside the note (§13); physical-phone
-acceptance; independent legal or security review. The existing
-`REGULATORY.md` financial/foreign-law alignment brief has not been adopted as
-evidence of this file's legal or security status.
-
-The watch list was read. Its messaging-service, scanning, Ofcom-code, fee and
-company-registration changes do not create an active duty for this local-file
-design. Recheck scope if its distribution or functionality changes. The law note
-is within its stated review period; it was not silently redated.
+Real host roles/logs/headers, the existing hosted app, other messaging providers,
+foreign law, individual users' processing, sanctions/end-use, consumer law and
+Equality Act issues outside the note (§13), independent legal/security review,
+physical phone camera/passkey support and actual one-minute human usability.
+Browser/OS passkey-provider networking is outside the app's own request monitor.
+No guarantee against compromise, coercion or live relay is claimed.
