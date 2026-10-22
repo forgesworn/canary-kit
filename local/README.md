@@ -7,18 +7,23 @@ The static hosting candidate is generated in ignored `local-site/`.
 
 ## In practice
 
-Set up each device once: choose a vault passphrase and keep it in a password
-manager. On a supported HTTPS origin, optionally add device unlock under
-**Your vault & backup**. The passphrase remains the recovery route.
-
 When meeting someone:
 
-1. Both open Canary and unlock their own vaults.
-2. One chooses **Pair with someone → Make a pair**. The other chooses
-   **Join their pair → Scan their private QR** inside Canary.
-3. Compare the pair reference on both screens. Give the person a nickname,
-   tick the reference confirmation and choose **Save this person** on each phone.
-4. Agree together what the separate duress signal means and what to do on hearing it.
+1. Both open Canary. One taps **Show my QR**; the other taps **Scan their QR**.
+   Allow camera access if asked. Scan inside Canary, not a general QR scanner.
+2. Scanning opens the receiver’s rotating words immediately. The person showing
+   the QR taps **They’ve scanned · show our words**. Say yours and listen for theirs.
+3. Each taps **Keep on this phone** for future calls. A supported device credential
+   protects the saved pair without a custom passphrase. Unsupported browsers and
+   local files ask for a vault passphrase only at this point. Existing vaults
+   unlock here instead; an already unlocked vault saves with one tap.
+
+No vault setup, typing, nickname or reference checkbox is required to exchange.
+Camera and native device prompts still depend on the browser and operating system.
+The pair reference remains available in details. Names are optional and can be
+added afterwards under **Name & pair details**. Without a name, saved pairs get
+numbered labels. Agree together what the separate duress signal means and what
+human response to make on hearing it.
 
 This is designed for a brief in-person exchange; one-minute usability has not
 been measured with real people. If scanning is unavailable, enter all 12 setup
@@ -40,10 +45,20 @@ their accepted window. A live relay can fool the check.
 
 ## Keeping pairs for the future
 
+Before **Keep on this phone**, the pair exists only in memory. It clears on
+backgrounding, reload, manual lock, Escape or five minutes without interaction.
+The screen explicitly distinguishes a transient pair from a saved one. Failed
+storage does not claim success. Both people must keep their own copy.
+
 The vault saves nicknames, setup secrets and roles as encrypted browser storage.
 It locks on reload, backgrounding, Escape, manual lock and five minutes without
 interaction. Local master-key bytes are zeroed on lock as a best effort; JavaScript
 and the browser do not provide guaranteed secure memory erasure.
+
+A device-only vault has no passphrase recovery initially. Under **Your people →
+Recovery & device unlock**, add a recovery passphrase and save an encrypted
+backup. Without recovery, losing device unlock or clearing browser data can lose
+your pairs. Previous passphrase-protected vaults remain readable.
 
 **Save encrypted backup** downloads encrypted JSON, not a secret-bearing HTML
 file. It omits the device credential slot and can be restored with the vault
@@ -64,9 +79,9 @@ appropriate; importing their old setup words does not revoke an exposed old copy
 ## Protection and limits
 
 - AES-256-GCM encrypts the payload with a random master key and fresh 96-bit
-  nonces. A separately salted PBKDF2-SHA256 key (600,000 iterations) wraps the
-  master key. Identifiers and record purpose are authenticated as additional data.
-- Optional device unlock uses WebAuthn with required user verification and the
+  nonces. When a passphrase is used, a separately salted PBKDF2-SHA256 key
+  (600,000 iterations) wraps the master key. Identifiers and record purpose are authenticated as additional data.
+- Device unlock, offered first when keeping a new pair, uses WebAuthn with required user verification and the
   PRF extension, then HKDF-SHA256 to wrap that same master key. A signature-only
   credential does not enable encryption unlock. Credential IDs are not encryption
   keys. Unsupported providers fail without changing the protected saved vault;

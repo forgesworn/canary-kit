@@ -1,18 +1,23 @@
 # Privacy facts and hosting inputs
 
-**Draft — 22 October 2026. Not legal advice; not reviewed by a lawyer.
-Code `b1d33e1b6a1dc5d18a01c8ab173e19356cd2e2ee`.
+**Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
+Code `b15046e69fd930006e5e620ef30459236d6308e1`.
 Law note verified 28 September 2026.**
 
 These facts apply to the local app and static hosting candidate, not a completed
 privacy notice for an unverified public host. The in-file privacy facts are
-`local/index.html:48`. They now describe storage and camera access accurately.
+`local/index.html:44`. They now describe storage and camera access accurately.
 
 ## Device processing
 
+Pairing starts in memory without a vault or account (`local/main.ts:121`). No
+persistent pair record is written until **Keep on this phone**. The receiver
+reaches rotating words directly after scanning, and naming is optional. Unsaved
+pairs are cleared on backgrounding or five-minute inactivity; both people must
+keep their own copy for future calls (`local/main.ts:63`, `local/main.ts:195`).
 Pair setup words, roles and user-chosen nicknames are held in memory while
 unlocked. Encrypted payloads and wrapped master keys are stored in this browser's
-localStorage (`local/main.ts:67`; `local/vault.ts:113`). Plaintext nicknames or
+localStorage (`local/main.ts:73`; `local/vault.ts:124`). Plaintext nicknames or
 pair secrets are not persisted by these handlers. The app also uses the device
 clock and transiently displays normal/duress words. No account or network member
 identifier is required, and there is no server-side recipient for the app data.
@@ -23,17 +28,25 @@ unlock (`local/vault.ts:9`). Data remains until removed by the user, browser
 clearing/eviction or device loss. Deleting one entry rewrites the encrypted
 vault; it does not guarantee erasure of old disk blocks or backups. Locking wipes
 displayed secrets and attempts to zero the in-memory key, not guaranteed browser
-memory erasure. See `local/main.ts:44`, `local/vault.ts:119`.
+memory erasure. See `local/main.ts:50`, `local/vault.ts:129`.
+
+Keeping a new pair first offers native device encryption where available, with
+passphrase fallback. Device-only vaults initially have no recovery passphrase.
+The user can add one later; until then portable backup export is refused
+(`local/vault.ts:171`, `local/vault.ts:117`, `local/vault.ts:193`). Loss of the
+credential or browser data without recovery can lose all saved pairs. Existing
+passphrase vaults are still supported. Saved nicknames may be default numbered
+labels until the user optionally renames them (`local/main.ts:179`).
 
 **Save encrypted backup** downloads encrypted JSON without the device credential
-slot (`local/main.ts:212`; `local/vault.ts:173`). Backups remain wherever the user
+slot (`local/main.ts:298`; `local/vault.ts:193`). Backups remain wherever the user
 saves them until deleted. Files, browser stores and backups may be copied by
 device backup/sync settings. The publisher cannot recover a forgotten vault
 passphrase, erase remote copies or revoke another offline pair holder.
 
 ## Camera and passkey providers
 
-**Scan their private QR** requests camera video, with audio disabled, only on
+**Scan their QR** requests camera video, with audio disabled, only on
 the user's action (`local/qr.ts:46`). Frames are decoded in memory by bundled
 JavaScript. They are not recorded, exported, uploaded or passed to a remote SDK.
 Capture stops after success, cancellation, navigation, backgrounding or timeout;
@@ -42,20 +55,21 @@ words remain secrets that another person's camera or screen capture could copy.
 
 Optional device unlock asks the browser and the user's chosen authenticator/
 passkey provider for a user-verified credential and PRF output
-(`local/vault.ts:138`). The request carries the origin, generic Canary label,
+(`local/vault.ts:148`). The request carries the origin, generic Canary label,
 random user/credential material and PRF inputs. The credential/unlock key is not
 sent to the publisher by app code. A provider may sync its credentials through
 the user's platform account under its own settings and privacy terms; this is
 not a claim that the operating system makes no network requests. No Google
 service or proprietary identity SDK is introduced by Canary. The passphrase
-fallback is available without that optional provider functionality.
+fallback for saving is available without that provider functionality. A recovery
+passphrase is not silently created for a device-only vault.
 
 ## External communication
 
 The bundled app does not connect to Signal, Kithmoot, WhatsApp, a relay, an agent,
 analytics or a remote backup. Users independently choose to speak words or use
 other messaging apps; those apps' data handling is separate. A duress match is
-an on-device result, not an alert or location report (`local/main.ts:268`).
+an on-device result, not an alert or location report (`local/main.ts:373`).
 The application installs no cookie, tracker, service worker or account system.
 The existing `SECURITY.md` describes repository security-report routes; this
 change adds no form, inbox endpoint or report upload service.
