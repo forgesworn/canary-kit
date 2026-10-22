@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { entropyToMnemonic } from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english.js'
-import { createPair, joinPair, wordsAt, checkWords, pairReference, readPair } from './model.js'
+import { createPair, joinPair, wordsAt, checkWords, pairReference, readPair, makeInvite, joinInvite } from './model.js'
 
 const setup = entropyToMnemonic(new Uint8Array(16).fill(19), wordlist)
 const first = () => joinPair(setup, 'first')
@@ -9,6 +9,27 @@ const second = () => joinPair(setup, 'second')
 const now = 1_000_000_050
 
 describe('local pair', () => {
+  it('expands four-letter BIP39 setup prefixes without changing the secret or accepting typos', () => {
+    const short = setup.split(' ').map(word => word.slice(0, 4)).join(' ')
+    expect(joinPair(short).mnemonic).toBe(setup)
+    expect(joinPair(`  ${short.toUpperCase().replaceAll(' ', '\n')} `).mnemonic).toBe(setup)
+    expect(() => joinPair(setup.replace(/^\S+/, 'aba'))).toThrow()
+    expect(() => joinPair(setup.replace(/^\S+/, 'abandonn'))).toThrow()
+    expect(new Set(wordlist.map(word => word.slice(0, 4))).size).toBe(2048)
+  })
+
+  it('transfers the same secret through a strictly parsed non-URL QR invite', () => {
+    const original = first()
+    const invite = makeInvite(original)
+    const received = joinInvite(invite)
+    expect(received.role).toBe('second')
+    expect(received.mnemonic).toBe(original.mnemonic)
+    expect(pairReference(received)).toBe(pairReference(original))
+    for (const input of ['https://example.invalid', 'javascript:alert(1)', invite + 'x', invite.replace(':1:', ':2:'), 'x'.repeat(2000)]) {
+      expect(() => joinInvite(input)).toThrow()
+    }
+  })
+
   it('creates fresh, checksummed setup words and rejects damaged or oversized input', () => {
     const a = createPair()
     const b = createPair()

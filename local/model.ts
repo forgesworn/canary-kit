@@ -1,13 +1,15 @@
-import { generateMnemonic, mnemonicToEntropy } from '@scure/bip39'
+import { generateMnemonic, mnemonicToEntropy, entropyToMnemonic } from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english.js'
 import { deriveToken, deriveDuressToken } from '../src/token.js'
-import { bytesToHex, sha256, timingSafeStringEqual } from '../src/crypto.js'
+import { bytesToHex, hexToBytes, sha256, timingSafeStringEqual } from '../src/crypto.js'
 
 export const INTERVAL = 30
 const CONTEXT = 'canary:local-pair:v1'
 const ROLES = ['first', 'second'] as const
 const ENCODING = { format: 'words', count: 2 } as const
 const TOLERANCE = 1
+const SETUP_WORDS = new Set(wordlist)
+const SETUP_PREFIXES = new Map(wordlist.map(word => [word.slice(0, 4), word]))
 export type Role = typeof ROLES[number]
 export interface Pair { v: 1; mnemonic: string; role: Role }
 
@@ -18,11 +20,30 @@ export function createPair(): Pair {
 export function joinPair(input: string, role: Role = 'second'): Pair {
   if (typeof input !== 'string' || input.length > 300) throw new Error('Enter the 12 setup words.')
   if (!ROLES.includes(role)) throw new Error('Choose the side you originally used.')
-  const mnemonic = input.toLowerCase().trim().replace(/\s+/g, ' ')
-  if (mnemonic.split(' ').length !== 12) throw new Error('Enter all 12 setup words, in order.')
+  const entered = input.toLowerCase().trim().split(/\s+/)
+  if (entered.length !== 12) throw new Error('Enter all 12 setup words, in order. The first four letters of each word are enough.')
+  const mnemonic = entered.map((word, index) => {
+    if (SETUP_WORDS.has(word)) return word
+    const expanded = word.length === 4 ? SETUP_PREFIXES.get(word) : undefined
+    if (!expanded) throw new Error(`Check setup word ${index + 1}. Use its first four letters, or the full word.`)
+    return expanded
+  }).join(' ')
   try { mnemonicToEntropy(mnemonic, wordlist).fill(0) }
   catch { throw new Error('Those setup words do not pass the spelling and checksum check. Check them with the other person.') }
   return { v: 1, mnemonic, role }
+}
+
+export function makeInvite(pair: Pair): string {
+  return withSeed(pair, seed => `CANARY-LOCAL:1:${bytesToHex(seed)}`)
+}
+
+export function joinInvite(input: string): Pair {
+  if (typeof input !== 'string' || input.length > 80) throw new Error('This is not a Canary pairing QR.')
+  const match = /^CANARY-LOCAL:1:([0-9a-f]{32})$/.exec(input)
+  if (!match) throw new Error('This is not a Canary pairing QR.')
+  const seed = hexToBytes(match[1])
+  try { return joinPair(entropyToMnemonic(seed, wordlist)) }
+  finally { seed.fill(0) }
 }
 
 export function readPair(raw: unknown): Pair {
