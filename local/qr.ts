@@ -43,7 +43,7 @@ export class QrScanner {
     this.stop()
     const revision = this.revision
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera scanning is unavailable here. Type the setup words below.')
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 640 } } })
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } })
     // Permission can finish after cancellation, tab hiding or navigation.
     if (revision !== this.revision) { stream.getTracks().forEach(track => track.stop()); return }
     this.stream = stream
@@ -64,7 +64,19 @@ export class QrScanner {
             if (!ctx) throw new Error('Camera decoding is unavailable. Type the setup words instead.')
             ctx.drawImage(this.video, 0, 0, width, height)
             const frame = ctx.getImageData(0, 0, width, height)
-            const result = jsQR(frame.data, width, height, { inversionAttempts: 'dontInvert' })
+            let result = jsQR(frame.data, width, height, { inversionAttempts: 'attemptBoth' })
+            // A distant QR can be legible in the camera's original pixels but
+            // disappear when a wide/portrait frame is shrunk for decoding.
+            // Retry the central square at higher resolution, without digital
+            // upscaling; the first pass still finds codes outside the centre.
+            if (!result) {
+              const side = Math.min(this.video.videoWidth, this.video.videoHeight)
+              const size = Math.min(960, side)
+              this.canvas.width = this.canvas.height = size
+              ctx.drawImage(this.video, (this.video.videoWidth - side) / 2, (this.video.videoHeight - side) / 2, side, side, 0, 0, size, size)
+              const centre = ctx.getImageData(0, 0, size, size)
+              result = jsQR(centre.data, size, size, { inversionAttempts: 'attemptBoth' })
+            }
             if (result) this.candidate(result.data)
           }
           if (revision === this.revision) this.timer = setTimeout(scan, 150)

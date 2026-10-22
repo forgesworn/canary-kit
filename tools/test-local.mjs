@@ -85,6 +85,27 @@ try {
   const decoded = jsQR(new Uint8ClampedArray(qr.data), qr.width, qr.height)
   assert.ok(decoded?.data.startsWith('CANARY-LOCAL:1:'))
 
+  // A QR may occupy only part of a real camera frame. The full-frame 640px
+  // reduction used to lose these original pixels; the centre retry must find it.
+  const distant = await newDevice()
+  await distant.evaluate(qr => {
+    const source = document.createElement('canvas'); source.width = qr.width; source.height = qr.height
+    source.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(qr.data), qr.width, qr.height), 0, 0)
+    const frame = document.createElement('canvas'); frame.width = 1280; frame.height = 720
+    const ctx = frame.getContext('2d'); ctx.fillStyle = 'white'; ctx.fillRect(0, 0, 1280, 720)
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(source, 580, 300, 120, 120)
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { configurable: true, value: async () => {
+      const stream = frame.captureStream(0)
+      ctx.drawImage(source, 580, 300, 120, 120); stream.getVideoTracks()[0].requestFrame()
+      return stream
+    } })
+  }, qr)
+  await distant.locator('#show-join').click()
+  await distant.clock.runFor(500)
+  await visible(distant, '#paired')
+  assert.equal(await distant.locator('#reference').innerText(), reference)
+  await distant.close()
+
   const b = await newDevice()
   // Feed the QR displayed by the other device through a real canvas-backed
   // MediaStream. No physical camera is opened and no frame is retained.

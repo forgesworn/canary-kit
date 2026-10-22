@@ -316,9 +316,20 @@ get('restore-file').addEventListener('change', () => {
 get('add-person').addEventListener('click', () => { selected = draft = null; wipeUi(); show('welcome') })
 get('create').addEventListener('click', () => { try { setupPair(createPair(), true) } catch { error('Could not create secure setup words. Try a current browser. No pair was saved.') } })
 function startScan() {
+  const stamp = generation
   get('scanner').hidden = false; get('scan-start').hidden = true
   get('scan-status').textContent = 'Point the camera at their private QR.'
-  void scanner.start().catch(() => { stopScan(); status('Camera access was not available. You can type the first four letters of each setup word instead.'); get<HTMLDetailsElement>('manual-join').open = true })
+  void scanner.start().catch(e => {
+    if (stamp !== generation || document.hidden || get('join').hidden) return
+    stopScan()
+    const name = e instanceof DOMException ? e.name : ''
+    status(!window.isSecureContext ? 'Camera access needs a secure website address (HTTPS). You can use the setup words here instead.'
+      : name === 'NotAllowedError' ? 'Allow camera access in this browser’s site settings, then tap Open camera. Or use the setup words below.'
+        : name === 'NotReadableError' ? 'The camera is busy or unavailable. Close other apps using it, then tap Open camera.'
+          : name === 'NotFoundError' ? 'No camera was found. You can use the setup words below.'
+            : 'Camera access was not available. You can type the first four letters of each setup word instead.')
+    get<HTMLDetailsElement>('manual-join').open = true
+  })
 }
 get('show-join').addEventListener('click', () => {
   show('join')
