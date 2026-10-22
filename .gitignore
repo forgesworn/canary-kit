@@ -2,6 +2,7 @@
 node_modules/
 dist/
 dist-single/
+dist-local/
 *.tsbuildinfo
 .worktrees/
 docs/plans/

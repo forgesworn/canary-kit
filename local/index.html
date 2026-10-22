@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Private rotating words for people who already know each other. One file. Works offline.">
+  <title>Canary — our words</title>
+  <!-- LOCAL_CSP -->
+</head>
+<body>
+  <div class="shell">
+    <header><a class="brand" href="#" aria-label="Canary home"><span class="bird" aria-hidden="true">c.</span> canary<span class="brand-note">our words</span></a><span class="offline"><span aria-hidden="true">●</span> Works offline</span></header>
+    <main>
+      <section id="start">
+        <p class="eyebrow">A little reassurance, between us.</p>
+        <h1>A familiar voice.<br>A private check.</h1>
+        <p class="intro">Share a pair once with someone you know. Then use fresh spoken words to check each other, on any call or chat.</p>
+        <div class="start-actions"><button id="create" class="primary">Make a pair <span aria-hidden="true">↗</span></button><button id="show-join" class="secondary">I have setup words</button></div>
+        <div class="steps"><p><b>01</b><span>Pair up in person, or over a call you already trust.</span></p><p><b>02</b><span>Say your words. Listen for theirs. They change every 30 seconds.</span></p><p><b>03</b><span>Agree a private plan for the separate duress words.</span></p></div>
+        <p class="small">One pair per person. No account, installation or internet needed.</p>
+      </section>
+      <section id="join" hidden aria-labelledby="join-title">
+        <button class="text-button back" id="join-back">← Back</button>
+        <p class="eyebrow">Shared privately. Just once.</p><h1 id="join-title">Let’s get in sync.</h1>
+        <p>Enter the 12 setup words the other person gave you. These are the secret behind your rotating words.</p>
+        <form id="join-form"><label for="setup-input">Your 12 setup words</label><textarea id="setup-input" rows="4" maxlength="300" autocomplete="off" autocapitalize="none" spellcheck="false" required placeholder="Paste or type the words, in order"></textarea>
+        <label class="checkbox"><input type="checkbox" id="original-creator"> I originally created this pair (restoring my own copy)</label>
+        <button class="primary" type="submit">Open our words <span aria-hidden="true">↗</span></button></form>
+        <p class="small">Use a new secret made here. Never enter a wallet recovery phrase or a secret used by another app.</p>
+      </section>
+      <section id="paired" hidden aria-labelledby="pair-title">
+        <div class="pair-heading"><div><p class="eyebrow">Just between the two of you.</p><h1 id="pair-title">Our words.</h1></div><button id="pause" class="secondary compact">Hide screen</button></div>
+        <p class="pair-ref">Pair reference <strong id="reference"></strong> <span id="side"></span></p>
+        <p class="small">Confirm the same pair reference on both devices before first use.</p>
+        <div id="word-area">
+          <div class="word-card"><span class="card-label">You say</span><p class="word" id="say">—</p><span class="card-hint">Read both words aloud.</span></div>
+          <div class="word-card listen"><span class="card-label">They should say</span><p class="word" id="hear">—</p><span class="card-hint">Listen for these, rather than repeating yours.</span></div>
+          <div class="timer-row"><span id="timer-text">Fresh words every 30 seconds</span><span id="countdown" aria-hidden="true"></span></div>
+          <progress id="progress" value="30" max="30" aria-label="Seconds until words change"></progress>
+          <p class="small" id="boundary">Both devices need the correct date and time.</p>
+          <details id="duress"><summary>My private signal</summary><div class="signal-box"><p class="small">If you need to use your agreed duress plan, say these instead of your normal words.</p><p class="word signal-word" id="signal">—</p><p class="small">Agree what to do beforehand. This tool sends no alerts and cannot guarantee a hidden signal stays hidden.</p></div></details>
+          <details id="check"><summary>Check what they said</summary><form id="check-form"><label for="heard-input">The two words you heard</label><input id="heard-input" maxlength="100" autocomplete="off" spellcheck="false" required><button class="secondary" type="submit">Check privately</button></form><p id="check-result" role="status"></p><p class="small">Allowing one interval either side helps at changeover. Accepted words can be replayed within that window.</p></details>
+        </div>
+        <div id="paused" class="paused" hidden><p>Screen hidden.</p><button class="primary" id="resume">Show our words</button></div>
+        <details id="share"><summary>Set up the other device · save this pair</summary><div class="share-content"><p>Save a copy for each person. Each file opens straight into the right side of this pair.</p><p class="notice">These files contain your shared secret, without a password. Anyone with either copy can generate both normal and duress words. Keep them private.</p><div class="save-actions"><button class="primary" id="save-mine">Save my private copy</button><button class="secondary" id="save-theirs">Save their private copy</button></div><p class="small">Give their copy in person, or through an already trusted route. Never post either file or the setup words to a group.</p><details id="setup-details"><summary>Or exchange 12 setup words</summary><p id="setup-words" class="setup-words"></p><p class="small">Read these privately and ask them to repeat them back. They choose “I have setup words” in a clean copy of Canary.</p><button class="secondary" id="copy-setup">Copy setup words</button><p class="small">Copying places the secret on your clipboard; clipboard history or sync may retain it.</p></details></div></details>
+        <p class="small assurance">A match shows knowledge of this pair’s secret. It does not prove identity or safety, and a live relay can fool it. Don’t post live words in a group.</p>
+        <button id="leave" class="text-button">Close this pair</button><span class="small"> Saved files are not deleted.</span>
+      </section>
+      <p id="error" role="alert" hidden></p><p id="status" role="status" class="small"></p>
+      <noscript>This local tool needs JavaScript enabled. It does not need an internet connection.</noscript>
+    </main>
+    <footer><span>Private by design. Yours to keep.</span><details><summary>Privacy &amp; limitations</summary><p>This file runs on your device. It makes no network requests and has no accounts, analytics, cookies, location access, camera access or automatic alerts. It does not remember a pair between sessions unless you explicitly save a private copy. Your browser, extensions and anyone with access to your files may still see secrets.</p><p>Exchange setup secrets only with someone you have met, or through an independently trusted channel. A familiar voice or video alone can be faked. Use a separate pair for each person. If a secret file or setup words are exposed, create a new pair and exchange it again; old offline copies cannot be revoked remotely.</p><p>The site cannot certify who you met, whether someone is safe, or whether they are being coerced. Anyone with the shared secret can derive either side’s words. Duress needs an agreed human response and offers no emergency service. This version has local checks; it has not had an independent security audit.</p><p>A future hosted download would expose ordinary connection data to that host. Hosting is not part of this local file.</p></details></footer>
+  </div>
+  <script type="application/json" id="private-pair">null</script>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
