@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { entropyToMnemonic } from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english.js'
-import { createPair, joinPair, wordsAt, checkWords, pairReference, readPair, makeInvite, joinInvite } from './model.js'
+import { createPair, joinPair, wordsAt, checkWords, pairReference, readPair, makeInvite, joinInvite, inviteLink, joinLink, joinFragment } from './model.js'
 
 const setup = entropyToMnemonic(new Uint8Array(16).fill(19), wordlist)
 const first = () => joinPair(setup, 'first')
@@ -9,6 +9,27 @@ const second = () => joinPair(setup, 'second')
 const now = 1_000_000_050
 
 describe('local pair', () => {
+  it('uses an HTTPS fragment for normal-camera pairing without putting the secret in the request URL', () => {
+    const address = 'https://example.test/canary/'
+    const link = inviteLink(first(), address)
+    const parsed = new URL(link)
+    expect(parsed.origin + parsed.pathname + parsed.search).toBe(address)
+    expect(joinLink(link, address).mnemonic).toBe(setup)
+    expect(joinLink(link, address).role).toBe('second')
+    expect(joinFragment(parsed.hash).mnemonic).toBe(setup)
+    for (const input of ['http://example.test/', 'file:///canary.html', 'https://user:secret@example.test/', address + '?tracking=yes']) {
+      expect(() => inviteLink(first(), input)).toThrow()
+    }
+  })
+
+  it('rejects off-site, malformed and executable pairing links', () => {
+    const address = 'https://example.test/canary/'
+    const link = inviteLink(first(), address)
+    for (const input of [link.replace('example.test', 'other.test'), link.replace('/canary/', '/other/'), link + 'extra', 'javascript:alert(1)', link.replace('#pair=', '?pair='), 'x'.repeat(3000)]) {
+      expect(() => joinLink(input, address)).toThrow()
+    }
+    expect(() => joinFragment('#pair=javascript:alert(1)')).toThrow()
+  })
   it('expands four-letter BIP39 setup prefixes without changing the secret or accepting typos', () => {
     const short = setup.split(' ').map(word => word.slice(0, 4)).join(' ')
     expect(joinPair(short).mnemonic).toBe(setup)

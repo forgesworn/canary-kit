@@ -24,11 +24,14 @@ try {
   })
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const url = `http://127.0.0.1:${server.address().port}/`
+  const hosted = "https://canary.example.test/"
   browser = await chromium.launch({ headless: true, ...(process.env.CANARY_CHROMIUM_EXECUTABLE ? { executablePath: process.env.CANARY_CHROMIUM_EXECUTABLE } : {}) })
 
   async function newDevice(address = url) {
     const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 390, height: 844 } })
     contexts.push(context)
+    // Intercept this HTTPS fixture locally; never send a request to this host.
+    await context.route(hosted + '**', route => route.fulfill({ contentType: 'text/html', body: html }))
     context.on('request', request => { if (/^https?:|^wss?:/.test(request.url())) requests.push(request.url()) })
     const page = await context.newPage()
     page.on('pageerror', e => errors.push(e.message))
@@ -69,12 +72,44 @@ try {
   }
   const evidence = resolve(root, 'local/evidence')
   await mkdir(evidence, { recursive: true })
+  // Simulate a normal phone camera opening the HTTPS URL encoded in the QR.
+  // This exercises a fresh browser, not Canary's in-app scanner.
+  const linkMaker = await newDevice(hosted)
+  await linkMaker.screenshot({ path: join(evidence, 'mobile.png'), fullPage: true })
+  assert.equal(await linkMaker.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+  await linkMaker.setViewportSize({ width: 1100, height: 1000 })
+  await linkMaker.screenshot({ path: join(evidence, 'desktop.png'), fullPage: true })
+  await linkMaker.setViewportSize({ width: 390, height: 844 })
+  await linkMaker.locator('#create').click()
+  await linkMaker.locator('#qr-instruction').filter({ hasText: 'normal phone camera' }).waitFor()
+  const linkQr = await linkMaker.locator('#pair-qr').evaluate(canvas => ({ width: canvas.width, height: canvas.height, data: [...canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data] }))
+  const link = jsQR(new Uint8ClampedArray(linkQr.data), linkQr.width, linkQr.height).data
+  assert.ok(link.startsWith(hosted + '#pair=CANARY-LOCAL:1:'))
+  const linkReceiver = await newDevice(link)
+  await visible(linkReceiver, '#paired')
+  assert.equal(linkReceiver.url(), hosted, 'Remove the secret fragment from the current history entry')
+  assert.equal(await linkReceiver.evaluate(() => window.canaryIncoming), undefined, 'Consume the bootstrap secret')
+  assert.equal(await linkReceiver.evaluate(() => localStorage.length), 0)
+  assert.equal(await linkReceiver.locator('#scanner').isVisible(), false, 'No in-app camera step is needed')
+  await linkMaker.locator('#finish-exchange').click()
+  assert.equal(await linkMaker.locator('#say').innerText(), await linkReceiver.locator('#hear').innerText())
+  assert.equal(await linkMaker.locator('#hear').innerText(), await linkReceiver.locator('#say').innerText())
+  assert.equal(requests.some(address => address.includes('CANARY-LOCAL') || address.includes('#pair=')), false, 'The host must not receive the fragment secret')
+  // Browsers can reuse an existing tab for a second link. A fragment-only
+  // navigation must consume the incoming pair too, without a reload.
+  await linkReceiver.goto(hosted)
+  await linkReceiver.goto(link)
+  await visible(linkReceiver, '#paired')
+  assert.equal(linkReceiver.url(), hosted)
+  assert.equal(await linkReceiver.evaluate(() => window.canaryIncoming), undefined)
+  await linkMaker.close(); await linkReceiver.close()
+  const invalidLink = await newDevice(hosted + '#pair=javascript:alert(1)')
+  await invalidLink.locator('#error').filter({ hasText: 'damaged or unsupported' }).waitFor()
+  assert.equal(invalidLink.url(), hosted)
+  assert.equal(await invalidLink.locator('#paired').isVisible(), false)
+  await invalidLink.close()
   const a = await newDevice()
-  await a.screenshot({ path: join(evidence, 'mobile.png'), fullPage: true })
   assert.equal(await a.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
-  await a.setViewportSize({ width: 1100, height: 1000 })
-  await a.screenshot({ path: join(evidence, 'desktop.png'), fullPage: true })
-  await a.setViewportSize({ width: 390, height: 844 })
   await a.locator('#create').click()
   await visible(a, '#pair-setup')
   const reference = await a.locator('#setup-reference').innerText()
@@ -303,9 +338,9 @@ try {
   await visible(late, '#welcome')
   assert.equal(await late.locator('#say').innerText(), '—')
   assert.equal(await late.evaluate(() => localStorage.length), 0)
-  assert.deepEqual(requests.filter(address => !address.startsWith(url)), [], 'No external requests are allowed')
+  assert.deepEqual(requests.filter(address => !address.startsWith(url) && !address.startsWith(hosted)), [], 'No external requests are allowed')
   assert.deepEqual(errors, [], 'No browser or CSP errors are allowed')
-  console.log('Chromium: no-form/no-vault pairing, transient clearing, device-only keeping and recovery, pending-pair unlock, failed-storage preservation; QR pairing through a canvas-fed camera, camera shutdown, four-letter setup, encrypted persistence/backups/recovery, wrong-password rejection, normal/duress checks, rotation, echo rejection, reload/background/idle locking and mobile/desktop/file layouts passed. No external network requests.')
+  console.log('Chromium: normal-camera link opening in a fresh HTTPS-fixture browser, fragment consumption and malformed-link rejection; no-form/no-vault pairing, transient clearing, device-only keeping and recovery, pending-pair unlock, failed-storage preservation; QR pairing through a canvas-fed camera, camera shutdown, four-letter setup, encrypted persistence/backups/recovery, wrong-password rejection, normal/duress checks, rotation, echo rejection, reload/background/idle locking and mobile/desktop/file layouts passed. No external network requests.')
 } finally {
   for (const context of contexts) await context.close()
   await browser?.close()

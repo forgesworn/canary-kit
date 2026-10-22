@@ -1,5 +1,5 @@
 import './style.css'
-import { createPair, joinPair, joinInvite, makeInvite, pairReference, wordsAt, checkWords, INTERVAL, type Pair } from './model.js'
+import { createPair, joinPair, joinInvite, makeInvite, inviteLink, joinLink, joinFragment, pairReference, wordsAt, checkWords, INTERVAL, type Pair } from './model.js'
 import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, parseVault, sealEntries, closeVault, enableDeviceUnlock, unlockWithDevice, deviceUnlockPossible, exportVault, type Vault, type VaultRecord, type Entry } from './vault.js'
 import { drawQr, QrScanner } from './qr.js'
 
@@ -20,7 +20,7 @@ let pendingKeep = false
 let recoveryMode = false
 
 const scanner = new QrScanner(get<HTMLVideoElement>('scan-video'), data => {
-  try { setupPair(joinInvite(data), false) }
+  try { setupPair(data.startsWith('CANARY-LOCAL:') ? joinInvite(data) : joinLink(data, location.origin + location.pathname), false) }
   catch { get('scan-status').textContent = 'That is not a Canary pairing QR. Keep looking, or use the setup words.' }
 }, message => { stopScan(); status(message) })
 
@@ -127,7 +127,10 @@ function setupPair(next: Pair, created: boolean) {
   get('setup-words').textContent = ''
   get<HTMLTextAreaElement>('setup-input').value = ''
   if (created) {
-    drawQr(get<HTMLCanvasElement>('pair-qr'), makeInvite(next))
+    const linked = location.protocol === 'https:'
+    get('qr-instruction').textContent = linked ? 'They scan with their normal phone camera and open the link.' : 'Local preview: they need Canary open and tap Scan their QR. A normal-camera link needs this page hosted over HTTPS.'
+    get('qr-privacy').textContent = linked ? 'Private setup link. Keep it between you.' : 'Use the camera inside Canary. Keep this QR private.'
+    drawQr(get<HTMLCanvasElement>('pair-qr'), linked ? inviteLink(next, location.origin + location.pathname) : makeInvite(next))
     show('pair-setup')
   } else finishExchange()
 }
@@ -406,4 +409,20 @@ try {
   diskVersion = localStorage.getItem(STORE)
   if (diskVersion) { record = parseVault(diskVersion); show('welcome'); updateUnlock() }
 } catch { show('welcome'); error('Saved storage is unavailable or damaged. Keep an encrypted backup and restore a valid copy if needed.') }
+function consumeIncoming() {
+  const incomingWindow = window as Window & { canaryIncoming?: string }
+  let incoming = incomingWindow.canaryIncoming
+  delete incomingWindow.canaryIncoming
+  if (!incoming) return
+  try {
+    const pair = joinFragment(incoming)
+    generation++; pendingKeep = false; restoring = null
+    wipeUi()
+    setupPair(pair, false)
+  } catch { error('This pairing link is damaged or unsupported. Ask them to show a fresh QR.') }
+  finally { incoming = undefined }
+}
+window.addEventListener('canary-incoming', consumeIncoming)
+consumeIncoming()
+get('hosting-note').hidden = location.protocol === 'https:'
 setInterval(tick, 250)

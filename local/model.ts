@@ -46,6 +46,29 @@ export function joinInvite(input: string): Pair {
   finally { seed.fill(0) }
 }
 
+function siteAddress(address: string): URL {
+  const url = new URL(address)
+  if (url.protocol !== 'https:' || url.username || url.password || url.search) throw new Error('Pairing links need a clean HTTPS website address.')
+  url.hash = ''
+  return url
+}
+export function inviteLink(pair: Pair, address: string): string {
+  const url = siteAddress(address)
+  url.hash = `pair=${makeInvite(pair)}`
+  return url.href
+}
+export function joinFragment(fragment: string): Pair {
+  if (typeof fragment !== 'string' || !fragment.startsWith('#pair=')) throw new Error('This is not a Canary pairing link.')
+  return joinInvite(fragment.slice(6))
+}
+export function joinLink(input: string, address: string): Pair {
+  if (typeof input !== 'string' || input.length > 2048) throw new Error('This is not a Canary pairing link.')
+  const expected = siteAddress(address)
+  const received = siteAddress(input)
+  if (received.href !== expected.href) throw new Error('This pairing link belongs to a different website. Open the trusted Canary address together.')
+  return joinFragment(new URL(input).hash)
+}
+
 export function readPair(raw: unknown): Pair {
   if (!raw || typeof raw !== 'object') throw new Error('This saved pair could not be opened.')
   const data = raw as Record<string, unknown>

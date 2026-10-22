@@ -11,7 +11,7 @@ const scriptHashes = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)
   .map(([, , body]) => `'sha256-${createHash('sha256').update(body).digest('base64')}'`)
 const styleHashes = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
   .map(([, body]) => `'sha256-${createHash('sha256').update(body).digest('base64')}'`)
-if (scriptHashes.length !== 1 || styleHashes.length !== 1 || !html.includes('<!-- LOCAL_CSP -->')) {
+if (scriptHashes.length !== 2 || styleHashes.length !== 1 || !html.includes('<!-- LOCAL_CSP -->')) {
   throw new Error('Unexpected standalone output; cannot install the restrictive content security policy.')
 }
 const csp = `default-src 'none'; script-src ${scriptHashes.join(' ')}; style-src ${styleHashes.join(' ')}; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`
