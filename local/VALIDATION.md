@@ -1,14 +1,14 @@
 # Verification record
 
-23 October 2026. Code `b15046e69fd930006e5e620ef30459236d6308e1`.
+23 October 2026. Code `3fc6a02c1d14f1cd57240efd6b59f16b23a9c0ba`.
 
-Artifact: `canary-local.html`, 260,357 bytes. SHA-256:
+Artifact: `canary-local.html`, 262,975 bytes. SHA-256:
 
 ```text
-ab9d1684410318b459e2e0e5fb46bfab6f0dd79aa7e2933ae024bb525a9fe98d
+0c03fc4681ea3b32aaff55eb63b0a85632d4503e85eec2cd67662e0f700ecdb7
 ```
 
-- `npm test -- --maxWorkers=2`: **720 passed across 29 files**. The twelve local
+- `npm test -- --maxWorkers=2`: **722 passed across 29 files**. The fourteen local
   model/vault tests cover setup abbreviation/checksum, directional normal/duress
   words, rotation/drift, encrypted round-trip, wrong passwords, tamper rejection,
   fresh nonces, key clearing and PRF wrapping. New cases cover device-only vault
@@ -24,6 +24,15 @@ ab9d1684410318b459e2e0e5fb46bfab6f0dd79aa7e2933ae024bb525a9fe98d
   goes through a canvas-backed MediaStream and actual local decoder. The receiver
   opens words immediately; the creator taps to finish. Storage remains empty
   until explicit Keep. The scanner stops its tracks and requests no audio.
+- Normal-camera opening is tested by generating the HTTPS QR, decoding its URL
+  and opening that URL in a fresh isolated browser. The HTTPS address is a locally
+  fulfilled fixture, not a real deployment. The receiver reaches words without
+  opening an in-app camera or creating storage. Word direction matches the maker.
+  The early inline script removes the fragment from the current history entry;
+  the app consumes its transient copy. Reusing an existing tab works too. A bad
+  fragment fails safely. Observed HTTP requests contain no fragment secret.
+  Model tests reject insecure/query-bearing addresses, off-site links, malformed
+  payloads and executable URI schemes. Both inline scripts have exact CSP hashes.
 - A new regression places a 120 × 120 QR inside a 1280 × 720 camera frame.
   It failed before the scanner centre retry and passes afterwards. The scanner
   requests HD video, retains a full-frame pass, retries a central square up to
@@ -45,15 +54,17 @@ ab9d1684410318b459e2e0e5fb46bfab6f0dd79aa7e2933ae024bb525a9fe98d
 
 Visual evidence: [mobile welcome](evidence/mobile.png),
 [desktop welcome](evidence/desktop.png), [mobile people](evidence/vault-mobile.png).
-These contain no pair secrets or actual user names; the people screenshot uses a
+Welcome screenshots show HTTPS mode served by the local fixture. These contain
+no pair secrets or actual user names; the people screenshot uses a
 fixture nickname. The updated HTML was opened in **Google Chrome** for owner review.
 
-Owner reported “QR doesn’t scan”; scanning method/device has not yet been
-confirmed. The QR is an opaque secret for Canary’s own scanner, not a web link
-that a normal camera can open. The updated page explains this. A separate,
-reproduced downsampling weakness was fixed; this does not establish that the
-owner’s reported failure is resolved. Native browser camera permissions,
-secure-context requirements and real lens/focus remain outside synthetic proof.
+Owner confirmed the failure was using a normal phone camera on the opaque local
+QR. HTTPS mode now generates a private setup link for normal cameras; local-file
+mode explicitly remains an in-app scanner preview. No hosted address is live yet,
+so the Mac file cannot demonstrate cross-phone normal-camera opening. The
+separate camera-downsampling regression was fixed as well. Native scanner apps,
+history sync or extensions could retain the private link despite early address
+replacement. No one-use/expiry/revocation or perfect erasure is claimed.
 
 Not evidenced: independent audit, physical GrapheneOS/iPhone camera or passkey
 support, measured human one-minute pairing, actual HTTPS hosting headers/logs,

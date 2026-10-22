@@ -1,7 +1,7 @@
 # Draft UK legal cover: static local-processing app
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code: `b15046e69fd930006e5e620ef30459236d6308e1`.**
+Code: `3fc6a02c1d14f1cd57240efd6b59f16b23a9c0ba`.**
 
 **Today:** software publisher; a local HTML file and static hosting candidate
 exist. No new service has been deployed. **Owner's intended position:** a

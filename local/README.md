@@ -9,10 +9,10 @@ The static hosting candidate is generated in ignored `local-site/`.
 
 When meeting someone:
 
-1. Both open Canary. One taps **Show my QR**; the other taps **Scan their QR**.
-   Allow camera access if asked. Scan inside Canary, not a general QR scanner.
-2. Scanning opens the receiver’s rotating words immediately. The person showing
-   the QR taps **They’ve scanned · show our words**. Say yours and listen for theirs.
+1. On the HTTPS website, one person taps **Show my QR**.
+2. The other uses their **normal phone camera**, taps its link, and Canary opens
+   directly into their words. The creator taps **They’ve scanned · show our words**.
+   Say yours and listen for theirs. The receiver does not need Canary open first.
 3. Each taps **Keep on this phone** for future calls. A supported device credential
    protects the saved pair without a custom passphrase. Unsupported browsers and
    local files ask for a vault passphrase only at this point. Existing vaults
@@ -20,6 +20,11 @@ When meeting someone:
 
 No vault setup, typing, nickname or reference checkbox is required to exchange.
 Camera and native device prompts still depend on the browser and operating system.
+The local HTML file is a preview: its QR still requires **Scan their QR** inside
+Canary on the other device. A Mac's local file address cannot open that file on
+someone else's phone. Normal-camera linking becomes usable when this same build
+is actually served at a stable HTTPS address; no public host is deployed yet.
+
 The pair reference remains available in details. Names are optional and can be
 added afterwards under **Name & pair details**. Without a name, saved pairs get
 numbered labels. Agree together what the separate duress signal means and what
@@ -42,6 +47,20 @@ to that device and sends no alert. The checker accepts the current interval and
 one on either side: three normal candidates, approximately 3 / 4,194,304 per
 random guess, and a 90-second span of verifier times. Tokens are replayable in
 their accepted window. A live relay can fool the check.
+
+## Private setup links
+
+An HTTPS QR carries the secret in a URL fragment (`#pair=…`), outside the path and
+query sent to the host. A small hashed inline script removes it from the current
+history entry before the application loads; the app consumes the transient value
+once. Reusing an existing tab for another link is supported. In-app scanning can
+also read a link for the same site; it parses the secret without navigating.
+
+This is a reusable secret-bearing link, not an expiring or single-use invitation.
+Native camera software, browser history sync, extensions or screen capture may
+still copy it. Removing it from the address does not guarantee erasure of those
+copies. Keep the QR/link between the pair; if exposed, establish a fresh pair.
+The native camera/provider is outside Canary's local video-processing guarantee.
 
 ## Keeping pairs for the future
 

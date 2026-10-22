@@ -1,7 +1,7 @@
 # Position and applicable duties
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code `b15046e69fd930006e5e620ef30459236d6308e1`.
+Code `3fc6a02c1d14f1cd57240efd6b59f16b23a9c0ba`.
 Law note verified 28 September 2026.**
 
 ## Position today / intended position
@@ -9,7 +9,7 @@ Law note verified 28 September 2026.**
 Publisher of software today. The owner chose a static phone-first HTTPS website
 with encrypted browser storage and optional device unlock. Both keep the shared
 secret on the devices. `local/main.ts:73` writes ciphertext to localStorage;
-`local/main.ts:298` exports encrypted JSON; `local/qr.ts:46` captures local video
+`local/main.ts:301` exports encrypted JSON; `local/qr.ts:46` captures local video
 with audio disabled. `tools/build-local.mjs:17` blocks application connections;
 `:40` writes a static hosting candidate. No account, directory, upload, chat,
 relay, discovery endpoint or default remote server is introduced.
@@ -25,7 +25,7 @@ verified 28 September 2026.
 
 | Regime | Scoped finding |
 |---|---|
-| Online Safety Act, §§2.1–2.2 | The statutory user-to-user definition is `[P]`. No user content reaches another through an operator-hosted endpoint here. Pairing is a private local QR/read-back exchange using independently run copies. The note's no-infrastructure static-software publisher reading remains `[U]`, not Ofcom approval. The ordinary static-site position does not import OSA assessments or age assurance from messaging platforms. `local/model.ts:36`, `local/qr.ts:46`, `tools/build-local.mjs:17`. |
+| Online Safety Act, §§2.1–2.2 | The statutory user-to-user definition is `[P]`. No user content reaches another through an operator-hosted endpoint here. Pairing is a private QR/read-back exchange; the HTTPS setup secret is in a URL fragment that is not sent to the static host. The note's no-infrastructure static-software publisher reading remains `[U]`, not Ofcom approval. The ordinary static-site position does not import OSA assessments or age assurance from messaging platforms. `local/model.ts:36`, `local/qr.ts:46`, `tools/build-local.mjs:17`. |
 | Data protection, §§3.1–3.2 | App data is held on the devices, not received by the publisher. Nicknames may be personal data, but no recipient/controller server is introduced for them. The note's controller examples are `[U]`, Article 13 notice contents `[P]`. Any real hosting request data must be assessed separately: collection/roles, retention, recipients and transfers cannot be inferred from a static build. `local/vault.ts:80`, `local/main.ts:73`. |
 | Device storage and PECR, §4 | The statute/exception list is `[P]`; the note's necessary-app-storage reading is `[U]`. Encrypted localStorage is now used expressly to save the service the user requests. There are no analytics or advertising stores. Explain it accurately; no tracking banner is added. Camera capture and optional passkey prompts are user initiated. `local/main.ts:73`, `local/qr.ts:46`, `local/vault.ts:148`. |
 | Children, §3.6 | No user-content service, accounts, advertising or remote profile collection is added. No minimum age is selected on the owner's behalf. The note's uncertainty about unfunded information-society services remains `[U]`, not an invented age-check requirement. |
@@ -33,6 +33,14 @@ verified 28 September 2026.
 | Trading, §8 | No purchase, subscription, payment or donation path is in this entry point. No business identity disclosure or registration is imposed merely because a static tool exists. `local/index.html:15`. |
 
 ## Already in place
+
+The HTTPS QR can open a new browser directly into the pair. Its fragment secret
+is consumed locally after early address replacement (`local/model.ts:55`,
+`local/index.html:12`, `local/main.ts:412`). Native scanner/history/sync software
+can still copy the original link; the notice now explains that separate exposure.
+No single-use/expiry/revocation promise is made. The source/runtime change does
+not publish a website or settle its hosting privacy facts.
+
 
 Pairing can run transiently before any vault exists (`local/main.ts:121`).
 Keeping a pair explicitly creates or unlocks encrypted local storage. Device-only
@@ -46,11 +54,11 @@ credential metadata and remain encrypted. The camera is optional, local-only and
 bounded; no microphone/location is requested. Device unlock uses actual PRF key
 material with user verification, not a public credential identifier. Unsupported
 providers cannot produce a falsely enabled state. See `local/vault.ts:148`,
-`local/vault.ts:193`, `local/qr.ts:31`, `local/main.ts:392`.
+`local/vault.ts:193`, `local/qr.ts:31`, `local/main.ts:395`.
 
 The UI describes shared-secret knowledge, a human duress plan and practical
 limits instead of claiming identity certification, safety or automatic dispatch
-(`local/main.ts:373`). No law or security assertion is justified by marketing copy.
+(`local/main.ts:376`). No law or security assertion is justified by marketing copy.
 
 ## Owed next
 

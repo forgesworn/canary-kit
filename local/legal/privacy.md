@@ -1,12 +1,12 @@
 # Privacy facts and hosting inputs
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code `b15046e69fd930006e5e620ef30459236d6308e1`.
+Code `3fc6a02c1d14f1cd57240efd6b59f16b23a9c0ba`.
 Law note verified 28 September 2026.**
 
 These facts apply to the local app and static hosting candidate, not a completed
 privacy notice for an unverified public host. The in-file privacy facts are
-`local/index.html:44`. They now describe storage and camera access accurately.
+`local/index.html:59`. They now describe storage and camera access accurately.
 
 ## Device processing
 
@@ -36,15 +36,31 @@ The user can add one later; until then portable backup export is refused
 (`local/vault.ts:171`, `local/vault.ts:117`, `local/vault.ts:193`). Loss of the
 credential or browser data without recovery can lose all saved pairs. Existing
 passphrase vaults are still supported. Saved nicknames may be default numbered
-labels until the user optionally renames them (`local/main.ts:179`).
+labels until the user optionally renames them (`local/main.ts:182`).
 
 **Save encrypted backup** downloads encrypted JSON without the device credential
-slot (`local/main.ts:298`; `local/vault.ts:193`). Backups remain wherever the user
+slot (`local/main.ts:301`; `local/vault.ts:193`). Backups remain wherever the user
 saves them until deleted. Files, browser stores and backups may be copied by
 device backup/sync settings. The publisher cannot recover a forgotten vault
 passphrase, erase remote copies or revoke another offline pair holder.
 
-## Camera and passkey providers
+## Setup links, camera and passkey providers
+
+On HTTPS, the displayed QR is a private link containing the pair secret in its
+fragment (`local/model.ts:55`), so a normal camera can open the app. The fragment
+is outside the HTTP request URL. An early, CSP-hashed script removes it from the
+current history entry (`local/index.html:12`) and the app consumes the transient
+value (`local/main.ts:412`). Same-tab fragment navigation is supported too.
+This is not a one-use, expiring or revocable invitation. Camera/scanner software,
+browser history sync, extensions or platform backups could retain the original
+link. Address replacement is not a guarantee against those copies. If exposed,
+create a fresh pair. This native software is outside Canary's app request monitor
+and local-frame handling. Keep setup links private; do not share them in groups.
+
+The local-file preview still displays an opaque QR for the in-app scanner;
+it cannot make a private Mac file accessible to another phone. No hosted link
+is presented as live or proved usable by a normal physical camera yet.
+
 
 **Scan their QR** requests camera video, with audio disabled, only on
 the user's action (`local/qr.ts:46`). Frames are decoded in memory by bundled
@@ -69,7 +85,7 @@ passphrase is not silently created for a device-only vault.
 The bundled app does not connect to Signal, Kithmoot, WhatsApp, a relay, an agent,
 analytics or a remote backup. Users independently choose to speak words or use
 other messaging apps; those apps' data handling is separate. A duress match is
-an on-device result, not an alert or location report (`local/main.ts:373`).
+an on-device result, not an alert or location report (`local/main.ts:376`).
 The application installs no cookie, tracker, service worker or account system.
 The existing `SECURITY.md` describes repository security-report routes; this
 change adds no form, inbox endpoint or report upload service.
