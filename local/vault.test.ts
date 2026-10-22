@@ -1,10 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import { createVault, unlockVault, sealEntries, parseVault, closeVault, enableDeviceUnlock, unlockWithDevice, exportVault } from './vault.js'
+import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, sealEntries, parseVault, closeVault, enableDeviceUnlock, unlockWithDevice, exportVault } from './vault.js'
 import { createPair } from './model.js'
 
 const password = 'a sufficiently long test passphrase'
 
 describe('encrypted local vault', () => {
+  it('can keep a pair with device encryption first and add portable recovery later', async () => {
+    const credential = () => ({ rawId: new Uint8Array([7, 8]).buffer, getClientExtensionResults: () => ({ prf: { results: { first: new Uint8Array(32).fill(42).buffer } } }) })
+    const provider = { create: async () => credential(), get: async () => credential() } as unknown as CredentialsContainer
+    const vault = await createDeviceVault('https://example.test', provider)
+    expect(vault.record.password).toBeUndefined()
+    const entries = [{ id: 'pair-1', label: 'Person 1', pair: createPair() }]
+    vault.record = await sealEntries(vault, entries)
+    const stored = parseVault(JSON.stringify(vault.record))
+    const reopened = await unlockWithDevice(stored, 'https://example.test', provider)
+    expect(reopened.entries).toEqual(entries)
+    expect(() => exportVault(stored)).toThrow(/recovery passphrase/i)
+    await expect(unlockVault(stored, password)).rejects.toThrow()
+    expect(() => parseVault(JSON.stringify({ ...stored, device: undefined }))).toThrow()
+    vault.record = await addRecoveryPassphrase(vault, password)
+    const recovered = await unlockVault(parseVault(exportVault(vault.record)), password)
+    expect(recovered.entries).toEqual(entries)
+    expect(vault.record.device).toEqual(stored.device)
+    closeVault(vault); closeVault(reopened); closeVault(recovered)
+  })
+
+  it('refuses device-only vaults when the provider cannot supply encryption material', async () => {
+    const provider = { create: async () => ({ rawId: new Uint8Array([4]).buffer, getClientExtensionResults: () => ({}) }) } as unknown as CredentialsContainer
+    await expect(createDeviceVault('https://example.test', provider)).rejects.toThrow(/not supported/)
+  })
   it('requires PRF encryption material for device unlock and keeps backups portable', async () => {
     const vault = await createVault(password)
     const credential = () => ({ rawId: new Uint8Array([1, 2, 3]).buffer, getClientExtensionResults: () => ({ prf: { enabled: true, results: { first: new Uint8Array(32).fill(77).buffer } } }) })

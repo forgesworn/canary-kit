@@ -9,7 +9,7 @@ export interface Entry { id: string; label: string; pair: Pair }
 export interface VaultRecord {
   v: 1
   id: string
-  password: { salt: string; rounds: number; box: Box }
+  password?: { salt: string; rounds: number; box: Box }
   device?: { credential: string; input: string; origin: string; box: Box }
   data: Box
 }
@@ -60,11 +60,14 @@ export function parseVault(text: string): VaultRecord {
   if (typeof text !== 'string' || text.length > MAX_BYTES) throw new Error('This backup is too large or is not a Canary vault.')
   const data = JSON.parse(text) as VaultRecord
   if (!data || data.v !== 1 || typeof data.id !== 'string' || !/^[0-9a-f]{32}$/.test(data.id)
-    || data.password?.rounds !== ROUNDS || unb64(data.password.salt, 16).length !== 16) throw new Error('This is not a supported Canary vault.')
+    || (!data.password && !data.device)) throw new Error('This is not a supported Canary vault.')
   const record: VaultRecord = {
     v: 1, id: data.id,
-    password: { salt: data.password.salt, rounds: ROUNDS, box: checkBox(data.password.box) },
     data: checkBox(data.data),
+  }
+  if (data.password) {
+    if (data.password.rounds !== ROUNDS || unb64(data.password.salt, 16).length !== 16) throw new Error('This is not a supported Canary vault.')
+    record.password = { salt: data.password.salt, rounds: ROUNDS, box: checkBox(data.password.box) }
   }
   if (data.device) {
     if (unb64(data.device.credential, 1024).length === 0 || unb64(data.device.input, 32).length !== 32
@@ -106,9 +109,16 @@ export async function createVault(password: string): Promise<Vault> {
 }
 export async function unlockVault(record: VaultRecord, password: string): Promise<Vault> {
   try {
+    if (!record.password) throw new Error('No passphrase slot')
     const master = await decrypt(await passwordKey(password, record.password.salt), record.password.box, record.id, 'password')
     return await opened(record, master)
   } catch { throw new Error('Could not unlock. Check the passphrase and that this backup is intact.') }
+}
+export async function addRecoveryPassphrase(vault: Vault, password: string): Promise<VaultRecord> {
+  if (password.trim().length < 14 || password.length > 200) throw new Error('Use at least 14 characters. Several random words are easier to remember.')
+  const salt = b64(random(16))
+  const box = await encrypt(await passwordKey(password, salt), vault.master, vault.record.id, 'password')
+  return { ...vault.record, password: { salt, rounds: ROUNDS, box } }
 }
 export async function sealEntries(vault: Vault, entries: Entry[]): Promise<VaultRecord> {
   const checked = entriesFrom(entries)
@@ -124,7 +134,7 @@ export function deviceUnlockPossible(): boolean {
 }
 function prfResult(credential: PublicKeyCredential | null): Uint8Array {
   const output = credential?.getClientExtensionResults().prf?.results?.first
-  if (!output || output.byteLength !== 32) throw new Error('Encrypted device unlock is not supported by this browser or passkey provider. Your passphrase still works.')
+  if (!output || output.byteLength !== 32) throw new Error('Encrypted device unlock is not supported by this browser or passkey provider. Use a passphrase to save instead.')
   return ArrayBuffer.isView(output)
     ? new Uint8Array(output.buffer, output.byteOffset, output.byteLength).slice()
     : new Uint8Array(output).slice()
@@ -145,10 +155,10 @@ export async function enableDeviceUnlock(vault: Vault, origin: string, credentia
     attestation: 'none', timeout: 60_000,
     extensions: { prf: { eval: { first: bytes(input) } } },
   } }) as PublicKeyCredential | null
-  if (!credential) throw new Error('Device setup was cancelled. Your passphrase still works.')
+  if (!credential) throw new Error('Device setup was cancelled. You can use a passphrase to save instead.')
   let result = credential
   if (!credential.getClientExtensionResults().prf?.results?.first) {
-    if (!credential.getClientExtensionResults().prf?.enabled) throw new Error('Encrypted device unlock is not supported by this passkey provider. Your passphrase still works.')
+    if (!credential.getClientExtensionResults().prf?.enabled) throw new Error('Encrypted device unlock is not supported by this passkey provider. Use a passphrase to save instead.')
     result = await credentials.get({ publicKey: {
       challenge: bytes(random(32)), allowCredentials: [{ type: 'public-key', id: credential.rawId }],
       userVerification: 'required', timeout: 60_000, extensions: { prf: { eval: { first: bytes(input) } } },
@@ -158,9 +168,19 @@ export async function enableDeviceUnlock(vault: Vault, origin: string, credentia
   const box = await encrypt(key, vault.master, vault.record.id, 'device')
   return { ...vault.record, device: { credential: b64(new Uint8Array(credential.rawId)), input: b64(input), origin, box } }
 }
+export async function createDeviceVault(origin: string, credentials: CredentialsContainer = navigator.credentials): Promise<Vault> {
+  const id = [...random(16)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+  const master = random(32)
+  try {
+    const data = await encrypt(await aes(master), encoder.encode('[]'), id, 'data')
+    const vault: Vault = { record: { v: 1, id, data }, master, entries: [] }
+    vault.record = await enableDeviceUnlock(vault, origin, credentials)
+    return vault
+  } catch (e) { master.fill(0); throw e }
+}
 export async function unlockWithDevice(record: VaultRecord, origin: string, credentials: CredentialsContainer = navigator.credentials): Promise<Vault> {
   const device = record.device
-  if (!device || device.origin !== origin) throw new Error('Use your passphrase on this website or device.')
+  if (!device || device.origin !== origin) throw new Error('Open the original website with your device credential, or restore a passphrase-protected backup.')
   const credential = await credentials.get({ publicKey: {
     challenge: bytes(random(32)), allowCredentials: [{ type: 'public-key', id: bytes(unb64(device.credential, 1024)) }],
     userVerification: 'required', timeout: 60_000,
@@ -171,5 +191,6 @@ export async function unlockWithDevice(record: VaultRecord, origin: string, cred
 }
 
 export function exportVault(record: VaultRecord): string {
+  if (!record.password) throw new Error('Add a recovery passphrase before making a portable backup.')
   return JSON.stringify({ v: record.v, id: record.id, password: record.password, data: record.data })
 }

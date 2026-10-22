@@ -1,6 +1,6 @@
 import './style.css'
 import { createPair, joinPair, joinInvite, makeInvite, pairReference, wordsAt, checkWords, INTERVAL, type Pair } from './model.js'
-import { createVault, unlockVault, parseVault, sealEntries, closeVault, enableDeviceUnlock, unlockWithDevice, deviceUnlockPossible, exportVault, type Vault, type VaultRecord, type Entry } from './vault.js'
+import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, parseVault, sealEntries, closeVault, enableDeviceUnlock, unlockWithDevice, deviceUnlockPossible, exportVault, type Vault, type VaultRecord, type Entry } from './vault.js'
 import { drawQr, QrScanner } from './qr.js'
 
 const STORE = 'canary.encrypted-vault.v1'
@@ -16,6 +16,8 @@ let busy = false
 let lastActivity = Date.now()
 let renderedCounter = -1
 let resultCounter = -1
+let pendingKeep = false
+let recoveryMode = false
 
 const scanner = new QrScanner(get<HTMLVideoElement>('scan-video'), data => {
   try { setupPair(joinInvite(data), false) }
@@ -32,18 +34,22 @@ function stopScan() {
 function show(name: string) {
   stopScan()
   document.querySelectorAll<HTMLElement>('.view').forEach(element => { element.hidden = element.id !== name })
-  get('lock').hidden = !vault
+  get('lock').hidden = !vault && !selected && !draft
+  get('your-people').hidden = !record
   get('local-note').hidden = !!vault
   error(); status()
   window.scrollTo(0, 0)
 }
 function updateUnlock() {
   get('unlock-device').hidden = !!restoring || !record?.device || !deviceUnlockPossible() || record.device.origin !== location.origin
-  get('unlock-message').textContent = restoring ? 'Unlock your encrypted backup. Your current saved vault is not changed yet.' : 'Unlock the vault saved on this device.'
+  const candidate = restoring ?? record
+  get('unlock-form').hidden = !candidate?.password
+  get('device-only-note').hidden = !!candidate?.password
+  get('unlock-message').textContent = restoring ? 'Unlock your encrypted backup. Your current saved vault is not changed yet.' : pendingKeep ? 'Unlock to keep this pair with your saved people.' : 'Unlock the vault saved on this phone.'
 }
 function wipeUi() {
   for (const id of ['say', 'hear', 'signal']) get(id).textContent = '—'
-  for (const id of ['setup-words', 'setup-reference', 'reference', 'side', 'check-result']) get(id).textContent = ''
+  for (const id of ['setup-words', 'setup-reference', 'reference', 'side', 'check-result', 'save-state']) get(id).textContent = ''
   for (const id of ['setup-input', 'person-name', 'heard-input', 'new-password', 'confirm-password', 'unlock-password']) {
     get<HTMLInputElement | HTMLTextAreaElement>(id).value = ''
   }
@@ -51,16 +57,16 @@ function wipeUi() {
   get('pair-title').textContent = 'Our words.'
   const qr = get<HTMLCanvasElement>('pair-qr')
   qr.width = qr.height = 1
-  for (const id of ['setup-details', 'duress', 'check', 'manual-join', 'vault-settings']) get<HTMLDetailsElement>(id).open = false
+  for (const id of ['setup-details', 'duress', 'check', 'manual-join', 'vault-settings', 'person-details']) get<HTMLDetailsElement>(id).open = false
   renderedCounter = resultCounter = -1
 }
 function lock(message = '') {
   generation++
   stopScan()
   if (vault) closeVault(vault)
-  vault = null; draft = null; selected = null; restoring = null
+  vault = null; draft = null; selected = null; restoring = null; pendingKeep = false; recoveryMode = false
   wipeUi()
-  show(diskVersion ? 'locked' : 'welcome')
+  show('welcome')
   updateUnlock()
   status(message)
 }
@@ -105,42 +111,90 @@ function people() {
   }
   get('enable-device').hidden = !deviceUnlockPossible()
   get('enable-device').textContent = vault.record.device ? 'Change device unlock' : 'Add device unlock'
-  get('device-status').textContent = vault.record.device
-    ? 'Device unlock is enabled for this saved vault. Keep your recovery passphrase safe.'
-    : deviceUnlockPossible() ? 'You can add device unlock on a supported browser and passkey provider.' : 'Use your vault passphrase here. Device unlock needs HTTPS and a compatible browser and provider.'
+  get('device-status').textContent = vault.record.password
+    ? 'Your recovery passphrase unlocks this vault and its encrypted backups.'
+    : 'Device unlock keeps this vault encrypted. Add recovery before relying on it long term.'
+  get('add-recovery').hidden = !!vault.record.password
+  get('backup').hidden = !vault.record.password
   show('people')
 }
 function setupPair(next: Pair, created: boolean) {
-  if (!vault) return
   stopScan()
   draft = next
-  get('qr-area').hidden = !created
-  get('setup-title').textContent = created ? 'A small thing\nonly you know.' : 'You’re in sync.'
-  get('setup-step').textContent = created ? '01 · Exchange' : '02 · Compare'
+  selected = null
   get('setup-reference').textContent = pairReference(next)
-  get<HTMLInputElement>('person-name').value = ''
-  get<HTMLInputElement>('reference-confirmed').checked = false
   get<HTMLDetailsElement>('setup-details').open = false
   get('setup-words').textContent = ''
-  if (created) drawQr(get<HTMLCanvasElement>('pair-qr'), makeInvite(next))
   get<HTMLTextAreaElement>('setup-input').value = ''
-  show('pair-setup')
+  if (created) {
+    drawQr(get<HTMLCanvasElement>('pair-qr'), makeInvite(next))
+    show('pair-setup')
+  } else finishExchange()
 }
+function finishExchange() {
+  if (!draft) return
+  const entry: Entry = { id: crypto.randomUUID(), label: '', pair: draft }
+  draft = null
+  get('setup-words').textContent = ''
+  get<HTMLCanvasElement>('pair-qr').width = get<HTMLCanvasElement>('pair-qr').height = 1
+  openPerson(entry)
+}
+function isSaved() { return !!selected && !!vault?.entries.some(entry => entry.id === selected!.id) }
 function openPerson(entry: Entry) {
   selected = entry
-  get('pair-title').textContent = entry.label
+  const saved = isSaved()
+  get('pair-title').textContent = entry.label || 'Our words.'
+  get<HTMLInputElement>('person-name').value = entry.label
   get('reference').textContent = pairReference(entry.pair)
-  get('side').textContent = entry.pair.role === 'first' ? 'you made this pair' : 'you joined this pair'
-  get<HTMLDetailsElement>('duress').open = get<HTMLDetailsElement>('check').open = false
+  get('side').textContent = entry.pair.role === 'first' ? 'you showed the QR' : 'you scanned the QR'
+  get('save-state').textContent = saved ? 'Saved encrypted on this phone.' : 'Here for now. Keep this pair before you leave.'
+  get('keep-person').hidden = saved
+  get('keep-hint').textContent = saved ? (vault!.record.password ? 'Ready for your next call.' : 'Add recovery in Your people to protect against losing device unlock.') : 'Each of you keeps your own copy for future calls.'
+  get('remove-person').hidden = !saved
+  get<HTMLDetailsElement>('duress').open = get<HTMLDetailsElement>('check').open = get<HTMLDetailsElement>('person-details').open = false
   get('check-result').textContent = ''
   get<HTMLInputElement>('heard-input').value = ''
   renderedCounter = resultCounter = -1
+  lastActivity = Date.now()
   show('paired')
   tick()
 }
+function home() {
+  if ((selected && !isSaved()) || draft) {
+    if (!confirm('Leave this unsaved pair? You will need to exchange a new QR.')) return
+  }
+  generation++
+  draft = selected = null; pendingKeep = false
+  if (vault) people()
+  else { wipeUi(); show('welcome') }
+}
+function createScreen(recovery = false) {
+  recoveryMode = recovery
+  show('vault-create')
+  get('create-title').textContent = recovery ? 'A way back in.' : 'Keep your private words.'
+  get('create-message').textContent = recovery ? 'Add a recovery passphrase so you can save a portable encrypted backup.' : 'Protect this pair with a passphrase. This is only for your phone; you don’t exchange it.'
+  get('create-submit').textContent = recovery ? 'Add recovery passphrase' : 'Keep encrypted on this phone'
+  get('new-password').focus()
+}
+async function keepWith(active: Vault, stamp: number) {
+  const entry = selected
+  const fresh = vault !== active
+  let adopted = false
+  try {
+    if (!entry || stamp !== generation || document.hidden) return
+    if (active.entries.some(item => item.id === entry.id)) return
+    const kept = { ...entry, label: entry.label || `Person ${active.entries.length + 1}` }
+    const entries = [...active.entries, kept]
+    const next = await sealEntries(active, entries)
+    if (stamp !== generation || selected !== entry || document.hidden) return
+    persist(next)
+    active.record = next; active.entries = entries; vault = active; adopted = true; pendingKeep = false
+    openPerson(kept)
+  } finally { if (fresh && !adopted) closeVault(active) }
+}
 function tick() {
-  if (vault && Date.now() - lastActivity > 300_000) { lock('Vault locked after five minutes without interaction.'); return }
-  if (!vault || !selected || document.hidden || get('paired').hidden) return
+  if ((vault || selected || draft) && Date.now() - lastActivity > 300_000) { lock('Locked after five minutes without interaction. Unsaved pairing was cleared.'); return }
+  if (!selected || document.hidden || get('paired').hidden) return
   const now = Math.floor(Date.now() / 1000)
   const counter = Math.floor(now / INTERVAL)
   const remaining = INTERVAL - now % INTERVAL
@@ -162,29 +216,59 @@ function tick() {
   }
 }
 
-get('setup-device').addEventListener('click', () => { show('vault-create'); get('new-password').focus() })
-get('create-back').addEventListener('click', () => { wipeUi(); show('welcome') })
-get('lock').addEventListener('click', () => lock('Your vault is locked.'))
+get('create-back').addEventListener('click', () => {
+  get<HTMLInputElement>('new-password').value = get<HTMLInputElement>('confirm-password').value = ''
+  if (recoveryMode) people(); else if (selected) openPerson(selected); else home()
+})
+get('unlock-back').addEventListener('click', () => { restoring = null; pendingKeep = false; if (selected) openPerson(selected); else show('welcome') })
+get('lock').addEventListener('click', () => lock('Locked. Unsaved pairing was cleared.'))
+get('your-people').addEventListener('click', () => { if (vault) people(); else { pendingKeep = false; show('locked'); updateUnlock() } })
 get('vault-create-form').addEventListener('submit', event => {
   event.preventDefault()
   const password = get<HTMLInputElement>('new-password').value
   if (password !== get<HTMLInputElement>('confirm-password').value) { error('The two passphrases do not match.'); return }
   get<HTMLInputElement>('new-password').value = get<HTMLInputElement>('confirm-password').value = ''
+  const recovering = recoveryMode, active = vault
   void action(async stamp => {
-    const next = await createVault(password)
-    if (stamp !== generation || document.hidden) { closeVault(next); return }
-    try { persist(next.record) } catch (e) { closeVault(next); throw e }
-    vault = next; lastActivity = Date.now(); people()
-    status('Vault created. Pair with someone, then save an encrypted backup.')
+    if (recovering && active) {
+      const next = await addRecoveryPassphrase(active, password)
+      if (stamp !== generation || vault !== active || document.hidden) return
+      persist(next); active.record = next; people()
+      get<HTMLDetailsElement>('vault-settings').open = true
+      status('Recovery added. Save your encrypted backup now.')
+    } else await keepWith(await createVault(password), stamp)
   })
 })
+get('keep-person').addEventListener('click', () => {
+  if (!selected) return
+  pendingKeep = true
+  if (vault) { const active = vault; void action(stamp => keepWith(active, stamp)); return }
+  if (diskVersion) { show('locked'); updateUnlock(); return }
+  if (!deviceUnlockPossible()) { createScreen(); return }
+  void action(async stamp => {
+    let next: Vault
+    try { next = await createDeviceVault(location.origin) }
+    catch {
+      if (stamp === generation && !document.hidden) {
+        createScreen()
+        status('Device encryption wasn’t available or was cancelled. You can keep this pair with a passphrase instead.')
+      }
+      return
+    }
+    await keepWith(next, stamp)
+  })
+})
+get('add-recovery').addEventListener('click', () => createScreen(true))
 async function acceptUnlocked(next: Vault, stamp: number, fromBackup: boolean) {
   if (stamp !== generation || document.hidden) { closeVault(next); return }
   if (fromBackup) {
     if (diskVersion && !confirm('Restore this backup in place of the vault currently saved in this browser? Keep a backup of the current vault first.')) { closeVault(next); status('Restore cancelled. Your saved vault is unchanged.'); return }
     try { persist(next.record) } catch (e) { closeVault(next); throw e }
   }
-  vault = next; restoring = null; lastActivity = Date.now(); people()
+  if (vault && vault !== next) closeVault(vault)
+  vault = next; restoring = null; lastActivity = Date.now()
+  if (pendingKeep && selected && !fromBackup) await keepWith(next, stamp)
+  else people()
 }
 get('unlock-form').addEventListener('submit', event => {
   event.preventDefault()
@@ -206,7 +290,7 @@ get('enable-device').addEventListener('click', () => {
   void action(async stamp => {
     const next = await enableDeviceUnlock(active, location.origin)
     if (stamp !== generation || vault !== active || document.hidden) return
-    persist(next); active.record = next; people(); status('Device unlock added. Your passphrase still unlocks encrypted backups.')
+    persist(next); active.record = next; people(); status('Device unlock added.')
   })
 })
 get('backup').addEventListener('click', () => {
@@ -229,16 +313,23 @@ get('restore-file').addEventListener('change', () => {
     restoring = imported; show('locked'); updateUnlock(); get('unlock-password').focus()
   })
 })
-get('add-person').addEventListener('click', () => show('pair-choice'))
+get('add-person').addEventListener('click', () => { selected = draft = null; wipeUi(); show('welcome') })
 get('create').addEventListener('click', () => { try { setupPair(createPair(), true) } catch { error('Could not create secure setup words. Try a current browser. No pair was saved.') } })
-get('show-join').addEventListener('click', () => { show('join'); get<HTMLTextAreaElement>('setup-input').value = ''; get<HTMLInputElement>('original-creator').checked = false })
-get('join-back').addEventListener('click', () => { get<HTMLTextAreaElement>('setup-input').value = ''; show('pair-choice') })
-document.querySelectorAll('.home').forEach(button => button.addEventListener('click', people))
-get('scan-start').addEventListener('click', () => {
+function startScan() {
   get('scanner').hidden = false; get('scan-start').hidden = true
   get('scan-status').textContent = 'Point the camera at their private QR.'
   void scanner.start().catch(() => { stopScan(); status('Camera access was not available. You can type the first four letters of each setup word instead.'); get<HTMLDetailsElement>('manual-join').open = true })
+}
+get('show-join').addEventListener('click', () => {
+  show('join')
+  get<HTMLTextAreaElement>('setup-input').value = ''
+  get<HTMLInputElement>('original-creator').checked = false
+  startScan()
 })
+get('join-back').addEventListener('click', () => { get<HTMLTextAreaElement>('setup-input').value = ''; show('welcome') })
+document.querySelectorAll('.home').forEach(button => button.addEventListener('click', home))
+get('scan-start').addEventListener('click', startScan)
+get('finish-exchange').addEventListener('click', finishExchange)
 get('scan-stop').addEventListener('click', stopScan)
 get('join-form').addEventListener('submit', event => {
   event.preventDefault()
@@ -248,26 +339,24 @@ get('join-form').addEventListener('submit', event => {
 get('setup-details').addEventListener('toggle', () => {
   get('setup-words').textContent = draft && get<HTMLDetailsElement>('setup-details').open ? draft.mnemonic : ''
 })
-get('save-person-form').addEventListener('submit', event => {
+get('rename-form').addEventListener('submit', event => {
   event.preventDefault()
-  if (!vault || !draft) return
-  const active = vault
-  const entry: Entry = { id: crypto.randomUUID(), label: get<HTMLInputElement>('person-name').value.trim(), pair: draft }
+  if (!selected) return
+  const entry = { ...selected, label: get<HTMLInputElement>('person-name').value.trim() }
+  if (!isSaved()) { openPerson(entry); return }
+  const active = vault!
+  if (!entry.label) entry.label = `Person ${active.entries.findIndex(item => item.id === entry.id) + 1}`
   void action(async stamp => {
-    const entries = [...active.entries, entry]
+    const entries = active.entries.map(item => item.id === entry.id ? entry : item)
     const next = await sealEntries(active, entries)
     if (stamp !== generation || vault !== active || document.hidden) return
-    persist(next); active.record = next; active.entries = entries; draft = null
-    get('setup-words').textContent = ''
-    get<HTMLCanvasElement>('pair-qr').width = get<HTMLCanvasElement>('pair-qr').height = 1
-    openPerson(entry)
-    status('Saved encrypted on this device. Agree together what the private signal should mean.')
+    persist(next); active.record = next; active.entries = entries; openPerson(entry)
   })
 })
 get('duress').addEventListener('toggle', () => { renderedCounter = -1; tick() })
 get('check-form').addEventListener('submit', event => {
   event.preventDefault()
-  if (!selected || !vault) return
+  if (!selected) return
   try {
     const now = Math.floor(Date.now() / 1000)
     const result = checkWords(selected.pair, get<HTMLInputElement>('heard-input').value, now)
@@ -288,13 +377,13 @@ get('remove-person').addEventListener('click', () => {
     persist(next); active.record = next; active.entries = entries; people()
   })
 })
-document.querySelector('.brand')!.addEventListener('click', event => { event.preventDefault(); if (vault) people(); else show(diskVersion ? 'locked' : 'welcome') })
+document.querySelector('.brand')!.addEventListener('click', event => { event.preventDefault(); home() })
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { stopScan(); if (vault || busy) lock('Vault locked when you left the tab. Unfinished pairing is not saved.') }
+  if (document.hidden) lock('Locked when you left the tab. Unsaved pairing was cleared.')
 })
-document.addEventListener('keydown', event => { lastActivity = Date.now(); if (event.key === 'Escape' && vault) lock('Your vault is locked.') })
+document.addEventListener('keydown', event => { lastActivity = Date.now(); if (event.key === 'Escape' && (vault || selected || draft)) lock('Your vault is locked.') })
 document.addEventListener('pointerdown', () => { lastActivity = Date.now() }, { passive: true })
-window.addEventListener('pagehide', () => { stopScan(); if (vault) lock() })
+window.addEventListener('pagehide', () => { stopScan(); if (vault || selected || draft) lock() })
 window.addEventListener('storage', event => {
   if (event.key === STORE && event.newValue !== diskVersion) {
     diskVersion = event.newValue
@@ -304,6 +393,6 @@ window.addEventListener('storage', event => {
 })
 try {
   diskVersion = localStorage.getItem(STORE)
-  if (diskVersion) { record = parseVault(diskVersion); show('locked'); updateUnlock() }
-} catch { show(diskVersion ? 'locked' : 'welcome'); error('Saved storage is unavailable or damaged. Keep an encrypted backup and restore a valid copy if needed.') }
+  if (diskVersion) { record = parseVault(diskVersion); show('welcome'); updateUnlock() }
+} catch { show('welcome'); error('Saved storage is unavailable or damaged. Keep an encrypted backup and restore a valid copy if needed.') }
 setInterval(tick, 250)

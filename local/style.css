@@ -87,3 +87,23 @@ footer { margin-top: 35px; }
   .word-card .word { min-height: 0; }
   h1 { font-size: 44px; }
 }
+
+/* Exchange first: the two actions stay together on a phone-sized screen. */
+#welcome .lead { margin-bottom: 24px; }
+#welcome .wide { justify-content: space-between; padding-inline: 22px; }
+#welcome .small { margin: 15px 0 0; }
+.welcome-more { margin-top: 38px; max-width: 500px; }
+.paired-lead { margin: -12px 0 20px; }
+.keep-card { margin: 26px 0 22px; padding: 18px 20px; background: #eeefe2; border: 1px solid var(--line); border-radius: 16px; }
+.keep-card p { margin: 0; }
+.keep-card .wide { margin-bottom: 12px; }
+.keep-card #save-state { color: var(--ink); font-weight: 600; }
+#reference, #setup-reference { font-family: monospace; }
+@media (max-width: 650px) {
+  #welcome h1 { font-size: clamp(43px, 12vw, 53px); }
+  #welcome .lead { margin-top: 21px; }
+  .welcome-more { margin-top: 32px; }
+  .keep-card { padding: 16px; }
+  #pair-setup .lead { margin-bottom: 16px; }
+  #pair-setup .qr-frame { margin-top: 18px; }
+}
