@@ -11,8 +11,12 @@ const decodedSizes = new Map()
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CANARY_CHROMIUM_EXECUTABLE })
 try {
   async function phone() {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 } }); contexts.push(context)
-    if (!live) await context.route(address + '**', route => route.fulfill({ contentType: 'text/html', body: html }))
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' }); contexts.push(context)
+    if (!live) await context.route(address + '**', async route => {
+      const path = new URL(route.request().url()).pathname.slice(1) || 'index.html'
+      const contentType = path.endsWith('.webmanifest') ? 'application/manifest+json' : path.endsWith('.png') ? 'image/png' : path.endsWith('.js') ? 'application/javascript' : 'text/html'
+      await route.fulfill({ contentType, body: await readFile('local-site/' + path) })
+    })
     context.on('request', r => requests.push(r.url()))
     await context.addInitScript(() => {
       const credential = () => ({ rawId: new Uint8Array([1, 3, 5]).buffer, getClientExtensionResults: () => ({ prf: { results: { first: new Uint8Array(32).fill(91).buffer } } }) })
@@ -46,7 +50,7 @@ try {
   }
   const keeper = await phone(), witness = await phone(), member = await phone()
   assert.equal(await keeper.locator('#open-private-groups').count(), 1, 'Private vouches need a usable phone interface')
-  await keeper.locator('#open-private-groups').click()
+  await keeper.locator('#open-private-groups').evaluate(el => { el.closest('details').open = true }); await keeper.locator('#open-private-groups').click()
   await keeper.locator('#trust-group-name').fill('Private coffee group')
   await keeper.locator('#trust-create-group').click()
   await keeper.locator('#trust-share-group').click()
@@ -95,7 +99,7 @@ try {
   await keeper.locator('#trust-account-context').fill('WhatsApp contact checked in person')
   await keeper.locator('#trust-check-member').click()
   const challenge = await transfer(keeper)
-  await keeper.reload(); await keeper.locator('#open-private-groups').click(); await keeper.locator('#unlock-device').click()
+  await keeper.reload(); await keeper.locator('#unlock-device').click(); await keeper.locator('#people-private-groups').evaluate(el => { el.closest('details').open = true }); await keeper.locator('#people-private-groups').click()
   await keeper.getByRole('button', { name: 'Private coffee group', exact: true }).click()
   await keeper.locator('#trust-resume').click()
   assert.equal(await transfer(keeper), challenge, 'Pending exchanges survive reload in the encrypted vault')

@@ -2,10 +2,47 @@ import { describe, expect, it } from 'vitest'
 import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, sealEntries, parseVault, closeVault, enableDeviceUnlock, unlockWithDevice, exportVault } from './vault.js'
 import { createPair } from './model.js'
 import { newGroup, groupCard, joinGroup, publicKey } from './trust.js'
+import { beginConnect, acceptConnect, finishConnect } from './connect.js'
 
 const password = 'a sufficiently long test passphrase'
 
 describe('encrypted local vault', () => {
+  it('reads original array and version-two vaults and upgrades saves to a version old builds reject', async () => {
+    const vault = await createVault(password)
+    const entries = [{ id: 'old-pair', label: 'Existing friend', pair: createPair() }]
+    const key = await crypto.subtle.importKey('raw', new Uint8Array(vault.master).buffer, 'AES-GCM', false, ['encrypt', 'decrypt'])
+    for (const payload of [entries, { v: 2, entries, trust: { v: 1, groups: [] } }]) {
+      const iv = crypto.getRandomValues(new Uint8Array(12))
+      const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(`canary:vault:1:${vault.record.id}:data`) }, key, new TextEncoder().encode(JSON.stringify(payload)))
+      const old = { ...vault.record, data: { iv: btoa(String.fromCharCode(...iv)), ciphertext: btoa(String.fromCharCode(...new Uint8Array(ciphertext))) } }
+      const reopened = await unlockVault(old, password)
+      expect(reopened.entries).toEqual(entries)
+      const upgraded = await sealEntries(reopened, entries)
+      const decode = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0))
+      const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decode(upgraded.data.iv), additionalData: new TextEncoder().encode(`canary:vault:1:${vault.record.id}:data`) }, key, decode(upgraded.data.ciphertext))
+      expect(JSON.parse(new TextDecoder().decode(plaintext)).v).toBe(3)
+      closeVault(reopened)
+    }
+    closeVault(vault)
+  })
+  it('recovers pending remote invitations and encrypted replies without exposing them in storage', async () => {
+    const vault = await createVault(password)
+    const exchange = beginConnect('Pending friend')
+    vault.exchanges = [exchange]
+    vault.record = await sealEntries(vault, [])
+    const stored = exportVault(vault.record)
+    for (const secret of [exchange.secret, exchange.label, exchange.invite]) expect(stored).not.toContain(secret)
+    const reopened = await unlockVault(parseVault(stored), password)
+    expect(reopened.exchanges).toEqual([exchange])
+    const response = acceptConnect(exchange.invite)
+    const pair = finishConnect(reopened.exchanges![0], response.reply)
+    const entries = [{ id: 'pending-pair', label: 'Pending friend', pair, setup: { method: 'trusted-call' as const, reply: response.reply } }]
+    reopened.exchanges = []
+    const recovered = await unlockVault(await sealEntries(reopened, entries), password)
+    expect(recovered.exchanges).toEqual([])
+    expect(recovered.entries).toEqual(entries)
+    closeVault(vault); closeVault(reopened); closeVault(recovered)
+  })
   it('preserves private group keys, pending exchanges and contact evidence across saving and portable recovery', async () => {
     const vault = await createVault(password)
     const keeper = newGroup('Private friends')

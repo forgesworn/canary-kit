@@ -1,0 +1,10 @@
+{
+  "id": "/", "name": "Canary · your people", "short_name": "Canary",
+  "description": "A private spoken check for the people you know.",
+  "start_url": "/", "scope": "/", "display": "standalone",
+  "background_color": "#f6f4ec", "theme_color": "#f6f4ec",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

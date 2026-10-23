@@ -4,6 +4,9 @@ import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, par
 import { drawQr, QrScanner } from './qr.js'
 import { mountTrust } from './trust-ui.js'
 import type { TrustState } from './trust.js'
+import { mountInstall } from './install.js'
+import { mountConnect } from './connect-ui.js'
+import type { Exchange } from './connect.js'
 
 const STORE = 'canary.encrypted-vault.v1'
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -22,6 +25,7 @@ let pendingKeep = false
 let recoveryMode = false
 let pendingTrustTask: (() => Promise<void>) | null = null
 let trustUi: ReturnType<typeof mountTrust> | undefined
+let connectUi: ReturnType<typeof mountConnect> | undefined
 
 const scanner = new QrScanner(get<HTMLVideoElement>('scan-video'), data => {
   if (data.startsWith('CANARY-TRUST:') || data.includes('#trust=')) { stopScan(); trustUi!.receive(data); return }
@@ -51,10 +55,11 @@ function updateUnlock() {
   const candidate = restoring ?? record
   get('unlock-form').hidden = !candidate?.password
   get('device-only-note').hidden = !!candidate?.password
-  get('unlock-message').textContent = restoring ? 'Unlock your encrypted backup. Your current saved vault is not changed yet.' : pendingTrustTask ? 'Unlock your private groups and vouches on this phone.' : pendingKeep ? 'Unlock to keep this pair with your saved people.' : 'Unlock the vault saved on this phone.'
+  get('unlock-message').textContent = restoring ? 'Unlock your encrypted backup. Your current saved vault is not changed yet.' : pendingTrustTask ? 'Unlock to continue your saved setup on this phone.' : pendingKeep ? 'Unlock to keep this pair with your saved people.' : 'Your saved people are ready on this phone.'
 }
 function wipeUi() {
   trustUi?.clear()
+  connectUi?.clear()
   for (const id of ['say', 'hear', 'signal']) get(id).textContent = '—'
   for (const id of ['setup-words', 'setup-reference', 'exchange-reference', 'reference', 'side', 'check-result', 'save-state']) get(id).textContent = ''
   for (const id of ['setup-input', 'person-name', 'heard-input', 'new-password', 'confirm-password', 'unlock-password']) {
@@ -67,6 +72,9 @@ function wipeUi() {
   for (const id of ['setup-details', 'duress', 'check', 'manual-join', 'vault-settings', 'person-details']) get<HTMLDetailsElement>(id).open = false
   for (const input of document.querySelectorAll<HTMLInputElement>('#person-evidence-form input')) input.value = ''
   get('person-evidence-summary').textContent = ''
+  get<HTMLInputElement>('quick-name').value = ''
+  get<HTMLInputElement>('people-search').value = ''
+  get('pending-connections').replaceChildren()
   renderedCounter = resultCounter = -1
 }
 function lock(message = '') {
@@ -75,7 +83,7 @@ function lock(message = '') {
   if (vault) closeVault(vault)
   vault = null; draft = null; selected = null; restoring = null; pendingKeep = false; recoveryMode = false; pendingTrustTask = null
   wipeUi()
-  show('welcome')
+  show(record ? 'locked' : 'welcome')
   updateUnlock()
   status(message)
 }
@@ -112,12 +120,14 @@ function people() {
     const avatar = document.createElement('span'); avatar.className = 'avatar'; avatar.textContent = entry.label.slice(0, 1).toUpperCase()
     const text = document.createElement('span'); text.className = 'person-text'
     const label = document.createElement('strong'); label.textContent = entry.label
-    const hint = document.createElement('small'); hint.textContent = 'Open your private words'
+    const hint = document.createElement('small'); hint.textContent = entry.setup ? 'Finish your saved setup' : 'Listen · compare · say yours'
     const arrow = document.createElement('span'); arrow.textContent = '↗'; arrow.setAttribute('aria-hidden', 'true')
     text.append(label, hint); button.append(avatar, text, arrow)
     button.addEventListener('click', () => openPerson(entry))
     get('people-list').append(button)
   }
+  connectUi?.list(get('pending-connections'))
+  get('people-search').hidden = vault.entries.length < 4
   get('enable-device').hidden = !deviceUnlockPossible()
   get('enable-device').textContent = vault.record.device ? 'Change device unlock' : 'Add device unlock'
   get('device-status').textContent = vault.record.password
@@ -125,6 +135,7 @@ function people() {
     : 'Device unlock keeps this vault encrypted. Add recovery before relying on it long term.'
   get('add-recovery').hidden = !!vault.record.password
   get('backup').hidden = !vault.record.password
+  get('recovery-card').hidden = !!vault.record.password
   show('people')
 }
 function setupPair(next: Pair, created: boolean) {
@@ -159,20 +170,29 @@ function isSaved() { return !!selected && !!vault?.entries.some(entry => entry.i
 function openPerson(entry: Entry) {
   selected = entry
   const saved = isSaved()
+  const settingUp = !saved || !!entry.setup
   get('pair-title').textContent = entry.label || (saved ? 'Our words.' : 'Keep this pair.')
-  get('paired-intro').textContent = saved ? 'Say yours. Listen for theirs.' : 'Same code on both phones? Each keep your copy.'
-  if (saved) get('words-end').after(get('keep-card'))
+  get('paired-intro').textContent = saved && !entry.setup ? 'Ask for their words. Compare, then say yours.' : 'Compare your fixed pair code together. No rush.'
+  get('check-guidance').hidden = !saved || !!entry.setup
+  get('keep-card').hidden = saved && !entry.setup
+  if (saved && !entry.setup) get('words-end').after(get('keep-card'))
   else get('words-grid').before(get('keep-card'))
+  get<HTMLInputElement>('quick-name').value = entry.label
+  get('setup-name').hidden = saved && !entry.setup
+  get('confirm-pair').hidden = !saved || !entry.setup
+  get('resend-reply').hidden = !entry.setup?.reply
+  for (const id of ['words-grid', 'word-timer', 'progress', 'words-end', 'open-check', 'check', 'duress']) get(id).hidden = settingUp
   get<HTMLInputElement>('person-name').value = entry.label
   get('reference').textContent = pairReference(entry.pair)
   get('exchange-reference').textContent = pairReference(entry.pair)
   get('side').textContent = entry.pair.role === 'first' ? 'you showed the QR' : 'you scanned the QR'
   renderContactEvidence(entry)
-  get('save-state').textContent = saved ? 'Saved encrypted on this phone.' : 'Here for now. Keep this pair before you leave.'
+  get('save-state').textContent = saved ? (entry.setup ? 'Saved encrypted. Finish the code check together.' : 'Saved encrypted on this phone.') : 'Keep your copy before switching apps.'
   get('keep-person').hidden = saved
   get('keep-hint').textContent = saved ? (vault!.record.password ? 'Ready for your next call.' : 'Add recovery in Your people to protect against losing device unlock.') : 'Each of you keeps your own copy for future calls.'
   get('remove-person').hidden = !saved
   get<HTMLDetailsElement>('duress').open = get<HTMLDetailsElement>('check').open = get<HTMLDetailsElement>('person-details').open = false
+  get<HTMLDetailsElement>('repair-pair').open = false
   get('check-result').textContent = ''
   get<HTMLInputElement>('heard-input').value = ''
   renderedCounter = resultCounter = -1
@@ -193,7 +213,7 @@ function createScreen(recovery = false) {
   recoveryMode = recovery
   show('vault-create')
   get('create-title').textContent = recovery ? 'A way back in.' : 'Keep your private words.'
-  get('create-message').textContent = recovery ? 'Add a recovery passphrase so you can save a portable encrypted backup.' : pendingTrustTask ? 'Protect your private group keys and vouches. This passphrase stays yours; you don’t exchange it.' : 'Protect this pair with a passphrase. This is only for your phone; you don’t exchange it.'
+  get('create-message').textContent = recovery ? 'Add a recovery passphrase so you can save a portable encrypted backup.' : 'Protect your people and saved setup on this phone. You never exchange this passphrase.'
   get('create-submit').textContent = recovery ? 'Add recovery passphrase' : 'Keep encrypted on this phone'
   get('new-password').focus()
 }
@@ -210,7 +230,7 @@ async function keepWith(active: Vault, stamp: number) {
       openPerson(existing)
       return
     }
-    const kept = { ...entry, label: entry.label || `Person ${active.entries.length + 1}` }
+    const kept = { ...entry, label: entry.label || `Person ${active.entries.length + 1}`, setup: entry.setup ?? { method: 'in-person' as const } }
     const entries = [...active.entries, kept]
     const next = await sealEntries(active, entries)
     if (stamp !== generation || selected !== entry || document.hidden) return
@@ -239,7 +259,7 @@ function ensureTrustVault(task: () => Promise<void>) {
   void action(async stamp => {
     let next: Vault
     try { next = await createDeviceVault(location.origin) }
-    catch { if (stamp === generation && !document.hidden) { createScreen(); status('Use a passphrase to protect your private groups on this phone.') }; return }
+    catch { if (stamp === generation && !document.hidden) { createScreen(); status('Device encryption was unavailable or cancelled. Save with a passphrase instead.') }; return }
     await adoptTrustVault(next, stamp)
   })
 }
@@ -255,12 +275,41 @@ trustUi = mountTrust(get('private-trust'), {
   },
   show: () => show('private-trust'), home, error, status,
 })
+async function savePairs(entries: Entry[], exchanges: Exchange[]) {
+  const active = vault, stamp = generation
+  if (!active || document.hidden) throw new Error('Unlock your phone’s Canary vault first.')
+  const next = await sealEntries({ ...active, exchanges }, entries)
+  if (stamp !== generation || active !== vault || document.hidden) throw new Error('Canary was locked. Unlock to continue your saved setup.')
+  persist(next); active.record = next; active.entries = entries; active.exchanges = exchanges
+}
+connectUi = mountConnect({ vault: () => vault, hasRecord: () => !!record, ensure: ensureTrustVault, save: savePairs, show, open: openPerson, home, error })
+mountInstall(show, home)
+get('people-search').addEventListener('input', () => {
+  const query = get<HTMLInputElement>('people-search').value.trim().toLocaleLowerCase()
+  get('people-list').querySelectorAll<HTMLElement>('.person-card').forEach(card => { card.hidden = !card.textContent?.toLocaleLowerCase().includes(query) })
+})
+get('open-check').addEventListener('click', () => {
+  get<HTMLDetailsElement>('check').open = true
+  get('check').scrollIntoView({ behavior: 'instant', block: 'start' })
+  get('heard-input').focus()
+})
+get('resend-reply').addEventListener('click', () => { if (selected) connectUi?.resend(selected) })
+get('confirm-pair').addEventListener('click', () => {
+  if (!selected?.setup || !vault) return
+  const entry: Entry = { ...selected, label: get<HTMLInputElement>('quick-name').value.trim() || selected.label, evidence: { method: selected.setup.method, at: Math.floor(Date.now() / 1000) } }
+  delete entry.setup
+  void action(async () => {
+    const active = vault!
+    await savePairs(active.entries.map(e => e.id === entry.id ? entry : e), active.exchanges ?? [])
+    openPerson(entry); status('Setup complete on your phone. Ask them to finish on theirs too.')
+  })
+})
 for (const id of ['open-private-groups', 'people-private-groups']) get(id).addEventListener('click', () => {
   if (record && !vault) ensureTrustVault(async () => { trustUi!.home() })
   else trustUi!.home()
 })
 function tick() {
-  if ((vault || selected || draft) && Date.now() - lastActivity > 300_000) { lock('Locked after five minutes without interaction. Unsaved pairing was cleared.'); return }
+  if ((vault || selected || draft || pendingTrustTask) && Date.now() - lastActivity > 300_000) { lock('Locked after five minutes without interaction. Unlock to continue saved setup.'); return }
   if (!selected || document.hidden || get('paired').hidden) return
   const now = Math.floor(Date.now() / 1000)
   const counter = Math.floor(now / INTERVAL)
@@ -285,7 +334,7 @@ function tick() {
 
 get('create-back').addEventListener('click', () => {
   get<HTMLInputElement>('new-password').value = get<HTMLInputElement>('confirm-password').value = ''
-  if (pendingTrustTask) { pendingTrustTask = null; trustUi!.home(); return }
+  if (pendingTrustTask) { pendingTrustTask = null; home(); return }
   if (recoveryMode) people(); else if (selected) openPerson(selected); else home()
 })
 get('unlock-back').addEventListener('click', () => { restoring = null; pendingKeep = false; pendingTrustTask = null; if (selected) openPerson(selected); else show('welcome') })
@@ -310,6 +359,7 @@ get('vault-create-form').addEventListener('submit', event => {
 })
 get('keep-person').addEventListener('click', () => {
   if (!selected) return
+  selected = { ...selected, label: get<HTMLInputElement>('quick-name').value.trim() || selected.label }
   pendingKeep = true
   if (vault) { const active = vault; void action(stamp => keepWith(active, stamp)); return }
   if (diskVersion) { show('locked'); updateUnlock(); return }
@@ -328,6 +378,13 @@ get('keep-person').addEventListener('click', () => {
   })
 })
 get('add-recovery').addEventListener('click', () => createScreen(true))
+get('recovery-start').addEventListener('click', () => createScreen(true))
+get('persist-storage').addEventListener('click', async () => {
+  try {
+    const kept = await navigator.storage?.persist?.()
+    get('persist-status').textContent = kept ? 'This browser granted persistent storage. Keep a recovery backup too; clearing site data still removes it.' : 'This browser did not grant persistent storage. A recovery backup is your way back if data is cleared.'
+  } catch { get('persist-status').textContent = 'Storage persistence is unavailable here. Keep a recovery backup.' }
+})
 async function acceptUnlocked(next: Vault, stamp: number, fromBackup: boolean) {
   if (stamp !== generation || document.hidden) { closeVault(next); return }
   if (fromBackup) {
@@ -385,7 +442,12 @@ get('restore-file').addEventListener('change', () => {
   })
 })
 get('add-person').addEventListener('click', () => { selected = draft = null; wipeUi(); show('welcome') })
-get('create').addEventListener('click', () => { try { setupPair(createPair(), true) } catch { error('Could not create secure setup words. Try a current browser. No pair was saved.') } })
+get('create').addEventListener('click', () => ensureTrustVault(async () => {
+  const active = vault!
+  const entry: Entry = { id: crypto.randomUUID(), label: `Person ${active.entries.length + 1}`, pair: createPair(), setup: { method: 'in-person' } }
+  await savePairs([...active.entries, entry], active.exchanges ?? [])
+  selected = entry; draft = null; showPairQr(entry.pair)
+}))
 function startScan() {
   const stamp = generation
   get('scanner').hidden = false; get('scan-start').hidden = true
@@ -474,7 +536,8 @@ get('check-form').addEventListener('submit', event => {
     const result = checkWords(selected.pair, get<HTMLInputElement>('heard-input').value, now)
     get('check-result').textContent = result === 'signal' ? 'Their private signal matches. Follow your agreed plan when safe. Nothing has been sent.'
       : result === 'match' ? 'Their normal words match. This confirms knowledge of your shared secret, not identity or safety.'
-        : 'These words do not match. Wait for fresh words and check the device clocks. Treat the person as unverified.'
+        : 'Pause. These words do not match. Do not act on their request. Contact them using a number or account you already trust. Check fresh words and phone clocks if needed.'
+    get('check-result').className = result === 'different' ? 'check-feedback check-stop' : 'check-feedback'
     resultCounter = Math.floor(now / INTERVAL)
     get<HTMLInputElement>('heard-input').value = ''
     if (result === 'match' && vault && isSaved()) {
@@ -514,13 +577,19 @@ window.addEventListener('storage', event => {
 })
 try {
   diskVersion = localStorage.getItem(STORE)
-  if (diskVersion) { record = parseVault(diskVersion); show('welcome'); updateUnlock() }
+  if (diskVersion) { record = parseVault(diskVersion); show('locked'); updateUnlock() }
 } catch { show('welcome'); error('Saved storage is unavailable or damaged. Keep an encrypted backup and restore a valid copy if needed.') }
 function consumeIncoming() {
   const incomingWindow = window as Window & { canaryIncoming?: string }
   let incoming = incomingWindow.canaryIncoming
   delete incomingWindow.canaryIncoming
   if (!incoming) return
+  if (incoming.startsWith('#connect=')) {
+    generation++; pendingKeep = false; pendingTrustTask = null; restoring = null
+    draft = selected = null; wipeUi(); show(record && !vault ? 'locked' : 'welcome')
+    updateUnlock(); void connectUi!.receive(location.origin + location.pathname + incoming)
+    return
+  }
   if (incoming.startsWith('#trust=')) {
     generation++; pendingKeep = false; pendingTrustTask = null; restoring = null
     draft = selected = null; wipeUi(); show('welcome'); trustUi!.receive(incoming)

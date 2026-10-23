@@ -5,6 +5,13 @@ Code `1ac118f5c4287159f08a72989c77d288c45207b7`.
 Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 23 October 2026 against primary sources.**
 
+Current factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `621b6ae5b4da6f8703b863bfeef9af4aeb8f7476` and the modified
+`../canary-words-site` publishing source. Earlier commit/readback references
+below record the earlier release, not production verification of this candidate.
+No deployment or public readback was performed for this gap review.
+
+
 ## Position today / intended position
 
 Publisher of a public static-response site today, delivered by a minimal
@@ -14,7 +21,7 @@ Worker wrapper at a separate origin (publishing source
 with encrypted browser storage and optional device unlock. Both keep the shared
 secret on the devices. `local/main.ts:82` writes ciphertext to localStorage;
 `local/main.ts:367` exports encrypted JSON; `local/qr.ts:46` captures local video
-with audio disabled. `tools/build-local.mjs:17` blocks application connections;
+with audio disabled. `tools/build-local.mjs` permits same-origin public shell fetches;
 `:40` writes a static hosting candidate. No account, directory, upload, chat,
 relay, discovery endpoint or default remote server is introduced.
 
@@ -29,7 +36,7 @@ verified 28 September 2026.
 
 | Regime | Scoped finding |
 |---|---|
-| Online Safety Act, §§2.1–2.2 | The statutory user-to-user definition is `[P]`. No user content reaches another through an operator-hosted endpoint here. Pairing is a private QR/read-back exchange; the HTTPS setup secret is in a URL fragment that is not sent to the static host. The note's no-infrastructure static-software publisher reading remains `[U]`, not Ofcom approval. The ordinary static-site position does not import OSA assessments or age assurance from messaging platforms. `local/model.ts:36`, `local/qr.ts:46`, `tools/build-local.mjs:17`. |
+| Online Safety Act, §§2.1–2.2 | The statutory user-to-user definition is `[P]`. No user content reaches another through an operator-hosted endpoint here. Pairing uses private QR/read-back or explicit sharing through a user-chosen chat app; the HTTPS setup secret is in a URL fragment that is not sent to the static host. The note's no-infrastructure static-software publisher reading remains `[U]`, not Ofcom approval. The ordinary static-site position does not import OSA assessments or age assurance from messaging platforms. `local/model.ts:36`, `local/qr.ts:46`, `tools/build-local.mjs:17`. |
 | Investigatory powers, §§5.1–5.2 | The Home Office Code §§2.3–2.8 expressly includes website owners `[P]`; no-chat/static hosting is not a guarantee against the IPA operator definition. IPA §66 concerns duties under a notice/authorisation with practicability limits, and §87 provides conditional retention notices `[P]`. The inference that these provisions create no blanket twelve-month logging duty on every site is `[U]`. No IPA immunity is claimed. App code receives no secret in HTTP requests (`local/model.ts:59`, `local/index.html:12`), but that does not settle duties under a future notice. |
 | Ofcom telecoms regulation, §7 | Communications Act §32(2)–(2B), (7) has a different definition and content-service exclusion `[P]`. The selected software page provides no internet access, phone numbers, calls, messages or signal-transport service (`local/main.ts:1`, `tools/build-local.mjs:17`). The project assessment is that this static software page is not providing that regulated communications service `[U]`; do not conflate it with the broader IPA label. |
 | Data protection, §§3.1–3.2 | App data is held on the devices, not received by the publisher. Nicknames may be personal data, but no recipient/controller server is introduced for them. The note's controller examples are `[U]`, Article 13 notice contents `[P]`. Any real hosting request data must be assessed separately: collection/roles, retention, recipients and transfers cannot be inferred from a static build. `local/vault.ts:86`, `local/main.ts:82`. |
@@ -48,7 +55,9 @@ No single-use/expiry/revocation promise is made. The public site now serves this
 pairing are recorded in `../evidence/publication.json`.
 
 
-Pairing can run transiently before any vault exists (`local/main.ts:130`).
+Incoming QR/manual pairing can remain transient; creating a new pair or a
+remote exchange now first creates/unlocks encrypted storage (`local/main.ts`,
+`create` handler; `local/connect-ui.ts`, `mountConnect`).
 Keeping a pair explicitly creates or unlocks encrypted local storage. Device-only
 vaults need no custom password; recovery and portable backups are offered later,
 with the loss risk explained (`local/vault.ts:197`, `local/vault.ts:219`). This
@@ -82,8 +91,8 @@ the drafts remains distinct from the code/test results.
 The separate Sites origin is now public. The owner-approved legitimate-interest
 basis, established project identity/private report route, processor terms,
 automatic traffic statistics and observed `__cf_bm` security cookie are described
-in the deployed notice and `hosting-proposal.md`. The wrapper delivers fixed
-HTML/headers only; no content-transfer or message API was added. Public bytes,
+in the deployed notice and `hosting-proposal.md`. The candidate wrapper delivers fixed public
+HTML, manifest, icons and service-worker files with security headers; no content-transfer or message API was added. Public bytes,
 security headers and anonymous secret-free HTTP requests were verified.
 
 Keep those facts current. The app inventory does not establish the controller's
@@ -122,3 +131,23 @@ vouch feeds, relay defaults, automatic admission or hosted freshness services,
 repeat the scope assessment. Local signed claims are not proof of civil
 identity, age, safety, the truth of an issuer's judgement or universal account
 ownership. Privacy/storage/recipient changes are recorded in `privacy.md`.
+
+## Phone/PWA and remote-exchange delta
+
+The candidate serves a fixed public PWA asset allowlist, caches only its public
+shell and uses an existing user-chosen messaging tool for deliberate link
+handoffs. It adds no operator-carried user content, shared pair store, relay,
+directory, account or API (`local/pwa/sw.js`, `FILES`; `local/connect.ts`;
+`local/connect-ui.ts`; `../canary-words-site/worker/index.js`, `fetch`). The
+intended and assessed position remains static software publisher under note
+§2.2 [U]. Encryption alone is not the reason for that conclusion: the absence
+of a publisher content transport/store is the relevant implementation fact.
+
+Device storage now also includes automatically registered public-shell caching,
+pending exchange keys and pending setup replies. Note §4's necessary-storage
+interpretation remains [U]; automatic caching must be disclosed and assessed for
+its offline purpose, rather than described as absent or as an explicit install
+consent. The existing minimal hosting purpose/basis is retained; no new basis,
+identity, age limit or service-operation decision is invented. The ordinary host
+request/statistics/cookie caveats remain, including extra public-asset requests.
+The current candidate has not been deployed/read back by this review.

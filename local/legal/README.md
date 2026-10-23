@@ -3,6 +3,13 @@
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
 Code: `1ac118f5c4287159f08a72989c77d288c45207b7`.**
 
+Current factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `621b6ae5b4da6f8703b863bfeef9af4aeb8f7476` and the modified
+`../canary-words-site` publishing source. Earlier commit/readback references
+below record the earlier release, not production verification of this candidate.
+No deployment or public readback was performed for this gap review.
+
+
 **Today:** publisher of a public static-response HTTPS site at
 [Canary](https://canary-words.cocoacod256.chatgpt.site/), with a local HTML copy.
 The owner selected and approved minimal hosting with encrypted device storage
@@ -53,3 +60,9 @@ position. Expanded local data/recipient and recovery facts are in `privacy.md`;
 the feature gap check and code evidence are in `inventory.md`. No Nostr account,
 relay connection, public social graph or automatic platform membership is
 introduced. Human attestations and cryptographic key proofs remain distinct.
+
+The phone/PWA and remote-pairing working-tree delta is recorded in the final
+sections of `inventory.md`, `privacy.md` and `position.md`. It adds public-shell
+caching and deliberate external-app handoffs, without a publisher content API.
+Earlier live readbacks do not verify this candidate. Current asset/cache/header
+readback and physical phone acceptance remain separate release gates.

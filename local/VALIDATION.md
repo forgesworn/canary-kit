@@ -193,3 +193,47 @@ software assessment and hosting basis are retained; legal interpretation marks
 and the broader IPA website-owner boundary remain explicit. No independent legal
 clearance, security audit, automatic account ownership or physical phone-camera
 acceptance is inferred. Signet integration remains a separate future adapter.
+
+## Phone experience and remote setup — 23 October 2026
+
+The current candidate replaces the old local-browser journey with
+`tools/test-mobile.mjs` (`npm run test:local`). The hosted runner uses the same
+journey with `CANARY_MOBILE_URL`. Earlier evidence above belongs to its named
+release; it does not qualify these changes.
+
+- **737 tests / 31 files passed**, including new remote transcript rejection,
+  encrypted pending-exchange recovery and original-array/version-2 vault
+  migration. New encrypted saves use payload version 3 so older builds reject
+  them instead of silently discarding pending setup. Global and local TypeScript
+  checks and the standalone build passed.
+- Three independent phone vaults exercised in-person QR opening and matching
+  directions, fixed setup-code comparison, encrypted persistence before outgoing
+  display, normal/private-signal/mismatch checks, one-person quick access and
+  reload/background recovery. A full public-invite/encrypted-reply round trip
+  survived both people switching away; consumed replies were rejected.
+- The suite checks an empty/wrong browser does not create a new vault from a
+  reply; unsupported PRF falls back to passphrase; wrong passphrases fail;
+  portable encrypted recovery restores; storage failures do not display a
+  successful outgoing QR; late native credential results after lock cannot
+  persist/reopen an exchange. Canvas-stream QR scanning stops all tracks and a
+  cancelled late camera grant is stopped.
+- An actual service worker installed, then offline reload, vault unlock and
+  words succeeded. Cache inspection found exactly the five public shell files.
+  App requests carried no fragments, pair secrets, exchange keys or request
+  bodies. No third-party application requests or browser/CSP errors occurred.
+- Reviewed mobile/desktop, installation and check screenshots under `evidence/`.
+  The quick-check button fits a 390×720 CSS-pixel viewport. Rendered evidence
+  substitutes dummy words and a dummy pair code.
+- The standalone downloaded HTML also pairs, saves with passphrase and opens
+  words without a host or service worker. The HTTPS app includes its separate
+  manifest/icon links; these links are removed from the standalone download.
+- Private group/vouch browser regression passed after the navigation change:
+  signed claims, deliberate issuer approval, fresh key proofs, replay/withdrawal
+  rejection, QR decoding and encrypted local data remained intact.
+
+`evidence/mobile-journey.json` records the local run. Actual credential operations
+are mocked PRF providers; this does **not** qualify iPhone or GrapheneOS passkeys,
+biometrics/PIN, native installation/storage migration, physical camera scanning,
+call multitasking or a one-minute human usability target. No independent security
+audit or UK-law clearance is claimed. The design/reuse map and remaining limits
+are in `MOBILE-EXPERIENCE.md`.

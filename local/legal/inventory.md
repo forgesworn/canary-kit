@@ -5,6 +5,13 @@ Code `1ac118f5c4287159f08a72989c77d288c45207b7`.
 Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 23 October 2026 against primary sources.**
 
+Current factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `621b6ae5b4da6f8703b863bfeef9af4aeb8f7476` and the modified
+`../canary-words-site` publishing source. Earlier commit/readback references
+below record the earlier release, not production verification of this candidate.
+No deployment or public readback was performed for this gap review.
+
+
 The legal-cover inventory helper was rerun on tracked `local/`: fourteen
 source/config/evidence files out of thirty-four tracked files, excluding prose,
 tests and build output. It found localStorage at `main.ts:83`; no default app
@@ -23,21 +30,21 @@ trust boundary. This is not end-to-end encryption of content carried by a server
 
 | Question | Finding / code evidence |
 |---|---|
-| 1. Could be hosted? | Public baked-page response only; exact HTML/headers verified. `../canary-words-site/worker/index.js:1`, `scripts/build-worker.mjs:1`, `local/evidence/publication.json`. |
+| 1. Could be hosted? | Fixed public HTML/manifest/icon/worker responses; earlier HTML/header readback is historical. `../canary-words-site/worker/index.js:1`, `scripts/build-worker.mjs:1`, `local/evidence/publication.json`. |
 | 2. Default hosts? | No external app server or remote asset. `local/main.ts:1` dependency graph, `tools/build-local.mjs:17`. |
 | 3. Publisher-operated defaults? | None wired into this entry point. Not a finding about the larger app. `vite.local.config.ts:6`. |
 | 4. Third parties? | Host receives public page requests; optional browser/OS credential provider receives its native API requests on user action. No app-content API or telemetry. `local/vault.ts:174`. |
-| 5. One user's content through an operator server? | No. Setup crosses a local QR or manual read-back; no server routes or shared stores. `local/model.ts:36`, `local/qr.ts:46`. |
+| 5. One user's content through an operator server? | No publisher content transport. Setup crosses a local QR/manual read-back or deliberate external-app sharing; no content API or shared store. `local/model.ts:36`, `local/qr.ts:46`. |
 | 6. Discovery? | No public search, directory, presence or profile lookup. The private people list is decrypted locally. `local/main.ts:104`. |
 | 7. Key holders? | Unlocked device and optional credential provider/key protection. No remote master key sent by app code. `local/vault.ts:110`, `local/vault.ts:174`. |
-| 8. Storage/retention? | Encrypted localStorage and explicit encrypted backups; unsaved pairs/plaintext in memory/display only, cleared on lock. No secure-erasure promise. `local/main.ts:82`, `local/main.ts:367`, `local/vault.ts:155`. |
+| 8. Storage/retention? | Encrypted localStorage including pending exchange/setup state and explicit encrypted backups; public shell in Cache Storage; unsaved plaintext clears on lock. No secure-erasure promise. `local/main.ts:82`, `local/main.ts:367`, `local/vault.ts:155`. |
 | 9. Accounts/ages? | No app accounts or age gate. Device vault/passkey is not an account at the publisher. No minimum age selected. `local/index.html:19`. |
 | 10. Money? | No purchase, donation, subscription or payment path in the local interface. `local/index.html:15`. |
 | 11. Agents/recording? | No agent or transcription. Camera frames are transient QR input, not recordings. No microphone request. `local/qr.ts:46`. |
 | 12. Start? | Public static page published 23 October; no messaging-service deadline inferred. `local/evidence/publication.json`. |
 | 13. Named operator? | No invented natural person or company. Existing project identity/report route retained; host terms and approved basis recorded. Page notice at `local/index.html:60`. |
-| 14. Server access? | Wrapper returns baked HTML for GET/HEAD only, with no storage/body processing. `../canary-words-site/worker/index.js:1`. |
-| 15. Position? | Static-site publisher; public readback and anonymous browser opening passed. `local/evidence/hosting.json`, `local/evidence/live-browser.json`. |
+| 14. Server access? | Wrapper returns only fixed public allowlisted files for GET/HEAD, with no content storage/body processing. `../canary-words-site/worker/index.js:1`. |
+| 15. Position? | Static-site publisher [U]; earlier readback/browser opening passed, current candidate release readback outstanding. `local/evidence/hosting.json`, `local/evidence/live-browser.json`. |
 
 Normal-camera links are now another secret-handling surface: generation at
 `local/model.ts:59`, early fragment stripping at `local/index.html:12`, and
@@ -120,3 +127,28 @@ uncertainty remains `[U]`; the expanded browser-only feature is not represented
 as Ofcom approval or blanket UK-law clearance. The hosting purpose/basis and
 processor/contact facts are unchanged. No new fee deadline or regulator
 registration is inferred from a private signed claim.
+
+## Phone/PWA and remote-exchange gap check — working tree
+
+The helper was run over the repository; its wider networked-app matches were
+excluded from this bounded entry-point assessment. New untracked source was
+reviewed directly, since the helper's tracked-file search does not capture it.
+The current key-holder answer remains: the unlocked user device holds pair,
+vault and pending exchange private keys; neither the fixed-response publisher
+wrapper nor the public-shell cache receives them through these handlers.
+
+| Gap | Evidence | Note section | Resolution / who decides |
+|---|---|---|---|
+| No-service-worker and root-only wording contradicted new public assets. | `local/install.ts`, `mountInstall`; `local/pwa/sw.js`, `FILES`; `../canary-words-site/worker/index.js`, `fetch`; `scripts/build-worker.mjs`, asset map. | §§3.2, 4 | Corrected public requests/cache and allowlist facts; no application content endpoint introduced. |
+| Remote setup adds explicit outside recipients and metadata. | `local/connect.ts`, `beginConnect`, `acceptConnect`, `connectLink`; `local/connect-ui.ts`, Send/Copy handlers. | §§2.2, 3.2 | Describe public offer, encrypted reply, chat/share/clipboard retention and separate code comparison. Publisher classification remains an interpretation [U]. |
+| Vault-only startup/pending setup differs from prior transient-creator wording. | `local/main.ts`, `create`, `savePairs`; `local/vault.ts`, `opened`, `sealEntries`. | §§3.2, 4 | Describe saved offer private keys, labels, pending replies and backup inclusion; no automatic invitation expiry claim. |
+| Phone-PIN label could imply a weak app key. | `local/vault.ts`, required `userVerification` and PRF; `local/index.html`, passphrase form. | §3.2 | Clarify platform credential protection and strong passphrase fallback; no short app PIN. |
+| Earlier live evidence cannot validate the candidate. | Previous `local/evidence/publication.json` versus changed source/assets. | Evidence gate | Current public bytes, worker/cache/update behaviour and physical-phone acceptance need fresh release evidence; no deployment performed here. |
+
+The legal note remains verified 28 September 2026, review by 28 March 2027;
+the existing documented partial 23 October refresh is not a full law refresh.
+The watch list was read. No new OSA deadline/cost is identified from these local
+changes. ICO fee status remains controller-wide and unverified (note §3.4:
+tier 1 if due £52/year, £5 direct-debit discount); no fee was paid or registration
+made. Provider configuration, foreign law, independent security/legal review and
+physical no-Play GrapheneOS/iPhone credential acceptance remain unchecked.

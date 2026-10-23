@@ -3,6 +3,13 @@
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
 App code `1ac118f5c4287159f08a72989c77d288c45207b7`.**
 
+Current factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `621b6ae5b4da6f8703b863bfeef9af4aeb8f7476` and the modified
+`../canary-words-site` publishing source. Earlier commit/readback references
+below record the earlier release, not production verification of this candidate.
+No deployment or public readback was performed for this gap review.
+
+
 ## Published deployment
 
 The separate Site is public at
@@ -13,8 +20,10 @@ commit `8921e7215b12a19f4377e024065554154beb36b0`.
 [HTTP readback](../evidence/hosting.json) and
 [live browser check](../evidence/live-browser.json) record the actual gates.
 
-A minimal Worker ESM wrapper returns only the baked app and fixed security
-headers on GET/HEAD `/`; other paths/methods are rejected. It reads no request
+The initial published Worker returned only the baked app and fixed security
+headers on GET/HEAD `/`. The current candidate also allowlists the public
+manifest, three icons and `/sw.js` for GET/HEAD; other paths/methods are rejected
+(`worker/index.js`, `fetch`; `scripts/build-worker.mjs`, asset map). It reads no request
 body and adds no logging, database, uploads, accounts, application API or remote
 pair store. This response wrapper is needed because the provider's initial
 static-file delivery ignored `_headers` and injected bot JavaScript. The app's
@@ -119,3 +128,19 @@ Controller-wide ICO fee status is not established by this app inventory. The
 GB note §3.4 records applicable fees and exemptions (tier 1, if due: £52 per year,
 with a £5 direct-debit discount). Do not infer automatic exemption or a completed
 registration from third-party hosting. No fee was paid.
+
+## Public PWA candidate delta
+
+`worker/index.js` and `scripts/build-worker.mjs` now bake an exact public asset
+map: root HTML, manifest, worker and three icons. Only GET/HEAD are accepted;
+no request body is consumed and no user-content response/store/API is added.
+The worker response allows root service-worker scope. Build headers now use
+`Cache-Control: no-cache, no-transform, must-revalidate`; the browser worker
+separately caches the versioned public shell (`local/pwa/sw.js`).
+
+This adds ordinary host asset/update requests under the existing adopted
+minimal hosting purpose. Earlier production byte/cookie/header evidence above
+is historical: it does not establish the current candidate's deployed headers,
+provider behaviour or asset completeness. Fresh release readback is outstanding.
+No host/provider/basis decision, deployment, paid resource or contact was made
+in this factual gap review.

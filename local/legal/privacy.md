@@ -5,6 +5,13 @@ Code `1ac118f5c4287159f08a72989c77d288c45207b7`.
 Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 23 October 2026 against primary sources.**
 
+Current factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `621b6ae5b4da6f8703b863bfeef9af4aeb8f7476` and the modified
+`../canary-words-site` publishing source. Earlier commit/readback references
+below record the earlier release, not production verification of this candidate.
+No deployment or public readback was performed for this gap review.
+
+
 These facts apply to the local app and the public static-response site at
 `https://canary-words.cocoacod256.chatgpt.site/`. The deployed notice is in
 `local/index.html:60`, including the owner-adopted hosting basis and contact.
@@ -12,11 +19,13 @@ See [hosting record](hosting-proposal.md) and [production evidence](../evidence/
 
 ## Device processing
 
-Pairing starts in memory without a vault or account (`local/main.ts:130`). No
-persistent pair record is written until **Keep on this phone**. The receiver
-reaches rotating words directly after scanning, and naming is optional. Unsaved
-pairs are cleared on backgrounding or five-minute inactivity; both people must
-keep their own copy for future calls (`local/main.ts:72`, `local/main.ts:262`).
+Starting a new in-person pair or remote exchange now first creates or unlocks
+the encrypted vault (`local/main.ts`, `create` handler and `ensureTrustVault`;
+`local/connect-ui.ts`, `mountConnect`). The in-person creator's pair and remote
+exchange progress are encrypted before their outgoing link is displayed. An
+incoming local QR/manual pair can still be transient until explicitly kept.
+Unsaved pairs are cleared on backgrounding or five-minute inactivity; both
+people need their own saved copy for future calls. No publisher account exists.
 Pair setup words, roles and user-chosen nicknames are held in memory while
 unlocked. Encrypted payloads and wrapped master keys are stored in this browser's
 localStorage (`local/main.ts:82`; `local/vault.ts:148`). Plaintext nicknames or
@@ -92,19 +101,20 @@ The bundled app does not connect to Signal, Kithmoot, WhatsApp, a relay, an agen
 analytics or a remote backup. Users independently choose to speak words or use
 other messaging apps; those apps' data handling is separate. A duress match is
 an on-device result, not an alert or location report (`local/main.ts:469`).
-The application installs no cookie, tracker, service worker or account system.
+The application installs no cookie, tracker or account system. It registers a
+same-origin service worker for the public offline shell; see the update below.
 The existing `SECURITY.md` describes repository security-report routes; this
 change adds no form, inbox endpoint or report upload service.
 
 A hosted download necessarily exposes ordinary connection/request metadata to
-its host. The app request monitor and `connect-src 'none'` do not prove that a
+its host. The app request monitor and the current `connect-src 'self'` policy do not prove that a
 web host retains no logs. Hosting processing is described below; no fixed log lifetime or UK-only
 location is asserted.
 
 ## Published host
 
-A separate OpenAI Sites origin is public; the response wrapper only serves the
-baked app with fixed headers and rejects other paths/methods. The platform's
+A separate OpenAI Sites origin is public; the current response wrapper serves a fixed public app/manifest/icon/service-worker
+allowlist with fixed headers and rejects other paths/methods. The platform's
 [automatic traffic metrics](https://learn.chatgpt.com/docs/sites/managing-a-site#review-site-analytics)
 and [applicable processor terms](https://openai.com/en-GB/policies/chatgpt-sites-data-processing-addendum/)
 were read on 23 October 2026. Those facts require a host-specific notice; the
@@ -179,3 +189,52 @@ than silently discard evidence. There is no online status lookup, account
 creation, profile discovery, relay connection, remote signer or public vouch
 publication. This changes local processing facts without adding a hosted user-
 content API. The deployed privacy text has been expanded to match.
+
+## Phone installation and remote pairing — working-tree update
+
+`local/install.ts` registers `./sw.js` automatically on supported secure website
+loads, independently of the home-screen installation button. The worker fetches
+and caches only `/`, `/manifest.webmanifest`, `/icon-192.png`, `/icon-512.png` and
+`/apple-touch-icon.png` (`local/pwa/sw.js`, `FILES`). Registration/update checks
+also request the public worker. These are additional ordinary host requests;
+no fragment, vault, nickname, exchange key or pair secret is put in this cache.
+Installation fetches omit credentials. Browser/platform installation and update
+processing remains subject to the user's browser/OS settings.
+
+The versioned public shell can remain available offline. Activation deletes old
+Canary shell cache versions; it does not erase saved vaults or external copies.
+The browser may evict storage. A user-requested `navigator.storage.persist()`
+permission can reduce eviction, not prevent clearing or device loss. Home-screen
+and ordinary browser contexts may have separate storage: use the same context
+or an encrypted recovery backup; installation does not promise vault migration.
+
+`local/connect.ts` produces an offer with a random exchange identifier and public
+key. It is public information, not a shared pair secret, but may link an exchange
+to the recipient/chat context. The reply carries the pair inside recipient-
+encrypted NIP-44 data with public exchange/key metadata. Encryption does not
+establish who owns the other key: compare the fixed pair code on a separately
+trusted live call. No relay, Nostr account, remote signer or messaging API is used.
+
+`local/connect-ui.ts` passes a link to `navigator.share` or writes the clipboard
+only when the user clicks Send/Copy. The user chooses the external app/recipient.
+Those apps, OS share tools, clipboard managers, browser and scanners can retain
+links and metadata under their own settings. Encryption is no promise that a
+recipient or compromised endpoint cannot copy the pair. Native sharing is not
+a direct send by the publisher. `#connect=` is stripped by the early history
+replacement in `local/index.html`; HTTP does not carry that fragment, but native
+history/sync/link handling copies cannot be guaranteed absent.
+
+Pending offers keep their private exchange key, public invitation and label in
+the encrypted vault; pending pair entries keep the setup method and an encrypted
+reply for resending (`local/vault.ts`, `opened`, `sealEntries`, `entriesFrom`).
+They travel in encrypted recovery backups with the vault payload. Unfinished
+offers have no automatic expiry in this implementation; users finish or remove
+them. Completion removes the matched offer locally. Removing data does not
+revoke previously shared links or erase other holders' copies. Unlocking exposes
+this material to the user's browser; the publisher receives no content key.
+
+Face/fingerprint/phone PIN refers to the platform authenticator's required user
+verification and PRF (`local/vault.ts`, `enableDeviceUnlock`, `unlockWithDevice`), not a
+short Canary PIN encrypting a copied vault. The fallback UI requires a strong
+passphrase of at least 14 characters. Existing-vault compatibility is not proof
+that every older passphrase was strong. Device-only recovery limitations remain.
