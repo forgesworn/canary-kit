@@ -299,3 +299,23 @@ and owner/novice/panic acceptance are outstanding. The owner cannot test phones
 today. Earlier NFC and public-site evidence remains tied to its recorded source
 and binaries. Candidate compilation/codec results are separate evidence, never
 an assertion that those physical gates passed. See `TRANSPORT-ACCEPTANCE.md`.
+
+
+### Transport publication follow-up — 23 October 2026
+
+The QR presentation changes are published as website version 13, from app source
+`9be541e854be5187ff35a026dddb517de868a5b6` and wrapper source
+`6824f325327e3b33f99cc9cccfe7617dc3e33051`. Anonymous exact-byte readback of all
+six public files and the live pairing/copy journeys passed. See
+`../local/evidence/publication.json` and `../local/evidence/v13-public-readback.json`; the v12
+publication and its earlier journey remain retained separately. No host,
+audience, purpose, controller/contact, production transport or notice basis
+changed. This is publication evidence, not a new law review.
+
+Android and signed iOS candidates are retained with exact hashes in
+`evidence/transport-artifacts.json`; they have not replaced the installed apps.
+Native wire/recovery tests, package checks and six local VP8/H264 codec journeys
+passed; `evidence/transport-checks.json` distinguishes their fixture providers.
+Bilateral physical BLE, a real provider/camera call, device unlock and human
+acceptance remain pending. The earlier NFC pass belongs to its own recorded
+binaries. No app-store release, independent audit or legal clearance follows.

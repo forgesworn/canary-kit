@@ -1,6 +1,7 @@
 {
-  "verified": "2026-10-23T18:20:09.529Z",
+  "verified": "2026-10-23T19:46:25.595Z",
   "address": "https://canary-words.cocoacod256.chatgpt.site/",
+  "browserVersion": "155.0.8059.85",
   "publicOfferAndEncryptedReply": true,
   "fixedComparison": true,
   "originalWordProfile": true,
@@ -10,7 +11,8 @@
   "reverseDirection": true,
   "duplicateMergeAndUnlockPreserved": true,
   "actualQrPixelsThroughCameraDecoder": true,
-  "fixtureFrames": 184,
+  "largerSlowerQr": true,
+  "fixtureFrames": 133,
   "cameraProvider": "local canvas stream; not physical video-call acceptance",
   "credentialProvider": "PRF stub; real local encryption",
   "noExtraNetwork": true,

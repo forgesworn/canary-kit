@@ -1,7 +1,7 @@
 {
-  "verified": "2026-10-23T19:33:31.449Z",
+  "verified": "2026-10-23T19:43:51.724Z",
   "address": "https://vouch.optical.test/",
-  "webBuildSha256": "86798959f6a74fddeff2f5c4554c5feec4f5e417481a280b05b4801384520bba",
+  "webBuildSha256": "68ffaa4ea1ab5e9892f4848eaf59599a57289e58701dda8a0663abbee2a0a0ee",
   "browserVersion": "155.0.8059.85",
   "publicOfferAndEncryptedReply": true,
   "fixedComparison": true,
@@ -13,7 +13,7 @@
   "duplicateMergeAndUnlockPreserved": true,
   "actualQrPixelsThroughCameraDecoder": true,
   "largerSlowerQr": true,
-  "fixtureFrames": 323,
+  "fixtureFrames": 133,
   "cameraProvider": "local canvas stream; not physical video-call acceptance",
   "credentialProvider": "PRF stub; real local encryption",
   "noExtraNetwork": true,
