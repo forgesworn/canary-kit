@@ -61,13 +61,13 @@ export function mountConnect(host: Host) {
       if (!host.vault() && !host.hasRecord()) {
         host.show('connect-paste-view')
         get<HTMLTextAreaElement>('connect-paste').value = connectLink(packet, location.origin + location.pathname)
-        host.error('Open the Canary app or browser where you sent the invitation. Copy this reply and paste it there. This browser has no saved invitation.')
+        host.error('Open the Signet Vouch app or browser where you sent the invitation. Copy this reply and paste it there. This browser has no saved invitation.')
         return
       }
       host.ensure(async () => {
         const active = host.vault()
         const exchange = active?.exchanges?.find(item => item.id === parsed.id)
-        if (!active || !exchange) throw new Error('No matching invitation on this browser. Open Canary where you made the invitation. If using the home-screen app, paste the reply there.')
+        if (!active || !exchange) throw new Error('No matching invitation on this browser. Open Signet Vouch where you made the invitation. If using the home-screen app, paste the reply there.')
         const pair = finishConnect(exchange, packet)
         const entry: Entry = { id: crypto.randomUUID(), label: exchange.label, pair, setup: { method: 'trusted-call' } }
         await host.save([...active.entries, entry], active.exchanges!.filter(item => item.id !== exchange.id))
@@ -86,7 +86,7 @@ export function mountConnect(host: Host) {
     const link = output
     if (!link) return
     try {
-      if (id === 'connect-send' && navigator.share) await navigator.share({ title: 'Our Canary setup', text: 'Open this in Canary to continue our private setup.', url: link })
+      if (id === 'connect-send' && navigator.share) await navigator.share({ title: 'Our Signet Vouch setup', text: 'Open this in Signet Vouch to continue our private setup.', url: link })
       else await navigator.clipboard.writeText(link)
       // Sharing can background and lock the app. Never redisplay data afterwards.
       if (output === link) get('connect-share-status').textContent = 'Ready. Continue in your private chat.'

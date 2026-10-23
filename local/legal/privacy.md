@@ -318,3 +318,40 @@ findings, not physical phone or real AirDrop acceptance. The published page must
 carry the candidate's file-transfer/storage explanation before this release;
 earlier production evidence does not verify the candidate. Existing host,
 controller/contact and adopted hosting purpose/basis remain unchanged.
+
+## Signet Vouch presentation and private labels — source candidate
+
+Reviewed 23 October 2026 against the working tree based on app commit
+`599058fa3c970467cb47122285592ffa7780fa88`. `local/vouch-view.ts`,
+`knownPeople`, derives a group-scoped list from existing saved private labels,
+chosen vouchers, issued/received claims and the last historical check. This is
+this device's saved key/evidence list, not an authoritative current member
+register, public directory, identity match or social graph. Identical labels
+in different groups do not link their keys or spoken pairs.
+
+`local/trust-ui.ts`, `personView`, lets the user explicitly save or replace a
+private name in the existing `Group.people` field. Names and key associations
+remain in the existing encrypted vault and encrypted recovery backup; the
+existing backup, device-compromise and retention limits above still apply.
+Saving a name does not accept that key as a voucher or alter any other platform's
+membership. User-supplied call/account context remains an observation.
+
+`local/vouch-view.ts`, `vouchSummary`, checks saved claim signatures, group
+scope, method and lifetime before presenting current, expired, withdrawn or
+unusable evidence. Dates describe the signed observation and its expiry; a
+current label reflects only local time and withdrawals already received. It
+does not prove current identity, account ownership, the truth of a meeting or
+global withdrawal freshness. A refreshed verification card or restarted
+expired request initiates the existing proof flow, rather than renewing an old
+vouch or converting it into an identity check.
+
+`local/index.html` and `local/pwa/manifest.webmanifest` use the Signet Vouch
+product name while keeping the existing app origin and manifest identity.
+The hosting notice still names the Canary Kit (ForgeSworn) publisher and the
+existing GitHub privacy route. The Signet Vouch label introduces no Signet
+login, account integration, relay,
+backend, automatic contact lookup or new recipient. Spoken words still check a
+separate shared secret and are not linked automatically to group keys. The
+publisher, origin, hosting purpose/basis and existing GitHub privacy route are
+unchanged. Publication/notice alignment and live release readback must be
+verified for this candidate; earlier publication evidence does not do that.

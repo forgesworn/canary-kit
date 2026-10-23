@@ -80,6 +80,7 @@ function wipeUi() {
   get<HTMLInputElement>('quick-name').value = ''
   get<HTMLInputElement>('people-search').value = ''
   get('pending-connections').replaceChildren()
+  get('vouch-overview').replaceChildren()
   renderedCounter = resultCounter = -1
 }
 function lock(message = '') {
@@ -125,13 +126,18 @@ function people() {
     const avatar = document.createElement('span'); avatar.className = 'avatar'; avatar.textContent = entry.label.slice(0, 1).toUpperCase()
     const text = document.createElement('span'); text.className = 'person-text'
     const label = document.createElement('strong'); label.textContent = entry.label
-    const hint = document.createElement('small'); hint.textContent = entry.setup ? 'Finish your saved setup' : 'Listen · compare · say yours'
+    const hint = document.createElement('small'); hint.textContent = entry.setup ? 'Finish your saved setup' : entry.lastCheck ? 'Spoken match · ' + new Date(entry.lastCheck * 1000).toLocaleDateString('en-GB') : 'Spoken check ready'
     const arrow = document.createElement('span'); arrow.textContent = '↗'; arrow.setAttribute('aria-hidden', 'true')
     text.append(label, hint); button.append(avatar, text, arrow)
     button.addEventListener('click', () => openPerson(entry))
     get('people-list').append(button)
   }
   connectUi?.list(get('pending-connections'))
+  if(vault.trust.groups.length){
+    for(const [title,hint,intent]of [['Your vouches',`${vault.trust.groups.length} private ${vault.trust.groups.length===1?'group':'groups'} · signed evidence`,'show'],['Vouch for someone','Check a key. Record what happened.','vouch']] as const){
+      const button=document.createElement('button'),label=document.createElement('strong'),caption=document.createElement('small');label.textContent=title;caption.textContent=hint;button.append(label,caption);button.addEventListener('click',()=>trustUi!.home(intent));get('vouch-overview').append(button)
+    }
+  }
   get('people-search').hidden = vault.entries.length < 4
   get('enable-device').hidden = !deviceUnlockPossible()
   get('enable-device').textContent = vault.record.device ? 'Change device unlock' : 'Add device unlock'
@@ -320,12 +326,17 @@ get('confirm-pair').addEventListener('click', () => {
     openPerson(entry); status('Setup complete on your phone. Ask them to finish on theirs too.')
   })
 })
-for (const id of ['open-private-groups', 'people-private-groups']) get(id).addEventListener('click', () => {
-  if (record && !vault) ensureTrustVault(async () => { trustUi!.home() })
-  else trustUi!.home()
-})
+function openVouches(intent:'groups'|'vouch'|'show'='groups') {
+  if(record&&!vault)ensureTrustVault(async()=>{trustUi!.home(intent)})
+  else trustUi!.home(intent)
+}
+for(const id of ['open-private-groups','people-private-groups'])get(id).addEventListener('click',()=>openVouches())
+get('start-vouch').addEventListener('click',()=>openVouches('vouch'))
+get('show-vouches-welcome').addEventListener('click',()=>openVouches('show'))
+get('welcome-spoken-check').addEventListener('click',()=>{get<HTMLDetailsElement>('setup-options').open=true;get('setup-options').scrollIntoView({behavior:'instant',block:'start'})})
 function tick() {
   if ((vault || selected || draft || pendingTrustTask) && Date.now() - lastActivity > 300_000) { lock('Locked after five minutes without interaction. Unlock to continue saved setup.'); return }
+  trustUi?.tick()
   if (!selected || document.hidden || get('paired').hidden) return
   const now = Math.floor(Date.now() / 1000)
   const counter = Math.floor(now / INTERVAL)
@@ -457,7 +468,7 @@ get('restore-file').addEventListener('change', () => {
     restoring = imported; show('locked'); updateUnlock(); get('unlock-password').focus()
   })
 })
-get('add-person').addEventListener('click', () => { selected = draft = null; wipeUi(); show('welcome') })
+get('add-person').addEventListener('click', () => { selected = draft = null; wipeUi(); show('welcome'); get<HTMLDetailsElement>('setup-options').open=true; get('setup-options').scrollIntoView({behavior:'instant',block:'start'}) })
 get('create').addEventListener('click', () => ensureTrustVault(async () => {
   const active = vault!
   const entry: Entry = { id: crypto.randomUUID(), label: `Person ${active.entries.length + 1}`, pair: createPair(), setup: { method: 'in-person' } }

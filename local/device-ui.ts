@@ -45,7 +45,7 @@ export function mountDevices(root: HTMLElement, host: Host) {
       await host.save(active.entries,{...active.devices,receive});receiving()
     }),'primary wide'))
     root.append(button('device-start-send','Copy from this device',()=>host.ensure(async()=>{
-      base('Open Canary\non your other device.','Choose “Bring my people here” there. Then scan its QR here, using your camera inside Canary.')
+      base('Open Signet Vouch\non your other device.','Choose “Bring my people here” there. Then scan its QR here, using your camera inside Signet Vouch.')
       root.append(button('device-scan','Scan the other device’s QR',host.scan,'primary wide'));paste()
       note('Your saved people stay here. This copies completed pairs and their contact notes; private groups and unfinished setup stay on this device.')
     })))
@@ -61,7 +61,7 @@ export function mountDevices(root: HTMLElement, host: Host) {
     const receive=host.vault()?.devices?.receive
     if(!receive){home();return}
     if(now()>receive.request.expires){base('Show a fresh QR.','This request has expired. Your saved people are unchanged.');root.append(button('device-renew','Show a new QR',()=>host.ensure(async()=>{const active=host.vault()!;await host.save(active.entries,{...active.devices,receive:newDeviceRequest()});receiving()}),'primary wide'));return}
-    base('Bring your people here.','On the device that already has your people, open Canary → Add another device → Copy from this device → Scan QR.')
+    base('Bring your people here.','On the device that already has your people, open Signet Vouch → Add another device → Copy from this device → Scan QR.')
     const address=location.origin+location.pathname
     const link=location.protocol==='https:'?deviceLink(receive.request,address):deviceToken(receive.request)
     const layout=node('div','','device-receive-grid'),left=node('div'),right=node('div');layout.append(left,right);root.append(layout)
@@ -75,7 +75,7 @@ export function mountDevices(root: HTMLElement, host: Host) {
       if(!selected)return
       const stamp=epoch
       try {
-        if(selected.size>DEVICE_FILE_LIMIT)throw new Error('This file is too large to be a Canary people copy.')
+        if(selected.size>DEVICE_FILE_LIMIT)throw new Error('This file is too large to be a Signet Vouch people copy.')
         const text=await selected.text()
         if(stamp!==epoch||document.hidden)return
         host.ensure(async()=>preview(text))
@@ -83,7 +83,7 @@ export function mountDevices(root: HTMLElement, host: Host) {
     }
     file.addEventListener('change',()=>{const selected=file.files?.[0];file.value='';void load(selected)})
     drop.append(node('h2','Then open the copy they send.'),node('p','Use AirDrop, your usual chat or a file transfer. On a desktop you can also drop the encrypted file here.','small'),button('device-pick-copy','Open encrypted copy',()=>file.click(),'primary wide'),file)
-    drop.addEventListener('dragover',event=>{event.preventDefault()});drop.addEventListener('drop',event=>{event.preventDefault();if(event.dataTransfer?.files.length===1)void load(event.dataTransfer.files[0]);else host.error('Drop one Canary encrypted copy at a time.')});right.append(drop)
+    drop.addEventListener('dragover',event=>{event.preventDefault()});drop.addEventListener('drop',event=>{event.preventDefault();if(event.dataTransfer?.files.length===1)void load(event.dataTransfer.files[0]);else host.error('Drop one Signet Vouch encrypted copy at a time.')});right.append(drop)
     root.append(button('device-cancel-receive','Cancel this receiving request',()=>host.ensure(async()=>{const active=host.vault()!;const devices={...active.devices};delete devices.receive;await host.save(active.entries,devices);home()}),'text-button'))
     note('Your existing people and unlock protection are kept. You’ll compare a code and review the names before anything is imported.')
   }
@@ -93,9 +93,9 @@ export function mountDevices(root: HTMLElement, host: Host) {
       if(now()<request.created-30||now()>request.expires)throw new Error('This device request has expired or the clocks differ. Show a new QR on the receiving device.')
       const active=host.vault()
       if(active){choose(request);return}
-      base('Use your saved\npeople here.','Unlock the Canary app where your people are already saved. This request asks that app for an encrypted copy.')
+      base('Use your saved\npeople here.','Unlock the Signet Vouch app where your people are already saved. This request asks that app for an encrypted copy.')
       if(host.hasRecord())root.append(button('device-unlock-source','Unlock my people',()=>host.ensure(async()=>choose(request)),'primary wide'))
-      else note('No saved people were found in this browser. Open your usual Canary home-screen app, choose Add another device → Copy from this device, and paste this request there.')
+      else note('No saved people were found in this browser. Open your usual Signet Vouch home-screen app, choose Add another device → Copy from this device, and paste this request there.')
       const area=node('textarea');area.readOnly=true;area.id='device-source-link';area.value=location.protocol==='https:'?deviceLink(request,location.origin+location.pathname):deviceToken(request);area.rows=3;root.append(area)
       root.append(button('device-copy-source-link','Copy this request',()=>{void navigator.clipboard.writeText(area.value).catch(()=>host.error('Select the request above and copy it.'))}))
     }catch(e){host.error(e instanceof Error?e.message:'This device request could not be read.')}
@@ -130,7 +130,7 @@ export function mountDevices(root: HTMLElement, host: Host) {
     let canShare=false;try{canShare=!!navigator.canShare?.({files:[file]})}catch{}
     if(canShare)root.append(button('device-share-file','Share encrypted copy',()=>{
       const stamp=epoch
-      void navigator.share({files:[file],title:'Canary encrypted people copy'}).catch(e=>{if(stamp===epoch&&e?.name!=='AbortError')host.error('Sharing did not finish. Save the encrypted file instead.')})
+      void navigator.share({files:[file],title:'Signet Vouch encrypted people copy'}).catch(e=>{if(stamp===epoch&&e?.name!=='AbortError')host.error('Sharing did not finish. Save the encrypted file instead.')})
     },'primary wide'))
     root.append(button('device-download-file',canShare?'Save encrypted file instead':'Save encrypted file',()=>{
       const url=URL.createObjectURL(file);urls.add(url);const a=node('a');a.href=url;a.download=file.name;a.click()
@@ -139,7 +139,7 @@ export function mountDevices(root: HTMLElement, host: Host) {
     },canShare?'secondary wide':'primary wide'))
     note('Choose AirDrop, your usual chat or a file transfer. The file is encrypted for the device that showed the QR. No recovery passphrase is needed for this copy.')
     root.append(button('device-finish-send','I’ve finished on the other device',()=>host.ensure(async()=>{const active=host.vault()!;const devices={...active.devices};delete devices.send;await host.save(active.entries,devices);base('Your original\npeople are kept.','The copy has been removed from this app. Your existing people are unchanged.');note('This does not delete a file already saved or shared. Each device works independently; changes do not sync automatically.');root.append(button('device-sender-done','Back to my people',host.home,'primary wide'))})))
-    note('You can switch apps and unlock Canary to continue this same copy. Only finish here after checking that the receiving device saved your people.')
+    note('You can switch apps and unlock Signet Vouch to continue this same copy. Only finish here after checking that the receiving device saved your people.')
   }
   function preview(file:string) {
     const active=host.vault(),receive=active?.devices?.receive

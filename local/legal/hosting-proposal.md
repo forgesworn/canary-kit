@@ -155,3 +155,17 @@ browser journey and actual offline shell reload passed (`mobile-hosting.json`,
 `mobile-live.json`). These later technical readbacks close the candidate
 publication gap mentioned above; the legal interpretation, physical-phone
 acceptance and independent-review limits remain. They are not a new law review.
+
+## Signet Vouch presentation candidate — unchanged hosting basis
+
+The 23 October 2026 source presentation candidate based on app commit
+`599058fa3c970467cb47122285592ffa7780fa88` uses Signet Vouch as the product
+label. The publisher remains Canary Kit (ForgeSworn), using the same public
+origin and established GitHub private privacy/report route. There is no Signet
+service/account integration, new hosting recipient or hosted content API.
+The already approved minimal hosting purpose/basis remains unchanged; no new
+controller identity, contact route, payment or owner decision is supplied here.
+Earlier publication receipts establish the earlier releases only. The candidate's
+served notice, app/manifest branding, exact public bytes and security headers
+need their own release readback. The law note's verified date and `[U]` scope
+limits are unchanged.

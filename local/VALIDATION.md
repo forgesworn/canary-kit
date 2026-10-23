@@ -316,3 +316,23 @@ source; a fresh mobile browser opened the device-copy flow without errors or
 overflow. Complete live transfer/mobile/offline regression remains the v7 run of
 identical functional code, explicitly named in the current receipt. The v7
 receipt is retained. No physical-device or independent-audit gate is upgraded.
+
+## Signet Vouch experience — 23 October 2026
+
+The candidate leads with private vouch actions, a group-scoped saved-person
+roster and dated signed-receipt cards. Issuer aliases use the existing private
+name field and do not grant keeper authority. Repeat checks still require a new
+signed challenge/response; open cards expire in place. No schema, wire profile,
+account/service integration, automatic platform binding or server route changed.
+The stable origin/vault and original publisher are retained.
+
+**745 tests / 33 files passed** with global/local TypeScript and standalone build.
+New tests cover active/expired/withdrawn/invalid signed summaries, group separation,
+known-person evidence and stale request/card hints. The private-vouch browser
+journey additionally checks an optional issuer alias without keeper authority,
+saved-person fresh re-vouching, open-card expiry and the withdrawn receipt badge.
+Existing local mobile setup/check/recovery/actual-offline and device-copy journeys
+passed. Screenshots use fixture names and dummy comparison words/codes.
+`SIGNET-VOUCH.md` describes the UI and preservation boundaries. Earlier publication
+receipts are historical; the following receipt names this release. Physical phone,
+real OS sharing and independent security/legal review remain separate gates.

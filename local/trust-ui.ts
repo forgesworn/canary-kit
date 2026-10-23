@@ -1,7 +1,8 @@
-import { newGroup, groupCard, describeGroup, joinGroup, keyCard, readKeyCard, issueVouch, receiveVouch, beginCheck, readChallenge, answerCheck, inspectProof, acceptProof, withdrawVouch, receiveWithdrawal, forgetVoucher, keyCode, publicKey, timeNow, type Group, type Transfer, type TrustState, type Signed, type Method, type Proof } from './trust.js'
+import { newGroup, groupCard, describeGroup, joinGroup, keyCard, readKeyCard, issueVouch, receiveVouch, beginCheck, readChallenge, answerCheck, inspectProof, acceptProof, withdrawVouch, receiveWithdrawal, forgetVoucher, keyCode, publicKey, timeNow, type Group, type Transfer, type TrustState, type Signed, type Method, type Proof, text } from './trust.js'
 import { packTransfer, unpackTransfer, sealTransfer, openTransfer, transferLink, transferToken } from './trust-wire.js'
 import { drawQr, QrScanner } from './qr.js'
 import type { Vault } from './vault.js'
+import { vouchSummary, knownPeople, exchangeHint, personName } from './vouch-view.js'
 
 interface Host {
   vault(): Vault | null
@@ -27,7 +28,7 @@ export function mountTrust(root: HTMLElement, host: Host) {
   function screen(title: string, lead: string, back: () => void = home) {
     stopScan(); host.show(); root.replaceChildren()
     const b = button('← Back', back); b.className = 'text-button back'; b.id = 'trust-back-group'
-    root.append(b, node('p', 'Private groups. Your choice.', 'eyebrow'), node('h1', title), node('p', lead, 'lead'))
+    root.append(b, node('p', 'Signet Vouch · private by choice', 'eyebrow'), node('h1', title), node('p', lead, 'lead'))
     return root
   }
   function input(parent: HTMLElement, label: string, id: string, max: number, value = '') {
@@ -45,7 +46,26 @@ export function mountTrust(root: HTMLElement, host: Host) {
     if (!state.groups.some(g => g.id === group.id) && state.groups.length >= 8) throw new Error('This phone already has eight private groups. Back up your data before removing records.')
     await host.save({ v: 1, groups: [...state.groups.filter(g => g.id !== group.id), group] })
   }
-  function name(group: Group, pubkey: string) { return group.trusted.find(p => p.pubkey === pubkey)?.label || group.people?.find(p => p.pubkey === pubkey)?.label || `Key ${keyCode(pubkey).split(' ').slice(0, 2).join(' ')}` }
+  function name(group: Group, pubkey: string) { return personName(group,pubkey) }
+  function journey(content:HTMLElement,step:number) {
+    const list=node('ol','','vouch-steps');list.setAttribute('aria-label','Vouch exchange progress')
+    for(const [i,label]of ['Compare codes','Fresh reply','Sign what happened','Keep the vouch'].entries()){const item=node('li',label);if(i+1===step)item.setAttribute('aria-current','step');list.append(item)}
+    content.append(list)
+  }
+  function receiptCard(group:Group,event:Signed) {
+    const info=vouchSummary(group,event,timeNow()),card=node('article','','vouch-receipt')
+    const label=info.state==='active'?'Current signed vouch':info.state==='expired'?'Expired vouch':info.state==='withdrawn'?'Withdrawn vouch':'Unusable signed claim'
+    card.dataset.vouchState=info.state;if(info.state==='active')card.dataset.expires=String(info.expires);card.append(node('span',label,'vouch-badge'),node('h2',`Vouched by ${info.label}`))
+    if(info.state!=='invalid')card.append(node('p',`${info.method} · recorded ${date(info.at)}`),node('p',`For ${group.name} · ${info.state==='expired'?'expired':'expires'} ${date(info.expires)}`,'small'))
+    card.append(node('p','A signed observation. The group keeper chooses whose vouches to accept.','small'));return card
+  }
+  function myVouches(group:Group) {
+    const content=screen('Your vouches.',`Private evidence for ${group.name}. Present a fresh key proof when the keeper asks.`,()=>groupView(getGroup(group.id)))
+    content.append(button('Show my verification QR',()=>host.ensure(async()=>outgoing(getGroup(group.id),{kind:'key',event:keyCard(getGroup(group.id))},'Show your verification code.')),'trust-my-vouch-qr',true))
+    if(!group.received.length)content.append(node('div','No vouches kept yet. Show your QR to someone who knows you. They check your key before signing a private vouch.','empty-card'))
+    for(const event of group.received)content.append(receiptCard(group,event))
+    content.append(node('p','This device knows only the withdrawals it has received. A current vouch is not a fresh identity or account check.','small'))
+  }
   async function outgoing(group: Group, transfer: Transfer, title = 'Let them scan this.') {
     const saved = { ...group, outgoing: transfer }
     await save(saved)
@@ -56,7 +76,9 @@ export function mountTrust(root: HTMLElement, host: Host) {
     const token = await packTransfer(transfer)
     if (stamp !== epoch || active !== host.vault() || document.hidden) return
     const payload = location.protocol === 'https:' ? transferLink(token, location.origin + location.pathname) : token
-    const content = screen(title, transfer.kind === 'group' ? 'This card shares the group name and keeper code. It does not admit anyone.' : transfer.kind === 'key' ? 'Show this to the person checking or vouching for you. It shares your group key, not your private key.' : 'This exchange is encrypted for the intended phone. They scan and open the link.', () => groupView(getGroup(group.id)))
+    const content = screen(title, transfer.kind === 'group' ? 'Send this group card first. Compare the keeper code together before keeping it.' : transfer.kind === 'key' ? 'Show or send this verification code to the person vouching for you. You both need the same group first.' : 'Send this private link in your chat, or let the other person scan. Then return here after their reply.', () => groupView(getGroup(group.id)))
+    if(group.pending&&field(group.pending,'purpose')==='vouch')journey(content,2)
+    else if(title.includes('vouch'))journey(content,4)
     const frame = node('div', '', 'qr-frame trust-qr'), canvas = node('canvas'); canvas.id = 'trust-qr'; canvas.setAttribute('aria-label', 'Private group exchange QR'); frame.append(canvas); content.append(frame)
     try { drawQr(canvas, payload, 'L') }
     catch { frame.hidden = true; content.append(node('p', 'This exchange is larger than a QR. Copy its encrypted link instead.', 'small notice')) }
@@ -64,34 +86,47 @@ export function mountTrust(root: HTMLElement, host: Host) {
     const l = node('label', 'Private exchange link'); l.htmlFor = 'trust-output'
     const output = node('textarea'); output.id = 'trust-output'; output.readOnly = true; output.value = payload; output.rows = 2; output.spellcheck = false
     content.append(l, output, button('Copy private link', () => { void navigator.clipboard?.writeText(payload).then(() => host.status('Copied. Share only with the intended person.')).catch(() => { output.select(); host.status('Select and copy the link above.') }) }))
-    if (navigator.share && location.protocol === 'https:') content.append(button('Share with the intended person', () => { void navigator.share({ title: 'Private Canary exchange', url: payload }).catch(() => {}) }))
+    if (navigator.share && location.protocol === 'https:') content.append(button('Share in our chat', () => { void navigator.share({ title: 'Private Signet Vouch exchange', url: payload }).catch(() => {}) },'',true))
     content.append(node('p', 'Your exchange is saved encrypted on this phone. If you leave the page, unlock this group and tap Continue exchange. Other apps and recipients can retain links you deliberately share.', 'small'))
   }
-  function home() {
-    const content = screen('Private groups.', 'Keep a small circle of trust. No account, public profile or relay.', host.home)
-    for (const group of host.vault()?.trust.groups ?? []) content.append(button(group.name, () => groupView(group)))
+  function home(intent:'groups'|'vouch'|'show'='groups') {
+    const groups=host.vault()?.trust.groups??[]
+    const content = screen(intent==='vouch'?'Vouch for someone.':intent==='show'?'Show your vouches.':'Your private groups.', groups.length?'Choose the group this vouch belongs to. People and trust choices stay private to each group.':'Start with a group you share: family, friends or a club. No account or public profile.', host.home)
+    for (const group of groups) {
+      content.append(button(group.name, () => intent==='show'?myVouches(group):groupView(group)))
+      content.append(node('p',`${knownPeople(group,timeNow()).length} saved people · ${group.received.length} signed ${group.received.length===1?'vouch':'vouches'} kept`,'small group-meta'))
+    }
+    content.append(button('I have a group or verification code',scanView,'trust-open-code',!groups.length))
+    const createDetails=node('details');createDetails.open=!groups.length;createDetails.append(node('summary','Start a private group'))
     const form = node('form'); form.id = 'trust-new-group-form'
     const groupName = input(form, 'A name for your group', 'trust-group-name', 40); groupName.required = true
     const create = node('button', 'Create a private group', 'primary wide'); create.id = 'trust-create-group'; create.type = 'submit'; form.append(create)
     form.addEventListener('submit', event => { event.preventDefault(); const value = groupName.value; host.ensure(async () => { const group = newGroup(value); await save(group); groupView(group) }) })
-    content.append(form, button('Open a group code or private exchange', scanView, 'trust-open-code'), node('p', 'A group keeper chooses whose vouches to accept. Vouches record someone’s judgement; they are not identity documents or safety guarantees. Each group uses separate keys.', 'small'))
+    createDetails.append(form);content.append(createDetails,node('p','A vouch records who checked a key, how and when. The keeper makes the group decision. Spoken words and messaging accounts need their own checks.','small'))
   }
   function groupView(group: Group) {
     const keeper = publicKey(group) === group.keeper
     const content = screen(group.name, keeper ? 'You keep this group. Choose whose vouches you accept.' : 'Your key and private vouches for this group stay in your encrypted vault.')
     const code = node('div', '', 'compare'); code.append(node('span', 'Keeper code'), node('strong', keyCode(group.keeper))); content.append(code)
     if (keeper) content.append(button('Share group card', () => host.ensure(async () => outgoing(group, { kind: 'group', event: groupCard(getGroup(group.id)) }, 'Share your group.')), 'trust-share-group'))
-    content.append(button('My verification QR', () => host.ensure(async () => outgoing(group, { kind: 'key', event: keyCard(getGroup(group.id)) }, 'Your group key.')), 'trust-my-key', true), button('Scan a person or private exchange', scanView, 'trust-open-code'))
-    if (group.outgoing) content.append(button('Continue exchange', () => host.ensure(async () => showOutgoing(getGroup(group.id), getGroup(group.id).outgoing!)), 'trust-resume'))
+    content.append(button('Vouch for someone · scan their code',scanView,'trust-open-code',true),button('Show my verification QR', () => host.ensure(async () => outgoing(group, { kind: 'key', event: keyCard(getGroup(group.id)) }, 'Your group key.')), 'trust-my-key'),button('Show my vouches',()=>myVouches(getGroup(group.id)),'trust-show-vouches'))
+    if (group.outgoing) {
+      content.append(node('p',exchangeHint(group,timeNow()),'small notice'))
+      content.append(button('Continue exchange', () => host.ensure(async () => {
+        const current=getGroup(group.id)
+        if(current.outgoing?.kind==='key'&&Number(field(current.outgoing.event,'expiration'))<=timeNow()){await outgoing(current,{kind:'key',event:keyCard(current)},'Your fresh verification code.');return}
+        if(current.pending&&Number(field(current.pending,'expiration'))<=timeNow()){personView(current,field(current.pending,'p'));host.status('The old request expired. Start a fresh check below.');return}
+        await showOutgoing(current,current.outgoing!)
+      }), 'trust-resume'))
+    }
     if (group.lastCheck) {
       const check = group.lastCheck
       const last = node('p', `Key proof checked ${date(check.at)}${check.issuer ? ` · vouch by ${name(group, check.issuer)}` : ' · voucher key'}.${check.account ? ` Context supplied by you: ${check.account}.` : ''} Historical check using this phone’s latest known state. It does not automatically admit or verify an account in another app.`, 'small notice'); last.id = 'trust-last-check'; content.append(last)
     }
-    for (const receipt of group.received) {
-      const card = node('div', '', 'trust-card')
-      const withdrawn = group.withdrawals.some(w => w.pubkey === receipt.pubkey && field(w, 'p') === publicKey(group) && w.created_at >= receipt.created_at)
-      card.append(node('strong', withdrawn ? 'Withdrawal received' : Number(field(receipt, 'expiration')) <= timeNow() ? 'Vouch expired' : 'Private vouch kept'), node('p', `${name(group, receipt.pubkey)} recorded ${field(receipt, 'method') === 'in-person' ? 'an in-person meeting' : 'an online check'} · until ${date(Number(field(receipt, 'expiration')))}. The keeper decides whether to accept it.`, 'small')); content.append(card)
-    }
+    const people=knownPeople(group,timeNow())
+    if(people.length){const roster=node('section','','vouch-roster');roster.append(node('h2','People saved for this group'))
+      for(const person of people){const card=button('',()=>personView(getGroup(group.id),person.pubkey));card.className='person-card vouch-person';card.dataset.personKey=person.pubkey
+        const text=node('span','','person-text'),hint=node('small',person.vouch?`Your vouch · ${person.vouch.state==='active'?'current':person.vouch.state}`:person.received?'Vouched for you':person.accepted?'Chosen voucher for this group':'Saved group key');if(person.vouch?.state==='active'){hint.dataset.expires=String(person.vouch.expires);hint.dataset.expiredText='Your vouch · expired'}text.append(node('strong',person.label),hint);card.append(text,node('span','↗'));roster.append(card)}content.append(roster)}
     if (keeper) {
       const accepted = node('details'), summary = node('summary', 'Whose vouches I accept'); accepted.append(summary)
       for (const person of group.trusted) {
@@ -151,26 +186,33 @@ export function mountTrust(root: HTMLElement, host: Host) {
     }), 'trust-keep-group', true), node('p', 'This keeps a new, independent verification key on this phone. It does not create a Nostr account or join a messaging group.', 'small'))
   }
   function personPreview(group: Group, request: Signed) {
-    readKeyCard(group, request)
-    const content = screen('A person, not a profile.', `This phone is presenting a key for ${group.name}. Compare their verification code with them before vouching.`)
-    const code = node('div', '', 'compare'); code.append(node('span', 'Their verification code'), node('strong', keyCode(request.pubkey))); content.append(code)
-    content.append(button('Check their key before vouching', () => host.ensure(async () => {
-      const current = getGroup(group.id), result = beginCheck(current, request.pubkey, 'vouch')
-      await outgoing(result.group, await sealTransfer(result.group, request.pubkey, { kind: 'challenge', event: result.event }), 'Ask for a fresh key check.')
-    }), 'trust-start-vouch', true))
-    if (publicKey(group) === group.keeper) {
-      const context = input(content, 'Account context for this check (optional, not platform verified)', 'trust-account-context', 100)
-      const begin = (purpose: 'member' | 'voucher') => host.ensure(async () => {
-        const result = beginCheck(getGroup(group.id), request.pubkey, purpose, context.value)
-        await outgoing(result.group, await sealTransfer(result.group, request.pubkey, { kind: 'challenge', event: result.event }), 'Ask for a fresh check.')
-      })
-      content.append(button('Check a private vouch', () => begin('member'), 'trust-check-member'), button('Check key before trusting a voucher', () => begin('voucher'), 'trust-check-voucher'))
-    }
+    readKeyCard(group,request)
+    personView(group,request.pubkey)
+  }
+  function personView(group:Group,subject:string) {
+    const label=name(group,subject),content=screen(label.startsWith('Key ')?'Check this person.':label,`A separate verification key for ${group.name}. Compare their code in person or on an already trusted call.`,()=>groupView(getGroup(group.id)))
+    journey(content,1)
+    const code=node('div','','compare');code.append(node('span','Their verification code'),node('strong',keyCode(subject)));content.append(code)
+    const context=input(content,'Account or call context (optional, your observation)','trust-account-context',100)
+    const begin=(purpose:'vouch'|'member'|'voucher')=>{const account=context.value;host.ensure(async()=>{
+      const current=getGroup(group.id)
+      if(current.pending&&Number(field(current.pending,'expiration'))>timeNow()&&!confirm('Replace the unfinished check? Replies to the old request will no longer be accepted.'))return
+      const result=beginCheck(current,subject,purpose,account)
+      await outgoing(result.group,await sealTransfer(result.group,subject,{kind:'challenge',event:result.event}),purpose==='vouch'?'Ask for a fresh key check.':'Ask for a fresh group check.')
+    })}
+    content.append(button('Check their key before vouching',()=>begin('vouch'),'trust-start-vouch',true))
+    if(publicKey(group)===group.keeper)content.append(button('Check their vouch for this group',()=>begin('member'),'trust-check-member'),button('Check before accepting their vouches',()=>begin('voucher'),'trust-check-voucher'))
+    const form=node('form'),alias=input(form,'Name on this device','trust-alias',40,group.people?.find(p=>p.pubkey===subject)?.label??'');alias.required=true
+    const saveName=node('button','Save this name','secondary wide');saveName.type='submit';form.append(saveName)
+    form.addEventListener('submit',event=>{event.preventDefault();const value=alias.value;host.ensure(async()=>{const current=getGroup(group.id),people=[...(current.people??[]).filter(p=>p.pubkey!==subject),{pubkey:subject,label:text(value,40)}];if(people.length>64)throw new Error('This group has reached its saved-name limit.');const next={...current,people};await save(next);personView(next,subject)})})
+    const details=node('details');details.append(node('summary','Save a name for next time'),form);content.append(details,node('p','This name is your private label. Saving it does not grant voucher authority, link a spoken pair or prove ownership of a messaging account.','small'))
+    const issued=group.issued.find(e=>field(e,'p')===subject);if(issued)content.append(receiptCard(group,issued))
   }
   function vouchPreview(group: Group, proof: Proof) {
     inspectProof(group, proof)
     const content = screen('What can you vouch for?', 'The fresh key proof matches. Only sign the meeting or trusted call that actually happened.')
-    const form = node('form'), label = input(form, 'Name on this phone (optional)', 'trust-person-label', 40)
+    journey(content,3)
+    const form = node('form'), label = input(form, 'Name on this device (optional)', 'trust-person-label', 40,group.people?.find(p=>p.pubkey===proof.event.pubkey)?.label??'')
     const methodLabel = node('label', 'How did you check this person?'); methodLabel.htmlFor = 'trust-method'
     const method = node('select'); method.id = 'trust-method'; method.required = true
     for (const [value, caption] of [['', 'Choose what actually happened'], ['in-person', 'We met in person'], ['online', 'We checked through a trusted live call']]) { const option = node('option', caption); option.value = value; method.append(option) }
@@ -196,7 +238,14 @@ export function mountTrust(root: HTMLElement, host: Host) {
     if (data.kind === 'vouch') {
       receiveVouch(group, data.event)
       const content = screen('A private vouch.', `${name(group, data.event.pubkey)} recorded ${field(data.event, 'method') === 'in-person' ? 'an in-person meeting' : 'an online check'} for ${group.name}. Valid until ${date(Number(field(data.event, 'expiration')))}. Your keeper decides which vouchers to accept.`)
-      content.append(button('Keep this private vouch', () => host.ensure(async () => { const next = receiveVouch(getGroup(group.id), data.event); await save(next); groupView(next) }), 'trust-keep-vouch', true))
+      journey(content,4)
+      content.append(receiptCard(group,data.event))
+      const issuerName=input(content,'Who vouched for you? Name on this device (optional)','trust-issuer-name',40,group.people?.find(p=>p.pubkey===data.event.pubkey)?.label??'')
+      content.append(button('Keep this private vouch', () => {const label=issuerName.value;host.ensure(async () => {
+        let next=receiveVouch(getGroup(group.id),data.event)
+        if(label.trim()){const people=[...(next.people??[]).filter(p=>p.pubkey!==data.event.pubkey),{pubkey:data.event.pubkey,label:text(label,40)}];if(people.length>64)throw new Error('This group has reached its saved-name limit.');next={...next,people}}
+        await save(next);groupView(next)
+      })}, 'trust-keep-vouch', true),node('p','A name helps you recognise this key. It does not make its vouches accepted by the keeper.','small'))
     } else if (data.kind === 'withdrawal') {
       receiveWithdrawal(group, data.event)
       const content = screen('A vouch was withdrawn.', 'Keep the signed withdrawal so future checks on this phone use that update. Other phones need to receive it separately.')
@@ -208,7 +257,7 @@ export function mountTrust(root: HTMLElement, host: Host) {
       if (challenge.content) content.append(node('p', 'Keeper-supplied account context: ' + challenge.content, 'notice'))
       content.append(button('Respond to this check', () => host.ensure(async () => {
         const current = getGroup(group.id), proof = answerCheck(current, challenge)
-        await outgoing(current, await sealTransfer(current, challenge.pubkey, proof), 'Return this to the keeper.')
+        await outgoing(current, await sealTransfer(current, challenge.pubkey, proof), 'Return this to the person checking you.')
       }), 'trust-answer-check', true), node('p', 'This proves control of this group key. It does not independently prove control of a WhatsApp, Telegram or other messaging account.', 'small'))
     } else {
       const result = inspectProof(group, data)
@@ -235,5 +284,12 @@ export function mountTrust(root: HTMLElement, host: Host) {
       else host.ensure(async () => process(transfer))
     })().catch(e => { if (stamp === epoch) host.error(e instanceof Error ? e.message : 'This private code could not be opened.') })
   }
-  return { home, receive, stopScan, clear() { epoch++; stopScan(); root.replaceChildren() } }
+  return { home, receive, stopScan, tick() {
+    if(root.hidden||document.hidden||!host.vault())return
+    for(const element of root.querySelectorAll<HTMLElement>('[data-expires]'))if(Number(element.dataset.expires)<=timeNow()){
+      delete element.dataset.expires
+      if(element.classList.contains('vouch-receipt')){element.dataset.vouchState='expired';element.querySelector('.vouch-badge')!.textContent='Expired vouch'}
+      else if(element.dataset.expiredText)element.textContent=element.dataset.expiredText
+    }
+  }, clear() { epoch++; stopScan(); root.replaceChildren() } }
 }

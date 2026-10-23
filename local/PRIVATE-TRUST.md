@@ -47,7 +47,7 @@ its own signer as its subject.
 Group keys, names, selected vouchers, local aliases, issued/received vouches,
 withdrawals, pending challenges and the latest outgoing transfer are in the
 existing AES-GCM encrypted vault. The outer vault format remains version 1;
-the decrypted payload is version 2. Legacy decrypted arrays remain readable.
+the decrypted payload is version 4. Legacy arrays and version 2/3 payloads remain readable.
 Saving/renaming contacts preserves group state. Portable encrypted backups carry
 the group keys and pending exchanges; device-only vaults still need a recovery
 passphrase before export. Existing backups are not silently retrofitted.
@@ -104,3 +104,25 @@ bounded decompression and encrypted transfer. Vault tests cover old arrays,
 contact notes, group-key preservation and portable recovery. Browser evidence
 uses three isolated contexts and actual QR decoding; it is not a physical
 iPhone/GrapheneOS acceptance test or an independent security audit.
+
+## Signet Vouch experience
+
+The same local app now presents Signet Vouch as its product name, retaining the
+original origin, vault key, manifests, protocol identifiers and publisher. No
+Signet login, account adapter or relay was added. The header and app icons reuse
+the ForgeSworn Signet mark under its bundled MIT licence.
+
+Front-page actions lead to vouching, showing private vouches and spoken setup.
+Unlocked people keep a direct spoken-check path with a separate Vouches & groups
+entry. Group rosters combine saved group keys, aliases, issued/received claims
+and the last checked key. They are local evidence lists, not live membership.
+Saving an alias never grants authority or links a spoken pair or platform account.
+
+Receipt cards show issuer label, method, recorded date, expiry and the current/
+expired/withdrawn state known on this device. Open current cards change to expired
+at their deadline. Withdrawals are only those received locally. Historical key
+checks remain labelled historical. A known person can be checked again without
+rescanning a holder card, but the existing fresh challenge/response is required
+before issuing a vouch; replacing an active unfinished request asks explicitly.
+Expired verification cards are regenerated on Continue; expired pending requests
+lead to a new check, never acceptance of the old proof.

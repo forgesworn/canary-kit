@@ -185,3 +185,29 @@ This review checks model/UI integration and factual document gaps. It does not
 establish physical phone/real AirDrop acceptance, passkey or camera support,
 a security audit, independent legal review or blanket legal clearance. Earlier
 public readbacks do not verify this working-tree candidate.
+
+## Signet Vouch presentation delta — source candidate
+
+The 23 October 2026 working tree based on app commit
+`599058fa3c970467cb47122285592ffa7780fa88` adds a product-facing Signet Vouch
+name, local receipt/people presentation and private alias editing. The evidence
+is `local/vouch-view.ts`, `vouchSummary`, `knownPeople`, `exchangeHint`, and
+`local/trust-ui.ts`, `myVouches`, `personView`, `groupView`. The roster is
+locally saved group-key evidence; keeper authority still requires the existing
+explicit proof/acceptance flow. No platform account, automatic membership,
+public directory or global revocation service is introduced.
+
+This retains the chosen static-software publisher assessment under GB note
+§2.2 `[U]`, local processing/storage explanation under §§3.1–3.2 and 4, and
+the existing host metadata assessment. The product name does not establish a
+new controller or connect to a Signet account service. The Canary Kit
+(ForgeSworn) publisher, origin, approved hosting purpose/basis and privacy
+contact remain the same. No new deadline, payment, registration, age or public
+identity decision is inferred from this presentation change. The note remains
+verified 28 September 2026, review by 28 March 2027, with the recorded
+23 October partial refresh; the provider/software watch-list uncertainty and
+prior legal, physical-device and independent-review limits remain.
+
+A source review does not establish deployed bytes, notices, headers, host
+behaviour or phone usability. Those release and acceptance gates must be
+recorded separately; Sites version 8 readbacks concern the earlier release.

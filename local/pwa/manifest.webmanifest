@@ -1,6 +1,6 @@
 {
-  "id": "/", "name": "Canary · your people", "short_name": "Canary",
-  "description": "A private spoken check for the people you know.",
+  "id": "/", "name": "Signet Vouch · your people", "short_name": "Vouch",
+  "description": "Private vouches and spoken checks for your people.",
   "start_url": "/", "scope": "/", "display": "standalone",
   "background_color": "#f6f4ec", "theme_color": "#f6f4ec",
   "icons": [

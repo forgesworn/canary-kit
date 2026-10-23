@@ -106,3 +106,21 @@ Final version 8 clarifies the receiving-device sentence (“encrypted for”, ra
 than promising physical hardware exclusivity). Technical behaviour is unchanged;
 its exact public readback and fresh mobile flow passed. The receipt explicitly
 labels v7 as the complete functional regression run and retains the v7 record.
+
+## Signet Vouch presentation candidate — 23 October 2026
+
+The current working tree based on app commit
+`599058fa3c970467cb47122285592ffa7780fa88` presents the local group-vouch
+feature as Signet Vouch. This product label does not replace the Canary Kit
+(ForgeSworn) publisher or its existing GitHub privacy contact, move the origin,
+or add a Signet account/service adapter. The existing minimal hosting basis
+and static-software publisher assessment `[U]` are retained.
+
+The bounded source gap check in `inventory.md` covers dated receipt status,
+group-scoped saved people, explicit private label editing and fresh-check
+navigation. `privacy.md` explains their local meaning and storage. Earlier
+Sites version 8 evidence is historical and does not verify this presentation
+candidate. Source/build/browser checks, exact public release readback, physical
+phone acceptance and independent review remain separate gates. This is a
+factual delta against the law note verified 28 September 2026, with the recorded
+23 October partial refresh; it is not a fresh law review or blanket clearance.

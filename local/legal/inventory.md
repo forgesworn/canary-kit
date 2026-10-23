@@ -188,3 +188,39 @@ contact or paid action was performed. Foreign law, provider-internal processing,
 independent legal/security review and physical phone/real AirDrop remain unchecked.
 The in-date GB note (verified 28 September 2026; review 28 March 2027, partial
 23 October refresh already recorded) was used without re-researching its claims.
+
+## Signet Vouch UX gap check — source candidate, 23 October 2026
+
+Scope: working tree based on app commit
+`599058fa3c970467cb47122285592ffa7780fa88`; `local/` and its existing bundled
+dependencies. The inventory helper was rerun; its wider networked `app/`, old
+generated app and recording/tool matches are outside this entry point. New
+untracked `local/vouch-view.ts` was reviewed directly. Key-holder answer:
+only the unlocked user browser holds the local vault/group keys; this delta
+adds no operator content-key holder.
+
+| Gap or claim tested | Code evidence | Note section | Resolution / who decides |
+|---|---|---|---|
+| Saved people might imply current membership or verified identity. | `vouch-view.ts`, `knownPeople`, `personName`; `trust-ui.ts`, `groupView`, `personView`. | §§2.2, 3.1–3.2 | Describe locally saved group keys, aliases and historical evidence, without membership/account/identity guarantees. |
+| Editing a friendly name might imply authority or a new profile store. | `trust-ui.ts`, `personView`; existing `trust.ts`, `Group.people`, `readTrust`. | §§3.2, 4 | Explicit local alias edit uses the existing encrypted field; it does not accept voucher authority or link spoken pairs. |
+| A current receipt badge might imply fresh identity or universal withdrawal status. | `vouch-view.ts`, `vouchSummary`; `trust-ui.ts`, `receiptCard`, `myVouches`; existing `trust.ts`, `inspectProof`. | §§2.2, 3.2 | Show signed method/date/expiry and received withdrawals only. Fresh protocol checks and keeper decisions remain separate. |
+| Continuing an expired exchange might imply old evidence was renewed. | `vouch-view.ts`, `exchangeHint`; `trust-ui.ts`, `groupView`, `personView`. | §3.2 | Expired public verification cards are refreshed; expired pending checks return to a fresh-check action. This does not renew a vouch. |
+| Signet Vouch branding might imply a new operator or Signet account integration. | `index.html`, title/brand and hosting privacy; `pwa/manifest.webmanifest`; `trust-ui.ts`, `screen`; existing `trust.ts`, `Group`; `trust-wire.ts`, `sealTransfer`, `openTransfer`. | §§2.2, 3.2 | Product label only; retain Canary Kit (ForgeSworn), same origin/contact/adopted hosting basis. No account adapter or new recipient is added. |
+
+No protocol, vault schema, master key, credential or crypto change is introduced
+by the reviewed presentation/alias delta. Existing user-chosen sharing
+recipients, local storage and recovery limits still apply. The static-publisher
+interpretation remains `[U]`; no blanket UK-law conclusion follows. Law note:
+verified 28 September 2026, review by 28 March 2027, with the recorded
+23 October partial IPA/telecom refresh. Watch-list items were read and no new
+law research or shared-note date change was required by this bounded delta.
+
+No new fee or deadline was identified for this delta. Controller-wide ICO fee
+status remains outside this inventory; the note's tier-1 figure, if applicable,
+is £52/year (£5 less by direct debit), not a new task payment. No owner
+decision, regulator contact or publication was made in this review. Current
+source/build/browser validation, public-byte/header/notice readback and physical
+phone acceptance must be evidenced separately. Earlier version 8 evidence
+does not verify this candidate. Independent legal/security review, host-internal
+retention/region, other platforms and individual users' processing remain outside
+this check.

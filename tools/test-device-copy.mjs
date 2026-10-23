@@ -35,7 +35,7 @@ try {
   }
   async function person(page,name) {
     if(await page.locator('#people').isVisible())await page.locator('#add-person').click()
-    await page.locator('#create').click()
+    await page.locator('#welcome-spoken-check').click();await page.locator('#create').click()
     if(await page.locator('#vault-create').isVisible()){await page.locator('#new-password').fill(password);await page.locator('#confirm-password').fill(password);await page.locator('#create-submit').click()}
     await visible(page,'#pair-setup');await page.locator('#finish-exchange').click();await page.locator('#quick-name').fill(name);await page.locator('#confirm-pair').click();await page.locator('.home').filter({visible:true}).click();await visible(page,'#people')
   }

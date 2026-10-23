@@ -46,7 +46,7 @@ Install first or use an encrypted backup to migrate.
 - Pending remote exchange private keys, invitations, labels, pending encrypted
   replies, pair seeds and recovery data live inside the same encrypted vault.
   Incoming private QR pairs remain transient until explicitly kept. New saves use
-  encrypted payload version 3: original arrays and version 2 are read and upgraded;
+  encrypted payload version 4: original arrays and versions 2/3 are read and upgraded;
   older app builds refuse the new payload rather than dropping pending state. Background
   locking clears the displayed QR, words, names, transfer fields and in-memory
   vault; saved exchanges can be resumed after unlock.

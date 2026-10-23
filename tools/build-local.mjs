@@ -18,6 +18,7 @@ const csp = `default-src 'none'; script-src ${scriptHashes.join(' ')}; style-src
 html = html.replace('<!-- LOCAL_CSP -->', `<meta http-equiv="Content-Security-Policy" content="${csp}">`)
 const thirdParty = [
   ['Canary Kit', 'LICENSE'],
+  ['Signet mark and app icons (ForgeSworn)', 'local/pwa/SIGNET-LICENSE'],
   ['Spoken Token', 'node_modules/spoken-token/LICENSE'],
   ['Scure BIP39', 'node_modules/@scure/bip39/LICENSE'],
   ['Scure Base', 'node_modules/@scure/base/LICENSE'],
