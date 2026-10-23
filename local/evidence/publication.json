@@ -1,0 +1,17 @@
+{
+  "verified_at": "2026-10-23T00:14:47.212Z",
+  "site_id": "appgprj_6adaa25043c48191a67ab6aa68ffff29",
+  "url": "https://canary-words.cocoacod256.chatgpt.site",
+  "version_id": "appgprj_6adaa25043c48191a67ab6aa68ffff29~appgver_416d3c29e37c8191bf1e2b13ec3f29eb",
+  "source_commit": "393c4750c688613d18cd78cc3cc307363bb2b170",
+  "deployment_id": "appgdep_6adaa6d56e9c8191ae870a2da10767c8",
+  "status": "succeeded",
+  "audience": "public",
+  "source_checkout": "../canary-words-site",
+  "artifact_sha256": "13c82ad849bf9dd0c6e0b8ed05a4d3bb945a4cbb5eff98a77352bb03d7525ec6",
+  "delivery": "Worker ESM serves a baked page with security headers; no app API or remote vault",
+  "readback": "hosting.json",
+  "browser": "live-browser.json",
+  "superseded_failed_readback": "hosting-v1.json",
+  "physical_phone_acceptance": false
+}

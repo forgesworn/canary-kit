@@ -39,7 +39,7 @@ html = html.replace('</body>', `<!--\nBundled software notices\n${noticeText}\n-
 await writeFile(resolve(root, 'canary-local.html'), html)
 await mkdir(resolve(root, 'local-site'), { recursive: true })
 await writeFile(resolve(root, 'local-site/index.html'), html)
-await writeFile(resolve(root, 'local-site/_headers'), `/*\n  Content-Security-Policy: ${csp}; frame-ancestors 'none'\n  Referrer-Policy: no-referrer\n  X-Content-Type-Options: nosniff\n  Strict-Transport-Security: max-age=31536000\n  Permissions-Policy: camera=(self), microphone=(), geolocation=()\n  Cache-Control: no-cache\n`)
+await writeFile(resolve(root, 'local-site/_headers'), `/*\n  Content-Security-Policy: ${csp}; frame-ancestors 'none'\n  Referrer-Policy: no-referrer\n  X-Content-Type-Options: nosniff\n  Strict-Transport-Security: max-age=31536000\n  Permissions-Policy: camera=(self), microphone=(), geolocation=()\n  Cache-Control: no-cache, no-transform, must-revalidate\n`)
 await rm(resolve(root, 'dist-local'), { recursive: true })
 console.log(`canary-local.html ready (${Buffer.byteLength(html).toLocaleString()} bytes). Open it directly; no server needed.`)
 console.log('local-site/ contains the static HTTPS deployment candidate; no runtime server or secrets are bundled.')

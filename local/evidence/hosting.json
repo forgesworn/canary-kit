@@ -1,0 +1,18 @@
+{
+  "url": "https://canary-words.cocoacod256.chatgpt.site/",
+  "sha256": "13c82ad849bf9dd0c6e0b8ed05a4d3bb945a4cbb5eff98a77352bb03d7525ec6",
+  "bytes": 264969,
+  "matches_local_artifact": true,
+  "security_headers": {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-cache, no-transform, must-revalidate",
+    "strict-transport-security": "max-age=31536000",
+    "content-security-policy": "default-src 'none'; script-src 'sha256-+ywYemamRHx54j38n0HpiH6Hdll5NcvQCOwQ7yqm6oU=' 'sha256-bFHuUiGKp2/WxWaqZRGVsp8OLQksUkn1XJMXNffe/OM='; style-src 'sha256-Au/k1iALPt3RhpxO8i+EiVVHal5gprQUWPXlSJ1tFlo='; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "permissions-policy": "camera=(self), microphone=(), geolocation=()",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff"
+  },
+  "set_cookie_names": [
+    "__cf_bm"
+  ]
+}

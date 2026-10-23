@@ -1,0 +1,30 @@
+{
+  "url": "https://canary-words.cocoacod256.chatgpt.site/",
+  "verified": "2026-10-23T00:14:47.212Z",
+  "unauthenticated": true,
+  "secureContext": true,
+  "normalCameraLinkOpenedInFreshBrowser": true,
+  "matchedWords": true,
+  "fragmentRemoved": true,
+  "noSecretInRequests": true,
+  "noPairPersistedBeforeKeep": true,
+  "browserErrors": [],
+  "cookies": [
+    {
+      "name": "__cf_bm",
+      "domain": ".chatgpt.site",
+      "secure": true,
+      "sameSite": "None"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    }
+  ]
+}
