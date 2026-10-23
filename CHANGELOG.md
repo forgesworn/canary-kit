@@ -1,3 +1,26 @@
+## 2.12.0 (2026-10-23)
+
+### Features
+
+- simplify call checks and add encrypted moving QR transfers
+- add offline native Vouch prototype and device unlock
+- add fully offline optical Connect with resumable commitments
+- simplify in-person checks and bind holder-approved vouch names
+- make Signet Vouch a people-first private trust experience
+- copy saved people securely between local devices
+- make mobile checks installable and pairing resumable
+- add private group vouches without accounts or relays
+- add mobile pairing and an encrypted local vault
+- add a simple offline pair verification tool
+
+### Bug Fixes
+
+- clarify encrypted device copy wording and retain live checks
+- separate mobile setup links and record deployment checks
+- separate pair setup from word refresh and let either phone resume
+
+
+
 ## [2.7.2](https://github.com/forgesworn/canary-kit/compare/v2.7.1...v2.7.2) (2026-04-12)
 
 
