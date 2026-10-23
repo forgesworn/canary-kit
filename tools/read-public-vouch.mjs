@@ -3,6 +3,10 @@ import {readFile,writeFile} from 'node:fs/promises'
 import {createHash} from 'node:crypto'
 import {chromium} from 'playwright'
 const url=process.env.CANARY_PUBLIC_URL||'https://canary-words.cocoacod256.chatgpt.site/'
+const version=Number(process.env.CANARY_PUBLIC_VERSION)
+assert.ok(Number.isSafeInteger(version)&&version>0,'Set CANARY_PUBLIC_VERSION to the deployed Sites version.')
+const publicUrl=new URL(url)
+assert.ok(publicUrl.protocol==='https:'&&!publicUrl.username&&!publicUrl.password&&!publicUrl.search&&!publicUrl.hash,'Anonymous public readback needs a plain HTTPS URL without credentials or access parameters.')
 const browser=await chromium.launch({headless:true,executablePath:process.env.CANARY_CHROMIUM_EXECUTABLE})
 try{
  const context=await browser.newContext({serviceWorkers:'block'}),page=await context.newPage()
@@ -24,6 +28,6 @@ try{
   }
   records.push({file:name,sha256:createHash('sha256').update(data).digest('hex'),matches:true})
  }
- await writeFile('local/evidence/v12-public-readback.json',JSON.stringify({verified:new Date().toISOString(),url,version:12,exactPublicFiles:records,securityHeaders:true,anonymousBrowser:true,noBypassToken:true,noPrivatePayloadInRequest:true},null,2)+'\n')
+ await writeFile(`local/evidence/v${version}-public-readback.json`,JSON.stringify({verified:new Date().toISOString(),url,version,exactPublicFiles:records,securityHeaders:true,anonymousBrowser:true,noBypassToken:true,noPrivatePayloadInRequest:true},null,2)+'\n')
  console.log('Six public files match byte-for-byte through an anonymous browser; restrictive security headers verified.')
 }finally{await browser.close()}
