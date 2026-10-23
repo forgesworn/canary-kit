@@ -1,5 +1,5 @@
 {
-  "verified": "2026-10-23T11:01:19.412Z",
+  "verified": "2026-10-23T12:32:14.603Z",
   "url": "https://canary-words.cocoacod256.chatgpt.site/",
   "exactPublicAssets": true,
   "noTransform": true,
@@ -7,8 +7,8 @@
   "assets": [
     {
       "path": "/",
-      "bytes": 437035,
-      "sha256": "b3e82fcded84ce8e02b2d698e3abffca5318afeb0814de9f86ec10fb09bf55f4",
+      "bytes": 452285,
+      "sha256": "cd92d2168c140a7507edaab79769f177d3614a5115d595492456bd0e6eaefc4d",
       "type": "text/html; charset=utf-8",
       "cookies": [
         "__cf_bm"
@@ -17,7 +17,7 @@
     {
       "path": "/sw.js",
       "bytes": 1712,
-      "sha256": "af454ddf823737d11a8247345f520634ae8f82012c03edc448e1428d39220f7f",
+      "sha256": "c393874cb793a2d039fd4c4160cddbdb809c29be9e6c6055c0884512830cc892",
       "type": "application/javascript; charset=utf-8",
       "cookies": [
         "__cf_bm"
@@ -25,8 +25,8 @@
     },
     {
       "path": "/manifest.webmanifest",
-      "bytes": 467,
-      "sha256": "32a9cf76a52b5cf0184364322b3f3f1c4a3cb24b00ce8aa76ec343a122ce779c",
+      "bytes": 475,
+      "sha256": "5ad0db5b735bca4e54db8d54379d4bf01d12acadd4ba4e185063bfaeef97a538",
       "type": "application/manifest+json",
       "cookies": [
         "__cf_bm"
@@ -34,8 +34,8 @@
     },
     {
       "path": "/icon-192.png",
-      "bytes": 2769,
-      "sha256": "f567a9d8301fdb2c3d1873a190b161806fd634363e5519d373cc45689f2c901e",
+      "bytes": 10106,
+      "sha256": "423cf41a5509eb9091e6d1a2cd465767f92d3c77de8cebb377c445f957518e58",
       "type": "image/png",
       "cookies": [
         "__cf_bm"
@@ -43,8 +43,8 @@
     },
     {
       "path": "/icon-512.png",
-      "bytes": 7937,
-      "sha256": "17eab3c44e22fbec4e550b8167db7fcd8effbdaa1549674380632061fd141603",
+      "bytes": 24766,
+      "sha256": "5d517859af32d9b53f6f7449b435cdfd2034087a1c68722a346bfbee429cacf0",
       "type": "image/png",
       "cookies": [
         "__cf_bm"
@@ -52,8 +52,8 @@
     },
     {
       "path": "/apple-touch-icon.png",
-      "bytes": 2576,
-      "sha256": "bcd9200de90f2cbfd88f094ee35d9e75a149251176f3c4aede6c888295e89a69",
+      "bytes": 9425,
+      "sha256": "b370b491c5608c50f24b914a911fc295356a67656d0474e8f839999f2cd3e8f2",
       "type": "image/png",
       "cookies": [
         "__cf_bm"

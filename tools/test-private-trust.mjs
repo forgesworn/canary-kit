@@ -11,7 +11,7 @@ const decodedSizes = new Map()
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CANARY_CHROMIUM_EXECUTABLE })
 try {
   async function phone() {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' }); contexts.push(context)
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: live ? 'allow' : 'block' }); contexts.push(context)
     if (!live) await context.route(address + '**', async route => {
       const path = new URL(route.request().url()).pathname.slice(1) || 'index.html'
       const contentType = path.endsWith('.webmanifest') ? 'application/manifest+json' : path.endsWith('.png') ? 'image/png' : path.endsWith('.js') ? 'application/javascript' : 'text/html'

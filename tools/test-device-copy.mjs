@@ -11,7 +11,7 @@ const browser=await chromium.launch({headless:true,executablePath:process.env.CA
 const password='test-only desktop copper orchard lantern'
 try {
   async function device({desktop=false,prf=true}={}) {
-    const context=await browser.newContext({viewport:desktop?{width:1100,height:900}:{width:390,height:844},acceptDownloads:true,serviceWorkers:'block'});contexts.push(context)
+    const context=await browser.newContext({viewport:desktop?{width:1100,height:900}:{width:390,height:844},acceptDownloads:true,serviceWorkers:live?'allow':'block'});contexts.push(context)
     if(!live)await context.route(address+'**',async route=>{
       const file=new URL(route.request().url()).pathname.slice(1)||'index.html'
       await route.fulfill({contentType:file.endsWith('.webmanifest')?'application/manifest+json':file.endsWith('.js')?'application/javascript':file.endsWith('.png')?'image/png':'text/html',body:await readFile(join(root,'local-site',file))})

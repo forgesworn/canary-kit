@@ -124,3 +124,12 @@ candidate. Source/build/browser checks, exact public release readback, physical
 phone acceptance and independent review remain separate gates. This is a
 factual delta against the law note verified 28 September 2026, with the recorded
 23 October partial refresh; it is not a fresh law review or blanket clearance.
+
+The Signet Vouch candidate was published as Sites version 9 on the same origin.
+The product title/mark changed; publisher, contact, hosting purpose/basis and
+local protocol identities did not. The new public privacy text covers private
+aliases, locally derived roster/status and separate spoken secrets, and expressly
+states that no Signet service/account adapter is connected. Exact public-file,
+live vouch/mobile/offline/device-copy and old-artifact upgrade checks passed;
+see `../evidence/publication.json` and its linked reports. These close the release
+readback/notice gate, not physical-phone, independent review or [U] legal scope.

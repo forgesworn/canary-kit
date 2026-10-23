@@ -1,5 +1,10 @@
 {
-  "verified": "2026-10-23T10:16:49.498Z",
+  "vouchUx": true,
+  "savedPersonRequiresFreshProof": true,
+  "openCardExpiryUpdates": true,
+  "withdrawalBadge": true,
+  "privateIssuerAliasDoesNotGrantKeeperAuthority": true,
+  "verified": "2026-10-23T12:33:05.044Z",
   "live": true,
   "independentGroupKeys": true,
   "encryptedVouchRoundTrip": true,

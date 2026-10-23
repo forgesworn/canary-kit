@@ -336,3 +336,30 @@ passed. Screenshots use fixture names and dummy comparison words/codes.
 `SIGNET-VOUCH.md` describes the UI and preservation boundaries. Earlier publication
 receipts are historical; the following receipt names this release. Physical phone,
 real OS sharing and independent security/legal review remain separate gates.
+
+### Signet Vouch publication and compatibility
+
+Site version **9** deployed successfully from website source
+`4ed9707c80b1b6b0b64e96fdb997609d3e2e1f4f`, app implementation
+`7331707346a7251d1c81857fda8e229f101f4cbf`. The display title is Signet Vouch; the
+existing public origin, publisher, storage key, PWA ID and protocols are retained.
+Current receipts/hashes are in `evidence/publication.json`; v8 is retained.
+
+All six public files matched the pushed source byte for byte with expected types
+and security headers. The live private-vouch, mobile/offline and device-copy
+journeys passed (`private-trust-live.json`, `mobile-live.json`,
+`device-copy-live.json`). The vouch journey includes named issuer/no automatic
+keeper authority, saved-person fresh re-vouch, live expiry badge, replay refusal,
+withdrawal and QR decoding. Test providers remain stubs, not physical acceptance.
+
+`tools/test-vouch-upgrade.mjs` starts the previous committed app (`599058f`) in an
+isolated browser, creates a person and group, then loads the new app at the same
+fixture origin. Existing words, keeper fingerprint and the entire encrypted
+record/credential slots remained byte-for-byte unchanged after unlock and read.
+See `evidence/vouch-upgrade.json`. This is a real old-artifact compatibility check
+with a PRF stub, not an owner's live vault or a physical passkey test.
+
+The deployed URL was opened in Google Chrome. Task preview server, automation
+browsers, scratch archive and installed dependencies were cleaned up afterwards.
+Close existing app windows and reopen to activate a downloaded PWA update; the
+app does not force a refresh during a call or unfinished setup.
