@@ -162,3 +162,26 @@ browser journey and actual offline shell reload passed (`mobile-hosting.json`,
 `mobile-live.json`). These later technical readbacks close the candidate
 publication gap mentioned above; the legal interpretation, physical-phone
 acceptance and independent-review limits remain. They are not a new law review.
+
+## Encrypted device-copy candidate
+
+The reviewed model adds local encryption/decryption of an explicitly transferred
+file (`local/device-transfer.ts`), not a publisher content transport or store.
+The intended transfer uses the user's chosen OS/file/chat facilities. Accordingly
+the selected static software-publisher assessment remains unchanged under
+GB note §2.2 [U]; the adopted minimal hosting purpose/basis and controller/contact
+are retained. Encryption alone does not settle provider classification. A future
+relay, upload/download service, automatic cloud transfer or shared content store
+would require reassessment.
+
+The law note remains verified 28 September 2026, review by 28 March 2027, with
+the documented partial 23 October IPA/telecom refresh. Its watch list was read;
+this bounded local file-copy delta does not resolve those [U] questions or add
+a new identified OSA assessment deadline or service fee. Controller-wide ICO
+fee status remains unverified (tier 1 if due: £52/year, £5 direct-debit discount).
+No registration, payment, contact or new legal-basis decision was made.
+
+This review checks model/UI integration and factual document gaps. It does not
+establish physical phone/real AirDrop acceptance, passkey or camera support,
+a security audit, independent legal review or blanket legal clearance. Earlier
+public readbacks do not verify this working-tree candidate.

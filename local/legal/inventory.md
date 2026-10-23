@@ -163,3 +163,28 @@ browser journey and actual offline shell reload passed (`mobile-hosting.json`,
 `mobile-live.json`). These later technical readbacks close the candidate
 publication gap mentioned above; the legal interpretation, physical-phone
 acceptance and independent-review limits remain. They are not a new law review.
+
+## Encrypted device-copy gap check — working-tree model
+
+Reviewed 23 October 2026. The repository-wide inventory helper was rerun;
+networked `app/`, generated artifacts and narration tools are outside `local/`
+entry-point scope. Untracked `device-transfer.ts` and `entries.ts` were read
+directly. Key-holder answer: the unlocked user devices hold pair secrets and
+ephemeral receive/decryption keys; the fixed public host receives no such key
+through this model. No new network call or publisher content endpoint appears
+in the device-copy model.
+
+| Gap | Evidence | Note section | Resolution / who decides |
+|---|---|---|---|
+| Existing notice omits a second-device file recipient and its public metadata. | `local/device-transfer.ts:15`, `:47`, `:115`. | §3.2 | Added encrypted-file and public request/key/timing/size facts; final UI and published notice alignment remain release checks. |
+| Vault storage/recovery explanation omits pending receive keys and outgoing files. | `local/vault.ts:84`, `:125`; `local/device-transfer.ts:83`. | §§3.2, 4 | Added encrypted v4 state/backups, limits, expiry versus deletion and backup-restoration replay limits. |
+| Copy could be mistaken for moving an entire vault or revoking old copies. | `local/device-transfer.ts:41`, `:103`; `local/entries.ts:4`. | §3.2 | People-only scope; preserve source and destination entries, deduplicate secrets, remap IDs; exclude unfinished setups and group/credential/exchange state. |
+| Cryptography could be mistaken for owner identity or fresh relationship evidence. | `local/device-transfer.ts:37`, `:63`; `local/entries.ts:23`. | §§3.1–3.2 | Describe 48-bit comparison and historical notes; no civil identity/freshness guarantee. |
+| Model alone did not establish confirmation, user-only handoff or local consumption. | `local/device-ui.ts:129`, `:142`, `:155`; `local/main.ts`, `mountDevices`, `save`, `wipeUi`; `local/index.html`, `take`. | §§3.2, 4 / evidence gate | Completed source recheck finds explicit share/save clicks, code checkbox/selection, early fragment removal, lock clearing and one guarded encrypted save of imported entries plus request removal. Missing request rejects reopening; old backup restoration remains a limit. Published notice alignment and physical handoff still require release evidence. |
+
+No new owner decision on publisher position, hosting basis or contact is needed
+for these factual amendments. No deployment, law-note modification, regulator
+contact or paid action was performed. Foreign law, provider-internal processing,
+independent legal/security review and physical phone/real AirDrop remain unchecked.
+The in-date GB note (verified 28 September 2026; review 28 March 2027, partial
+23 October refresh already recorded) was used without re-researching its claims.

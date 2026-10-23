@@ -1,0 +1,18 @@
+{
+  "verified": "2026-10-23T10:54:40.712Z",
+  "address": "https://canary.device.test/",
+  "publicQrDecoded": true,
+  "selectedPeopleOnly": true,
+  "encryptedRecipientCopy": true,
+  "exactResumeAfterBackground": true,
+  "previewRequiresCodeConfirmation": true,
+  "storageFailurePreservesOriginal": true,
+  "mergeKeepsNamesAndUnlock": true,
+  "requestConsumed": true,
+  "sourcePreserved": true,
+  "peopleSurviveReload": true,
+  "noSecretInRequests": true,
+  "physicalPhoneAcceptance": false,
+  "credentialProvider": "PRF stub and real passphrase encryption",
+  "browserErrors": []
+}

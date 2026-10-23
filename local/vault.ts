@@ -1,19 +1,15 @@
-import { readPair, type Pair } from './model.js'
-import { emptyTrust, readTrust, text, type TrustState } from './trust.js'
+import { readEntries, type Entry } from './entries.js'
+export type { Entry } from './entries.js'
+import { emptyTrust, readTrust, type TrustState } from './trust.js'
 import { readExchange, type Exchange } from './connect.js'
+import { readDevices, type Devices } from './device-transfer.js'
 
 const ROUNDS = 600_000
-const MAX_BYTES = 262_144
+export const MAX_VAULT_BYTES = 1_048_576
+const MAX_BYTES = MAX_VAULT_BYTES
 const encoder = new TextEncoder()
 const decoder = new TextDecoder('utf-8', { fatal: true })
 interface Box { iv: string; ciphertext: string }
-export interface Entry {
-  id: string; label: string; pair: Pair
-  evidence?: { method: 'in-person' | 'trusted-call'; at: number }
-  accounts?: { service: string; account: string; observedAt: number }[]
-  lastCheck?: number
-  setup?: { method: 'in-person' | 'trusted-call'; reply?: string }
-}
 export interface VaultRecord {
   v: 1
   id: string
@@ -21,7 +17,7 @@ export interface VaultRecord {
   device?: { credential: string; input: string; origin: string; box: Box }
   data: Box
 }
-export interface Vault { record: VaultRecord; master: Uint8Array; entries: Entry[]; trust: TrustState; exchanges?: Exchange[] }
+export interface Vault { record: VaultRecord; master: Uint8Array; entries: Entry[]; trust: TrustState; exchanges?: Exchange[]; devices?: Devices }
 
 function random(size: number): Uint8Array { return crypto.getRandomValues(new Uint8Array(size)) }
 function bytes(input: Uint8Array): ArrayBuffer { return new Uint8Array(input).buffer }
@@ -85,46 +81,18 @@ export function parseVault(text: string): VaultRecord {
   return record
 }
 
-function entriesFrom(raw: unknown): Entry[] {
-  if (!Array.isArray(raw) || raw.length > 200) throw new Error('Invalid vault contents.')
-  const ids = new Set<string>()
-  return raw.map(value => {
-    if (!value || typeof value.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(value.id) || ids.has(value.id)
-      || typeof value.label !== 'string' || !value.label.trim() || value.label.length > 60) throw new Error('Invalid saved pair.')
-    ids.add(value.id)
-    const result: Entry = { id: value.id, label: value.label, pair: readPair(value.pair) }
-    const checkedTime = (time: unknown) => {
-      if (!Number.isSafeInteger(time) || (time as number) < 0 || (time as number) > 4_102_444_800) throw new Error('Invalid contact evidence date.')
-      return time as number
-    }
-    if (value.evidence) {
-      if (!['in-person', 'trusted-call'].includes(value.evidence.method)) throw new Error('Invalid contact evidence method.')
-      result.evidence = { method: value.evidence.method, at: checkedTime(value.evidence.at) }
-    }
-    if (value.accounts !== undefined) {
-      if (!Array.isArray(value.accounts) || value.accounts.length > 8) throw new Error('Too many observed accounts.')
-      result.accounts = value.accounts.map((account: Entry['accounts'] extends (infer T)[] | undefined ? T : never) => ({ service: text(account.service, 32), account: text(account.account, 100), observedAt: checkedTime(account.observedAt) }))
-    }
-    if (value.lastCheck !== undefined) result.lastCheck = checkedTime(value.lastCheck)
-    if (value.setup !== undefined) {
-      if (!['in-person', 'trusted-call'].includes(value.setup.method) || (value.setup.reply !== undefined && (typeof value.setup.reply !== 'string' || value.setup.reply.length > 3000))) throw new Error('Invalid saved setup.')
-      result.setup = { method: value.setup.method, ...(value.setup.reply ? { reply: value.setup.reply } : {}) }
-    }
-    return result
-  })
-}
 async function opened(record: VaultRecord, master: Uint8Array): Promise<Vault> {
   try {
     if (master.length !== 32) throw new Error('Invalid vault key')
     const data = await decrypt(await aes(master), record.data, record.id, 'data')
     try {
       const parsed = JSON.parse(decoder.decode(data))
-      if (Array.isArray(parsed)) return { record, master, entries: entriesFrom(parsed), trust: emptyTrust() }
-      if (!parsed || ![2, 3].includes(parsed.v)) throw new Error('Unsupported encrypted vault payload.')
+      if (Array.isArray(parsed)) return { record, master, entries: readEntries(parsed), trust: emptyTrust() }
+      if (!parsed || ![2, 3, 4].includes(parsed.v)) throw new Error('Unsupported encrypted vault payload.')
       if (parsed.exchanges !== undefined && (!Array.isArray(parsed.exchanges) || parsed.exchanges.length > 16)) throw new Error('Invalid saved connections.')
       const exchanges = (parsed.exchanges ?? []).map(readExchange) as Exchange[]
       if (new Set(exchanges.map(e => e.id)).size !== exchanges.length) throw new Error('Duplicate saved connections.')
-      return { record, master, entries: entriesFrom(parsed.entries), trust: readTrust(parsed.trust), exchanges }
+      return { record, master, entries: readEntries(parsed.entries), trust: readTrust(parsed.trust), exchanges, devices: readDevices(parsed.devices) }
     }
     finally { data.fill(0) }
   } catch (e) { master.fill(0); throw e }
@@ -155,19 +123,21 @@ export async function addRecoveryPassphrase(vault: Vault, password: string): Pro
   return { ...vault.record, password: { salt, rounds: ROUNDS, box } }
 }
 export async function sealEntries(vault: Vault, entries: Entry[], trust = vault.trust): Promise<VaultRecord> {
-  const checked = entriesFrom(entries)
+  const checked = readEntries(entries)
   const exchanges = vault.exchanges ?? []
   if (exchanges.length > 16) throw new Error('Finish or remove an existing invitation first.')
   const checkedExchanges = exchanges.map(readExchange)
   if (new Set(checkedExchanges.map(e => e.id)).size !== checkedExchanges.length) throw new Error('Duplicate saved connections.')
   // Old app builds must refuse this payload rather than silently drop pending
   // exchange keys or unconfirmed setup state on their next save.
-  const data = encoder.encode(JSON.stringify({ v: 3, entries: checked, trust: readTrust(trust), exchanges: checkedExchanges }))
-  if (data.length > 160_000) { data.fill(0); throw new Error('This local vault is full. Back up your data before removing old records.') }
+  const contents = { entries: checked, trust: readTrust(trust), exchanges: checkedExchanges }
+  if (encoder.encode(JSON.stringify(contents)).length > 160_000) throw new Error('This local vault is full. Back up your data before removing old records.')
+  const data = encoder.encode(JSON.stringify({ v: 4, ...contents, devices: readDevices(vault.devices) }))
+  if (data.length > 600_000) { data.fill(0); throw new Error('Finish or remove the previous device copy before saving another.') }
   try { return { ...vault.record, data: await encrypt(await aes(vault.master), data, vault.record.id, 'data') } }
   finally { data.fill(0) }
 }
-export function closeVault(vault: Vault): void { vault.master.fill(0); vault.entries = []; vault.trust = emptyTrust(); vault.exchanges = [] }
+export function closeVault(vault: Vault): void { vault.master.fill(0); vault.entries = []; vault.trust = emptyTrust(); vault.exchanges = []; vault.devices = {} }
 
 export function deviceUnlockPossible(): boolean {
   return typeof window !== 'undefined' && window.isSecureContext && location.protocol !== 'file:'

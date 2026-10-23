@@ -3,15 +3,30 @@ import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, sea
 import { createPair } from './model.js'
 import { newGroup, groupCard, joinGroup, publicKey } from './trust.js'
 import { beginConnect, acceptConnect, finishConnect } from './connect.js'
+import { newDeviceRequest, makeDeviceCopy } from './device-transfer.js'
 
 const password = 'a sufficiently long test passphrase'
 
 describe('encrypted local vault', () => {
+  it('keeps device-copy progress encrypted and portable while preserving it on unrelated saves', async () => {
+    const vault = await createVault(password), entries = [{id:'friend',label:'Private name',pair:createPair()}]
+    const receive = newDeviceRequest(), sent = makeDeviceCopy(receive.request,entries)
+    vault.devices = {receive,send:{file:sent.file,count:1}}
+    vault.record = await sealEntries(vault,entries)
+    const stored = exportVault(vault.record)
+    for (const value of [receive.secret,'Private name',sent.file]) expect(stored).not.toContain(value)
+    const reopened = await unlockVault(parseVault(stored),password)
+    expect(reopened.devices).toEqual(vault.devices)
+    const again = await unlockVault(await sealEntries(reopened,reopened.entries),password)
+    expect(again.devices).toEqual(vault.devices)
+    closeVault(vault);closeVault(reopened);closeVault(again)
+    expect(vault.devices).toEqual({})
+  })
   it('reads original array and version-two vaults and upgrades saves to a version old builds reject', async () => {
     const vault = await createVault(password)
     const entries = [{ id: 'old-pair', label: 'Existing friend', pair: createPair() }]
     const key = await crypto.subtle.importKey('raw', new Uint8Array(vault.master).buffer, 'AES-GCM', false, ['encrypt', 'decrypt'])
-    for (const payload of [entries, { v: 2, entries, trust: { v: 1, groups: [] } }]) {
+    for (const payload of [entries, { v: 2, entries, trust: { v: 1, groups: [] } }, { v: 3, entries, trust: { v: 1, groups: [] }, exchanges: [] }]) {
       const iv = crypto.getRandomValues(new Uint8Array(12))
       const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(`canary:vault:1:${vault.record.id}:data`) }, key, new TextEncoder().encode(JSON.stringify(payload)))
       const old = { ...vault.record, data: { iv: btoa(String.fromCharCode(...iv)), ciphertext: btoa(String.fromCharCode(...new Uint8Array(ciphertext))) } }
@@ -20,7 +35,7 @@ describe('encrypted local vault', () => {
       const upgraded = await sealEntries(reopened, entries)
       const decode = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0))
       const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decode(upgraded.data.iv), additionalData: new TextEncoder().encode(`canary:vault:1:${vault.record.id}:data`) }, key, decode(upgraded.data.ciphertext))
-      expect(JSON.parse(new TextDecoder().decode(plaintext)).v).toBe(3)
+      expect(JSON.parse(new TextDecoder().decode(plaintext)).v).toBe(4)
       closeVault(reopened)
     }
     closeVault(vault)
@@ -126,7 +141,7 @@ describe('encrypted local vault', () => {
     const changed = structuredClone(vault.record)
     changed.data.ciphertext = (changed.data.ciphertext[0] === 'A' ? 'B' : 'A') + changed.data.ciphertext.slice(1)
     await expect(unlockVault(changed, password)).rejects.toThrow()
-    expect(() => parseVault('x'.repeat(300_000))).toThrow()
+    expect(() => parseVault('x'.repeat(1_100_000))).toThrow()
     expect(() => parseVault(JSON.stringify({ ...vault.record, v: 99 }))).toThrow()
     await expect(createVault('too short')).rejects.toThrow()
     closeVault(vault)

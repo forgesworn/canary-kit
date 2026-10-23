@@ -82,3 +82,14 @@ The final published receipt is now Sites version 6, a CSS-only touch-target
 correction after v5. The complete mobile/offline journey and six-file public
 readback passed again. Scope and legal findings are unchanged; the current
 receipt and the retained v5 receipt identify the exact versions.
+
+## Encrypted device-copy candidate — 23 October 2026
+
+The device-copy working-tree review covers `local/device-transfer.ts`, the
+extracted `local/entries.ts` validator and vault payload version 4. It retains
+the selected static software-publisher position and adopted hosting basis.
+Model-level storage, recipient and copy limits are recorded in `privacy.md`;
+the gap table in `inventory.md` records the subsequent completed source UI,
+fragment, lock-clearing and atomic-save review. Release checks remain distinct. Earlier version 6 public evidence does
+not verify this new candidate. No device-copy deployment, physical phone, real
+AirDrop or passkey/QR acceptance is claimed by this review.

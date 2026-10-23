@@ -249,3 +249,72 @@ browser journey and actual offline shell reload passed (`mobile-hosting.json`,
 `mobile-live.json`). These later technical readbacks close the candidate
 publication gap mentioned above; the legal interpretation, physical-phone
 acceptance and independent-review limits remain. They are not a new law review.
+
+## Encrypted copy to another device — working-tree model review
+
+Reviewed 23 October 2026 against the device-copy working tree, not a deployed
+release. `local/device-transfer.ts:26` creates a random request identifier,
+ephemeral public key and fifteen-minute expiry; its private key stays with
+the receiving device. `deviceLink` puts only that public request in `#device=`.
+The public request can still reveal timing and link a transfer to a chat or
+recipient context. A public key is not proof of who owns the device.
+
+`makeDeviceCopy` accepts completed saved people only and encrypts their pair
+secrets, names, observed-account notes, meeting evidence and last-check dates
+using the existing NIP-44 library (`local/device-transfer.ts:41`). Each encrypted
+chunk binds purpose, request, keys, dates, digest, position and total; the
+receiver checks those bindings before accepting the data. The file envelope
+exposes public request/key metadata, expiry, a keyed manifest digest and encrypted-part sizes. The manifest uses the shared conversation key, rather than exposing a plaintext hash of private contact notes.
+The fixed comparison code is twelve hexadecimal digits (48 bits); it is for
+comparison with the source device, not proof of civil identity or a new
+historical check. Copied notes remain historical observations.
+
+The intended handoff is a user-selected encrypted `.canary.json` file through
+the OS share sheet or Save file, followed by the user's existing AirDrop, chat
+or manual transfer. Canary adds no upload/download endpoint, relay, remote
+signer or automatic recipient. Chosen apps, file stores, device backups and
+OS sharing tools may retain the encrypted file and metadata under their own
+settings. A recipient who unlocks/decrypts the copy can retain its contents.
+The request expiry is an app acceptance limit, not guaranteed deletion or
+cryptographic revocation of copies or keys. Restoring an older encrypted
+backup can also restore the receive key and unconsumed request; local
+consumption is not a global replay or erasure guarantee.
+
+Only people entries are serialised, with unfinished setups rejected. Group
+keeper/signing keys, group trust records, master/unlock credentials and unfinished
+connection exchanges are excluded from this file. `mergePeople` preserves
+existing destination entries, deduplicates by pair secret and remaps colliding
+entry identifiers (`local/device-transfer.ts:103`). Copying leaves the source
+intact; no synchronisation, removal or revocation is implemented by this model.
+
+Vault payload version 4 additionally saves a pending receiving private key and
+an outgoing encrypted file/count inside the encrypted vault and its recovery
+backup (`local/vault.ts:84`, `:125`). Previous array/v2/v3 payloads remain
+readable. The encoded record limit is 1 MiB, total plaintext payload limit
+600,000 bytes and ordinary entries/trust/exchanges limit remains 160,000 bytes;
+limits reject a save rather than silently discard data. Expiry does not itself
+erase retained local state or existing backups. Unlocked device compromise and
+backup retention limits stated above still apply.
+
+The completed source integration was then reviewed: `local/device-ui.ts:129`
+shares a file only after the user clicks; `:133` similarly downloads ciphertext.
+The receiving preview requires an explicit matching-code checkbox and selected
+people (`:142`). Import revalidates the packet, removes the receive request and
+passes both entries/state to one encrypted save (`:155`; `local/main.ts`,
+`mountDevices`, `save`). That save checks the same unlocked vault/generation and
+visible document before persisting, retaining its master/credential/group and
+connection state. With no receiving request, reopening the same file fails;
+this is local consumption subject to the backup-restoration limit above.
+
+`local/index.html`, `take`, removes `#device=` through the early history
+replacement; app HTTP requests carry no fragment. Native browser/scanner,
+clipboard and history-sync retention remain outside that guarantee. Locking
+clears the device UI and preview references (`local/main.ts`,
+`wipeUi`; `local/device-ui.ts`, `clear`). Recipient-encrypted download object
+URLs may remain for up to 60 seconds to let the OS finish a handoff; they contain
+no plaintext people and are then revoked. An import preview must reopen the file after
+unlocking; saved encrypted receive/send state can resume. These are code-review
+findings, not physical phone or real AirDrop acceptance. The published page must
+carry the candidate's file-transfer/storage explanation before this release;
+earlier production evidence does not verify the candidate. Existing host,
+controller/contact and adopted hosting purpose/basis remain unchanged.

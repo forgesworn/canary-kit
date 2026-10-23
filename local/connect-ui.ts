@@ -4,6 +4,7 @@ import { type Entry, type Vault } from './vault.js'
 interface Host {
   vault(): Vault | null
   hasRecord(): boolean
+  device?(input: string): void
   ensure(task: () => Promise<void>): void
   save(entries: Entry[], exchanges: Exchange[]): Promise<void>
   show(view: string): void
@@ -54,6 +55,7 @@ export function mountConnect(host: Host) {
   })
   async function receive(input: string) {
     try {
+      if (input.includes('#device=')) { host.device?.(input); return }
       const packet = connectInput(input, location.origin + location.pathname), parsed = readConnect(packet)
       if (parsed.type === 'offer') { start(packet); return }
       if (!host.vault() && !host.hasRecord()) {

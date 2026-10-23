@@ -265,3 +265,22 @@ exactly. Current receipts, screenshots and hashes supersede v5; the v5 receipt
 is retained as `evidence/publication-v5.json`. The private-group regression
 passed against v5's identical application code; v6 changes only CSS. Public
 file readback is reproducible with `node tools/check-public-local.mjs`.
+
+## Add another device — 23 October 2026
+
+The current candidate adds a public request QR and recipient-encrypted people
+file, explicit code confirmation and a merge into the receiving vault. Existing
+contacts/credentials and the source are preserved. Private group keys and
+unfinished exchanges are excluded; there is no automatic sync or deletion.
+
+**742 tests / 32 files passed**, plus global/local TypeScript and standalone build.
+New model tests cover recipient/direction binding, chunk integrity/order/count,
+expiry, keyed manifest privacy, size limits, duplicate/ID merge behaviour and
+encrypted resume/recovery. Arrays/v2/v3 vaults upgrade to payload v4. The device
+browser suite passed the complete transfer, scanner/share lifecycle, failed-save
+retry, preview clearing, exact resend, merge, replay/wrong-request refusal and
+reload. The existing mobile setup/normal/duress/recovery/offline suite passed.
+See `DEVICE-COPY.md`, `tools/test-device-copy.mjs` and `evidence/device-copy.json`.
+The following publication record, when present, names the release that passed
+live checks; earlier v6 receipts do not validate this candidate. Physical phone
+and actual native share/AirDrop acceptance remain open.

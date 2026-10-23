@@ -1,12 +1,14 @@
 import './style.css'
 import { createPair, joinPair, joinInvite, makeInvite, inviteLink, joinLink, joinFragment, pairReference, wordsAt, checkWords, INTERVAL, type Pair } from './model.js'
-import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, parseVault, sealEntries, closeVault, enableDeviceUnlock, unlockWithDevice, deviceUnlockPossible, exportVault, type Vault, type VaultRecord, type Entry } from './vault.js'
+import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, parseVault, sealEntries, closeVault, enableDeviceUnlock, unlockWithDevice, deviceUnlockPossible, exportVault, MAX_VAULT_BYTES, type Vault, type VaultRecord, type Entry } from './vault.js'
 import { drawQr, QrScanner } from './qr.js'
 import { mountTrust } from './trust-ui.js'
 import type { TrustState } from './trust.js'
 import { mountInstall } from './install.js'
 import { mountConnect } from './connect-ui.js'
 import type { Exchange } from './connect.js'
+import { mountDevices } from './device-ui.js'
+import type { Devices } from './device-transfer.js'
 
 const STORE = 'canary.encrypted-vault.v1'
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -26,8 +28,10 @@ let recoveryMode = false
 let pendingTrustTask: (() => Promise<void>) | null = null
 let trustUi: ReturnType<typeof mountTrust> | undefined
 let connectUi: ReturnType<typeof mountConnect> | undefined
+let devicesUi: ReturnType<typeof mountDevices> | undefined
 
 const scanner = new QrScanner(get<HTMLVideoElement>('scan-video'), data => {
+  if (data.includes('#device=') || data.startsWith('CANARY-DEVICE:') || data.startsWith('{')) { stopScan(); devicesUi!.receive(data); return }
   if (data.startsWith('CANARY-TRUST:') || data.includes('#trust=')) { stopScan(); trustUi!.receive(data); return }
   try { setupPair(data.startsWith('CANARY-LOCAL:') ? joinInvite(data) : joinLink(data, location.origin + location.pathname), false) }
   catch { get('scan-status').textContent = 'That is not a Canary pairing QR. Keep looking, or use the setup words.' }
@@ -60,6 +64,7 @@ function updateUnlock() {
 function wipeUi() {
   trustUi?.clear()
   connectUi?.clear()
+  devicesUi?.clear()
   for (const id of ['say', 'hear', 'signal']) get(id).textContent = '—'
   for (const id of ['setup-words', 'setup-reference', 'exchange-reference', 'reference', 'side', 'check-result', 'save-state']) get(id).textContent = ''
   for (const id of ['setup-input', 'person-name', 'heard-input', 'new-password', 'confirm-password', 'unlock-password']) {
@@ -282,7 +287,18 @@ async function savePairs(entries: Entry[], exchanges: Exchange[]) {
   if (stamp !== generation || active !== vault || document.hidden) throw new Error('Canary was locked. Unlock to continue your saved setup.')
   persist(next); active.record = next; active.entries = entries; active.exchanges = exchanges
 }
-connectUi = mountConnect({ vault: () => vault, hasRecord: () => !!record, ensure: ensureTrustVault, save: savePairs, show, open: openPerson, home, error })
+connectUi = mountConnect({ vault: () => vault, hasRecord: () => !!record, device: input => devicesUi!.receive(input), ensure: ensureTrustVault, save: savePairs, show, open: openPerson, home, error })
+devicesUi = mountDevices(get('devices'), {
+  vault: () => vault, hasRecord: () => !!record, ensure: ensureTrustVault,
+  async save(entries: Entry[], devices: Devices) {
+    const active = vault, stamp = generation
+    if (!active || document.hidden) throw new Error('Unlock Canary on this device before continuing the copy.')
+    const next = await sealEntries({ ...active, devices }, entries)
+    if (stamp !== generation || active !== vault || document.hidden) throw new Error('Canary was locked. Unlock to continue the saved device copy.')
+    persist(next); active.record = next; active.entries = entries; active.devices = devices
+  },
+  show: () => show('devices'), scan: () => { show('join'); startScan() }, home, error,
+})
 mountInstall(show, home)
 get('people-search').addEventListener('input', () => {
   const query = get<HTMLInputElement>('people-search').value.trim().toLocaleLowerCase()
@@ -435,7 +451,7 @@ get('restore-file').addEventListener('change', () => {
   const file = input.files?.[0]; input.value = ''
   if (!file) return
   void action(async stamp => {
-    if (file.size > 262_144) throw new Error('This is too large to be a Canary backup.')
+    if (file.size > MAX_VAULT_BYTES) throw new Error('This is too large to be a Canary backup.')
     const imported = parseVault(await file.text())
     if (stamp !== generation) return
     restoring = imported; show('locked'); updateUnlock(); get('unlock-password').focus()
@@ -584,6 +600,12 @@ function consumeIncoming() {
   let incoming = incomingWindow.canaryIncoming
   delete incomingWindow.canaryIncoming
   if (!incoming) return
+  if (incoming.startsWith('#device=')) {
+    generation++; pendingKeep = false; pendingTrustTask = null; restoring = null
+    draft = selected = null; wipeUi(); show(record && !vault ? 'locked' : 'welcome')
+    updateUnlock(); devicesUi!.receive(location.origin + location.pathname + incoming)
+    return
+  }
   if (incoming.startsWith('#connect=')) {
     generation++; pendingKeep = false; pendingTrustTask = null; restoring = null
     draft = selected = null; wipeUi(); show(record && !vault ? 'locked' : 'welcome')
