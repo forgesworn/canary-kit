@@ -101,3 +101,8 @@ mobile/offline journeys passed; see `../evidence/publication.json`,
 file/storage explanation is included in the published privacy notice. This
 closes the publication/notice alignment gate above, not physical handoff,
 independent security/legal review or the [U] scope interpretation.
+
+Final version 8 clarifies the receiving-device sentence (“encrypted for”, rather
+than promising physical hardware exclusivity). Technical behaviour is unchanged;
+its exact public readback and fresh mobile flow passed. The receipt explicitly
+labels v7 as the complete functional regression run and retains the v7 record.

@@ -305,3 +305,14 @@ Canary was opened in Google Chrome. Temporary preview and automation servers,
 archive and this task's installed dependencies were removed after evidence was
 recorded. Existing installed app windows need to close and reopen to activate a
 downloaded update; there is no forced refresh during a call or setup.
+
+The final public version is **8**, website source
+`ae34f24d85cb9163e4e13712dfe16127071179c1`, app source
+`88c64a58eb85048359542d783874c1c271a0773a`. Its sole app change from v7 is an
+explanatory sentence: the file is “encrypted for” the receiving device. It avoids
+an absolute hardware-binding claim, since recovery backups can retain the
+receiving key. No functional code changed. All six v8 public files matched the
+source; a fresh mobile browser opened the device-copy flow without errors or
+overflow. Complete live transfer/mobile/offline regression remains the v7 run of
+identical functional code, explicitly named in the current receipt. The v7
+receipt is retained. No physical-device or independent-audit gate is upgraded.
