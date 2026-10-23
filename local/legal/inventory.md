@@ -324,3 +324,14 @@ Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
 fields and adds no processing recipient or networking. Only source notice
 alignment is closed here; publication/readback, physical camera/credential-provider
 acceptance and independent review are unchanged separate gates.
+
+
+## Transport-check candidate — 23 October 2026
+
+See [native factual delta](../../native/LEGAL.md#transport-check-candidate--23-october-2026).
+BLE retry/deadline and larger/slower QR changes preserve local secrets, existing
+recipient encryption and the approved static hosting facts. WebRTC is test tooling
+only, with local signalling and no ICE servers. No new notice gap was identified
+from the changed source. Native build/codec evidence is separate from physical
+BLE, external-provider camera trials, owner acceptance and the `[U]` legal
+classification. Existing law-note dates and owner decisions remain unchanged.

@@ -1,0 +1,192 @@
+{
+  "verified": "2026-10-23T19:37:50.121Z",
+  "address": "https://vouch.optical.test/",
+  "webBuildSha256": "68ffaa4ea1ab5e9892f4848eaf59599a57289e58701dda8a0663abbee2a0a0ee",
+  "browserVersion": "155.0.8059.85",
+  "publicOfferAndEncryptedReply": true,
+  "fixedComparison": true,
+  "originalWordProfile": true,
+  "ownDuressVisibleInSpeak": true,
+  "animatedReceivingRequest": true,
+  "animatedEncryptedPeopleCopy": true,
+  "reverseDirection": true,
+  "duplicateMergeAndUnlockPreserved": true,
+  "actualQrPixelsThroughCameraDecoder": true,
+  "largerSlowerQr": true,
+  "fixtureFrames": 990,
+  "cameraProvider": "Real local WebRTC encoder/RTP/decoder; simulated screens/cameras; no external call provider or physical acceptance",
+  "credentialProvider": "PRF stub; real local encryption",
+  "noExtraHttpRequests": true,
+  "noExternalCallService": true,
+  "videoTrials": [
+    {
+      "profile": {
+        "width": 640,
+        "height": 360,
+        "qrPixels": 250,
+        "bitrate": 250000,
+        "codec": "video/VP8",
+        "mirror": false,
+        "rotation": 0.018
+      },
+      "qrParts": 6,
+      "withheldPartsOnFirstCycle": 1,
+      "elapsedMs": 5714,
+      "steps": 33,
+      "framesDecoded": 26,
+      "bytesReceived": 55281,
+      "packetsReceived": 77,
+      "frameWidth": 320,
+      "frameHeight": 180,
+      "codec": "video/VP8",
+      "iceServerCount": 0,
+      "candidateTypes": [
+        "host"
+      ],
+      "tracksStopped": true,
+      "framesEncoded": 26,
+      "bytesSent": 55281
+    },
+    {
+      "profile": {
+        "width": 640,
+        "height": 360,
+        "qrPixels": 250,
+        "bitrate": 250000,
+        "codec": "video/H264",
+        "mirror": true,
+        "rotation": 0.018
+      },
+      "qrParts": 25,
+      "withheldPartsOnFirstCycle": 5,
+      "elapsedMs": 27434,
+      "steps": 189,
+      "framesDecoded": 125,
+      "bytesReceived": 365325,
+      "packetsReceived": 399,
+      "frameWidth": 640,
+      "frameHeight": 360,
+      "codec": "video/H264",
+      "iceServerCount": 0,
+      "candidateTypes": [
+        "host"
+      ],
+      "tracksStopped": true,
+      "framesEncoded": 125,
+      "bytesSent": 365325
+    },
+    {
+      "profile": {
+        "width": 640,
+        "height": 360,
+        "qrPixels": 250,
+        "bitrate": 250000,
+        "codec": "video/VP8",
+        "mirror": false,
+        "rotation": 0.018
+      },
+      "qrParts": 5,
+      "withheldPartsOnFirstCycle": 1,
+      "elapsedMs": 4150,
+      "steps": 30,
+      "framesDecoded": 28,
+      "bytesReceived": 50205,
+      "packetsReceived": 75,
+      "frameWidth": 320,
+      "frameHeight": 180,
+      "codec": "video/VP8",
+      "iceServerCount": 0,
+      "candidateTypes": [
+        "host"
+      ],
+      "tracksStopped": true,
+      "framesEncoded": 28,
+      "bytesSent": 50205
+    },
+    {
+      "profile": {
+        "width": 640,
+        "height": 360,
+        "qrPixels": 250,
+        "bitrate": 250000,
+        "codec": "video/H264",
+        "mirror": true,
+        "rotation": 0.018
+      },
+      "qrParts": 46,
+      "withheldPartsOnFirstCycle": 9,
+      "elapsedMs": 52340,
+      "steps": 354,
+      "framesDecoded": 355,
+      "bytesReceived": 976129,
+      "packetsReceived": 1091,
+      "frameWidth": 640,
+      "frameHeight": 360,
+      "codec": "video/H264",
+      "iceServerCount": 0,
+      "candidateTypes": [
+        "host"
+      ],
+      "tracksStopped": true,
+      "framesEncoded": 355,
+      "bytesSent": 976129
+    },
+    {
+      "profile": {
+        "width": 640,
+        "height": 360,
+        "qrPixels": 250,
+        "bitrate": 250000,
+        "codec": "video/VP8",
+        "mirror": false,
+        "rotation": 0.018
+      },
+      "qrParts": 5,
+      "withheldPartsOnFirstCycle": 1,
+      "elapsedMs": 3681,
+      "steps": 30,
+      "framesDecoded": 28,
+      "bytesReceived": 49380,
+      "packetsReceived": 77,
+      "frameWidth": 320,
+      "frameHeight": 180,
+      "codec": "video/VP8",
+      "iceServerCount": 0,
+      "candidateTypes": [
+        "host"
+      ],
+      "tracksStopped": true,
+      "framesEncoded": 28,
+      "bytesSent": 49380
+    },
+    {
+      "profile": {
+        "width": 640,
+        "height": 360,
+        "qrPixels": 250,
+        "bitrate": 250000,
+        "codec": "video/H264",
+        "mirror": true,
+        "rotation": 0.018
+      },
+      "qrParts": 46,
+      "withheldPartsOnFirstCycle": 9,
+      "elapsedMs": 49520,
+      "steps": 354,
+      "framesDecoded": 355,
+      "bytesReceived": 962763,
+      "packetsReceived": 1081,
+      "frameWidth": 640,
+      "frameHeight": 360,
+      "codec": "video/H264",
+      "iceServerCount": 0,
+      "candidateTypes": [
+        "host"
+      ],
+      "tracksStopped": true,
+      "framesEncoded": 355,
+      "bytesSent": 962763
+    }
+  ],
+  "browserErrors": []
+}

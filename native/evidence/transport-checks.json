@@ -1,0 +1,43 @@
+{
+  "verified": "2026-10-23T19:39:45.109803+00:00",
+  "sourceBaseCommit": "6d787b760409243873da987ebb9fe9a368351b3b",
+  "runtimeInputSha256": {
+    "local/optical.ts": "72501b70cc6125d72c1f848df85083d742dbb7f5626cf8b32866a6b363121116",
+    "local/optical-ui.ts": "2e2c8e919cc50d09fcfaef79290867ff3f7876478a8625a61464dfa75a83e602",
+    "local/style.css": "cd2f3363786df67010a60a89140301cbd65d1e607601e5f602f97a401a721406",
+    "local/qr.ts": "a6491afed3c045de9bef6f40e46c6b8dc979563dad02d4a3b2cf927d9af9d1e0",
+    "local/meet-ui.ts": "d54128a00492dc5a866cef11bb51442f7970e879f1285fc1d9470971616ff74b",
+    "local/native.ts": "d68b202fc4dca81ff0099165a9be75160403d145bbfe7a22fedcfbe1e9a97a1f",
+    "package-lock.json": "ad505012fb37f153315a2df9fa215edfeaf645d8bfd1dd0c341530ad686c20d5",
+    "tools/build-local.mjs": "d08702788af05e860b9b656a3e627a667e9fc5ab08c8c11d2a719410617022f3",
+    "native/android/app/src/main/java/dev/forgesworn/vouch/BleCarrier.java": "179e8485750b6e90475da82c94dfccaa9ff984cb0ea4cc65ba8411ba7d335444",
+    "native/android/app/src/main/java/dev/forgesworn/vouch/BleReadLoop.java": "23969f307d48c421a4f1dce8faa943c286f82eb8a4ca218a723640f7f116c758",
+    "native/android/app/src/main/java/dev/forgesworn/vouch/PublicCode.java": "ad8faa40a83628103069258bd378fae8946ec39725fb1067d8d3f8de0928ba8b",
+    "native/android/app/src/main/java/dev/forgesworn/vouch/Radios.java": "bff97b9326e0377ca0a4ce8ac855536a82c4d7aa7ca289ff0216a03e0a84475c",
+    "native/ios/Vouch/NearbyCarrier.swift": "ae4d756134ebdd93835118c37c9343cb51bd549467ef3ed66545a9167b59883d",
+    "native/ios/Vouch/BleReadLoop.swift": "2ebf37ccaf44f127c34899982f95c4faba87929bde3ddd135b40b7b098fc0eea",
+    "native/ios/Vouch/PublicCode.swift": "47d60e7b6d2b5214f179c6b97ced03c7840fa1569bb80f886f0ea2cd88bcd4b4",
+    "native/ios/Vouch/NativeRadios.swift": "2d1f8c2623330714905c4710ce3a357b62762d482ecf68b52af90321fb61f15d"
+  },
+  "automated": {
+    "unitTests": 772,
+    "unitFiles": 37,
+    "androidJvmTests": 6,
+    "swiftWireAndBlePolicy": true,
+    "androidApkCompiledAndSigned": true,
+    "iosDeviceAppCompiledAndSigned": true,
+    "bothBundledPagesExact": true,
+    "nativeBridgeJourney": "browser.json; radio and device-auth providers are fixtures",
+    "videoJourneys": 6,
+    "videoEvidence": "../../local/evidence/video-call-transfer.json",
+    "videoScope": "real local VP8/H264 encoder, RTP and decoder; host ICE candidates only; simulated screens/cameras; stub credentials"
+  },
+  "nativeArtifacts": "transport-artifacts.json",
+  "physical": {
+    "bilateralBle": "pending",
+    "realProviderAndCameraVideoQr": "pending",
+    "deviceUnlockAndUsability": "pending",
+    "ownerUnavailableToday": true
+  },
+  "installation": "Candidates retained only; earlier installed prototypes unchanged"
+}

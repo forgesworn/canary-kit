@@ -28,13 +28,15 @@ describe('encrypted local vault', () => {
   it('recovers independent named requests and exact outgoing handoffs without losing the other person on completion', async () => {
     const now=1_800_000_000,vault=await createVault(password),keeper=newGroup('Private circle',now)
     const alice=joinGroup(groupCard(keeper,now),now),bob=joinGroup(groupCard(keeper,now),now)
-    const first=beginCheck(keeper,publicKey(alice),'vouch','',now,'Alice')
-    const second=beginCheck(first.group,publicKey(bob),'vouch','',now,'Bob')
+    const aliceLabel='Alice private contact 719fba18',bobLabel='Bob private contact 24c795e6'
+    const first=beginCheck(keeper,publicKey(alice),'vouch','',now,aliceLabel)
+    const second=beginCheck(first.group,publicKey(bob),'vouch','',now,bobLabel)
     const a=await sealTransfer(second.group,publicKey(alice),{kind:'challenge',event:first.event})
     const b=await sealTransfer(second.group,publicKey(bob),{kind:'challenge',event:second.event})
     const group=saveHandoff(saveHandoff(second.group,a,'Waiting for Alice',first.event.id,publicKey(alice)),b,'Waiting for Bob',second.event.id,publicKey(bob))
     vault.trust={v:1,groups:[group]};const record=await sealEntries(vault,[])
-    for(const privateText of ['Private circle','Alice','Bob',group.secret,JSON.stringify(a)])expect(JSON.stringify(record)).not.toContain(privateText)
+    // Short names can occur by chance in random Base64 ciphertext.
+    for(const privateText of ['Private circle',aliceLabel,bobLabel,group.secret,JSON.stringify(a)])expect(JSON.stringify(record)).not.toContain(privateText)
     const restored=await unlockVault(parseVault(exportVault(record)),password),saved=restored.trust.groups[0]
     expect(pendingChecks(saved)).toHaveLength(2);expect(saved.handoffs).toEqual(group.handoffs)
     const finished=issueVouch(saved,answerCheck(alice,first.event,now),{method:'in-person',days:30},now)

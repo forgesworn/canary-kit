@@ -1,0 +1,76 @@
+name: Vouch native
+on:
+  pull_request:
+    paths:
+      - 'native/**'
+      - 'local/**'
+      - 'src/**'
+      - 'tools/build-local.mjs'
+      - 'package*.json'
+      - '.github/workflows/vouch-native.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'native/**'
+      - 'local/**'
+      - 'src/**'
+      - 'tools/build-local.mjs'
+      - 'package*.json'
+      - '.github/workflows/vouch-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: npm ci
+      - run: node native/prepare.mjs
+      - run: npm run build:local -- --native
+      - name: Compile carriers, run wire and stalled-read tests, assemble APK
+        working-directory: native/android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest :app:assembleDebug
+      - name: Validate packaged native boundary
+        run: python3 native/check-builds.py --android native/android/app/build/outputs/apk/debug/app-debug.apk
+
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node native/prepare.mjs
+      - run: npm run build:local -- --native
+      - name: Run public-code and stalled-read tests without a simulator
+        run: |
+          swiftc native/ios/Vouch/PublicCode.swift native/ios/Vouch/BleReadLoop.swift native/ios/tests/WireTests.swift -o "$RUNNER_TEMP/vouch-wire-test"
+          "$RUNNER_TEMP/vouch-wire-test" native/shared/vectors.json
+      - run: brew install xcodegen
+      - name: Compile the iOS carrier and app without signing or booting a simulator
+        working-directory: native/ios
+        run: |
+          xcodegen generate --spec project.yml
+          xcodebuild -quiet -jobs 2 -project Vouch.xcodeproj -scheme Vouch -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
+      - name: Validate packaged native boundary
+        run: python3 native/check-builds.py --ios native/ios/build/Build/Products/Debug-iphonesimulator/Vouch.app

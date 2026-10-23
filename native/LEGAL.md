@@ -272,3 +272,50 @@ installation facts do not establish BLE, new UI, real video QR, biometric or
 human acceptance. The earlier NFC pass remains tied to its recorded binaries.
 No app-store publication, new publisher messaging service, independent audit or
 blanket legal clearance is implied.
+
+
+## Transport-check candidate — 23 October 2026
+
+The candidate adds foreground BLE operation deadlines, bounded read retries and
+temporary cooldown bookkeeping. Established links and advertising remain for
+the slower peer after local reading completes, until the existing overall stop.
+Moving QR offers a larger/slower display and parser-validated fragment progress;
+partial progress does not authenticate a sender or complete a transfer. The
+existing public-token bounds, human comparison, radio activity limit, vault and
+recipient encryption remain unchanged. Code: `native/*/BleReadLoop`,
+`BleCarrier.java`, `NearbyCarrier.swift`, `local/optical.ts`, `local/optical-ui.ts`.
+
+Test tooling (`tools/lib/vouch-video-call.mjs`, `tools/test-optical-vouch.mjs`)
+uses locally signalled WebRTC VP8/H.264 encoders/RTP/decoders, simulated screens
+and cameras, and stubbed device credentials. No production video service,
+STUN/TURN server, new publisher recipient or hosting purpose is introduced.
+The existing approved static-hosting basis and publisher/contact remain;
+classification stays `[U]`. The existing notices remain aligned with this source
+change. This is a factual delta, not a new legal opinion; the law note remains
+verified 28 September 2026, review due 28 March 2027, with partial 23 October updates.
+
+Physical bilateral BLE, real camera-through-provider video calls, system unlock
+and owner/novice/panic acceptance are outstanding. The owner cannot test phones
+today. Earlier NFC and public-site evidence remains tied to its recorded source
+and binaries. Candidate compilation/codec results are separate evidence, never
+an assertion that those physical gates passed. See `TRANSPORT-ACCEPTANCE.md`.
+
+
+### Transport publication follow-up — 23 October 2026
+
+The QR presentation changes are published as website version 13, from app source
+`9be541e854be5187ff35a026dddb517de868a5b6` and wrapper source
+`6824f325327e3b33f99cc9cccfe7617dc3e33051`. Anonymous exact-byte readback of all
+six public files and the live pairing/copy journeys passed. See
+`../local/evidence/publication.json` and `../local/evidence/v13-public-readback.json`; the v12
+publication and its earlier journey remain retained separately. No host,
+audience, purpose, controller/contact, production transport or notice basis
+changed. This is publication evidence, not a new law review.
+
+Android and signed iOS candidates are retained with exact hashes in
+`evidence/transport-artifacts.json`; they have not replaced the installed apps.
+Native wire/recovery tests, package checks and six local VP8/H264 codec journeys
+passed; `evidence/transport-checks.json` distinguishes their fixture providers.
+Bilateral physical BLE, a real provider/camera call, device unlock and human
+acceptance remain pending. The earlier NFC pass belongs to its own recorded
+binaries. No app-store release, independent audit or legal clearance follows.

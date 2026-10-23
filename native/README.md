@@ -104,7 +104,7 @@ does not include TestFlight, App Store or public APK publication.
 The pure Swift APDU vectors also run on macOS without booting a simulator:
 
 ```sh
-swiftc native/ios/Vouch/PublicCode.swift native/ios/tests/WireTests.swift -o /tmp/vouch-native-wire-test
+swiftc native/ios/Vouch/PublicCode.swift native/ios/Vouch/BleReadLoop.swift native/ios/tests/WireTests.swift -o /tmp/vouch-native-wire-test
 /tmp/vouch-native-wire-test native/shared/vectors.json
 python3 native/test_check_builds.py
 python3 native/check-builds.py --android native/android/app/build/outputs/apk/debug/app-debug.apk --ios native/ios/build/Build/Products/Debug-iphoneos/Vouch.app --out native/evidence/artifacts.json
@@ -139,6 +139,24 @@ assuming an ATT write MTU; no OS Bluetooth pairing dialogue or Google services
 is required. UUIDs and NFC vectors are in `shared/vectors.json` and checked by
 both platform tests. Application crypto remains in the shared `meet.ts` profile,
 not in the radio adapters; no new cipher is implemented.
+
+Both carriers bound connection, service discovery and reads to 8, 5 and 4 seconds
+respectively. Transient read failures retry with backoff; a third failed read or
+missing callback releases the outgoing peer slot for discovery after a short
+cooldown. Android discovers services without waiting for an optional MTU callback.
+Long reads still use the platform MTU and a stable public-code snapshot. After
+local completion, reading/scanning stops but established links and advertising
+remain for the slower peer until session stop. Leaving, locking, backgrounding
+and the one-minute activity limit still close everything. Bounded debug logs
+contain operation stages, not tokens or people. JVM and Swift tests exercise
+missing callbacks, transient/repeated failures, late callbacks and recovery.
+
+`npm run test:video` checks pairing and selected-person copying in both directions
+through real local VP8/H.264 video, with RTP statistics and deliberately missing
+QR parts. Screens, cameras and credentials remain fixtures; no actual call or
+physical camera acceptance follows. CI compiles both native carriers and checks
+the packaged boundary without starting emulators. See
+[physical trial steps](TRANSPORT-ACCEPTANCE.md).
 
 The native wire accepts only canonical public `CANARY-MEET:1` tokens up to 186
 ASCII bytes. Curve, commitment, recipient and pinned-peer checks still happen in

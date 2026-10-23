@@ -17,6 +17,27 @@ import Foundation
   precondition(!delivery.delivered(card)) // A response can arrive before our reveal has left.
   precondition(delivery.delivered(reveal))
   delivery.reset();precondition(!delivery.delivered(reveal))
-  print("Swift public-code grammar and NFC APDU golden vectors passed.")
+  for stage in 0..<4 {
+   let loop=BleReadLoop(now:0)
+   if stage>0{precondition(loop.connected(1))}
+   if stage>1{precondition(loop.services(2))}
+   if stage>2{precondition(loop.ready(3))}
+   precondition(loop.tick(100) == .none)
+   precondition(loop.tick(9_000) == .close)
+  }
+  let retry=BleReadLoop(now:0)
+  precondition(retry.connected(1));precondition(retry.ready(2))
+  precondition(retry.received(false,3));precondition(retry.tick(600) == .none)
+  precondition(retry.tick(703) == .read);precondition(retry.received(false,704))
+  precondition(retry.tick(2104) == .read);precondition(retry.received(false,2105))
+  precondition(retry.tick(2105) == .close)
+  let reset=BleReadLoop(now:0)
+  precondition(!reset.ready(1));precondition(reset.connected(2));precondition(!reset.connected(3))
+  precondition(reset.ready(4));precondition(reset.received(false,5));precondition(!reset.received(true,6))
+  precondition(reset.tick(705) == .read);precondition(reset.received(true,706))
+  precondition(reset.tick(1155) == .none);precondition(reset.tick(1156) == .read)
+  reset.close();precondition(!reset.received(true,1157))
+  precondition(reset.tick(1158) == .close)
+  print("Swift public-code, NFC APDU and BLE stalled-read recovery checks passed.")
  }
 }

@@ -59,7 +59,7 @@ export function opticalFrames(raw: string, rotate = false): string[] {
  * must match one full SHA-256 digest before the code is parsed. */
 export function createOpticalFrameReader() {
   let session: { digest: string; count: number; started: number; parts: Map<number, string> } | undefined;
-  return (raw: string, nowMs: number): string | null => {
+  const read = (raw: string, nowMs: number): string | null => {
     if (!Number.isFinite(nowMs) || nowMs < 0 || raw.length > MAX_TEXT) return null;
     if (!raw.startsWith(FRAME_PREFIX)) { session = undefined; return raw; }
     if (raw.length > 154) return null;
@@ -82,6 +82,7 @@ export function createOpticalFrameReader() {
     session = undefined;
     return joined.length <= MAX_TEXT && joined.startsWith(PREFIX) && frameDigest(joined) === digest ? joined : null;
   };
+  return Object.assign(read, {progress: () => session ? {received: session.parts.size, total: session.count} : null});
 }
 
 export type OpticalPayload = { kind: 'connection' | 'device-request' | 'device-copy'; value: string }

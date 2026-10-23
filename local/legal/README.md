@@ -1,12 +1,12 @@
 # Draft UK legal cover: static local-processing app
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Published app: `4335636c2fa7621c7961619cc69f8ea90d3cbc91`.**
+Published app: `9be541e854be5187ff35a026dddb517de868a5b6`.**
 
-The latest factual delta is the Listen/Speak and trusted-video QR review below,
-followed by version 12's publication readback. Earlier review and release sections
+The latest factual delta is the transport-check review in `inventory.md` and
+`../../native/LEGAL.md`, followed by version 13's publication readback. Earlier review and release sections
 are dated history. The published fixed-response wrapper is
-`9bf8b1218b98f0fda8f5be1c120c40c3405722d2`; exact deployment and anonymous
+`6824f325327e3b33f99cc9cccfe7617dc3e33051`; exact deployment and anonymous
 six-file readback are recorded in [publication evidence](../evidence/publication.json).
 Publication does not settle the documented legal interpretation or physical
 device and usability acceptance gates.
