@@ -52,7 +52,10 @@ or live relay is outside the protection of the spoken check.
 
 `VQP1:` wraps canonical typed packets in Base45. `VQF1:` frames bind up to 128
 coarse parts with the full digest, reject inconsistent totals/parts and accept
-out-of-order duplicates. Frames repeat every 500 ms. Dedicated reading and
+out-of-order duplicates. Frames repeat every 500 ms. **Trouble scanning?** offers
+a larger QR and one-second frames. Reader progress counts only validated,
+distinct parts; the complete digest is still required before opening a transfer.
+Dedicated reading and
 partial assembly are bounded to three minutes and stop on leaving or lock.
 Ordinary offline Connect/radio sessions keep their one-minute activity pause.
 
@@ -60,4 +63,11 @@ Unit checks cover RFC vectors, mixed/damaged/expired assemblies, private-field
 stripping, recipient encryption and actual QR pixel decoding. The complete
 browser journey covers invitation/reply and own-device copying in both
 directions through canvas camera fixtures. See `evidence/optical-transfer.json`.
-This is not physical video-call, camera compression or novice timing acceptance.
+`npm run test:video` runs the same complete journeys through real, locally
+signalled WebRTC VP8 and H.264 encoders, RTP and decoders. It deliberately
+withholds some whole QR parts in the first cycle, mirrors alternate video
+streams and adds slight rotation. Input is 640 × 360 at a 250 kbit/s cap;
+the encoder may adapt resolution. Reported RTP/codec/frame statistics are in
+`evidence/video-call-transfer.json`. Screens/cameras and credentials are fixtures,
+without any external call provider. This is not a physical camera-through-call
+trial or novice timing acceptance.

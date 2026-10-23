@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import {readFile,writeFile} from 'node:fs/promises'
+import {createHash} from 'node:crypto'
 import {chromium} from 'playwright'
+import {readVideoQr} from './lib/vouch-video-call.mjs'
 const live=process.env.CANARY_OPTICAL_URL,address=live||'https://vouch.optical.test/',browser=await chromium.launch({headless:true,executablePath:process.env.CANARY_CHROMIUM_EXECUTABLE})
 const contexts=[],errors=[],requests=[]
 let decodedFrames=0
+const videoMode=process.argv.includes('--video')||process.env.CANARY_OPTICAL_VIDEO==='1',videoTrials=[]
 try{
  async function device(){
   const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});contexts.push(context)
@@ -14,9 +17,10 @@ try{
    Object.defineProperty(navigator.credentials,'create',{configurable:true,value:async()=>credential()});Object.defineProperty(navigator.credentials,'get',{configurable:true,value:async()=>credential()})
   })
   const page=await context.newPage();page.setDefaultTimeout(12000);page.on('pageerror',e=>errors.push(e.message))
-  await page.clock.install({time:new Date('2026-10-23T12:00:05Z')});await page.goto(address);await page.clock.setFixedTime(new Date('2026-10-23T12:00:05Z'));return page
+  await page.clock.install({time:new Date('2026-10-23T12:00:05Z')});await page.clock.pauseAt(new Date('2026-10-23T12:01:05Z'));await page.goto(address);await page.clock.setFixedTime(new Date('2026-10-23T12:00:05Z'));return page
  }
  async function readMoving(reader,source,start){
+  if(videoMode){const trial=await readVideoQr(reader,source,start,videoTrials.length);videoTrials.push(trial);decodedFrames+=trial.steps;console.log('Compressed QR complete:',trial.profile.codec,trial.qrParts+' parts',Math.round(trial.elapsedMs/1000)+'s');return}
   const first=await source.locator('#optical-qr').evaluate(c=>c.toDataURL('image/png').split(',')[1])
   await reader.evaluate(async encoded=>{
    const image=await createImageBitmap(new Blob([Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))],{type:'image/png'}));
@@ -39,6 +43,13 @@ try{
  async function home(page){await page.locator('.brand').click();await page.locator('#people').waitFor()}
  const a=await device(),b=await device();console.log('Optical fixture: new-person setup')
  await a.locator('#remote-start').click();await acceptVideo(a,'Video friend');await a.locator('#connect-optical').click()
+ const originalFrame=await a.locator('#optical-frame-count').innerText()
+ await a.locator('#optical-help').evaluate(el=>el.open=true)
+ await a.locator('#optical-easier').click();assert.equal(await a.locator('#optical').evaluate(el=>el.classList.contains('optical-large')),true)
+ await a.clock.runFor(500);assert.equal(await a.locator('#optical-frame-count').innerText(),originalFrame)
+ await a.clock.runFor(500);assert.notEqual(await a.locator('#optical-frame-count').innerText(),originalFrame)
+ await a.locator('#optical-easier').click();assert.equal(await a.locator('#optical').evaluate(el=>el.classList.contains('optical-large')),false)
+ await a.locator('#optical-help').evaluate(el=>el.open=false)
  await readMoving(b,a,()=>b.locator('#optical-read-welcome').click());await b.locator('#connect-start').waitFor();await acceptVideo(b,'Other video friend');await b.locator('#connect-optical').click()
  await readMoving(a,b,()=>a.locator('#optical-scan-reply').click());await a.locator('#paired').waitFor()
  await b.locator('#optical-next').click();await b.locator('#paired').waitFor()
@@ -65,6 +76,7 @@ try{
  assert.equal(after.id,before.id);assert.deepEqual(after.device,before.device);assert.deepEqual(await a.locator('.person-card strong').allTextContents(),['Video friend'])
  for(const page of [a,b,other])assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
  assert.deepEqual(errors,[]);assert.deepEqual(requests.filter(url=>!url.startsWith(address)),[])
- await writeFile(live?'local/evidence/optical-transfer-live.json':'local/evidence/optical-transfer.json',JSON.stringify({verified:new Date().toISOString(),address,publicOfferAndEncryptedReply:true,fixedComparison:true,originalWordProfile:true,ownDuressVisibleInSpeak:true,animatedReceivingRequest:true,animatedEncryptedPeopleCopy:true,reverseDirection:true,duplicateMergeAndUnlockPreserved:true,actualQrPixelsThroughCameraDecoder:true,fixtureFrames:decodedFrames,cameraProvider:'local canvas stream; not physical video-call acceptance',credentialProvider:'PRF stub; real local encryption',noExtraNetwork:true,browserErrors:errors},null,2)+'\n')
- console.log('Moving QR passed: actual QR pixels through local camera decoder, public offer/encrypted reply, fixed comparison and encrypted people copying in both directions. Camera and credential providers are fixtures.')
+ const evidence=videoMode?'local/evidence/video-call-transfer.json':live?'local/evidence/optical-transfer-live.json':'local/evidence/optical-transfer.json'
+ await writeFile(evidence,JSON.stringify({verified:new Date().toISOString(),address,...(!live?{webBuildSha256:createHash('sha256').update(await readFile('local-site/index.html')).digest('hex')}:{}),browserVersion:browser.version(),publicOfferAndEncryptedReply:true,fixedComparison:true,originalWordProfile:true,ownDuressVisibleInSpeak:true,animatedReceivingRequest:true,animatedEncryptedPeopleCopy:true,reverseDirection:true,duplicateMergeAndUnlockPreserved:true,actualQrPixelsThroughCameraDecoder:true,largerSlowerQr:true,fixtureFrames:decodedFrames,cameraProvider:videoMode?'Real local WebRTC encoder/RTP/decoder; simulated screens/cameras; no external call provider or physical acceptance':'local canvas stream; not physical video-call acceptance',credentialProvider:'PRF stub; real local encryption',...(videoMode?{noExtraHttpRequests:true,noExternalCallService:true,videoTrials}:{noExtraNetwork:true}),browserErrors:errors},null,2)+'\n')
+ console.log(videoMode?'Video QR passed: real VP8/H264 encoded RTP, missing-part recovery, pairing and encrypted people copies in both directions. Screens, cameras and credentials are fixtures.':'Moving QR passed: actual QR pixels through local camera decoder, public offer/encrypted reply, fixed comparison and encrypted people copying in both directions. Camera and credential providers are fixtures.')
 }finally{await Promise.allSettled(contexts.map(c=>c.close()));await browser.close()}

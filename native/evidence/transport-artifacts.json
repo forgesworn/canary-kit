@@ -1,0 +1,22 @@
+{
+  "verified": "2026-10-23T19:38:56.253682+00:00",
+  "nativePageSha256": "60e9dcfe3e1897ce5ffbdd5786bcf847cd6cdf26f014fe13ad13eda605f05adf",
+  "android": {
+    "file": "Vouch-transport-candidate.apk",
+    "sha256": "5a0aa9dae629fad481618a02a28138e9355c156279a96be4da501682dd31b94c",
+    "bundledPageSha256": "60e9dcfe3e1897ce5ffbdd5786bcf847cd6cdf26f014fe13ad13eda605f05adf",
+    "signatureVerified": true
+  },
+  "ios": {
+    "file": "Vouch.app",
+    "bundleIdentifier": "dev.forgesworn.vouch.prototype",
+    "executableSha256": "6a6ad61fb1523a6c3f60180b35e0d57b30d9d5556f85eb0bbf38c331de0a247d",
+    "bundleInventorySha256": "cca76fb5b144f200510c31ad761d0175cd96acafdc85640641db847577b1c21e",
+    "bundledPageSha256": "60e9dcfe3e1897ce5ffbdd5786bcf847cd6cdf26f014fe13ad13eda605f05adf",
+    "archive": "Vouch-transport-candidate-iphone.app.zip",
+    "archiveSha256": "c6bbd40385dfc9c20b4dc38bbb6c2391ad6ffb700c9b1a629bd6ed5d38f9a833",
+    "signatureVerified": true
+  },
+  "installed": false,
+  "physicalAcceptance": "Pending: owner cannot test phones today. No new physical BLE or real provider/camera trial claimed."
+}
