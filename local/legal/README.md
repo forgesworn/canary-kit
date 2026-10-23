@@ -1,25 +1,28 @@
 # Draft UK legal cover: static local-processing app
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Published app: `9be541e854be5187ff35a026dddb517de868a5b6`.**
+Published app: `9c3c621e2f4532aad7caf7a116c9c9c99d657f4e`.**
 
-The latest factual delta is the transport-check review in `inventory.md` and
-`../../native/LEGAL.md`, followed by version 13's publication readback. Earlier review and release sections
-are dated history. The published fixed-response wrapper is
-`6824f325327e3b33f99cc9cccfe7617dc3e33051`; exact deployment and anonymous
-six-file readback are recorded in [publication evidence](../evidence/publication.json).
-Publication does not settle the documented legal interpretation or physical
-device and usability acceptance gates.
+The current factual delta adds the owner-selected branded address and direct
+Cloudflare provider. The same fixed-response wrapper source
+`56b61d0e0bc0873169f267d51ea95730092f06a8` serves both addresses; exact bytes,
+settings and separate DNS/TLS readbacks are in
+[publication evidence](../evidence/publication.json). Earlier sections remain
+dated history. Publication does not settle the documented legal interpretation,
+physical-device or novice-usability acceptance gates.
 
+**Today:** publisher of a public static HTTPS app at
+[Signet Vouch](https://vouch.mysignet.app/), with the original
+[Sites address](https://canary-words.cocoacod256.chatgpt.site/) retained and no
+redirect. The approved minimal hosting purpose/basis and existing contact remain.
+Direct Cloudflare and OpenAI Sites processing are identified separately in the
+public notice and [hosting record](hosting-proposal.md#branded-address-and-direct-cloudflare-hosting--23-october-2026).
+No application account, directory, message carriage, shared pair store or relay.
+Both six-file deployments, security headers and live two-origin setup/copy were
+verified. Public DNS and TLS work; the local recursive resolver still caches an
+earlier NXDOMAIN, so new-origin browser checks used the published IPv4 mapping
+without disabling TLS validation. See [hosting readback](../evidence/domain-hosting.json).
 
-**Today:** publisher of a public static-response HTTPS site at
-[Canary](https://canary-words.cocoacod256.chatgpt.site/), with a local HTML copy.
-The owner selected and approved minimal hosting with encrypted device storage
-and optional device unlock. No application accounts, directory, message carriage,
-shared pair store or relay. Hosting processes request metadata and aggregate
-traffic statistics; the adopted basis and notice are in `hosting-proposal.md`.
-Production bytes, security headers and anonymous browser pairing were verified
-on 23 October; [publication evidence](../evidence/publication.json).
 
 Scope is `local/`, its bundled dependency graph and generated artifact. It does
 not assess the larger `app/`, other hosted Canary services, other messaging
