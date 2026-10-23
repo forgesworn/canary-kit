@@ -1,0 +1,263 @@
+# Adopted hosting record — minimal static page
+
+**Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
+App code: working tree based on `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a`.**
+
+Latest factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
+`../canary-words-site` wrapper. The final Offline Connect source-candidate section
+in each document governs this candidate; preceding release sections are dated
+history. Earlier publication receipts do not verify this candidate. No deployment
+or public readback was performed for this gap review.
+
+
+## Published deployment
+
+The separate Site is public at
+`https://canary-words.cocoacod256.chatgpt.site/`, published 23 October 2026.
+The standalone source checkout is `../canary-words-site` beside this repository,
+commit `8921e7215b12a19f4377e024065554154beb36b0`.
+[Publication metadata](../evidence/publication.json),
+[HTTP readback](../evidence/hosting.json) and
+[live browser check](../evidence/live-browser.json) record the actual gates.
+
+The initial published Worker returned only the baked app and fixed security
+headers on GET/HEAD `/`. The current candidate also allowlists the public
+manifest, three icons and `/sw.js` for GET/HEAD; other paths/methods are rejected
+(`worker/index.js`, `fetch`; `scripts/build-worker.mjs`, asset map). It reads no request
+body and adds no logging, database, uploads, accounts, application API or remote
+pair store. This response wrapper is needed because the provider's initial
+static-file delivery ignored `_headers` and injected bot JavaScript. The app's
+strict CSP blocked that injection; the failed readback is retained as
+`hosting-v1.json`. The corrected wrapper serves the exact 266,531-byte app with
+CSP/framing/transport/permissions headers and `Cache-Control: no-transform`.
+That cache directive prevents Cloudflare JavaScript injection under its
+[documented policy](https://developers.cloudflare.com/cloudflare-challenges/challenge-types/javascript-detections/).
+The successful readback matches the local artifact byte for byte; no browser
+or CSP errors or external application requests were observed.
+
+## Why hosting adds privacy work
+
+[Managing a Site](https://learn.chatgpt.com/docs/sites/managing-a-site#review-site-analytics)
+states that the platform automatically records unique visits and page views
+without an analytics SDK. This is separate from the app's absence of analytics.
+No supported disable control was found in the available connector capabilities;
+absence of a control is not proof that none exists elsewhere.
+
+The applicable [Sites DPA](https://openai.com/en-GB/policies/chatgpt-sites-data-processing-addendum/)
+(or the organisation's business DPA where applicable) describes OpenAI processing
+hosted personal data on the publisher's behalf. Schedule 1 includes generated log,
+usage and device data. Therefore this is not presented as a host that receives no
+personal data, or as proof that the publisher has no controller responsibilities.
+
+A GitHub Pages alternative was investigated read-only. The personal account’s default
+origin already serves two unrelated apps. No available default account origin
+was established as exclusive to this tool, so no shared default origin was
+selected for its vault/passkeys. No existing site, DNS or account settings
+were changed. No new server, custom domain or paid resource is proposed.
+
+## Adopted notice facts
+
+- Controller/project identity: the existing public Canary Kit project (ForgeSworn),
+  with the already established GitHub private report route. No person's name or
+  company identity is invented. Private reporting was verified enabled via the
+  repository API on 23 October; the project policy now accepts privacy enquiries
+  and the separate local website. That external contact route requires a GitHub
+  account; the app itself does not.
+- Purposes/basis: owner explicitly approved legitimate interests for delivering,
+  securing and operating the static page, including the host's aggregate traffic
+  statistics, on 23 October 2026. No advertising or app tracking SDK is introduced.
+- Recipients: OpenAI as hosting provider, its hosting/subprocessors as described
+  by the applicable DPA, and authorities where legally required. App code adds no
+  other server recipient for pair secrets or names.
+- Data: host connection/request metadata and automatic traffic statistics;
+  the browser keeps pair secrets/nicknames locally, encrypted only on explicit
+  Keep. The private setup secret is a URL fragment, outside the request path/query.
+- Retention: the DPA describes the service term plus time needed to complete
+  applicable obligations including deletion, rather than a universal fixed log
+  lifetime. Do not invent a seven/thirty-day retention setting. Host-specific
+  security/account data may also be governed by OpenAI's privacy policy.
+- Transfers: refer to the applicable DPA's safeguards and UK Addendum. Do not
+  claim UK-only/EU-only storage: the account's actual hosting region is unverified.
+- Rights: access, correction, deletion, restriction, objection and portability
+  where applicable; contact the controller about hosted data, with a complaint
+  route to the ICO. There is no server-side pair vault for the publisher to find,
+  recover, erase or disclose. Do not send setup links, pair words or passphrases
+  with a privacy request. The host may require enough information to locate logs.
+- Cookies: app installs no cookie or tracker. The public host sets Cloudflare's
+  `__cf_bm` bot-protection cookie; the browser observed Secure / SameSite=None
+  on `.chatgpt.site`. Values are not retained in evidence. Cloudflare describes
+  expiry after 30 minutes of continuous inactivity in its
+  [cookie documentation](https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/).
+  The page discloses this security processing. No zero-cookie promise is made.
+
+## Legal scope versus a guarantee
+
+The selected app has no message carriage or user-content store: the existing
+OSA software/static-site assessment remains a documented interpretation `[U]`,
+not a regulator's approval. The September law note was partially refreshed on
+23 October for investigatory powers and Communications Act definitions.
+
+Home Office guidance expressly includes website owners within the broad IPA
+operator definition. That cannot be designed away merely by omitting chat. The
+Communications Act definition is separate. Notice duties and a blanket logging
+obligation must not be conflated: the reviewed IPA sections 66 and 87 concern
+requirements/notices with their statutory conditions, not a prohibition on this
+kind of static tool. No promise of immunity from future notices is made.
+
+No lawfulness certificate or blanket UK-law clearance is given. The owner adopted
+the hosting basis, and the deployed page uses the verified facts; this does not
+certify every controller-wide obligation.
+
+The basis assessment is limited to ordinary delivery/security metadata and
+aggregate operation statistics: those support providing the requested page;
+there is no app profiling, advertising or receipt of pair data. Host statistics
+are automatic and no supported disable control was found. The notice explains
+the processing and objection route. Reassess if the provider changes its
+tracking or if the project adds personal analytics. This is a proportionate
+project assessment, not a legal finding about every provider operation.
+
+## Remaining steps
+
+Public access, exact served HTML, security headers and anonymous QR-link
+browser opening passed. The test used a generated secret in two isolated
+contexts; HTTP requests contained no setup secret. Evidence contains no pair
+secrets, words or cookie values. Physical iPhone/GrapheneOS camera and real
+device-unlock acceptance remain to be performed separately.
+
+Controller-wide ICO fee status is not established by this app inventory. The
+GB note §3.4 records applicable fees and exemptions (tier 1, if due: £52 per year,
+with a £5 direct-debit discount). Do not infer automatic exemption or a completed
+registration from third-party hosting. No fee was paid.
+
+## Public PWA candidate delta
+
+`worker/index.js` and `scripts/build-worker.mjs` now bake an exact public asset
+map: root HTML, manifest, worker and three icons. Only GET/HEAD are accepted;
+no request body is consumed and no user-content response/store/API is added.
+The worker response allows root service-worker scope. Build headers now use
+`Cache-Control: no-cache, no-transform, must-revalidate`; the browser worker
+separately caches the versioned public shell (`local/pwa/sw.js`).
+
+This adds ordinary host asset/update requests under the existing adopted
+minimal hosting purpose. Earlier production byte/cookie/header evidence above
+is historical: it does not establish the current candidate's deployed headers,
+provider behaviour or asset completeness. Fresh release readback is outstanding.
+No host/provider/basis decision, deployment, paid resource or contact was made
+in this factual gap review.
+
+## Publication evidence after this gap review
+
+The phone/PWA candidate was subsequently deployed as Sites version 5 on the same
+origin. `../evidence/publication.json` records website source `cc95b579a31ac64a0cf9fde5f0508cf566c136a1`
+and app implementation `82817b61632e81cc4e1236faad175ea3566430ea`. All six served
+public files matched the pushed source bytes and required headers. The live
+browser journey and actual offline shell reload passed (`mobile-hosting.json`,
+`mobile-live.json`). These later technical readbacks close the candidate
+publication gap mentioned above; the legal interpretation, physical-phone
+acceptance and independent-review limits remain. They are not a new law review.
+
+## Signet Vouch presentation candidate — unchanged hosting basis
+
+The 23 October 2026 source presentation candidate based on app commit
+`599058fa3c970467cb47122285592ffa7780fa88` uses Signet Vouch as the product
+label. The publisher remains Canary Kit (ForgeSworn), using the same public
+origin and established GitHub private privacy/report route. There is no Signet
+service/account integration, new hosting recipient or hosted content API.
+The already approved minimal hosting purpose/basis remains unchanged; no new
+controller identity, contact route, payment or owner decision is supplied here.
+Earlier publication receipts establish the earlier releases only. The candidate's
+served notice, app/manifest branding, exact public bytes and security headers
+need their own release readback. The law note's verified date and `[U]` scope
+limits are unchanged.
+
+## Signed-name and nearby-pairing candidate — 23 October 2026
+
+The changed local trust/pairing code does not change `worker/index.js`, `fetch`:
+GET/HEAD return baked public assets; no request body, upload, relay, directory,
+account endpoint, application content store or custom request logging is added.
+Default nearby QR now carries a public invitation and recipient-encrypted reply;
+advanced recovery can still carry a raw-secret fragment. Signed group nicknames,
+chosen receipts and concurrent saved handoffs stay in user-held encrypted vaults
+and deliberate recipient handoffs, not host request payloads. Fragment stripping
+is not a promise that scanners, browser history or extensions retain nothing.
+
+Canary Kit (ForgeSworn), its established GitHub privacy/report contact, OpenAI
+Sites recipient/processor facts and the owner's approved legitimate-interest
+purpose/basis remain unchanged. Ordinary public asset/update request metadata,
+automatic provider statistics, retention/region uncertainty and security-cookie
+facts remain as previously recorded; local nickname agreement does not add a
+hosting consent basis or a new controller identity. No external approval,
+contact, paid resource or publication was performed for this review.
+
+The candidate's public privacy text must distinguish signed shared names from
+private aliases, disclose keeper presentation and recipient copying/retention,
+and distinguish default encrypted QR scan-back from advanced raw-secret
+recovery. Exact deployed bytes, notice, headers and live flow need a new release
+receipt; previous Sites version 9 proves only that release. This review uses
+the GB note verified 28 September 2026 (review by 28 March 2027), with the
+previously recorded partial 23 October refresh. It does not establish physical
+phone acceptance, independent review or blanket compliance.
+
+Source recheck on 23 October 2026: the updated `local/index.html` notice now
+explains public invitation/encrypted scan-back versus advanced raw-secret
+recovery, holder-approved group nicknames versus private aliases, selected
+receipt presentation, explicit keeper review and recipient copying/retention.
+The accompanying source paths match those disclosures. This closes those source
+notice-alignment findings; built and published bytes/readback remain separate.
+
+Moving nearby naming to final comparison, simplifying show/scan/save controls
+and displaying four fixed setup-comparison words introduces no new host data
+path, metadata purpose or provider. No website NFC/bump support is asserted.
+
+Final source recheck also confirms that transient-until-kept wording is
+explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
+is saved encrypted before scan-back. The source notice-alignment gate is closed
+for this candidate. Publication readback and physical acceptance remain open
+until separately evidenced.
+
+
+## Offline Connect — 23 October 2026 source candidate
+
+This section supersedes earlier default nearby invitation/encrypted-scan-back
+and vault-v5 descriptions for this candidate. Those descriptions remain history
+or advanced compatibility behaviour, not the new Connect default. The source
+review covers the current working tree, including `local/meet.ts` and
+`local/meet-ui.ts`; it is not a deployment/readback or independent security audit.
+The GB note remains verified 28 September 2026, review by 28 March 2027, with
+the already recorded partial 23 October updates. No fresh law research, new
+provider selection, external contact or publication was performed.
+
+The owner chose fully offline Connect rather than a relay/default or an owned
+rendezvous. Per-session public cards and recipient-bound public nonce reveals
+are scanned locally or explicitly transferred as public files. Shared seeds
+are derived on each device and unfinished state is encrypted in the local vault
+(`local/meet.ts:30`, `:48`; `local/meet-ui.ts:28`, `:52`, `:106`). There is no
+new publisher upload, socket, relay, API, DO, content store or server-side key
+holder. The six-asset fixed-response wrapper remains the existing hosting
+architecture (`../canary-words-site/worker/index.js:5`).
+
+The existing publisher/contact, hosting recipients, legitimate-interest purpose
+and basis, traffic-statistics/security-cookie disclosures and retention/region
+limits are retained. Fully offline refers to the exchange after the shell is
+available; it does not promise that initial page loads, updates, OS sharing or
+passkey-provider activity never use networking. #meet fragments are not HTTP
+request data, while external scanners/history/sync/transfer tools can retain
+the public code (`local/index.html:18`, `local/meet.ts:89`).
+
+The corrected app source footer describes this commit/reveal default and its
+saved session state, while preserving the older encrypted-reply/manual recovery
+paths as compatibility features. This source notice-alignment finding is closed
+for this candidate. This review neither
+changes the served wrapper assets nor verifies a deployment. Browser camera
+fixtures, exact public release bytes/readback, physical phone/webcam and actual
+credential-provider acceptance, and independent review remain distinct gates.
+
+Final source notice recheck on 23 October 2026: `local/index.html:103` matches
+the reviewed offline commit/reveal flow, local seed derivation, fixed comparison,
+encrypted pending state and backup limits, no setup expiry versus the one-minute
+scan pause, public files and user-chosen OS transfer, and retained advanced paths.
+Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
+fields and adds no processing recipient or networking. Only source notice
+alignment is closed here; publication/readback, physical camera/credential-provider
+acceptance and independent review are unchanged separate gates.

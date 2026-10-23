@@ -1,0 +1,100 @@
+{
+  "verified": "2026-10-23T17:48:33.710Z",
+  "address": "https://canary.mobile.test/",
+  "deviceUnlock": "PRF stub, not physical biometrics",
+  "mobilePanicPath": true,
+  "publicInviteEncryptedReply": true,
+  "inPersonPublicQrEncryptedScanBack": true,
+  "fourFixedComparisonWords": true,
+  "nearbyRecipientHasNoNameForm": true,
+  "normalCameraOpensPublicInvitation": true,
+  "encryptedProgressSurvivesBackgroundAndReload": true,
+  "replyReplayRejected": true,
+  "passphraseFallbackAndRecovery": true,
+  "offlineShell": true,
+  "physicalPhoneAcceptance": false,
+  "browserErrors": [],
+  "standaloneDownload": true,
+  "appRequests": [
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/sw.js"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/manifest.webmanifest"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-192.png"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-512.png"
+    },
+    {
+      "method": "GET",
+      "path": "/apple-touch-icon.png"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    }
+  ]
+}

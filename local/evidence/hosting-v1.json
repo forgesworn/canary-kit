@@ -1,0 +1,13 @@
+{
+  "url": "https://canary-words.cocoacod256.chatgpt.site/",
+  "sha256": "735ad0ef2c7ebfc394232570b8e82f89ef57f7a3a4c379ad96151c115ed08251",
+  "bytes": 265763,
+  "matches_local_artifact": false,
+  "security_headers": {
+    "content-type": "text/html",
+    "cache-control": "public, max-age=0, must-revalidate"
+  },
+  "set_cookie_names": [
+    "__cf_bm"
+  ]
+}

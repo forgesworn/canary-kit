@@ -1,0 +1,63 @@
+{
+  "verified": "2026-10-23T15:02:22.844Z",
+  "url": "https://canary-words.cocoacod256.chatgpt.site/",
+  "exactPublicAssets": true,
+  "noTransform": true,
+  "noRemoteVault": true,
+  "assets": [
+    {
+      "path": "/",
+      "bytes": 478679,
+      "sha256": "7cb85649cfb25764e358ce1ccdf72f8e28f587dbcbd427b67ed513eaee9871a5",
+      "type": "text/html; charset=utf-8",
+      "cookies": [
+        "__cf_bm"
+      ]
+    },
+    {
+      "path": "/sw.js",
+      "bytes": 1712,
+      "sha256": "937258b7454bb1c8ecc0e4ab77ae0ccd6ebf2788662df77234eb26c31de59890",
+      "type": "application/javascript; charset=utf-8",
+      "cookies": [
+        "__cf_bm"
+      ]
+    },
+    {
+      "path": "/manifest.webmanifest",
+      "bytes": 475,
+      "sha256": "5ad0db5b735bca4e54db8d54379d4bf01d12acadd4ba4e185063bfaeef97a538",
+      "type": "application/manifest+json",
+      "cookies": [
+        "__cf_bm"
+      ]
+    },
+    {
+      "path": "/icon-192.png",
+      "bytes": 10106,
+      "sha256": "423cf41a5509eb9091e6d1a2cd465767f92d3c77de8cebb377c445f957518e58",
+      "type": "image/png",
+      "cookies": [
+        "__cf_bm"
+      ]
+    },
+    {
+      "path": "/icon-512.png",
+      "bytes": 24766,
+      "sha256": "5d517859af32d9b53f6f7449b435cdfd2034087a1c68722a346bfbee429cacf0",
+      "type": "image/png",
+      "cookies": [
+        "__cf_bm"
+      ]
+    },
+    {
+      "path": "/apple-touch-icon.png",
+      "bytes": 9425,
+      "sha256": "b370b491c5608c50f24b914a911fc295356a67656d0474e8f839999f2cd3e8f2",
+      "type": "image/png",
+      "cookies": [
+        "__cf_bm"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ <uses-permission android:name="android.permission.NFC"/>
+ <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
+ <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+ <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
+ <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+ <uses-permission android:name="android.permission.CAMERA"/>
+ <uses-feature android:name="android.hardware.nfc" android:required="false"/>
+ <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
+ <uses-feature android:name="android.hardware.camera.any" android:required="false"/>
+ <application android:theme="@android:style/Theme.Material.Light.NoActionBar" android:label="Vouch Prototype" android:icon="@drawable/vouch_icon" android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false">
+  <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden">
+   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+  </activity>
+  <service android:name=".VouchCardService" android:exported="true" android:permission="android.permission.BIND_NFC_SERVICE">
+   <intent-filter><action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE"/></intent-filter>
+   <meta-data android:name="android.nfc.cardemulation.host_apdu_service" android:resource="@xml/vouch_apdu"/>
+  </service>
+  <provider android:name=".ExportProvider" android:authorities="dev.forgesworn.vouch.prototype.exports" android:exported="false" android:grantUriPermissions="true"/>
+ </application>
+</manifest>

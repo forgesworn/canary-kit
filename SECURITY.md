@@ -18,6 +18,14 @@
 
 **Do not** report security vulnerabilities through public GitHub issues, pull requests, or any other public channel.
 
+### Local website and privacy enquiries
+
+The separate `local/` website and its published static copy are included in the
+project's private reporting route. Privacy questions, complaints and rights
+requests may also be sent privately through that route. It requires a GitHub
+account. Do not include setup links, pair words, vault passphrases or other
+people's personal data in an initial report. The app has no remote pair vault.
+
 ### What to Include
 
 - Description of the vulnerability

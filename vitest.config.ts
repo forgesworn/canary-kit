@@ -16,7 +16,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.test.ts', 'app/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'app/**/*.test.ts', 'local/**/*.test.ts'],
     passWithNoTests: true,
     coverage: {
       provider: 'v8',

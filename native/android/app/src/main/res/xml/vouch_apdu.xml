@@ -1,0 +1,3 @@
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android" android:description="@string/nfc_description" android:requireDeviceUnlock="true">
+ <!-- The AID is registered only during an explicit foreground Connect session. -->
+</host-apdu-service>

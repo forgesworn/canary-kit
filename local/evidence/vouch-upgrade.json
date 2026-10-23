@@ -1,0 +1,13 @@
+{
+  "verified": "2026-10-23T17:57:20.560Z",
+  "previousAppCommit": "599058f",
+  "sameOrigin": true,
+  "savedPairWordsPreserved": true,
+  "savedGroupKeeperPreserved": true,
+  "encryptedRecordByteForByteUnchanged": true,
+  "firstSaveUpgradePreservesWords": true,
+  "oldBuildRefusesNewPayloadWithoutOverwrite": true,
+  "credentialProvider": "PRF stub",
+  "physicalDeviceAcceptance": false,
+  "browserErrors": []
+}

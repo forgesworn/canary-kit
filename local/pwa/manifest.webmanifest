@@ -1,0 +1,10 @@
+{
+  "id": "/", "name": "Signet Vouch · your people", "short_name": "Vouch",
+  "description": "Private vouches and spoken checks for your people.",
+  "start_url": "/", "scope": "/", "display": "standalone",
+  "background_color": "#f6f4ec", "theme_color": "#f6f4ec",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
