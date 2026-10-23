@@ -175,3 +175,13 @@ explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
 is saved encrypted before scan-back. The source notice-alignment gate is closed
 for this candidate. Publication readback and physical acceptance remain open
 until separately evidenced.
+
+### Version 10 publication readback
+
+Version 10 was published from website source
+`7919d77ad1d6e6709b6372b706373918b0441d89`, app source
+`91d54c0d7bd16839bc45847ae23bba905d8ea791`. All six public files and the updated
+notice matched source with expected security headers (`../evidence/publication.json`,
+`mobile-hosting.json`). Live browser journeys passed. This closes the candidate
+publication/notice-alignment gate; it does not change the dated law review, [U]
+scope interpretations or outstanding physical/independent acceptance gates.

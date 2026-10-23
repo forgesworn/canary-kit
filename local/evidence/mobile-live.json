@@ -1,9 +1,13 @@
 {
-  "verified": "2026-10-23T12:32:30.637Z",
+  "verified": "2026-10-23T13:22:22.944Z",
   "address": "https://canary-words.cocoacod256.chatgpt.site/",
   "deviceUnlock": "PRF stub, not physical biometrics",
   "mobilePanicPath": true,
   "publicInviteEncryptedReply": true,
+  "inPersonPublicQrEncryptedScanBack": true,
+  "fourFixedComparisonWords": true,
+  "nearbyRecipientHasNoNameForm": true,
+  "normalCameraOpensPublicInvitation": true,
   "encryptedProgressSurvivesBackgroundAndReload": true,
   "replyReplayRejected": true,
   "passphraseFallbackAndRecovery": true,
@@ -82,10 +86,6 @@
     },
     {
       "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
       "path": "/manifest.webmanifest"
     },
     {
@@ -99,6 +99,10 @@
     {
       "method": "GET",
       "path": "/apple-touch-icon.png"
+    },
+    {
+      "method": "GET",
+      "path": "/"
     },
     {
       "method": "GET",
@@ -134,7 +138,123 @@
     },
     {
       "method": "GET",
+      "path": "/apple-touch-icon.png"
+    },
+    {
+      "method": "GET",
       "path": "/sw.js"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/sw.js"
+    },
+    {
+      "method": "GET",
+      "path": "/manifest.webmanifest"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-192.png"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-512.png"
+    },
+    {
+      "method": "GET",
+      "path": "/apple-touch-icon.png"
+    },
+    {
+      "method": "GET",
+      "path": "/manifest.webmanifest"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-192.png"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-512.png"
+    },
+    {
+      "method": "GET",
+      "path": "/apple-touch-icon.png"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/sw.js"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/manifest.webmanifest"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-192.png"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-512.png"
+    },
+    {
+      "method": "GET",
+      "path": "/apple-touch-icon.png"
+    },
+    {
+      "method": "GET",
+      "path": "/sw.js"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/manifest.webmanifest"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-192.png"
+    },
+    {
+      "method": "GET",
+      "path": "/sw.js"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-512.png"
     },
     {
       "method": "GET",
@@ -171,122 +291,6 @@
     {
       "method": "GET",
       "path": "/apple-touch-icon.png"
-    },
-    {
-      "method": "GET",
-      "path": "/manifest.webmanifest"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-192.png"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-512.png"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/apple-touch-icon.png"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/sw.js"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/manifest.webmanifest"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-192.png"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-512.png"
-    },
-    {
-      "method": "GET",
-      "path": "/apple-touch-icon.png"
-    },
-    {
-      "method": "GET",
-      "path": "/sw.js"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/manifest.webmanifest"
-    },
-    {
-      "method": "GET",
-      "path": "/sw.js"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/manifest.webmanifest"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-192.png"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-512.png"
-    },
-    {
-      "method": "GET",
-      "path": "/apple-touch-icon.png"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-192.png"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-512.png"
-    },
-    {
-      "method": "GET",
-      "path": "/apple-touch-icon.png"
-    },
-    {
-      "method": "GET",
-      "path": "/sw.js"
-    },
-    {
-      "method": "GET",
-      "path": "/"
     },
     {
       "method": "GET",

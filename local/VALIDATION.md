@@ -398,3 +398,31 @@ needs a fresh real-phone/novice trial, including the person who found it confusi
 PHONE-ACCEPTANCE.md records the tasks and unqualified physical/timing gates.
 Independent security/legal review remains separate. Candidate checks do not by
 themselves verify published bytes; the next publication receipt records release.
+
+### Simpler flow publication and live checks
+
+Site version **10** deployed successfully from website source
+`7919d77ad1d6e6709b6372b706373918b0441d89`, app implementation
+`91d54c0d7bd16839bc45847ae23bba905d8ea791`. The public origin, PWA ID, storage key,
+publisher/contact and hosting basis are unchanged. Receipt/hashes are in
+`evidence/publication.json`; the previous receipt is `publication-v9.json`.
+
+All six public files matched source byte for byte with required types/security
+headers and no-transform. The live mobile/offline, private-vouch and device-copy
+journeys passed. Mobile evidence includes real decoding in both QR directions,
+normal-camera URL opening, the one-button recipient, four fixed setup words,
+protected resume, call normal/duress/mismatch, fallback/recovery and offline reload.
+Private-group evidence includes name approval before proof, chosen receipt,
+explicit keeper review, separate voucher authority, replay and withdrawal checks.
+The old-artifact upgrade/downgrade test preserved words/keys and refused v5 in the
+old build without overwriting it. See the named JSON reports and phone screenshots.
+
+The updated public site was opened in Google Chrome. No physical phone, actual
+biometrics/PRF, native OS-sharing or novice acceptance is inferred. Earlier owner
+feedback remains a failed clarity result for the earlier flow; this simpler
+version needs the fresh PHONE-ACCEPTANCE.md trial. Native My Signet Android taps
+are not connected to this website or its spoken pairs.
+
+Task-owned preview server, automation browsers, dependency installation and scratch
+publication archive were removed after validation. No task service is left running.
+The Google Chrome review tab is left open intentionally.
