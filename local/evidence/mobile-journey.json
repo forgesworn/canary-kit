@@ -1,5 +1,5 @@
 {
-  "verified": "2026-10-23T10:13:15.358Z",
+  "verified": "2026-10-23T10:17:41.942Z",
   "address": "https://canary.mobile.test/",
   "deviceUnlock": "PRF stub, not physical biometrics",
   "mobilePanicPath": true,
@@ -10,6 +10,7 @@
   "offlineShell": true,
   "physicalPhoneAcceptance": false,
   "browserErrors": [],
+  "standaloneDownload": true,
   "appRequests": [
     {
       "method": "GET",
@@ -91,6 +92,5 @@
       "method": "GET",
       "path": "/"
     }
-  ],
-  "standaloneDownload": true
+  ]
 }

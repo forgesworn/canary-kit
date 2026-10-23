@@ -152,3 +152,14 @@ changes. ICO fee status remains controller-wide and unverified (note §3.4:
 tier 1 if due £52/year, £5 direct-debit discount); no fee was paid or registration
 made. Provider configuration, foreign law, independent security/legal review and
 physical no-Play GrapheneOS/iPhone credential acceptance remain unchecked.
+
+## Publication evidence after this gap review
+
+The phone/PWA candidate was subsequently deployed as Sites version 5 on the same
+origin. `../evidence/publication.json` records website source `cc95b579a31ac64a0cf9fde5f0508cf566c136a1`
+and app implementation `82817b61632e81cc4e1236faad175ea3566430ea`. All six served
+public files matched the pushed source bytes and required headers. The live
+browser journey and actual offline shell reload passed (`mobile-hosting.json`,
+`mobile-live.json`). These later technical readbacks close the candidate
+publication gap mentioned above; the legal interpretation, physical-phone
+acceptance and independent-review limits remain. They are not a new law review.

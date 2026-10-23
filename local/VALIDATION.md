@@ -237,3 +237,21 @@ biometrics/PIN, native installation/storage migration, physical camera scanning,
 call multitasking or a one-minute human usability target. No independent security
 audit or UK-law clearance is claimed. The design/reuse map and remaining limits
 are in `MOBILE-EXPERIENCE.md`.
+
+### Published phone/PWA evidence
+
+Site version **5** deployed successfully on the same public origin from website
+source commit `cc95b579a31ac64a0cf9fde5f0508cf566c136a1`; app implementation is
+`82817b61632e81cc4e1236faad175ea3566430ea`. The native publication receipt is in
+`evidence/publication.json` (v4 preserved separately).
+
+The live mobile suite passed the same setup, check, app-switch, remote exchange,
+replay, fallback and recovery journey. Real service-worker offline reload,
+unlock and words also passed on the deployed origin; native credentials remain
+stubs. All **six** served public files matched the pushed source byte for byte,
+with expected MIME types, CSP, no-transform and worker scope headers; the offline
+cache has **five** public shell files (it does not cache the worker itself).
+See `evidence/mobile-live.json` and `evidence/mobile-hosting.json`. This readback
+closes the browser/publication gate, not the physical phone or independent audit
+gates above. The live app was opened in Google Chrome. Task preview/test servers
+and automation browsers were stopped afterwards.

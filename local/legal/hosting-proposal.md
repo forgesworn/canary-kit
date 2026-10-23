@@ -144,3 +144,14 @@ is historical: it does not establish the current candidate's deployed headers,
 provider behaviour or asset completeness. Fresh release readback is outstanding.
 No host/provider/basis decision, deployment, paid resource or contact was made
 in this factual gap review.
+
+## Publication evidence after this gap review
+
+The phone/PWA candidate was subsequently deployed as Sites version 5 on the same
+origin. `../evidence/publication.json` records website source `cc95b579a31ac64a0cf9fde5f0508cf566c136a1`
+and app implementation `82817b61632e81cc4e1236faad175ea3566430ea`. All six served
+public files matched the pushed source bytes and required headers. The live
+browser journey and actual offline shell reload passed (`mobile-hosting.json`,
+`mobile-live.json`). These later technical readbacks close the candidate
+publication gap mentioned above; the legal interpretation, physical-phone
+acceptance and independent-review limits remain. They are not a new law review.
