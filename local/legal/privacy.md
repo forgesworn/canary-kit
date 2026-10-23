@@ -543,3 +543,25 @@ Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
 fields and adds no processing recipient or networking. Only source notice
 alignment is closed here; publication/readback, physical camera/credential-provider
 acceptance and independent review are unchanged separate gates.
+
+
+## Branded address and direct Cloudflare hosting — 23 October 2026
+
+The additional `https://vouch.mysignet.app/` copy is served directly by Cloudflare;
+the original Sites address remains hosted through OpenAI. Controller/contact,
+minimal hosting purposes and the approved legitimate-interest basis are retained.
+The public footer identifies both providers separately. Cloudflare's Privacy
+Policy covers operational/security information and retention/transfer criteria;
+its published DPA covers applicable processor data. No fixed retention period
+or UK-only processing is promised. Sites statistics, cookie observations and
+DPA statements remain scoped to the original copy. See the provider terms,
+private-account verification limits and deployment status in
+[the hosting record](hosting-proposal.md#branded-address-and-direct-cloudflare-hosting--23-october-2026).
+
+Each origin has separate storage, PWA and passkeys. Opening the new address does
+not move existing people. Portable recovery omits the device slot and requires
+a recovery passphrase; selected-person copy excludes groups, unfinished state
+and unlock credentials. The welcome help explains both routes and retaining
+the original until verified. Strict two-root public-link compatibility does
+not expand vault/device-credential origins. No redirect or automatic migration
+is introduced.

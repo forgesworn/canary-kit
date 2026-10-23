@@ -364,6 +364,9 @@ get('optical-file').addEventListener('change',()=>{
 })
 let pendingTransfer:OpticalPayload|undefined
 mountInstall(show, home)
+get('address-help').hidden = nativeAvailable()
+get('address-restore').addEventListener('click', () => get('restore-welcome').click())
+get('address-copy').addEventListener('click', () => get('devices-welcome').click())
 get('people-search').addEventListener('input', () => {
   const query = get<HTMLInputElement>('people-search').value.trim().toLocaleLowerCase()
   get('people-list').querySelectorAll<HTMLElement>('.person-card').forEach(card => { card.hidden = !card.textContent?.toLocaleLowerCase().includes(query) })

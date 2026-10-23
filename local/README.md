@@ -1,6 +1,6 @@
 # Signet Vouch — your people, your call check
 
-A phone-first website at [Signet Vouch](https://canary-words.cocoacod256.chatgpt.site/),
+A phone-first website at [Signet Vouch](https://vouch.mysignet.app/),
 with a self-contained
 [HTML copy](../canary-local.html) for local review in **Chrome**. There are no
 application accounts, message servers, directories, relays or secret-sync APIs.
@@ -205,3 +205,18 @@ locking/reloading, reopen the group and use **Continue exchange**. Expired
 requests need a new check. Group keys travel in your encrypted recovery backup.
 Withdrawals must reach each relevant phone separately; no global status service
 is claimed. See [protocol and limits](PRIVATE-TRUST.md).
+
+
+## Moving from the original address
+
+The original https://canary-words.cocoacod256.chatgpt.site/ address remains
+available. Each address keeps its own encrypted vault, installed PWA and device
+unlock. Nothing is moved or deleted automatically. To move the full vault, unlock
+the original, add a recovery passphrase if needed, export an encrypted backup
+and restore it at the destination. Enrol destination device unlock and recovery,
+check the people/groups and keep the old copy until verified. Selected-person
+copy is an alternative for completed people only; it excludes groups, unfinished
+exchanges and unlock credentials. The shared app accepts public links between
+these two exact HTTPS roots without broadening passkey/vault origins. Installed
+native prototypes still use their original share address; moving QR and files
+retain their existing protocol and explicit human comparison.

@@ -33,7 +33,7 @@ jobs:
       - name: Check moving QR setup and encrypted copies
         run: node tools/test-optical-vouch.mjs
       - name: Check QR through compressed VP8 and H264 video
-        run: npm run test:video
+        run: npm run test:video -- --domains
       - name: Build Vouch native web bundle
         run: npm run build:local -- --native
       - name: Check native bridge fixtures

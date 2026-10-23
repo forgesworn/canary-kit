@@ -335,3 +335,28 @@ only, with local signalling and no ICE servers. No new notice gap was identified
 from the changed source. Native build/codec evidence is separate from physical
 BLE, external-provider camera trials, owner acceptance and the `[U]` legal
 classification. Existing law-note dates and owner decisions remain unchanged.
+
+
+## Branded address and direct Cloudflare hosting — 23 October 2026
+
+New static recipient: direct Cloudflare at `vouch.mysignet.app`, configured by
+`../canary-words-site/wrangler.jsonc` (Worker `signet-vouch`, custom-domain route,
+observability/Logpush disabled). The same baked response wrapper reads method
+and path only and returns six public files (`worker/index.js`, `build-worker.mjs`);
+there is no request-body processing, outbound fetch, message/content API or key
+custody. The old OpenAI/Sites origin remains separate and available. Cloudflare
+is a direct host for the new copy, not merely a Sites subprocessor there.
+
+`local/address.ts` limits public link compatibility to the two exact HTTPS
+roots; lookalikes, other subdomains, paths, credentials, queries and non-default
+ports remain rejected. Vault/device unlock still uses exact origin equality in
+`vault.ts`. `address.test.ts` checks that an old passkey slot cannot unlock at
+the new origin and that passphrase recovery re-enrols destination unlock without
+changing the original. The welcome help exposes the existing restore/copy routes.
+Native prototypes retain their legacy share address.
+
+Provider/privacy and source-notice deltas are in
+[the hosting record](hosting-proposal.md#branded-address-and-direct-cloudflare-hosting--23-october-2026).
+Actual Worker settings, DNS/TLS, public bytes/headers/cookies and browser requests
+are separate acceptance gates; public terms are not a private-account contract
+attestation. Existing legal classifications and physical-device limits remain.

@@ -2,6 +2,7 @@ import { generateMnemonic, mnemonicToEntropy, entropyToMnemonic } from '@scure/b
 import { wordlist } from '@scure/bip39/wordlists/english.js'
 import { deriveToken, deriveDuressToken } from '../src/token.js'
 import { bytesToHex, hexToBytes, sha256, timingSafeStringEqual } from '../src/crypto.js'
+import { isVouchLinkAddress } from './address.js'
 
 export const INTERVAL = 30
 const CONTEXT = 'canary:local-pair:v1'
@@ -69,7 +70,7 @@ export function joinLink(input: string, address: string): Pair {
   if (typeof input !== 'string' || input.length > 2048) throw new Error('This is not a Canary pairing link.')
   const expected = siteAddress(address)
   const received = siteAddress(input)
-  if (received.href !== expected.href) throw new Error('This pairing link belongs to a different website. Open the trusted Canary address together.')
+  if (!isVouchLinkAddress(received, expected)) throw new Error('This pairing link belongs to a different website. Open the trusted Canary address together.')
   return joinFragment(new URL(input).hash)
 }
 

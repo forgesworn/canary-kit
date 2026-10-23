@@ -76,7 +76,12 @@ export async function readVideoQr(reader,source,start,trial) {
    }
    await source.clock.runFor(500)
   }
-  throw new Error('Compressed video QR did not complete within three bounded cycles')
+  const diagnostic=await reader.evaluate(async()=>{
+   const progress=document.querySelector('#optical-progress'),stats=await window.vouchVideoRx.pc.getStats()
+   const inbound=[...stats.values()].find(s=>s.type==='inbound-rtp'&&s.kind==='video')
+   return {received:progress?.value,total:progress?.max,framesDecoded:inbound?.framesDecoded,bytesReceived:inbound?.bytesReceived,connection:window.vouchVideoRx.pc.connectionState}
+  })
+  throw new Error('Compressed video QR did not complete within three bounded cycles: '+JSON.stringify(diagnostic))
  }finally{
   await Promise.allSettled([
    source.evaluate(()=>{const tx=window.vouchVideoTx;if(tx){tx.stream.getTracks().forEach(t=>t.stop());tx.pc.close();delete window.vouchVideoTx}}),

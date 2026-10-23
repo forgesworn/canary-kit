@@ -310,3 +310,21 @@ Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
 fields and adds no processing recipient or networking. Only source notice
 alignment is closed here; publication/readback, physical camera/credential-provider
 acceptance and independent review are unchanged separate gates.
+
+
+## Branded address and direct Cloudflare hosting — 23 October 2026
+
+The owner selected `vouch.mysignet.app` for an additional direct static
+Cloudflare Worker deployment. The fixed-response wrapper serves six public
+files, adds no logging/body processing/outbound fetch and holds no private keys
+or user content. Worker observability/Logpush are disabled in configuration;
+provider security/operational processing remains. The original Sites deployment
+continues. This preserves the scoped software/static-publisher assessment `[U]`,
+existing IPA/Communications Act caveats, minimal purposes/basis and controller
+identity/contact. It does not turn the name into Signet account integration.
+
+See [the hosting record](hosting-proposal.md#branded-address-and-direct-cloudflare-hosting--23-october-2026)
+for provider-specific public terms, private-account limits and DNS/TLS/readback
+gates. No new statutory deadline or fee was identified; controller-wide fee
+uncertainty remains. The UK note remains verified 28 September 2026, review due
+28 March 2027, with partial 23 October updates. No blanket legal clearance follows.
