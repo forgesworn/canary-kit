@@ -1,0 +1,15 @@
+web/
+evidence/*.apk
+evidence/*.ipa
+evidence/*.app/
+evidence/*.zip
+__pycache__/
+android/.gradle/
+android/local.properties
+android/build/
+android/app/build/
+ios/*.xcodeproj/
+ios/build/
+ios/DerivedData/
+ios/Vouch/Assets.xcassets/
+android/app/src/main/res/drawable-nodpi/

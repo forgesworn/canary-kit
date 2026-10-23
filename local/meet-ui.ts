@@ -3,6 +3,7 @@ import { pairComparison } from './model.js'
 import { text } from './trust.js'
 import { QrScanner, drawQr } from './qr.js'
 import type { Entry, Vault } from './vault.js'
+import { nativeAvailable, nativeSaveFile, openNativeRadio, cancelNativeRadios, type NativeRadio } from './native.js'
 
 interface Host {
   vault():Vault|null
@@ -15,16 +16,32 @@ interface Host {
 }
 export function mountMeet(root:HTMLElement,host:Host){
   let epoch=0,scanner:QrScanner|null=null,current:string|undefined,facing:'user'|'environment'='user'
+  let radio:NativeRadio|null=null,radioId:string|undefined,radioRevision=0,starting=false,cameraMode=false,nativeState='Keep both phones open on Connect.',stateNode:HTMLElement|undefined
   const node=<K extends keyof HTMLElementTagNameMap>(tag:K,value='',className='')=>{const n=document.createElement(tag);n.textContent=value;n.className=className;return n}
   function button(label:string,task:()=>void,id='',primary=false){const b=node('button',label,primary?'primary wide':'secondary wide');b.type='button';b.id=id;b.addEventListener('click',task);return b}
-  function stopScan(){scanner?.stop();scanner=null}
-  function clear(){epoch++;stopScan();current=undefined;root.ondragover=root.ondrop=null;root.replaceChildren()}
+  function stopCamera(){scanner?.stop();scanner=null}
+  function stopRadio(){radioRevision++;cancelNativeRadios();radio?.stop();radio=null;radioId=undefined;starting=false;stateNode=undefined}
+  function stopScan(){stopCamera();stopRadio()}
+  function clear(){epoch++;stopScan();current=undefined;cameraMode=false;nativeState='Keep both phones open on Connect.';root.ondragover=root.ondrop=null;root.replaceChildren()}
   function shell(title:string,lead:string){
-    stopScan();host.show();root.replaceChildren()
+    stopCamera();host.show();root.replaceChildren()
     const back=button('← Your people',host.home);back.className='text-button back'
     root.append(back,node('p','Connect · fully offline','eyebrow'),node('h1',title),node('p',lead,'lead'))
   }
   const find=(id:string)=>{const m=host.vault()?.meetings?.find(m=>m.id===id);if(!m)throw new Error('Unlock and open your saved connection, or start again together.');return m}
+  const address=()=>nativeAvailable()?'https://canary-words.cocoacod256.chatgpt.site/':location.origin+location.pathname
+  function startRadio(id:string){
+    const code=()=>meetingToken(meetingMessage(find(id)))
+    if(radio&&radioId===id){void radio.update(code(),!!find(id).peerReveal).catch(e=>{nativeState=e.message;if(stateNode)stateNode.textContent=nativeState});return}
+    if(starting)return
+    stopRadio();starting=true;const revision=radioRevision;radioId=id
+    void openNativeRadio(code(),candidate,message=>{nativeState=message;if(stateNode)stateNode.textContent=message}).then(async opened=>{
+      if(revision!==radioRevision||root.hidden||document.hidden||!host.vault()||current!==id||cameraMode){opened.stop();return}
+      radio=opened;starting=false
+      await opened.update(code(),!!find(id).peerReveal)
+      const tap=root.querySelector<HTMLButtonElement>('#meet-nfc');if(tap)tap.hidden=!opened.nfc
+    }).catch(e=>{if(revision===radioRevision){starting=false;nativeState=e instanceof Error?e.message:'Nearby connection unavailable. Use a camera instead.';if(stateNode)stateNode.textContent=nativeState}})
+  }
   async function prepare(peer?:MeetingMessage){
     const vault=host.vault();if(!vault)return
     const meetings=vault.meetings??[]
@@ -42,7 +59,7 @@ export function mountMeet(root:HTMLElement,host:Host){
   function start(){host.ensure(()=>prepare())}
   function receive(input:string){
     try{
-      const peer=meetingInput(input,location.origin+location.pathname)
+      const peer=meetingInput(input,address())
       const self=host.vault()?.meetings?.find(m=>meetingCard(m).pub===peer.card.pub)
       if(self){render(self.id);host.error('That is this device’s own code. Use the other device.');return}
       shell('Connect together.','Keep a private check with the person beside you. On later calls, check each other’s two words.')
@@ -62,20 +79,32 @@ export function mountMeet(root:HTMLElement,host:Host){
   function candidate(input:string){
     if(root.hidden||document.hidden||!host.vault()||!current)return
     let peer:MeetingMessage
-    try{peer=meetingInput(input,location.origin+location.pathname)}catch{return}
+    try{peer=meetingInput(input,address())}catch{return}
     const previous=find(current)
     if(previous.peer&&previous.peer.id===peer.card.id&&previous.peer.pub===peer.card.pub&&previous.peer.commitment===peer.card.commitment&&(!peer.reveal||previous.peerReveal===peer.reveal))return
-    host.ensure(async()=>{stopScan();try{await match(peer)}catch(e){if(current&&!document.hidden)render(current);host.error(e instanceof Error?e.message:'Point at the other screen.')}})
+    host.ensure(async()=>{stopCamera();try{await match(peer)}catch(e){if(current&&!document.hidden)render(current);host.error(e instanceof Error?e.message:'Point at the other screen.')}})
   }
   function render(id:string){
     const meeting=find(id),stamp=epoch,code=meetingMessage(meeting)
     current=id
-    shell(meeting.peerReveal?'Compare your words.':meeting.peer?'Keep facing each other.':'Face your screens together.',meeting.peerReveal?'Keep this code visible until the other device has its four words too.':'Both open Connect. Hold your screens facing each other so the front cameras can finish reading the codes.')
+    const nearby=nativeAvailable()&&!cameraMode
+    shell(meeting.peerReveal?'Compare your words.':nearby?'Bring your phones together.':meeting.peer?'Keep facing each other.':'Face your screens together.',meeting.peerReveal?(nearby?'Keep Connect open until the other phone has its four words too.':'Keep this code visible until the other device has its four words too.'):nearby?'Both open Connect and stay nearby. You can also start an NFC tap when one phone is Android.':'Both open Connect. Hold your screens facing each other so the front cameras can finish reading the codes.')
     const layout=node('div','','meet-layout'),optical=node('div','','meet-optical'),actions=node('div','','meet-actions')
     const frame=node('div','','qr-frame meet-qr-frame'),canvas=node('canvas');canvas.id='meet-qr';canvas.setAttribute('aria-label','Public connection code, containing no shared secret');frame.append(canvas);optical.append(frame)
-    const payload=location.protocol==='https:'?meetingLink(code,location.origin+location.pathname):meetingToken(code)
+    const payload=nativeAvailable()||location.protocol==='https:'?meetingLink(code,address()):meetingToken(code)
     drawQr(canvas,payload)
     optical.append(node('p','Your code stays here while the other device catches up.','small centered'))
+    let nativeHelp:HTMLElement|undefined
+    if(nearby){
+      optical.hidden=true;layout.classList.add('native-meet-layout')
+      if(!meeting.peerReveal){const phones=node('div','','native-phones');phones.setAttribute('aria-hidden','true');phones.append(node('span',''),node('span',''));actions.append(phones)}
+      const controls=node('div')
+      stateNode=node('p',nativeState,'notice small');stateNode.id='meet-native-state';stateNode.setAttribute('role','status');controls.append(stateNode)
+      const tap=button('Tap using NFC',()=>{void radio?.readNfc().catch(e=>host.error(e.message))},'meet-nfc');tap.hidden=!!radio&&!radio.nfc
+      controls.append(tap,button('Try nearby again',()=>{stopRadio();render(id)},'meet-native-again'),node('p','One person starts NFC; the other keeps Connect open. For two iPhones, use the nearby Bluetooth connection.','small'))
+      if(meeting.peerReveal){nativeHelp=node('details');nativeHelp.append(node('summary','Other phone still waiting?'),controls)}else actions.append(controls)
+      startRadio(id)
+    }
     if(meeting.peerReveal){
       const pair=pairFromMeeting(meeting),entry=host.vault()!.entries.find(e=>e.id===meeting.id)!
       actions.append(node('p','Same four words on both devices?','small'))
@@ -92,7 +121,7 @@ export function mountMeet(root:HTMLElement,host:Host){
         if(stamp===epoch&&!document.hidden){clear();host.open(completed)}
       })})
       actions.append(form,node('p','Compare together before saving. These fixed words do not rotate. Your two call words appear afterwards.','small'))
-    }else{
+    }else if(!nearby){
       const camera=node('div','','meet-camera'),video=node('video');video.id='meet-video';video.muted=true;video.playsInline=true;video.setAttribute('aria-label','Local front camera for reading the other screen')
       const state=node('p','Reading the other screen…','small');state.id='meet-camera-state';camera.append(video,state)
       const again=button('Read codes again',()=>render(id),'meet-read-again');again.hidden=true
@@ -104,21 +133,24 @@ export function mountMeet(root:HTMLElement,host:Host){
         video.hidden=true;again.hidden=false
       })
     }
+    if(nativeHelp)actions.append(nativeHelp)
     const help=node('details'),summary=node('summary','Use a file instead of a camera');help.append(summary,node('p','A desktop without a camera can show its code to your phone. Send the phone’s public reply file back using AirDrop, USB or another offline transfer you choose, then open it here. The file contains no private key or shared secret.','small'))
     const file=node('input');file.type='file';file.id='meet-file';file.accept='.txt,text/plain';file.hidden=true
     const readFile=async(blob:File)=>{
       if(blob.size>2048)throw new Error('This public code file is too large.')
       const value=await blob.text();if(stamp!==epoch||current!==id||document.hidden||root.hidden)return
-      meetingInput(value.trim(),location.origin+location.pathname)
+      meetingInput(value.trim(),address())
       candidate(value.trim())
     }
     file.addEventListener('change',()=>{const value=file.files?.[0];file.value='';if(value)void readFile(value).catch(e=>host.error(e instanceof Error?e.message:'Could not read this code.'))})
     help.append(button('Save my public code file',()=>{
+      if(nativeAvailable()){void nativeSaveFile('vouch-public-code.txt',meetingToken(code),'text/plain').catch(e=>host.error(e.message));return}
       const blob=new Blob([meetingToken(code)],{type:'text/plain'}),url=URL.createObjectURL(blob),a=node('a');a.href=url;a.download='vouch-public-code.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),30_000)
     },'meet-export'),button('Open their public code file',()=>file.click(),'meet-import'),file)
     if(navigator.share&&navigator.canShare?.({files:[new File([meetingToken(code)],'vouch-public-code.txt',{type:'text/plain'})]}))help.append(button('Share my public code file',()=>{void navigator.share({files:[new File([meetingToken(code)],'vouch-public-code.txt',{type:'text/plain'})]}).catch(()=>{})},'meet-share-file'))
     root.ondragover=event=>{event.preventDefault()};root.ondrop=event=>{event.preventDefault();const value=event.dataTransfer?.files[0];if(value)void readFile(value).catch(e=>host.error(e instanceof Error?e.message:'Could not read this code.'))}
-    actions.append(help,node('p','Camera frames stay on this device. No internet, microphone, relay or account is used for this exchange.','small'))
+    if(nativeAvailable())actions.append(button(nearby?'Use a camera instead':'Use nearby connection',()=>{stopScan();cameraMode=!cameraMode;render(id)},'meet-mode'))
+    actions.append(help,node('p',nearby?'Connection codes travel directly between devices. Compare the words before saving. No internet or account is used.':'Camera frames stay on this device. No internet, microphone, relay or account is used for this exchange.','small'))
     layout.append(optical,actions);root.append(layout)
     root.append(button('Start again together',()=>host.ensure(async()=>{
       if(!confirm('Start this connection again? Your completed saved people stay as they are.'))return

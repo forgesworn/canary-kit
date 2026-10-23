@@ -149,3 +149,30 @@ select { display:block; width:100%; padding:14px; font:16px/1.6 Arial,sans-serif
 #meet{max-width:820px}#meet h1{font-size:43px;margin-bottom:16px}#meet .lead{font-size:17px;max-width:620px}.meet-layout{display:grid;gap:22px;align-items:start}.meet-layout>div{min-width:0}.meet-qr-frame{width:100%;max-width:320px;margin:0 auto 12px;padding:12px}.meet-qr-frame canvas{display:block;width:100%;height:auto;image-rendering:pixelated}.meet-camera{display:flex;align-items:center;gap:16px;background:#eeefe2;border-radius:14px;padding:14px;margin-bottom:12px}.meet-camera video{width:104px;height:92px;object-fit:cover;border-radius:10px}.meet-camera p{flex:1;margin:0}.meet-words{font:650 27px/1.35 Arial,sans-serif;letter-spacing:-.5px;color:var(--ink);padding:18px;border:1px solid var(--line);background:#e9edda;border-radius:14px;margin:10px 0 22px;overflow-wrap:anywhere}.meet-actions form .primary{margin-top:18px}.meet-actions details{margin-top:24px}.meet-actions .small{font-size:12px}#meet-restart{margin-top:26px;font-size:13px}.meet-optical .small{font-size:12px;max-width:300px;margin:12px auto}#pending-meetings:empty{display:none}#meet .back{margin-bottom:14px}
 @media(min-width:700px){.meet-layout{grid-template-columns:1fr 1fr;gap:32px}.meet-actions>.small:first-child{margin-top:0}}
 @media(max-width:650px){#meet h1{font-size:34px;line-height:1.1}#meet .eyebrow{font-size:10px;margin-bottom:12px}#meet .lead{font-size:15px;line-height:1.55;margin-bottom:22px}.meet-qr-frame{max-width:255px}.meet-layout{gap:8px}.meet-optical .small{font-size:11px}.meet-words{font-size:25px;margin-bottom:18px}.meet-camera{padding:10px}.meet-camera video{height:72px;width:88px}}
+.native-meet-layout{grid-template-columns:1fr;max-width:520px;margin:auto}.native-phones{display:flex;justify-content:center;gap:24px;padding:22px}.native-phones span{display:block;width:70px;height:125px;border:3px solid var(--ink);border-radius:16px;background:#e9edda;position:relative;transform:rotate(-8deg)}.native-phones span+span{transform:rotate(8deg)}.native-phones span:after{content:'';position:absolute;bottom:8px;left:27px;width:10px;height:3px;border-radius:4px;background:var(--ink)}.native-meet-layout button{margin-bottom:12px}
+
+/* Call checks need readable words and an unmistakable listener-only result. */
+#paired .word-card .word, #paired #signal {font-size:clamp(36px,7vw,44px);line-height:1.2;letter-spacing:-.7px;overflow-wrap:anywhere}
+#paired .card-label {font-size:14px}
+#paired .card-hint, #paired #words-end {font-size:14px;line-height:1.45}
+#paired #open-check {font-size:18px;min-height:56px}
+#check {margin-top:18px}
+#check>summary {font-size:19px;min-height:48px}
+.check-instruction {font-size:18px;line-height:1.5}
+.check-choices {display:grid;gap:14px;margin:20px 0}
+.heard-choice {display:grid;gap:8px;width:100%;text-align:left;border:2px solid #b7c6ab;background:#eef2e5;color:var(--ink);padding:18px;border-radius:16px}
+.heard-choice .choice-label {font-size:15px;font-weight:700}
+.heard-choice .choice-words {font-size:clamp(34px,7vw,42px);line-height:1.2;overflow-wrap:anywhere;letter-spacing:-.5px}
+.heard-choice .choice-action {font-size:16px;font-weight:500;line-height:1.4}
+.heard-choice.heard-duress {background:#fcf0e5;border-color:#c48b60;color:#673c24}
+#check .check-local-note, #check .small {font-size:15px;line-height:1.5}
+#check #heard-input {font-size:23px}
+#check button {min-height:56px}
+#check-result {scroll-margin-top:16px}
+#check-result .check-result-title {display:block;font-size:30px;line-height:1.2}
+#check-result p {font-size:18px;line-height:1.55;margin:16px 0 22px}
+#check-result.check-duress {background:#fff0e9;border:3px solid #aa392b;color:#681f16;padding:22px!important}
+#check-result .secondary {font-size:17px;border-color:currentColor;color:inherit}
+#paired .paired-lead {font-size:17px;line-height:1.5}
+@media(max-width:650px){#paired .word-card,#paired .word-card.listen{padding:14px 16px}#paired .word-card .word{margin:8px 0}#paired .word-card .card-hint{font-size:13px}#paired #words-end{font-size:13px}#paired #check-guidance{font-size:15px}#paired #pair-title{font-size:34px}#paired .paired-lead{font-size:16px}}
+.meet-words{font-size:clamp(30px,6.4vw,36px)}

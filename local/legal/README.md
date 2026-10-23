@@ -232,3 +232,71 @@ in `../evidence/publication.json`, `mobile-hosting.json` and the four live brows
 reports named by the receipt. The public source footer matches this source review.
 This closes that release's publication/readback gate; it does not upgrade the
 `[U]` legal interpretation, physical-device acceptance or independent review.
+
+
+## Native prototype — 23 October 2026 source review
+
+The owner authorised a separate packaged Vouch prototype under `native/` using
+the existing local meet/word/vault engines. Its native-only build substitutes
+`native/PRIVACY.html` and blocks application network connections; it does not
+publish the public website or replace its approved publisher/contact/hosting
+purpose and basis (`tools/build-local.mjs:17`, `:27`, `:58`). Native Bluetooth
+and Android HCE/iOS Core NFC carry only temporary public commit/reveal tokens;
+shared seeds are derived locally and each human must compare four fixed words.
+NFC/Bluetooth proximity is not identity proof.
+
+The [native source review](../../native/LEGAL.md) records device-only Keychain/
+Keystore unlock protection, encrypted pending state, recovery backups excluding
+native credentials, bounded foreground radio handling, nearby metadata and
+explicit OS export/import limits. Its source notice-alignment gate is closed.
+The software-publisher assessment remains `[U]`; law note verified 28 September
+2026, review by 28 March 2027, with the recorded 23 October partial updates.
+No new server, relay default, account, cloud pair store, Google runtime service,
+owner decision, legal basis or legal/regulatory acceptance is inferred.
+
+Local builds and automated checks do not establish installation, physical NFC/
+BLE interoperability, real device-authentication behaviour, no-Play GrapheneOS
+acceptance, independent review or distribution readiness. This review makes no
+app-store/website publication, runtime change, external contact or new law
+research. The separate MySignet application remains outside scope.
+
+
+### Native device and NFC delivery delta — 23 October 2026
+
+The task now reports actual installation and launch on iPhone 13 Pro Max
+(iOS 26.6.2) and Pixel 10 Pro XL (Android 17), with NFC-only logs showing service
+selection and public frames on both devices. Android NFC was enabled and its
+state verified after being found off. These establish the reported device
+launch/transport gate. The owner subsequently confirmed matching four setup
+words via NFC on the earlier binary; both humans saving, reciprocal call checks
+and acceptance of the later call-check UI remain unconfirmed. BLE is untested.
+
+The native reader now drains its own final public reveal through a successful
+exchange before finishing, with stale-callback session guards. Additional local
+diagnostics contain reader/service state, pause and first-three public-frame
+transport names, without payloads, words, keys or contacts. These are operational
+metadata, not a zero-log promise. See the [native delta review](../../native/LEGAL.md).
+Source notice alignment and the existing publisher/contact/basis remain
+unchanged; physical authentication/lifecycle/recovery, complete pairing, BLE,
+no-Play GrapheneOS and independent review remain separate gates. No website or
+app-store publication is recorded by this delta.
+
+
+### Listener comparison and duress UI — 23 October 2026
+
+The listener can now confirm either displayed normal/duress phrase, choose
+Neither matches or use the retained full-word input (`../model.ts:118`,
+`../main.ts:588`, `../index.html:83`). This is the user's statement of what they
+heard, not independent caller capture or identity evidence. Normal confirmation
+can update the existing encrypted local lastCheck timestamp. Duress receives an
+explicit persistent result and agreed-plan guidance without any alert/message
+transmission; normal results expire at rotation. Fresh checks, person changes
+and lock clear the result. The protocol, vault format and privacy recipients
+are unchanged; see [native delta review](../../native/LEGAL.md).
+
+The owner's real-phone NFC matching-four-words confirmation concerns the earlier
+binary. New UI builds/installation are separate from physical acceptance of the
+listener/duress interaction, separate saves and reciprocal call checks. Exact
+artifact/device receipts must preserve that distinction. No public-site/app-store
+publication, new legal basis, automatic incident response or independent review
+is inferred.

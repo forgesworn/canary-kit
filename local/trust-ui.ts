@@ -1,3 +1,4 @@
+import { nativeAvailable, vouchAddress } from './native.js'
 import { newGroup, groupCard, describeGroup, joinGroup, keyCard, readKeyCard, issueVouch, receiveVouch, beginCheck, readChallenge, answerCheck, inspectProof, acceptProof, withdrawVouch, receiveWithdrawal, forgetVoucher, keyCode, publicKey, timeNow, pendingChecks, cancelCheck, saveHandoff, claimName, currentVouches, type Handoff, type Group, type Transfer, type TrustState, type Signed, type Method, type Proof, text } from './trust.js'
 import { packTransfer, unpackTransfer, sealTransfer, openTransfer, transferLink, transferToken } from './trust-wire.js'
 import { drawQr, QrScanner } from './qr.js'
@@ -77,7 +78,7 @@ export function mountTrust(root: HTMLElement, host: Host) {
     const stamp = epoch, active = host.vault()
     const token = await packTransfer(transfer)
     if (stamp !== epoch || active !== host.vault() || document.hidden) return
-    const payload = location.protocol === 'https:' ? transferLink(token, location.origin + location.pathname) : token
+    const payload = nativeAvailable() || location.protocol === 'https:' ? transferLink(token, vouchAddress()) : token
     const content = screen(title, transfer.kind === 'group' ? 'Send this group card first. Compare the keeper code together before keeping it.' : transfer.kind === 'key' ? 'Show or send this verification code to the person vouching for you. You both need the same group first.' : 'Send this private link in your chat, or let the other person scan. Then return here after their reply.', () => groupView(getGroup(group.id)))
     if(group.pending&&field(group.pending,'purpose')==='vouch')journey(content,2)
     else if(title.includes('vouch'))journey(content,4)
@@ -313,7 +314,7 @@ export function mountTrust(root: HTMLElement, host: Host) {
   function receive(input: string) {
     const stamp = epoch
     void (async () => {
-      const token = input.startsWith('#trust=') ? input.slice(7) : transferToken(input, location.origin + location.pathname)
+      const token = input.startsWith('#trust=') ? input.slice(7) : transferToken(input, vouchAddress())
       const transfer = await unpackTransfer(token)
       if (stamp !== epoch || document.hidden) return
       if (transfer.kind === 'group') groupPreview(transfer.event)

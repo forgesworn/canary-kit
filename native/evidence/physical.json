@@ -1,0 +1,62 @@
+{
+  "verified": "2026-10-23T16:54:24.519117+00:00",
+  "applicationId": "dev.forgesworn.vouch.prototype",
+  "devices": [
+    {
+      "platform": "ios",
+      "model": "iPhone 13 Pro Max",
+      "os": "26.6.2"
+    },
+    {
+      "platform": "android",
+      "model": "Pixel 10 Pro XL",
+      "os": "17",
+      "connection": "ADB on M4"
+    }
+  ],
+  "nfcTrial": {
+    "mode": "NFC only; Bluetooth suppressed on both phones",
+    "androidApkSha256": "d548a1b0449224c8488476bf132374ca8492b3d12f3b7dcefffc85a1d1b947e7",
+    "iosExecutableSha256": "4e94a5be2e544b36bef6b77f9af2239043e90475e6327e1ddfda289f0443899e",
+    "iosBundleInventorySha256": "a12e7bc93bccc3ad66212045f87445e4552725953729b39ba68ac7e7f7b2e12b",
+    "iosArchive": "Vouch-prototype-nfc-tested-iphone.app.zip",
+    "iosArchiveSha256": "32e8a746ddffc35ba60960e893e007ba79235c302c98a69c5bb5e99b96e9d1aa",
+    "initialFailure": "Pixel NFC was off; app incorrectly announced readiness. Enabled NFC using supported OS shell command; verified on and corrected readiness copy.",
+    "androidCardRegistration": true,
+    "androidForegroundPreferred": true,
+    "iosSelectedPublicService": true,
+    "publicFramesObservedOnBothPhones": true,
+    "matchingFourWords": "owner confirmed on both real phones",
+    "ownerFeedback": "Call checker required too much typing, fonts too small, duress result unclear."
+  },
+  "updatedUi": {
+    "artifacts": "artifacts.json",
+    "androidInstalledApkSha256": "c087a46297e9738d9e78c5b823609fe641ca18a363d3fe6065d003177cfcd71a",
+    "iosInstalledExecutableSha256": "8d507fe42757d81934d20b41aab608caab60ba3739ed1fc97793b89d06669f6a",
+    "androidInstallerSucceeded": true,
+    "iosInstallerSucceeded": true,
+    "androidWebCryptoReady": true,
+    "iosWebCryptoReady": true,
+    "testMode": "normal launches; BLE available during Connect",
+    "acceptance": "Owner: better, still too crowded; own duress words hidden. Further Listen/Speak redesign requested.",
+    "androidInstalledReadbackMatches": true
+  },
+  "remainingAcceptance": [
+    "Diagnose and fix one-way BLE exchange; repeat on physical phones",
+    "New UI and duress recognition on actual phones",
+    "Separate save/reopen and reciprocal call check after latest update",
+    "Physical BLE exchange",
+    "Real system-authentication fallback, background and recovery/file-provider cases",
+    "Android-to-Android NFC and iPhone-to-iPhone BLE",
+    "No-Play GrapheneOS qualification",
+    "Independent security review"
+  ],
+  "publication": "local development installation only; public website remains v11",
+  "bluetoothTrial": {
+    "artifacts": "artifacts.json",
+    "mode": "normal launches; no NFC tap",
+    "androidReceivedPublicBleFrames": true,
+    "iosReceivedPublicBleFramesObserved": false,
+    "ownerOutcome": "Bluetooth not working between Android and iPhone; not a pass."
+  }
+}

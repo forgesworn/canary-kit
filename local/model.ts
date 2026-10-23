@@ -114,6 +114,12 @@ export function wordsAt(pair: Pair, nowSec: number) {
   })
 }
 
+/** Listener-only comparison choices; never read either phrase to the caller. */
+export function wordsToHear(pair: Pair, nowSec: number) {
+  const speaker = wordsAt({ ...pair, role: pair.role === 'first' ? 'second' : 'first' }, nowSec)
+  return { normal: speaker.say, duress: speaker.duress }
+}
+
 export function checkWords(pair: Pair, input: string, nowSec: number): 'match' | 'signal' | 'different' {
   if (typeof input !== 'string' || input.length > 100) return 'different'
   const spoken = input.toLowerCase().trim().replace(/\s+/g, ' ')

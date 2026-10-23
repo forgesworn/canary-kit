@@ -5,6 +5,16 @@ then say your words**. Setup, recovery and group keeper controls stay out of tha
 path. A mismatch says to pause and use a known contact route; a match remains
 only evidence of the shared secret. No emergency alert is sent.
 
+The listener can open **Check the words I heard**, compare their spoken phrase
+against the large normal/duress choices, and select the one they actually heard.
+**Neither matches** gives the pause/recontact advice immediately. This needs no
+typing and records the listener's own comparison, not a received remote verdict.
+Never read either expected phrase to the caller. A duress result has a distinct
+red heading and stays visible across rotations until a fresh check or lock;
+normal results expire at changeover. Manual entry remains available for other
+words and one interval of clock drift. Spoken Token call words still need to be
+spoken in full; their four-letter prefixes are not globally unique.
+
 ## Set up before a stressful call
 
 1. Add the trusted HTTPS page to the home screen, open the new icon and keep

@@ -1,6 +1,12 @@
+import { nativeAvailable } from './native.js'
 interface InstallPrompt extends Event { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> }
 export function mountInstall(open: (name: string) => void, home: () => void) {
   const get = (id: string) => document.getElementById(id)!
+  if(nativeAvailable()){
+    for(const id of ['install-welcome','install-people','install-connect'])get(id).hidden=true
+    get('offline-state').textContent='Installed app · available offline'
+    return{show:home}
+  }
   let prompt: InstallPrompt | undefined
   let returnView = 'welcome'
   const installed = () => matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true

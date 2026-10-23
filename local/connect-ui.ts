@@ -1,3 +1,4 @@
+import { nativeAvailable, vouchAddress } from './native.js'
 import { beginConnect, acceptConnect, finishConnect, connectInput, connectLink, readConnect, type Exchange } from './connect.js'
 import { type Entry, type Vault } from './vault.js'
 import { drawQr } from './qr.js'
@@ -25,7 +26,7 @@ export function mountConnect(host: Host) {
     get('connect-intro').textContent=nearby?'Save a private check with the person beside you. On future calls, you can check each other’s two words.':'A new pair cannot verify an unexpected caller. Continue only with someone you already know, using an independently trusted meeting or call.'
     get('connect-accept-nearby').hidden=!nearby
     get('connect-form').hidden=!!nearby
-    get('install-connect').hidden=!!nearby
+    get('install-connect').hidden=!!nearby||nativeAvailable()
     get('connect-technical').hidden=!!nearby
     get('connect-start-eyebrow').textContent=nearby?'Together now. Ready for future calls.':'Set up once · over a trusted call'
     get<HTMLInputElement>('connect-known').checked = false
@@ -33,14 +34,14 @@ export function mountConnect(host: Host) {
   }
   function present(packet: string, reply = false) {
     const parsed=readConnect(packet),nearby=parsed.method==='in-person'
-    output = location.protocol==='https:'?connectLink(packet, location.origin + location.pathname):packet
+    output = nativeAvailable()||location.protocol==='https:'?connectLink(packet, vouchAddress()):packet
     get<HTMLTextAreaElement>('connect-output').value = output
     get('connect-share-title').textContent = nearby?(reply?'Let them scan back.':'Let them scan this.'):(reply ? 'Send your reply.' : 'Send your invitation.')
     get('connect-share-hint').textContent = nearby?(reply?'Your copy is saved encrypted. They scan this encrypted reply, then you both compare the fixed code.':'This QR contains a public invitation. They scan, protect their copy and show an encrypted reply for you to scan back.'):(reply ? 'Send this back in your private chat. Then both compare the fixed pair code on a trusted call.' : 'They open this link, protect their phone, then send you a reply. Open their reply here to finish.')
     get('connect-qr-frame').hidden=!nearby
     if(nearby)drawQr(get<HTMLCanvasElement>('connect-qr'),output,'L')
     get('connect-scan-reply').hidden=reply||!nearby
-    get('connect-send').hidden=location.protocol!=='https:'
+    get('connect-send').hidden=!nativeAvailable()&&location.protocol!=='https:'
     get('connect-read-code').hidden = !reply
     get('connect-share-status').textContent = 'Progress is saved encrypted. You can safely switch apps and unlock to continue.'
     host.show('connect-share')
@@ -87,11 +88,11 @@ export function mountConnect(host: Host) {
   async function receive(input: string) {
     try {
       if (input.includes('#device=')) { host.device?.(input); return }
-      const packet = connectInput(input, location.origin + location.pathname), parsed = readConnect(packet)
+      const packet = connectInput(input, vouchAddress()), parsed = readConnect(packet)
       if (parsed.type === 'offer') { start(packet); return }
       if (!host.vault() && !host.hasRecord()) {
         host.show('connect-paste-view')
-        get<HTMLTextAreaElement>('connect-paste').value = connectLink(packet, location.origin + location.pathname)
+        get<HTMLTextAreaElement>('connect-paste').value = connectLink(packet, vouchAddress())
         host.error('Open the Signet Vouch app or browser where you sent the invitation. Copy this reply and paste it there. This browser has no saved invitation.')
         return
       }
@@ -126,7 +127,7 @@ export function mountConnect(host: Host) {
     }
   })
   get('connect-read-code').addEventListener('click', () => {
-    const packet = output ? connectInput(output, location.origin + location.pathname) : undefined
+    const packet = output ? connectInput(output, vouchAddress()) : undefined
     const entry = host.vault()?.entries.find(item => item.setup?.reply === packet)
     if (entry) host.open(entry)
   })

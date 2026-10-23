@@ -62,8 +62,8 @@ export function mountDevices(root: HTMLElement, host: Host) {
     if(!receive){home();return}
     if(now()>receive.request.expires){base('Show a fresh QR.','This request has expired. Your saved people are unchanged.');root.append(button('device-renew','Show a new QR',()=>host.ensure(async()=>{const active=host.vault()!;await host.save(active.entries,{...active.devices,receive:newDeviceRequest()});receiving()}),'primary wide'));return}
     base('Bring your people here.','On the device that already has your people, open Signet Vouch → Add another device → Copy from this device → Scan QR.')
-    const address=location.origin+location.pathname
-    const link=location.protocol==='https:'?deviceLink(receive.request,address):deviceToken(receive.request)
+    const address=vouchAddress()
+    const link=nativeAvailable()||location.protocol==='https:'?deviceLink(receive.request,address):deviceToken(receive.request)
     const layout=node('div','','device-receive-grid'),left=node('div'),right=node('div');layout.append(left,right);root.append(layout)
     const frame=node('div','','qr-frame device-qr'), canvas=node('canvas');canvas.id='device-request-qr';canvas.setAttribute('aria-label','Public request for an encrypted copy to this device');frame.append(canvas);left.append(frame);drawQr(canvas,link,'L')
     left.append(node('p','This QR contains a public receiving key, not your people. It lasts 15 minutes; there is no race against the spoken words.','small'))
@@ -89,14 +89,14 @@ export function mountDevices(root: HTMLElement, host: Host) {
   }
   function receive(input: string) {
     try {
-      const request=deviceInput(input,location.origin+location.pathname)
+      const request=deviceInput(input,vouchAddress())
       if(now()<request.created-30||now()>request.expires)throw new Error('This device request has expired or the clocks differ. Show a new QR on the receiving device.')
       const active=host.vault()
       if(active){choose(request);return}
       base('Use your saved\npeople here.','Unlock the Signet Vouch app where your people are already saved. This request asks that app for an encrypted copy.')
       if(host.hasRecord())root.append(button('device-unlock-source','Unlock my people',()=>host.ensure(async()=>choose(request)),'primary wide'))
       else note('No saved people were found in this browser. Open your usual Signet Vouch home-screen app, choose Add another device → Copy from this device, and paste this request there.')
-      const area=node('textarea');area.readOnly=true;area.id='device-source-link';area.value=location.protocol==='https:'?deviceLink(request,location.origin+location.pathname):deviceToken(request);area.rows=3;root.append(area)
+      const area=node('textarea');area.readOnly=true;area.id='device-source-link';area.value=nativeAvailable()||location.protocol==='https:'?deviceLink(request,vouchAddress()):deviceToken(request);area.rows=3;root.append(area)
       root.append(button('device-copy-source-link','Copy this request',()=>{void navigator.clipboard.writeText(area.value).catch(()=>host.error('Select the request above and copy it.'))}))
     }catch(e){host.error(e instanceof Error?e.message:'This device request could not be read.')}
   }
@@ -133,6 +133,7 @@ export function mountDevices(root: HTMLElement, host: Host) {
       void navigator.share({files:[file],title:'Signet Vouch encrypted people copy'}).catch(e=>{if(stamp===epoch&&e?.name!=='AbortError')host.error('Sharing did not finish. Save the encrypted file instead.')})
     },'primary wide'))
     root.append(button('device-download-file',canShare?'Save encrypted file instead':'Save encrypted file',()=>{
+      if(nativeAvailable()){void nativeSaveFile(file.name,send.file,'application/json').catch(e=>host.error(e.message));return}
       const url=URL.createObjectURL(file);urls.add(url);const a=node('a');a.href=url;a.download=file.name;a.click()
       // Keep the download alive if the OS opens another app; it contains only ciphertext.
       setTimeout(()=>{URL.revokeObjectURL(url);urls.delete(url)},60_000)
@@ -178,3 +179,4 @@ export function mountDevices(root: HTMLElement, host: Host) {
   for(const id of ['devices-welcome','devices-people'])document.getElementById(id)!.addEventListener('click',()=>{clear();home()})
   return {home,receive,clear}
 }
+import { nativeAvailable, nativeSaveFile, vouchAddress } from './native.js'

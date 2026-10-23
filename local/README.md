@@ -42,8 +42,11 @@ Later: **home-screen icon → unlock → person → words**. If you requested th
 check, listen first. If the other person asked, read **You say**. Never read their
 expected **Listen for** words aloud. A normal match is knowledge of the shared
 secret, not a guarantee of identity or safety. For unexpected words, use the
-private checker; an agreed duress signal needs a rehearsed human response and
-sends no alert.
+private checker. It shows large normal and duress choices to compare without
+typing, plus **Neither matches**. Select only what you actually heard. A duress
+result is distinct and stays visible until a fresh check or lock; it needs a
+rehearsed human response and sends no alert. Manual entry still accepts the full
+words across one interval of clock drift.
 
 The Spoken Token list has ambiguous four-letter prefixes, so spoken check words
 must be read in full. Manual BIP39 recovery still accepts the first four letters

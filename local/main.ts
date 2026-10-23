@@ -1,6 +1,7 @@
 import './style.css'
-import { joinPair, joinInvite, makeInvite, inviteLink, joinLink, joinFragment, pairReference, pairComparison, wordsAt, checkWords, INTERVAL, type Pair } from './model.js'
-import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, parseVault, sealEntries, closeVault, enableDeviceUnlock, unlockWithDevice, deviceUnlockPossible, exportVault, MAX_VAULT_BYTES, type Vault, type VaultRecord, type Entry } from './vault.js'
+import { joinPair, joinInvite, makeInvite, inviteLink, joinLink, joinFragment, pairReference, pairComparison, wordsAt, wordsToHear, checkWords, INTERVAL, type Pair } from './model.js'
+import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, parseVault, sealEntries, closeVault, enableDeviceUnlock, unlockWithDevice, deviceUnlockPossible, deviceUnlockOrigin, exportVault, MAX_VAULT_BYTES, type Vault, type VaultRecord, type Entry } from './vault.js'
+import { nativeAvailable, nativeSaveFile, onNativeBackground, vouchAddress, reportNativeReady } from './native.js'
 import { drawQr, QrScanner } from './qr.js'
 import { mountTrust } from './trust-ui.js'
 import type { TrustState } from './trust.js'
@@ -25,6 +26,8 @@ let busy = false
 let lastActivity = Date.now()
 let renderedCounter = -1
 let resultCounter = -1
+let resultKind: 'match' | 'signal' | 'different' | null = null
+let checkChoices: ReturnType<typeof wordsToHear> | null = null
 let pendingKeep = false
 let recoveryMode = false
 let pendingTrustTask: (() => Promise<void>) | null = null
@@ -39,7 +42,7 @@ const scanner = new QrScanner(get<HTMLVideoElement>('scan-video'), data => {
   if(data.startsWith('{')){try{readConnect(data);stopScan();void connectUi!.receive(data);return}catch{ /* Try the existing device-request parser below. */ }}
   if (data.includes('#device=') || data.startsWith('CANARY-DEVICE:') || data.startsWith('{')) { stopScan(); devicesUi!.receive(data); return }
   if (data.startsWith('CANARY-TRUST:') || data.includes('#trust=')) { stopScan(); trustUi!.receive(data); return }
-  try { setupPair(data.startsWith('CANARY-LOCAL:') ? joinInvite(data) : joinLink(data, location.origin + location.pathname), false) }
+  try { setupPair(data.startsWith('CANARY-LOCAL:') ? joinInvite(data) : joinLink(data, vouchAddress()), false) }
   catch { get('scan-status').textContent = 'That is not a Canary pairing QR. Keep looking, or use the setup words.' }
 }, message => { stopScan(); status(message) })
 
@@ -53,7 +56,7 @@ function stopScan() {
 function show(name: string) {
   stopScan()
   trustUi?.stopScan()
-  meetUi?.stopScan()
+  if(name!=='meet')meetUi?.stopScan()
   document.querySelectorAll<HTMLElement>('.view').forEach(element => { element.hidden = element.id !== name })
   get('lock').hidden = !vault && !selected && !draft && !pendingTrustTask
   get('your-people').hidden = !record
@@ -62,7 +65,7 @@ function show(name: string) {
   window.scrollTo(0, 0)
 }
 function updateUnlock() {
-  get('unlock-device').hidden = !!restoring || !record?.device || !deviceUnlockPossible() || record.device.origin !== location.origin
+  get('unlock-device').hidden = !!restoring || !record?.device || !deviceUnlockPossible() || record.device.origin !== deviceUnlockOrigin()
   const candidate = restoring ?? record
   get('unlock-form').hidden = !candidate?.password
   get('device-only-note').hidden = !!candidate?.password
@@ -91,6 +94,9 @@ function wipeUi() {
   get('pending-meetings').replaceChildren()
   get('vouch-overview').replaceChildren()
   renderedCounter = resultCounter = -1
+  resultKind = null; checkChoices = null
+  resetCheckResult()
+  for(const id of ['check-choice-normal','check-choice-duress'])get(id).querySelector('.choice-words')!.textContent='—'
 }
 function lock(message = '') {
   generation++
@@ -176,7 +182,7 @@ function showPairQr(next: Pair) {
   get('qr-instruction').textContent = linked ? 'They scan with their normal phone camera and open the link.' : 'Local preview: they need Canary open and tap Scan their QR. A normal-camera link needs this page hosted over HTTPS.'
   get('qr-privacy').textContent = linked ? 'Same pair. No countdown. Keep this setup link private.' : 'Same pair. Use the camera inside Canary. Keep this QR private.'
   get('finish-exchange').textContent = selected ? 'Back to our words ↗' : 'They’ve scanned · show our words ↗'
-  drawQr(get<HTMLCanvasElement>('pair-qr'), linked ? inviteLink(next, location.origin + location.pathname) : makeInvite(next))
+  drawQr(get<HTMLCanvasElement>('pair-qr'), linked ? inviteLink(next, vouchAddress()) : makeInvite(next))
   show('pair-setup')
 }
 function finishExchange() {
@@ -216,6 +222,7 @@ function openPerson(entry: Entry) {
   get<HTMLDetailsElement>('duress').open = get<HTMLDetailsElement>('check').open = get<HTMLDetailsElement>('person-details').open = false
   get<HTMLDetailsElement>('repair-pair').open = false
   get('check-result').textContent = ''
+  resetCheckResult()
   get<HTMLInputElement>('heard-input').value = ''
   renderedCounter = resultCounter = -1
   lastActivity = Date.now()
@@ -280,7 +287,7 @@ function ensureTrustVault(task: () => Promise<void>) {
   if (!deviceUnlockPossible()) { createScreen(); return }
   void action(async stamp => {
     let next: Vault
-    try { next = await createDeviceVault(location.origin) }
+    try { next = await createDeviceVault(deviceUnlockOrigin()) }
     catch { if (stamp === generation && !document.hidden) { createScreen(); status('Device encryption was unavailable or cancelled. Save with a passphrase instead.') }; return }
     await adoptTrustVault(next, stamp)
   })
@@ -326,10 +333,12 @@ get('people-search').addEventListener('input', () => {
   const query = get<HTMLInputElement>('people-search').value.trim().toLocaleLowerCase()
   get('people-list').querySelectorAll<HTMLElement>('.person-card').forEach(card => { card.hidden = !card.textContent?.toLocaleLowerCase().includes(query) })
 })
+get('open-check').after(get('check'))
 get('open-check').addEventListener('click', () => {
   get<HTMLDetailsElement>('check').open = true
+  refreshCheckChoices()
   get('check').scrollIntoView({ behavior: 'instant', block: 'start' })
-  get('heard-input').focus()
+  get(resultKind ? 'check-result' : 'check-choice-normal').focus({preventScroll:true})
 })
 get('resend-reply').addEventListener('click', () => { if (selected) connectUi?.resend(selected) })
 get('confirm-pair').addEventListener('click', () => {
@@ -361,13 +370,16 @@ function tick() {
   get('countdown').textContent = `${remaining}s`
   get<HTMLProgressElement>('progress').value = remaining
   get('timer-text').textContent = remaining <= 5 ? 'Changing soon — wait before reading' : 'Fresh words every 30 seconds'
-  if (resultCounter !== -1 && counter !== resultCounter) { get('check-result').textContent = 'Words have changed. Check again if needed.'; resultCounter = -1 }
+  if (resultCounter !== -1 && counter !== resultCounter && resultKind !== 'signal') {
+    resetCheckResult();get('check-result').textContent = 'Words have changed. Check again if needed.'
+  }
   if (counter === renderedCounter) return
   try {
     const words = wordsAt(selected.pair, now)
     get('say').textContent = words.say
     get('hear').textContent = words.hear
     get('signal').textContent = get<HTMLDetailsElement>('duress').open ? words.duress : '—'
+    if(get<HTMLDetailsElement>('check').open)refreshCheckChoices()
     renderedCounter = counter
     error()
   } catch (e) {
@@ -410,7 +422,7 @@ get('keep-person').addEventListener('click', () => {
   if (!deviceUnlockPossible()) { createScreen(); return }
   void action(async stamp => {
     let next: Vault
-    try { next = await createDeviceVault(location.origin) }
+    try { next = await createDeviceVault(deviceUnlockOrigin()) }
     catch {
       if (stamp === generation && !document.hidden) {
         createScreen()
@@ -454,19 +466,23 @@ get('unlock-form').addEventListener('submit', event => {
 get('unlock-device').addEventListener('click', () => {
   if (!record) return
   const candidate = record
-  void action(async stamp => { await acceptUnlocked(await unlockWithDevice(candidate, location.origin), stamp, false) })
+  void action(async stamp => { await acceptUnlocked(await unlockWithDevice(candidate, deviceUnlockOrigin()), stamp, false) })
 })
 get('enable-device').addEventListener('click', () => {
   if (!vault) return
   const active = vault
   void action(async stamp => {
-    const next = await enableDeviceUnlock(active, location.origin)
+    const next = await enableDeviceUnlock(active, deviceUnlockOrigin())
     if (stamp !== generation || vault !== active || document.hidden) return
     persist(next); active.record = next; people(); status('Device unlock added.')
   })
 })
 get('backup').addEventListener('click', () => {
   if (!vault) return
+  if(nativeAvailable()){
+    void nativeSaveFile('canary-encrypted-backup.json',exportVault(vault.record),'application/json').catch(e=>error(e instanceof Error?e.message:'The export did not finish.'))
+    return
+  }
   const blob = new Blob([exportVault(vault.record)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a'); link.href = url; link.download = 'canary-encrypted-backup.json'; link.click()
@@ -568,20 +584,38 @@ get('person-evidence-form').addEventListener('submit', event => {
   })
 })
 get('duress').addEventListener('toggle', () => { renderedCounter = -1; tick() })
-get('check-form').addEventListener('submit', event => {
-  event.preventDefault()
-  if (!selected) return
+function refreshCheckChoices() {
+  if(!selected)return
+  checkChoices=wordsToHear(selected.pair,Math.floor(Date.now()/1000))
+  get('check-choice-normal').querySelector('.choice-words')!.textContent=checkChoices.normal
+  get('check-choice-duress').querySelector('.choice-words')!.textContent=checkChoices.duress
+}
+function resetCheckResult() {
+  resultCounter=-1;resultKind=null
+  const result=get('check-result');result.replaceChildren();result.className='';result.removeAttribute('data-result');result.setAttribute('role','status')
+  get('check-choices').hidden=false;get('check-manual').hidden=false;get<HTMLDetailsElement>('check-manual').open=false
+}
+function showCheckResult(input:string) {
+  if(!selected)return
   try {
-    const now = Math.floor(Date.now() / 1000)
-    const result = checkWords(selected.pair, get<HTMLInputElement>('heard-input').value, now)
-    get('check-result').textContent = result === 'signal' ? 'Their private signal matches. Follow your agreed plan when safe. Nothing has been sent.'
-      : result === 'match' ? 'Their normal words match. This confirms knowledge of your shared secret, not identity or safety.'
-        : 'Pause. These words do not match. Do not act on their request. Contact them using a number or account you already trust. Check fresh words and phone clocks if needed.'
-    get('check-result').className = result === 'different' ? 'check-feedback check-stop' : 'check-feedback'
-    resultCounter = Math.floor(now / INTERVAL)
-    get<HTMLInputElement>('heard-input').value = ''
+    const now=Math.floor(Date.now()/1000),result=checkWords(selected.pair,input,now)
+    resultKind=result;resultCounter=Math.floor(now/INTERVAL)
+    const feedback=get('check-result');feedback.replaceChildren();feedback.dataset.result=result
+    feedback.setAttribute('role',result==='signal'?'alert':'status')
+    feedback.className='check-feedback '+(result==='signal'?'check-duress':result==='different'?'check-stop':'check-match')
+    const title=document.createElement('strong'),message=document.createElement('p'),again=document.createElement('button')
+    title.className='check-result-title'
+    title.textContent=result==='signal'?'Duress signal recognised':result==='match'?'Their normal words match':'Pause. Words do not match'
+    message.textContent=result==='signal'?'They are using your agreed duress words. Stay calm and follow the plan you agreed, when safe. No alert has been sent.'
+      :result==='match'?'You confirmed the words you heard. A match shows knowledge of your shared secret, not proof of identity or safety.'
+        :'Do not act on their request. Contact them using a number or account you already trust. You can check fresh words and phone clocks.'
+    again.id='check-again';again.type='button';again.className='secondary wide';again.textContent='Check fresh words'
+    again.addEventListener('click',()=>{resetCheckResult();refreshCheckChoices();get('check-choice-normal').focus()})
+    feedback.append(title,message,again);get('check-choices').hidden=true;get('check-manual').hidden=true
+    get<HTMLInputElement>('heard-input').value='';get<HTMLInputElement>('heard-input').blur()
+    feedback.scrollIntoView({behavior:'instant',block:'start'});feedback.focus({preventScroll:true})
     if (result === 'match' && vault && isSaved()) {
-      const active = vault, entry = { ...selected!, lastCheck: now }
+      const active = vault, entry = { ...selected, lastCheck: now }
       void action(async stamp => {
         const entries = active.entries.map(item => item.id === entry.id ? entry : item)
         const next = await sealEntries(active, entries)
@@ -590,6 +624,14 @@ get('check-form').addEventListener('submit', event => {
       })
     }
   } catch { error('Could not check these words. Check this device’s date and time.') }
+}
+get('check-choice-normal').addEventListener('click',()=>{if(checkChoices)showCheckResult(checkChoices.normal)})
+get('check-choice-duress').addEventListener('click',()=>{if(checkChoices)showCheckResult(checkChoices.duress)})
+get('check-neither').addEventListener('click',()=>showCheckResult(''))
+get('check').addEventListener('toggle',()=>{if(get<HTMLDetailsElement>('check').open)refreshCheckChoices()})
+get('check-form').addEventListener('submit', event => {
+  event.preventDefault()
+  showCheckResult(get<HTMLInputElement>('heard-input').value)
 })
 get('remove-person').addEventListener('click', () => {
   if (!vault || !selected || !confirm('Remove this pair from this device? This cannot revoke the other person’s copy.')) return
@@ -605,6 +647,8 @@ document.querySelector('.brand')!.addEventListener('click', event => { event.pre
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) lock('Locked when you left the tab. Unsaved pairing was cleared.')
 })
+onNativeBackground(()=>lock('Locked when the app went into the background. Unlock to resume.'))
+reportNativeReady()
 document.addEventListener('keydown', event => { lastActivity = Date.now(); if (event.key === 'Escape' && (vault || selected || draft || pendingTrustTask)) lock('Your vault is locked.') })
 document.addEventListener('pointerdown', () => { lastActivity = Date.now() }, { passive: true })
 window.addEventListener('pagehide', () => { stopScan(); if (vault || selected || draft) lock() })
@@ -625,18 +669,18 @@ function consumeIncoming() {
   delete incomingWindow.canaryIncoming
   if (!incoming) return
   if(incoming.startsWith('#meet=')){
-    generation++;pendingKeep=false;pendingTrustTask=null;restoring=null;draft=selected=null;wipeUi();show('welcome');meetUi!.receive(location.origin+location.pathname+incoming);return
+    generation++;pendingKeep=false;pendingTrustTask=null;restoring=null;draft=selected=null;wipeUi();show('welcome');meetUi!.receive(vouchAddress()+incoming);return
   }
   if (incoming.startsWith('#device=')) {
     generation++; pendingKeep = false; pendingTrustTask = null; restoring = null
     draft = selected = null; wipeUi(); show(record && !vault ? 'locked' : 'welcome')
-    updateUnlock(); devicesUi!.receive(location.origin + location.pathname + incoming)
+    updateUnlock(); devicesUi!.receive(vouchAddress() + incoming)
     return
   }
   if (incoming.startsWith('#connect=')) {
     generation++; pendingKeep = false; pendingTrustTask = null; restoring = null
     draft = selected = null; wipeUi(); show(record && !vault ? 'locked' : 'welcome')
-    updateUnlock(); void connectUi!.receive(location.origin + location.pathname + incoming)
+    updateUnlock(); void connectUi!.receive(vouchAddress() + incoming)
     return
   }
   if (incoming.startsWith('#trust=')) {

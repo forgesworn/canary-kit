@@ -4,6 +4,8 @@ import { emptyTrust, readTrust, type TrustState } from './trust.js'
 import { readExchange, type Exchange } from './connect.js'
 import { readDevices, type Devices } from './device-transfer.js'
 import { readMeetings, pairFromMeeting, type Meeting } from './meet.js'
+import { nativeAvailable, nativeOrigin, nativeCreateKey, nativeKey } from './native.js'
+import { hmacSha256 } from '../src/crypto.js'
 
 const ROUNDS = 600_000
 export const MAX_VAULT_BYTES = 1_048_576
@@ -153,8 +155,14 @@ export async function sealEntries(vault: Vault, entries: Entry[], trust = vault.
 export function closeVault(vault: Vault): void { vault.master.fill(0); vault.entries = []; vault.trust = emptyTrust(); vault.exchanges = []; vault.devices = {};vault.meetings=[] }
 
 export function deviceUnlockPossible(): boolean {
+  if(nativeAvailable())return true
   return typeof window !== 'undefined' && window.isSecureContext && location.protocol !== 'file:'
     && typeof PublicKeyCredential !== 'undefined' && !!navigator.credentials
+}
+export function deviceUnlockOrigin():string {return nativeAvailable()?nativeOrigin():location.origin}
+function nativePrf(secret:Uint8Array,input:Uint8Array){
+  const prefix=encoder.encode('canary:native-prf:v1\0'),data=new Uint8Array(prefix.length+input.length);data.set(prefix);data.set(input,prefix.length)
+  try{return hmacSha256(secret,data)}finally{secret.fill(0);data.fill(0)}
 }
 function prfResult(credential: PublicKeyCredential | null): Uint8Array {
   const output = credential?.getClientExtensionResults().prf?.results?.first
@@ -171,6 +179,12 @@ async function deviceKey(output: Uint8Array, id: string): Promise<CryptoKey> {
 }
 export async function enableDeviceUnlock(vault: Vault, origin: string, credentials: CredentialsContainer = navigator.credentials): Promise<VaultRecord> {
   const input = random(32)
+  if(nativeAvailable()){
+    if(origin!==nativeOrigin())throw new Error('Open the installed Vouch app to use this device key.')
+    const created=await nativeCreateKey(),key=await deviceKey(nativePrf(created.secret,input),vault.record.id)
+    const box=await encrypt(key,vault.master,vault.record.id,'device')
+    return{...vault.record,device:{credential:created.credential,input:b64(input),origin,box}}
+  }
   const credential = await credentials.create({ publicKey: {
     challenge: bytes(random(32)), rp: { name: 'Canary private vault' },
     user: { id: bytes(random(32)), name: 'Canary private vault', displayName: 'Canary private vault' },
@@ -205,6 +219,11 @@ export async function createDeviceVault(origin: string, credentials: Credentials
 export async function unlockWithDevice(record: VaultRecord, origin: string, credentials: CredentialsContainer = navigator.credentials): Promise<Vault> {
   const device = record.device
   if (!device || device.origin !== origin) throw new Error('Open the original website with your device credential, or restore a passphrase-protected backup.')
+  if(device.origin.startsWith('vouch-native:')){
+    if(!nativeAvailable()||origin!==nativeOrigin())throw new Error('Open the original installed Vouch app, or restore an encrypted recovery backup.')
+    const key=await deviceKey(nativePrf(await nativeKey(device.credential),unb64(device.input,32)),record.id)
+    return opened(record,await decrypt(key,device.box,record.id,'device'))
+  }
   const credential = await credentials.get({ publicKey: {
     challenge: bytes(random(32)), allowCredentials: [{ type: 'public-key', id: bytes(unb64(device.credential, 1024)) }],
     userVerification: 'required', timeout: 60_000,

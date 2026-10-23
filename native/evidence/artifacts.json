@@ -1,0 +1,18 @@
+{
+  "verified": "2026-10-23T16:51:23.877577+00:00",
+  "nativePageSha256": "64e9e8184ae0f63450d5dbd79f43a830b75a80eb648a31220ec371771fbccb9b",
+  "android": {
+    "file": "Vouch-prototype-debug.apk",
+    "sha256": "c087a46297e9738d9e78c5b823609fe641ca18a363d3fe6065d003177cfcd71a",
+    "bundledPageSha256": "64e9e8184ae0f63450d5dbd79f43a830b75a80eb648a31220ec371771fbccb9b"
+  },
+  "ios": {
+    "file": "Vouch.app",
+    "bundleIdentifier": "dev.forgesworn.vouch.prototype",
+    "executableSha256": "8d507fe42757d81934d20b41aab608caab60ba3739ed1fc97793b89d06669f6a",
+    "bundleInventorySha256": "2acf8412fe6fa21c25e14ba2b9f71f2bcce14ef1a773657c1c915c53ea850b00",
+    "bundledPageSha256": "64e9e8184ae0f63450d5dbd79f43a830b75a80eb648a31220ec371771fbccb9b",
+    "archiveFile": "Vouch-prototype-iphone.app.zip",
+    "archiveSha256": "9e2edab46f59dd02996450ad4efb10aef750ccb6c382273200de910b4c340db0"
+  }
+}

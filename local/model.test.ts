@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { entropyToMnemonic } from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english.js'
-import { createPair, joinPair, wordsAt, checkWords, pairReference, readPair, makeInvite, joinInvite, inviteLink, joinLink, joinFragment } from './model.js'
+import { createPair, joinPair, wordsAt, wordsToHear, checkWords, pairReference, readPair, makeInvite, joinInvite, inviteLink, joinLink, joinFragment } from './model.js'
 
 const setup = entropyToMnemonic(new Uint8Array(16).fill(19), wordlist)
 const first = () => joinPair(setup, 'first')
@@ -93,6 +93,16 @@ describe('local pair', () => {
     expect(wordsAt(first(), now + 30).say).not.toBe(token)
     expect(checkWords(second(), token, now + 30)).toBe('match')
     expect(checkWords(second(), token, now + 60)).toBe('different')
+  })
+
+  it('shows the listener the other person’s exact normal and duress words', () => {
+    for (const [speaker, listener] of [[first(), second()], [second(), first()]]) {
+      const choices = wordsToHear(listener, now)
+      const spoken = wordsAt(speaker, now)
+      expect(choices).toEqual({ normal: spoken.say, duress: spoken.duress })
+      expect(checkWords(listener, choices.normal, now)).toBe('match')
+      expect(checkWords(listener, choices.duress, now)).toBe('signal')
+    }
   })
 
   it('detects each side’s duress phrase across clock drift without confusing normal words', () => {

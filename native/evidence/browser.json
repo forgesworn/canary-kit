@@ -1,0 +1,22 @@
+{
+  "verified": "2026-10-23T16:45:21.458Z",
+  "nativeProviders": "iOS and Android bridge stubs",
+  "realLocalCrypto": true,
+  "publicRadioCodesOnly": true,
+  "encryptedPinBeforeReveal": true,
+  "sameFixedWords": true,
+  "radioPauseResumesSameSession": true,
+  "lockResume": true,
+  "reciprocalCallWords": true,
+  "noTypingListenerCheck": true,
+  "distinctPersistentDuress": true,
+  "normalResultExpires": true,
+  "lockClearsDuressAndChoices": true,
+  "portableEncryptedRecovery": true,
+  "lateUnlockCannotReopen": true,
+  "noNetworkAfterBundledShell": true,
+  "physicalNfc": false,
+  "physicalBluetooth": false,
+  "physicalBiometrics": false,
+  "browserErrors": []
+}

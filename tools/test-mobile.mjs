@@ -126,7 +126,9 @@ try {
   await a.locator('#duress > summary').click(); await a.clock.runFor(250)
   const say = await a.locator('#say').innerText(), duress = await a.locator('#signal').innerText()
   await b.locator('#open-check').click()
-  for (const [input,expected] of [[say,'normal words match'],[duress,'private signal matches'],['not valid','Pause.']]) {
+  for (const [input,expected] of [[say,'normal words match'],[duress,'Duress signal recognised'],['not valid','Pause.']]) {
+    if(await b.locator('#check-again').isVisible())await b.locator('#check-again').click()
+    await b.locator('#check-manual').evaluate(el=>el.open=true)
     await b.locator('#heard-input').fill(input); await b.locator('#check-form button').click(); await b.locator('#check-result').filter({ hasText: expected }).waitFor()
   }
   await background(a); await unlock(a)

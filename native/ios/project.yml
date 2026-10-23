@@ -1,0 +1,30 @@
+name: Vouch
+options:
+  bundleIdPrefix: dev.forgesworn
+  deploymentTarget:
+    iOS: '16.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    DEVELOPMENT_TEAM: ''
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Vouch:
+    type: application
+    platform: iOS
+    sources:
+      - Vouch
+      - path: ../web
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.forgesworn.vouch.prototype
+        INFOPLIST_FILE: Vouch/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Vouch/Vouch.entitlements
+        TARGETED_DEVICE_FAMILY: '1,2'
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    scheme:
+      testTargets: []
