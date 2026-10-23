@@ -1,3 +1,11 @@
+## 2.12.1 (2026-10-23)
+
+### Bug Fixes
+
+- recover Bluetooth stalls and verify compressed video QR
+
+
+
 ## 2.12.0 (2026-10-23)
 
 ### Features
