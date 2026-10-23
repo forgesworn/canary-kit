@@ -578,3 +578,43 @@ screenshots and receipts remain in `native/evidence/` for the next phone test.
 No task test server or emulator is left running; pre-existing M4 emulator/ADB
 services and unrelated projects were preserved. The Chrome public review tab is
 left open intentionally. No worktree was created or removed.
+
+
+## Branded publication — 23 October 2026
+
+`https://vouch.mysignet.app/` now serves the same six public files as Sites
+version 14 at the preserved original address. The fixed-response wrapper source
+is `56b61d0e0bc0873169f267d51ea95730092f06a8`; the application implementation is
+`9c3c621e2f4532aad7caf7a116c9c9c99d657f4e`. Exact hashes and deployment identifiers
+are in `evidence/publication.json`, with version 13 retained separately.
+
+- Full unit suite: 776 tests in 38 files; core/local type checks and lint passed.
+- `address.test.ts` covers all five public URL types in both directions, hostile
+  roots/credentials/queries and independent origin-bound unlock after recovery.
+- `domain-transfer.json`: two-origin QR setup/copy/reverse-copy using QR pixels,
+  distinct PRF stubs and actual encryption.
+- `domain-video-transfer.json`: six completed cross-origin VP8/H264 RTP trials,
+  including omitted QR parts, mirrored video and encrypted copy in both directions.
+  The fixture grants camera permission for local ICE candidates but supplies
+  canvas tracks; it neither opens a physical camera nor calls a hosted service.
+  Earlier failed attempts never connected ICE without that fixture permission;
+  the passing receipt requires encoded/decoded frames and host-only candidates.
+- `domain-transfer-live.json`: the same complete QR journey at both real deployments.
+- Both `v14-*-public-readback.json` files verify all six bytes and security headers.
+- `domain-hosting.json`: Cloudflare custom-domain/settings readback, published DNS
+  from the authoritative nameserver and two public resolvers, valid HTTPS,
+  responsive recovery controls, 405/404 rejection, cookie names and requests.
+  NEL response headers remain provider operational processing. Worker observability
+  is absent and Logpush false in readback; configuration disables both.
+
+The local recursive resolver cached the pre-deployment NXDOMAIN. New-origin
+browser readback and live QR tests explicitly mapped the published IPv4, with
+normal certificate/hostname validation; public DNS resolution was verified
+separately. This is recorded, not counted as normal local-resolver success.
+The original origin stays available with separate vaults/passkeys. Full backup
+recovery and selected-person copying have different scopes, explained in welcome
+help and `local/README.md`. Installed native prototypes keep their legacy URL.
+
+Physical phone/video-call, actual biometric/passkey provider and novice usability
+acceptance remain pending, alongside independent review. No old native candidate
+receipt is advanced by this website deployment.

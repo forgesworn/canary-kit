@@ -2,6 +2,7 @@ import { generateSecretKey, getPublicKey } from 'nostr-tools/pure'
 import * as nip44 from 'nostr-tools/nip44'
 import { bytesToHex, hexToBytes, sha256, hmacSha256, timingSafeStringEqual } from '../src/crypto.js'
 import { readEntries, type Entry } from './entries.js'
+import { isVouchLinkAddress } from './address.js'
 
 const PURPOSE = 'canary:device-copy:1'
 const LIFE = 900, CHUNK = 8000, MAX_PARTS = 24, MAX_PEOPLE = 180_000
@@ -137,6 +138,6 @@ export function deviceInput(input: string, address: string): DeviceRequest {
   if (typeof input !== 'string' || input.length > 3000) throw new Error('Invalid device request.')
   if (input.startsWith('{') || input.startsWith('CANARY-DEVICE:')) return requestToken(input)
   const url = new URL(input,address), expected = new URL(address)
-  if (url.origin !== expected.origin || url.pathname !== expected.pathname || url.search || url.username || url.password || !url.hash.startsWith('#device=')) throw new Error('This device request belongs to a different website.')
+  if (!isVouchLinkAddress(url, expected) || !url.hash.startsWith('#device=')) throw new Error('This device request belongs to a different website.')
   return requestToken(decodeURIComponent(url.hash.slice(8)))
 }

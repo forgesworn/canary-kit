@@ -1,0 +1,50 @@
+{
+  "verified": "2026-10-23T21:11:24.432Z",
+  "url": "https://vouch.mysignet.app/",
+  "worker": "signet-vouch",
+  "workerVersion": "e05dbb79-2e9e-4ef4-ae2b-6cb3abf67cdb",
+  "sourceCommit": "56b61d0e0bc0873169f267d51ea95730092f06a8",
+  "authoritativeAndPublicDns": {
+    "nameserver": "liv.ns.cloudflare.com",
+    "resolvers": [
+      "1.1.1.1",
+      "8.8.8.8"
+    ],
+    "ipv4": [
+      "104.21.29.246",
+      "172.67.150.18"
+    ]
+  },
+  "resolverOverride": "MAP vouch.mysignet.app 104.21.29.246",
+  "resolverReason": "Local recursive resolver retains an earlier NXDOMAIN; authoritative and two public resolvers already return these addresses.",
+  "tlsHostnameValidation": true,
+  "anonymous": true,
+  "restoreFileChooser": true,
+  "copyView": true,
+  "mobileNoOverflow": true,
+  "postStatus": 405,
+  "unknownPathStatus": 404,
+  "cookieNames": [],
+  "requests": [
+    "https://vouch.mysignet.app/",
+    "https://vouch.mysignet.app/",
+    "https://vouch.mysignet.app/unavailable"
+  ],
+  "errors": [],
+  "headers": {
+    "csp": "default-src 'none'; script-src 'sha256-6cfdhC6Yralkgtl1GgbkACtk86qlsubMK3b3Yg0eheQ=' 'sha256-pNw4SAWKSb/6GnPVpRLKs0fzhHSNfkqQp9XZaDvm7TE='; style-src 'sha256-qZYdv+QAq15aGKz58IcMIWyMSecJ5BQK5x5zCG0OZRY='; connect-src 'self'; worker-src 'self'; manifest-src 'self'; img-src 'self'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; frame-ancestors 'none'",
+    "permissionsPolicy": "camera=(self), microphone=(), geolocation=()",
+    "referrerPolicy": "no-referrer",
+    "networkErrorLoggingPresent": true
+  },
+  "workerSettingsReadback": {
+    "bindings": [],
+    "logpush": false,
+    "observability": null,
+    "previewUrls": false,
+    "customDomainEnabled": true
+  },
+  "oldOriginRedirected": false,
+  "oldOrigin": "https://canary-words.cocoacod256.chatgpt.site/",
+  "physicalCameraOrBiometricAcceptance": false
+}

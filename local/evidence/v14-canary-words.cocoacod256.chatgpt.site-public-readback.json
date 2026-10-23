@@ -1,0 +1,41 @@
+{
+  "verified": "2026-10-23T21:08:17.874Z",
+  "url": "https://canary-words.cocoacod256.chatgpt.site/",
+  "version": 14,
+  "exactPublicFiles": [
+    {
+      "file": "index.html",
+      "sha256": "fa33f260301ad813a83b8f053f6c8e6977a3ceee27e1aec1ae5ef6ba20b6c4c0",
+      "matches": true
+    },
+    {
+      "file": "sw.js",
+      "sha256": "ce2badd0c1b99e3f8c663e857214573de4d078bb5371992c43b40103d3e361be",
+      "matches": true
+    },
+    {
+      "file": "manifest.webmanifest",
+      "sha256": "5ad0db5b735bca4e54db8d54379d4bf01d12acadd4ba4e185063bfaeef97a538",
+      "matches": true
+    },
+    {
+      "file": "icon-192.png",
+      "sha256": "423cf41a5509eb9091e6d1a2cd465767f92d3c77de8cebb377c445f957518e58",
+      "matches": true
+    },
+    {
+      "file": "icon-512.png",
+      "sha256": "5d517859af32d9b53f6f7449b435cdfd2034087a1c68722a346bfbee429cacf0",
+      "matches": true
+    },
+    {
+      "file": "apple-touch-icon.png",
+      "sha256": "b370b491c5608c50f24b914a911fc295356a67656d0474e8f839999f2cd3e8f2",
+      "matches": true
+    }
+  ],
+  "securityHeaders": true,
+  "anonymousBrowser": true,
+  "noBypassToken": true,
+  "noPrivatePayloadInRequest": true
+}

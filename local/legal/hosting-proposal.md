@@ -261,3 +261,50 @@ Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
 fields and adds no processing recipient or networking. Only source notice
 alignment is closed here; publication/readback, physical camera/credential-provider
 acceptance and independent review are unchanged separate gates.
+
+
+## Branded address and direct Cloudflare hosting — 23 October 2026
+
+The owner selected `https://vouch.mysignet.app/`. This additional origin uses the
+same fixed-response public wrapper directly on Cloudflare Worker `signet-vouch`,
+with no request-body processing, outbound fetch, message API, account, relay,
+content store or private-key custody. Configuration disables Worker observability
+and Logpush; provider operational/security processing still exists. The original
+Sites origin/project stays public and available, without a redirect. Direct
+Cloudflare is a provider/recipient change; it is not described merely as an
+OpenAI subprocessor at the branded address. Domain, DNS, TLS, worker settings,
+public bytes/headers/cookies and browser requests need separate readback evidence.
+
+Controller/project, private contact route, minimal delivery/security/operation
+purposes and the owner's approved legitimate-interest basis remain unchanged.
+The shared public notice identifies both providers separately and keeps the
+Sites traffic-statistics, cookie, retention and DPA statements scoped to Sites.
+Cloudflare's published Privacy Policy and Customer DPA describe its own retention
+criteria, controller/processor roles, international processing and conditional
+transfer safeguards. No fixed metadata retention or UK-only storage is asserted.
+Public Self-Serve terms incorporate the DPA where applicable; this private
+account's governing agreement/version was not inspected. No new contract
+acceptance, paid plan change or company/identity decision was performed.
+
+Primary provider sources read on 23 October: Cloudflare
+[Self-Serve terms](https://www.cloudflare.com/terms/) (12 September 2025),
+[Customer DPA](https://www.cloudflare.com/cloudflare-customer-dpa/) v6.4 (3 April
+2026), Annex 1/section 3.1(i) retention criteria and section 6.2(b) UK transfer
+provisions; [Privacy Policy](https://www.cloudflare.com/privacypolicy/) sections
+2/6/7/11. These are public-term facts, not an account-specific contract attestation.
+The existing UK note remains verified 28 September 2026, review due 28 March 2027,
+with partial 23 October updates; publisher/IPA applications stay marked `[U]`.
+No new statutory deadline or fee was identified by this hosting delta.
+
+A different origin has separate local storage and passkeys (`vault.ts`,
+`deviceUnlockOrigin`/`unlockWithDevice`). Public link compatibility is limited
+to the two exact HTTPS roots (`address.ts`); it does not broaden credential
+origins. Portable recovery omits the device slot and needs a recovery passphrase;
+restore it at the destination and enrol new device unlock. Selected-person copy
+excludes groups, pending exchanges and unlock credentials. Keep the original
+until verified. The new welcome help explains this; native prototypes preserve
+their existing legacy share address until a separate build/test update.
+
+The old "no custom domain proposed" wording above is historical and superseded
+by this explicit owner choice. No blanket legal clearance, physical-device
+acceptance or independent security audit is implied.

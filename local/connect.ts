@@ -2,6 +2,7 @@ import { generateSecretKey, getPublicKey } from 'nostr-tools/pure'
 import * as nip44 from 'nostr-tools/nip44'
 import { bytesToHex, hexToBytes } from '../src/crypto.js'
 import { createPair, readPair, type Pair } from './model.js'
+import { isVouchLinkAddress } from './address.js'
 
 type Offer = { v: 1; type: 'offer'; id: string; pub: string; method?: 'in-person' }
 type Reply = { v: 1; type: 'reply'; id: string; pub: string; box: string; method?: 'in-person' }
@@ -72,6 +73,6 @@ export function connectInput(input: string, address: string): string {
   if (input.length > 6000) throw new Error('This connection link is too large.')
   if (input.startsWith('{')) return JSON.stringify(readConnect(input))
   const url = new URL(input, address), expected = new URL(address)
-  if (url.origin !== expected.origin || url.pathname !== expected.pathname || url.search || !url.hash.startsWith('#connect=')) throw new Error('Open a connection link from the trusted Canary address.')
+  if (!isVouchLinkAddress(url, expected) || !url.hash.startsWith('#connect=')) throw new Error('Open a connection link from the trusted Canary address.')
   return JSON.stringify(readConnect(decodeURIComponent(url.hash.slice(9))))
 }

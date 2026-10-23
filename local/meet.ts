@@ -4,6 +4,7 @@ import { entropyToMnemonic } from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english.js'
 import { bytesToHex, hexToBytes, hmacSha256, sha256 } from '../src/crypto.js'
 import type { Pair } from './model.js'
+import { isVouchLinkAddress } from './address.js'
 
 export interface MeetingCard { id:string; pub:string; commitment:string }
 export interface MeetingMessage { card:MeetingCard; to?:string; reveal?:string }
@@ -96,7 +97,7 @@ export function meetingInput(input:string,address:string):MeetingMessage {
  let token=input
  if(!token.startsWith('CANARY-MEET:')){
   const url=new URL(input,address),expected=new URL(address)
-  if(url.origin!==expected.origin||url.pathname!==expected.pathname||url.username||url.password||url.search||!url.hash.startsWith('#meet='))throw new Error('Use a connection code from this Vouch website.')
+  if(!isVouchLinkAddress(url,expected)||!url.hash.startsWith('#meet='))throw new Error('Use a connection code from this Vouch website.')
   token=url.hash.slice(6)
  }
  const m=/^CANARY-MEET:1:([A-Za-z0-9_-]{107})(?::([A-Za-z0-9_-]{64}))?$/.exec(token)

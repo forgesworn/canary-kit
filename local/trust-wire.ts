@@ -1,6 +1,7 @@
 import * as nip44 from 'nostr-tools/nip44'
 import { hexToBytes } from '../src/crypto.js'
 import { publicKey, readTransfer, signed, type Group, type Transfer, type Signed, type Proof } from './trust.js'
+import { isVouchLinkAddress } from './address.js'
 
 type SealedContent = { kind: 'vouch'; event: Signed } | { kind: 'withdrawal'; event: Signed } | { kind: 'challenge'; event: Signed } | Proof
 const encoder = new TextEncoder()
@@ -39,7 +40,7 @@ export function transferLink(token: string, address: string): string {
 export function transferToken(input: string, address: string): string {
   if (input.startsWith('CANARY-TRUST:')) return input
   const expected = new URL(address), received = new URL(input)
-  if (received.protocol !== 'https:' || received.origin !== expected.origin || received.pathname !== expected.pathname || received.search || received.username || received.password || !received.hash.startsWith('#trust=')) throw new Error('This private transfer belongs to another address.')
+  if (!isVouchLinkAddress(received, expected) || !received.hash.startsWith('#trust=')) throw new Error('This private transfer belongs to another address.')
   return received.hash.slice(7)
 }
 export async function sealTransfer(group: Group, recipient: string, content: SealedContent): Promise<Transfer & { kind: 'sealed' }> {
