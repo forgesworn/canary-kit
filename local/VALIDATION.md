@@ -1,14 +1,14 @@
 # Verification record
 
-23 October 2026. Code `5b38644f1e9c88d6bb53f88e2650377406f3c375`.
+23 October 2026. Code `1ac118f5c4287159f08a72989c77d288c45207b7`.
 
-Artifact: `canary-local.html`, 266,531 bytes. SHA-256:
+Artifact: `canary-local.html`, 389,302 bytes. SHA-256:
 
 ```text
-533b8901e4dbc4dc172dd12c98228a5760a301551dd6c0293725c31cc8e74ff1
+aa5f173c7e2eaa1fab8091cb4c919d23c7ee12ef51fb4e3b8c901dd53b3174a9
 ```
 
-- `npm test -- --maxWorkers=2 --testTimeout=30000`: **723 passed across 29 files**. The local
+- `npm test -- --maxWorkers=2 --testTimeout=30000`: **733 passed across 30 files**. The local
   model/vault tests cover setup abbreviation/checksum, directional normal/duress
   words, rotation/drift, encrypted round-trip, wrong passwords, tamper rejection,
   fresh nonces, key clearing and PRF wrapping. New cases cover device-only vault
@@ -62,7 +62,7 @@ fixture nickname. The updated HTML was opened in **Google Chrome** for owner rev
 
 [Live Canary](https://canary-words.cocoacod256.chatgpt.site/) is public, with no
 visitor sign-in. Standalone source `../canary-words-site` commit
-`1cf56957bce742d80d55efc523f348259fc0fa62`; Site/version/deployment IDs are in
+`8921e7215b12a19f4377e024065554154beb36b0`; Site/version/deployment IDs are in
 [evidence/publication.json](evidence/publication.json). Native deployment status
 succeeded, followed by independent HTTP and real-browser checks.
 
@@ -141,3 +141,55 @@ Publication v3 retains the same public origin and storage format; source/deploy
 identifiers are in `evidence/publication.json`. No broader messaging service or
 new hosting-data category was introduced. The owner reported partial physical
 pairing; completion of the revised flow on their phones remains owner acceptance.
+
+## Private contacts and group vouches — publication v4
+
+Feature commit `1ac118f5c4287159f08a72989c77d288c45207b7` adds optional
+group-scoped independent signing keys, signed personal vouches and recipient-
+encrypted handoffs. It reuses Canary/Spoken Token, the attestation templates,
+Nostr Tools/Noble signatures and NIP-44 encryption. No Nostr account, relay,
+remote signer, public trust graph or platform admission adapter is used.
+The concrete protocol and limits are in [PRIVATE-TRUST.md](PRIVATE-TRUST.md).
+
+The final **733 tests / 30 files**, global/local typechecks, standalone build
+and diff checks passed. The new trust tests cover signatures without SDK cache
+trust, subject/group/purpose/nonce/account binding, fresh key proof before
+vouching, clock skew, replay/expiry, explicit issuer policy, self-vouch rejection,
+withdrawals, the 90-day maximum, encrypted recipient binding, QR size and bounded
+decompression. A new vault regression first failed when contact evidence/group
+keys were discarded, then passed with the version 2 encrypted payload. Previous
+array payloads remain readable; portable backup recovery preserves group keys.
+
+`tools/test-private-trust.mjs` passed with three isolated mobile browser contexts
+against both a local HTTPS fixture and the actual public URL. It verifies the
+fresh-key exchange before a deliberate vouch, encrypted handoff/Keep, refusal
+of an unaccepted issuer, separate fresh voucher proof plus explicit trust,
+successful holder proof with account-context binding, saved pending-exchange
+recovery after reload, replay rejection and a delivered withdrawal rejecting
+the next member proof. It decodes actual public-card and encrypted-transfer QRs,
+checks encrypted local storage and phone-width layout, and observed no external
+app request, transfer fragment in HTTP requests or browser/CSP error.
+
+Reports: [fixture](evidence/private-trust.json),
+[live](evidence/private-trust-live.json). Screenshots:
+[kept vouch](evidence/private-vouch-mobile.png),
+[historical keeper check](evidence/private-check-mobile.png). They use fixture
+names and public verification codes, with no private signing key or pair seed.
+WebAuthn/PRF success is stubbed in this browser suite; it does not qualify a
+physical authenticator. Group vouching requires return steps and is not claimed
+to be a one-scan or measured one-minute ceremony.
+
+The same public origin now serves v4. Publishing-source commit
+`8921e7215b12a19f4377e024065554154beb36b0` passed the Worker artifact/static-
+response contract checks, was pushed by the supported source helper, saved and
+deployed successfully. Independent HTTP readback matched all **389,302 bytes**
+and the exact SHA above, with expected CSP, no-transform, transport, permissions,
+MIME and referrer headers. Deployment IDs and readbacks are in the publication
+record. The live page was opened in **Google Chrome**.
+
+The legal-cover feature gap check updates local data, key custody, recovery,
+public-card/recipient disclosure and withdrawal-freshness facts. The same static-
+software assessment and hosting basis are retained; legal interpretation marks
+and the broader IPA website-owner boundary remain explicit. No independent legal
+clearance, security audit, automatic account ownership or physical phone-camera
+acceptance is inferred. Signet integration remains a separate future adapter.

@@ -1,47 +1,47 @@
 # Privacy facts and hosting inputs
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code `5b38644f1e9c88d6bb53f88e2650377406f3c375`.
+Code `1ac118f5c4287159f08a72989c77d288c45207b7`.
 Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 23 October 2026 against primary sources.**
 
 These facts apply to the local app and the public static-response site at
 `https://canary-words.cocoacod256.chatgpt.site/`. The deployed notice is in
-`local/index.html:59`, including the owner-adopted hosting basis and contact.
+`local/index.html:60`, including the owner-adopted hosting basis and contact.
 See [hosting record](hosting-proposal.md) and [production evidence](../evidence/publication.json).
 
 ## Device processing
 
-Pairing starts in memory without a vault or account (`local/main.ts:121`). No
+Pairing starts in memory without a vault or account (`local/main.ts:130`). No
 persistent pair record is written until **Keep on this phone**. The receiver
 reaches rotating words directly after scanning, and naming is optional. Unsaved
 pairs are cleared on backgrounding or five-minute inactivity; both people must
-keep their own copy for future calls (`local/main.ts:63`, `local/main.ts:209`).
+keep their own copy for future calls (`local/main.ts:72`, `local/main.ts:262`).
 Pair setup words, roles and user-chosen nicknames are held in memory while
 unlocked. Encrypted payloads and wrapped master keys are stored in this browser's
-localStorage (`local/main.ts:73`; `local/vault.ts:124`). Plaintext nicknames or
+localStorage (`local/main.ts:82`; `local/vault.ts:148`). Plaintext nicknames or
 pair secrets are not persisted by these handlers. The app also uses the device
 clock and transiently displays normal/duress words. No account or network member
 identifier is required, and there is no server-side recipient for the app data.
 
 Local records contain ciphertext, salts/nonces, a random vault reference and,
 if enabled, a credential identifier, PRF input, origin and wrapped key for device
-unlock (`local/vault.ts:9`). Data remains until removed by the user, browser
+unlock (`local/vault.ts:14`). Data remains until removed by the user, browser
 clearing/eviction or device loss. Deleting one entry rewrites the encrypted
 vault; it does not guarantee erasure of old disk blocks or backups. Locking wipes
 displayed secrets and attempts to zero the in-memory key, not guaranteed browser
-memory erasure. See `local/main.ts:50`, `local/vault.ts:129`.
+memory erasure. See `local/main.ts:56`, `local/vault.ts:155`.
 
 Keeping a new pair first offers native device encryption where available, with
 passphrase fallback. Device-only vaults initially have no recovery passphrase.
 The user can add one later; until then portable backup export is refused
-(`local/vault.ts:171`, `local/vault.ts:117`, `local/vault.ts:193`). Loss of the
+(`local/vault.ts:197`, `local/vault.ts:142`, `local/vault.ts:219`). Loss of the
 credential or browser data without recovery can lose all saved pairs. Existing
 passphrase vaults are still supported. Saved nicknames may be default numbered
-labels until the user optionally renames them (`local/main.ts:190`).
+labels until the user optionally renames them (`local/main.ts:200`).
 
 **Save encrypted backup** downloads encrypted JSON without the device credential
-slot (`local/main.ts:315`; `local/vault.ts:193`). Backups remain wherever the user
+slot (`local/main.ts:367`; `local/vault.ts:219`). Backups remain wherever the user
 saves them until deleted. Files, browser stores and backups may be copied by
 device backup/sync settings. The publisher cannot recover a forgotten vault
 passphrase, erase remote copies or revoke another offline pair holder.
@@ -52,7 +52,7 @@ On HTTPS, the displayed QR is a private link containing the pair secret in its
 fragment (`local/model.ts:59`), so a normal camera can open the app. The fragment
 is outside the HTTP request URL. An early, CSP-hashed script removes it from the
 current history entry (`local/index.html:12`) and the app consumes the transient
-value (`local/main.ts:429`). Same-tab fragment navigation is supported too.
+value (`local/main.ts:519`). Same-tab fragment navigation is supported too.
 Either holder can intentionally re-show the same pair’s QR to restore the
 other side. The recovery invite identifies the recipient’s speaking role; it
 does not rotate the shared secret or revoke previous copies. Resaving the same
@@ -77,7 +77,7 @@ words remain secrets that another person's camera or screen capture could copy.
 
 Optional device unlock asks the browser and the user's chosen authenticator/
 passkey provider for a user-verified credential and PRF output
-(`local/vault.ts:148`). The request carries the origin, generic Canary label,
+(`local/vault.ts:174`). The request carries the origin, generic Canary label,
 random user/credential material and PRF inputs. The credential/unlock key is not
 sent to the publisher by app code. A provider may sync its credentials through
 the user's platform account under its own settings and privacy terms; this is
@@ -91,7 +91,7 @@ passphrase is not silently created for a device-only vault.
 The bundled app does not connect to Signal, Kithmoot, WhatsApp, a relay, an agent,
 analytics or a remote backup. Users independently choose to speak words or use
 other messaging apps; those apps' data handling is separate. A duress match is
-an on-device result, not an alert or location report (`local/main.ts:393`).
+an on-device result, not an alert or location report (`local/main.ts:469`).
 The application installs no cookie, tracker, service worker or account system.
 The existing `SECURITY.md` describes repository security-report routes; this
 change adds no form, inbox endpoint or report upload service.
@@ -138,3 +138,44 @@ The Article 13 notice list is in the
 [GB note §3.2](https://github.com/forgesworn/jurisdiction-kit/blob/main/law/gb/online-services.md#32-the-privacy-notice)
 `[P]`. These inputs are for hosting, not permission to add moderation, identity
 checks or other regulated-service obligations to this ordinary static app.
+
+## Optional private contacts and group vouches — 23 October update
+
+`local/vault.ts` now preserves user-entered meeting method/date, observed account
+labels and last matching normal-word check dates. These are local notes; an
+observed platform identifier is not independently verified account ownership.
+Merely displaying words does not record a comparison, and duress results are
+not exported into group evidence or public activity.
+
+`local/trust.ts` creates an independent signing key per group. Keys, group names,
+private aliases, accepted vouchers, signed issued/received vouches, withdrawals,
+dated historical checks, pending challenges and outgoing handoffs are in the
+same encrypted local vault. The payload migration reads previous entry arrays.
+Encrypted recovery backups now also carry these keys and records. Older backups
+retain only the data they originally contained. Local removal does not revoke
+remote copies or erase the browser's old disk blocks/backups.
+
+`local/trust-wire.ts` uses the existing NIP-44 encryption implementation for
+recipient-addressed vouches, challenges, responses and withdrawals. Signature
+verification is separate and mandatory. Group cards and holder-key cards contain
+public information and can reveal the group name or public keys to recipients.
+Signatures alone do not make statements private; an authorised recipient can
+copy a decrypted proof or disclose it to a keeper during a requested check.
+
+`local/trust-ui.ts` offers local camera decoding, explicit clipboard copying and
+user-invoked native sharing. A chosen messaging app, clipboard manager, native
+camera or browser can retain deliberately shared links and metadata under its
+own settings/terms. The app adds no messaging provider or recipient by default.
+`local/index.html` consumes `#trust=` through the same early hashed history
+replacement as setup links. The HTTP request contains no fragment. Link erasure
+from native history/sync is not guaranteed.
+
+Pending requests and outgoing handoffs are saved before their QR is displayed.
+The app still clears plaintext UI/references on locking, hiding or idle. Fresh
+requests expire after ten minutes; group cards do not themselves admit people.
+Vouches expire after the issuer's explicit 1–90 day selection. Signed withdrawals
+are stored until the group is removed; storage limits reject a new write rather
+than silently discard evidence. There is no online status lookup, account
+creation, profile discovery, relay connection, remote signer or public vouch
+publication. This changes local processing facts without adding a hosted user-
+content API. The deployed privacy text has been expanded to match.

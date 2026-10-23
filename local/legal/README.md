@@ -1,7 +1,7 @@
 # Draft UK legal cover: static local-processing app
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code: `5b38644f1e9c88d6bb53f88e2650377406f3c375`.**
+Code: `1ac118f5c4287159f08a72989c77d288c45207b7`.**
 
 **Today:** publisher of a public static-response HTTPS site at
 [Canary](https://canary-words.cocoacod256.chatgpt.site/), with a local HTML copy.
@@ -47,3 +47,9 @@ apply even without messaging; the Communications Act test is different. The
 partial 23 October primary-source refresh is recorded in `position.md`. No
 blanket promise of being outside all telecoms law, or of immunity from notices,
 is made. Classification is not itself a prohibition on publishing this tool.
+
+The optional private-contact and group-vouch release keeps the same hosted
+position. Expanded local data/recipient and recovery facts are in `privacy.md`;
+the feature gap check and code evidence are in `inventory.md`. No Nostr account,
+relay connection, public social graph or automatic platform membership is
+introduced. Human attestations and cryptographic key proofs remain distinct.

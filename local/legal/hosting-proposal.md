@@ -1,14 +1,14 @@
 # Adopted hosting record — minimal static page
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-App code `5b38644f1e9c88d6bb53f88e2650377406f3c375`.**
+App code `1ac118f5c4287159f08a72989c77d288c45207b7`.**
 
 ## Published deployment
 
 The separate Site is public at
 `https://canary-words.cocoacod256.chatgpt.site/`, published 23 October 2026.
 The standalone source checkout is `../canary-words-site` beside this repository,
-commit `1cf56957bce742d80d55efc523f348259fc0fa62`.
+commit `8921e7215b12a19f4377e024065554154beb36b0`.
 [Publication metadata](../evidence/publication.json),
 [HTTP readback](../evidence/hosting.json) and
 [live browser check](../evidence/live-browser.json) record the actual gates.
