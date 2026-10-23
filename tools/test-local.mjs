@@ -38,7 +38,16 @@ try {
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()) })
     await page.clock.install({ time: new Date('2026-10-22T12:00:05Z') })
     await page.goto(address)
+    await page.clock.setFixedTime(new Date('2026-10-22T12:00:05Z'))
     return page
+  }
+  // Keep dates identical across contexts while browser animation/polling runs.
+  // Advancing a scenario changes its date explicitly as well as its timers.
+  async function advance(page, milliseconds, skip = false) {
+    const now = await page.evaluate(() => Date.now())
+    await page.clock.setFixedTime(new Date(now + milliseconds))
+    if (skip) await page.clock.fastForward(milliseconds)
+    else await page.clock.runFor(milliseconds)
   }
   const visible = (page, selector) => page.locator(selector).waitFor({ state: 'visible' })
   async function unlock(page) {
@@ -94,6 +103,51 @@ try {
   await linkMaker.locator('#finish-exchange').click()
   assert.equal(await linkMaker.locator('#say').innerText(), await linkReceiver.locator('#hear').innerText())
   assert.equal(await linkMaker.locator('#hear').innerText(), await linkReceiver.locator('#say').innerText())
+  assert.equal(await linkMaker.locator('#exchange-reference').count(), 1, 'Setup needs a fixed pair code instead of racing rotating words')
+  const fixedReference = await linkMaker.locator('#exchange-reference').innerText()
+  assert.equal(await linkReceiver.locator('#exchange-reference').innerText(), fixedReference)
+  const wordOrder = await linkMaker.evaluate(() => {
+    const keep = document.getElementById('keep-person').getBoundingClientRect()
+    const words = document.getElementById('say').getBoundingClientRect()
+    return keep.top < words.top
+  })
+  assert.ok(wordOrder, 'Keep and the fixed setup code should appear before the rotating words')
+  await advance(linkMaker, 61_000)
+  assert.equal(await linkMaker.locator('#exchange-reference').innerText(), fixedReference)
+  assert.equal(await linkMaker.locator('#keep-person').isVisible(), true, 'Word refresh must not end pairing or hide Keep')
+  await advance(linkMaker, 239_500, true)
+  await visible(linkMaker, '#welcome')
+  // The receiver can recover the original maker after its unsaved copy clears.
+  // Keep/reload first to exercise recovery from the actual encrypted saved pair.
+  await stubPrf(linkReceiver)
+  await linkReceiver.locator('#keep-person').click()
+  await linkReceiver.locator('#save-state').filter({ hasText: 'Saved encrypted' }).waitFor()
+  await linkReceiver.reload()
+  await linkReceiver.locator('#your-people').click()
+  await stubPrf(linkReceiver)
+  await linkReceiver.locator('#unlock-device').click()
+  await linkReceiver.locator('.person-card').click()
+  await linkReceiver.locator('#show-pair-qr').click()
+  const resumedQr = await linkReceiver.locator('#pair-qr').evaluate(canvas => ({ width: canvas.width, height: canvas.height, data: [...canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data] }))
+  const resumedLink = jsQR(new Uint8ClampedArray(resumedQr.data), resumedQr.width, resumedQr.height).data
+  const resumedMaker = await newDevice(resumedLink)
+  await visible(resumedMaker, '#paired')
+  assert.equal(await resumedMaker.locator('#exchange-reference').innerText(), fixedReference)
+  assert.equal(await resumedMaker.locator('#side').textContent(), 'you showed the QR')
+  await linkReceiver.locator('#finish-exchange').click()
+  assert.equal(await resumedMaker.locator('#say').innerText(), await linkReceiver.locator('#hear').innerText())
+  assert.equal(await resumedMaker.locator('#hear').innerText(), await linkReceiver.locator('#say').innerText())
+  assert.equal(await linkReceiver.locator('#keep-person').isVisible(), false, 'Showing the QR must preserve saved state')
+  await resumedMaker.close()
+  await linkReceiver.locator('#lock').click()
+  await linkReceiver.goto(link)
+  await linkReceiver.locator('#keep-person').click()
+  await visible(linkReceiver, '#locked')
+  await stubPrf(linkReceiver)
+  await linkReceiver.locator('#unlock-device').click()
+  await linkReceiver.locator('#save-state').filter({ hasText: 'Saved encrypted' }).waitFor()
+  await linkReceiver.locator('.home').filter({ visible: true }).click()
+  assert.equal(await linkReceiver.locator('.person-card').count(), 1, 'Rescanning must reuse a saved pair rather than duplicate it')
   assert.equal(requests.some(address => address.includes('CANARY-LOCAL') || address.includes('#pair=')), false, 'The host must not receive the fragment secret')
   // Browsers can reuse an existing tab for a second link. A fragment-only
   // navigation must consume the incoming pair too, without a reload.
@@ -136,7 +190,7 @@ try {
     } })
   }, qr)
   await distant.locator('#show-join').click()
-  await distant.clock.runFor(500)
+  await advance(distant, 500)
   await visible(distant, '#paired')
   assert.equal(await distant.locator('#reference').innerText(), reference)
   await distant.close()
@@ -157,7 +211,7 @@ try {
     } })
   }, qr)
   await b.locator('#show-join').click()
-  await b.clock.runFor(500)
+  await advance(b, 500)
   await visible(b, '#paired')
   assert.equal(await b.locator('#reference').innerText(), reference)
   assert.equal(await b.evaluate(() => window.testConstraints.audio), false)
@@ -182,7 +236,7 @@ try {
     await b.locator('#check-form button').click()
     await b.locator('#check-result').filter({ hasText: expected }).waitFor()
   }
-  await b.clock.runFor(30_000)
+  await advance(b, 30_000)
   assert.notEqual(await b.locator('#say').innerText(), bSay)
   await b.locator('#check-result').filter({ hasText: 'Words have changed' }).waitFor()
   assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
@@ -254,7 +308,7 @@ try {
   assert.equal(await a.locator('#pair-title').innerText(), 'Our words.')
   await a.evaluate(() => Object.defineProperty(document, 'hidden', { configurable: true, value: false }))
   await unlock(a)
-  await a.clock.runFor(300_001)
+  await advance(a, 300_001)
   await visible(a, '#welcome')
   // A late camera permission grant after cancellation must not leave a camera
   // running or reopen pairing. This is a separate pending-permission stream.
@@ -321,7 +375,7 @@ try {
   assert.equal(await transient.locator('#say').innerText(), unsavedWords)
   assert.equal(await transient.locator('#save-state').innerText(), 'Here for now. Keep this pair before you leave.')
   assert.equal(await transient.evaluate(() => localStorage.length), 0)
-  await transient.clock.runFor(300_001)
+  await advance(transient, 300_001)
   await visible(transient, '#welcome')
   assert.equal(await transient.locator('#say').innerText(), '—')
   // A device prompt that finishes after locking must not restore the pair or
@@ -342,8 +396,8 @@ try {
   assert.deepEqual(errors, [], 'No browser or CSP errors are allowed')
   console.log('Chromium: normal-camera link opening in a fresh HTTPS-fixture browser, fragment consumption and malformed-link rejection; no-form/no-vault pairing, transient clearing, device-only keeping and recovery, pending-pair unlock, failed-storage preservation; QR pairing through a canvas-fed camera, camera shutdown, four-letter setup, encrypted persistence/backups/recovery, wrong-password rejection, normal/duress checks, rotation, echo rejection, reload/background/idle locking and mobile/desktop/file layouts passed. No external network requests.')
 } finally {
-  for (const context of contexts) await context.close()
-  await browser?.close()
+  await Promise.allSettled(contexts.map(context => context.close()))
+  await browser?.close().catch(() => {})
   if (server) await new Promise(resolve => server.close(resolve))
   await rm(scratch, { recursive: true, force: true })
 }

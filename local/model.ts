@@ -34,15 +34,19 @@ export function joinPair(input: string, role: Role = 'second'): Pair {
 }
 
 export function makeInvite(pair: Pair): string {
-  return withSeed(pair, seed => `CANARY-LOCAL:1:${bytesToHex(seed)}`)
+  // Preserve existing first-to-second links; a recovering original creator
+  // needs the first role when the original receiver shows the QR again.
+  return withSeed(pair, seed => pair.role === 'first'
+    ? `CANARY-LOCAL:1:${bytesToHex(seed)}`
+    : `CANARY-LOCAL:2:${bytesToHex(seed)}:first`)
 }
 
 export function joinInvite(input: string): Pair {
   if (typeof input !== 'string' || input.length > 80) throw new Error('This is not a Canary pairing QR.')
-  const match = /^CANARY-LOCAL:1:([0-9a-f]{32})$/.exec(input)
+  const match = /^CANARY-LOCAL:(?:1:([0-9a-f]{32})|2:([0-9a-f]{32}):(first|second))$/.exec(input)
   if (!match) throw new Error('This is not a Canary pairing QR.')
-  const seed = hexToBytes(match[1])
-  try { return joinPair(entropyToMnemonic(seed, wordlist)) }
+  const seed = hexToBytes(match[1] ?? match[2])
+  try { return joinPair(entropyToMnemonic(seed, wordlist), (match[3] ?? 'second') as Role) }
   finally { seed.fill(0) }
 }
 

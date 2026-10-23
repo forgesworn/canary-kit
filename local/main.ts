@@ -49,7 +49,7 @@ function updateUnlock() {
 }
 function wipeUi() {
   for (const id of ['say', 'hear', 'signal']) get(id).textContent = '—'
-  for (const id of ['setup-words', 'setup-reference', 'reference', 'side', 'check-result', 'save-state']) get(id).textContent = ''
+  for (const id of ['setup-words', 'setup-reference', 'exchange-reference', 'reference', 'side', 'check-result', 'save-state']) get(id).textContent = ''
   for (const id of ['setup-input', 'person-name', 'heard-input', 'new-password', 'confirm-password', 'unlock-password']) {
     get<HTMLInputElement | HTMLTextAreaElement>(id).value = ''
   }
@@ -122,21 +122,25 @@ function setupPair(next: Pair, created: boolean) {
   stopScan()
   draft = next
   selected = null
+  get<HTMLTextAreaElement>('setup-input').value = ''
+  if (created) showPairQr(next)
+  else finishExchange()
+}
+function showPairQr(next: Pair) {
   get('setup-reference').textContent = pairReference(next)
   get<HTMLDetailsElement>('setup-details').open = false
   get('setup-words').textContent = ''
-  get<HTMLTextAreaElement>('setup-input').value = ''
-  if (created) {
-    const linked = location.protocol === 'https:'
-    get('qr-instruction').textContent = linked ? 'They scan with their normal phone camera and open the link.' : 'Local preview: they need Canary open and tap Scan their QR. A normal-camera link needs this page hosted over HTTPS.'
-    get('qr-privacy').textContent = linked ? 'Private setup link. Keep it between you.' : 'Use the camera inside Canary. Keep this QR private.'
-    drawQr(get<HTMLCanvasElement>('pair-qr'), linked ? inviteLink(next, location.origin + location.pathname) : makeInvite(next))
-    show('pair-setup')
-  } else finishExchange()
+  get('setup-role-hint').textContent = next.role === 'second' ? 'On their phone, tick “I originally made this pair” to restore their side.' : 'On their phone, leave “I originally made this pair” unticked.'
+  const linked = location.protocol === 'https:'
+  get('qr-instruction').textContent = linked ? 'They scan with their normal phone camera and open the link.' : 'Local preview: they need Canary open and tap Scan their QR. A normal-camera link needs this page hosted over HTTPS.'
+  get('qr-privacy').textContent = linked ? 'Same pair. No countdown. Keep this setup link private.' : 'Same pair. Use the camera inside Canary. Keep this QR private.'
+  get('finish-exchange').textContent = selected ? 'Back to our words ↗' : 'They’ve scanned · show our words ↗'
+  drawQr(get<HTMLCanvasElement>('pair-qr'), linked ? inviteLink(next, location.origin + location.pathname) : makeInvite(next))
+  show('pair-setup')
 }
 function finishExchange() {
-  if (!draft) return
-  const entry: Entry = { id: crypto.randomUUID(), label: '', pair: draft }
+  const entry = selected ?? (draft ? { id: crypto.randomUUID(), label: '', pair: draft } : null)
+  if (!entry) return
   draft = null
   get('setup-words').textContent = ''
   get<HTMLCanvasElement>('pair-qr').width = get<HTMLCanvasElement>('pair-qr').height = 1
@@ -146,9 +150,13 @@ function isSaved() { return !!selected && !!vault?.entries.some(entry => entry.i
 function openPerson(entry: Entry) {
   selected = entry
   const saved = isSaved()
-  get('pair-title').textContent = entry.label || 'Our words.'
+  get('pair-title').textContent = entry.label || (saved ? 'Our words.' : 'Keep this pair.')
+  get('paired-intro').textContent = saved ? 'Say yours. Listen for theirs.' : 'Same code on both phones? Each keep your copy.'
+  if (saved) get('words-end').after(get('keep-card'))
+  else get('words-grid').before(get('keep-card'))
   get<HTMLInputElement>('person-name').value = entry.label
   get('reference').textContent = pairReference(entry.pair)
+  get('exchange-reference').textContent = pairReference(entry.pair)
   get('side').textContent = entry.pair.role === 'first' ? 'you showed the QR' : 'you scanned the QR'
   get('save-state').textContent = saved ? 'Saved encrypted on this phone.' : 'Here for now. Keep this pair before you leave.'
   get('keep-person').hidden = saved
@@ -186,6 +194,12 @@ async function keepWith(active: Vault, stamp: number) {
   try {
     if (!entry || stamp !== generation || document.hidden) return
     if (active.entries.some(item => item.id === entry.id)) return
+    const existing = active.entries.find(item => item.pair.role === entry.pair.role && item.pair.mnemonic === entry.pair.mnemonic)
+    if (existing) {
+      vault = active; adopted = true; pendingKeep = false
+      openPerson(existing)
+      return
+    }
     const kept = { ...entry, label: entry.label || `Person ${active.entries.length + 1}` }
     const entries = [...active.entries, kept]
     const next = await sealEntries(active, entries)
@@ -344,6 +358,8 @@ get('join-back').addEventListener('click', () => { get<HTMLTextAreaElement>('set
 document.querySelectorAll('.home').forEach(button => button.addEventListener('click', home))
 get('scan-start').addEventListener('click', startScan)
 get('finish-exchange').addEventListener('click', finishExchange)
+get('qr-back').addEventListener('click', () => { if (selected) finishExchange(); else home() })
+get('show-pair-qr').addEventListener('click', () => { if (selected) showPairQr(selected.pair) })
 get('scan-stop').addEventListener('click', stopScan)
 get('join-form').addEventListener('submit', event => {
   event.preventDefault()
@@ -351,7 +367,8 @@ get('join-form').addEventListener('submit', event => {
   catch (e) { error(e instanceof Error ? e.message : 'Check the setup words.') }
 })
 get('setup-details').addEventListener('toggle', () => {
-  get('setup-words').textContent = draft && get<HTMLDetailsElement>('setup-details').open ? draft.mnemonic : ''
+  const pair = draft ?? selected?.pair
+  get('setup-words').textContent = pair && get<HTMLDetailsElement>('setup-details').open ? pair.mnemonic : ''
 })
 get('rename-form').addEventListener('submit', event => {
   event.preventDefault()

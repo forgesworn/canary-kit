@@ -51,6 +51,19 @@ describe('local pair', () => {
     }
   })
 
+  it('lets either holder resume the same pair with the opposite speaking role', () => {
+    for (const holder of [first(), second()]) {
+      const restored = joinInvite(makeInvite(holder))
+      expect(restored.mnemonic).toBe(holder.mnemonic)
+      expect(restored.role).toBe(holder.role === 'first' ? 'second' : 'first')
+      expect(wordsAt(restored, now).say).toBe(wordsAt(holder, now).hear)
+      expect(joinLink(inviteLink(holder, 'https://example.test/'), 'https://example.test/')).toEqual(restored)
+    }
+    for (const role of ['', 'third', 'FIRST', 'first:extra']) {
+      expect(() => joinInvite(`CANARY-LOCAL:2:${'13'.repeat(16)}:${role}`)).toThrow()
+    }
+  })
+
   it('creates fresh, checksummed setup words and rejects damaged or oversized input', () => {
     const a = createPair()
     const b = createPair()
