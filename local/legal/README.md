@@ -77,3 +77,8 @@ browser journey and actual offline shell reload passed (`mobile-hosting.json`,
 `mobile-live.json`). These later technical readbacks close the candidate
 publication gap mentioned above; the legal interpretation, physical-phone
 acceptance and independent-review limits remain. They are not a new law review.
+
+The final published receipt is now Sites version 6, a CSS-only touch-target
+correction after v5. The complete mobile/offline journey and six-file public
+readback passed again. Scope and legal findings are unchanged; the current
+receipt and the retained v5 receipt identify the exact versions.

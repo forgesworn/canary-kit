@@ -255,3 +255,13 @@ See `evidence/mobile-live.json` and `evidence/mobile-hosting.json`. This readbac
 closes the browser/publication gate, not the physical phone or independent audit
 gates above. The live app was opened in Google Chrome. Task preview/test servers
 and automation browsers were stopped afterwards.
+
+Version **6** applies a final CSS correction so the two secondary mobile setup
+links have separate 44px touch targets. Website source is
+`fab2f6d9ddbc61bcc19291241f02706d40b31f06`, app implementation plus that correction
+is `b1af99669e15d3467adf5027e10b6b9aae597be3`. The full local and live mobile
+journey and actual offline reload passed again, and six public files matched
+exactly. Current receipts, screenshots and hashes supersede v5; the v5 receipt
+is retained as `evidence/publication-v5.json`. The private-group regression
+passed against v5's identical application code; v6 changes only CSS. Public
+file readback is reproducible with `node tools/check-public-local.mjs`.
