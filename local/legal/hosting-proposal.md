@@ -1,13 +1,14 @@
 # Adopted hosting record — minimal static page
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-App code `1ac118f5c4287159f08a72989c77d288c45207b7`.**
+App code: working tree based on `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a`.**
 
-Current factual delta reviewed on 23 October 2026 against the working tree based
-on app commit `621b6ae5b4da6f8703b863bfeef9af4aeb8f7476` and the modified
-`../canary-words-site` publishing source. Earlier commit/readback references
-below record the earlier release, not production verification of this candidate.
-No deployment or public readback was performed for this gap review.
+Latest factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
+`../canary-words-site` wrapper. The final signed-name/concurrent-exchange section
+in each document governs this candidate; preceding release sections are dated
+history. Earlier publication receipts do not verify this candidate. No deployment
+or public readback was performed for this gap review.
 
 
 ## Published deployment
@@ -169,3 +170,48 @@ Earlier publication receipts establish the earlier releases only. The candidate'
 served notice, app/manifest branding, exact public bytes and security headers
 need their own release readback. The law note's verified date and `[U]` scope
 limits are unchanged.
+
+## Signed-name and nearby-pairing candidate — 23 October 2026
+
+The changed local trust/pairing code does not change `worker/index.js`, `fetch`:
+GET/HEAD return baked public assets; no request body, upload, relay, directory,
+account endpoint, application content store or custom request logging is added.
+Default nearby QR now carries a public invitation and recipient-encrypted reply;
+advanced recovery can still carry a raw-secret fragment. Signed group nicknames,
+chosen receipts and concurrent saved handoffs stay in user-held encrypted vaults
+and deliberate recipient handoffs, not host request payloads. Fragment stripping
+is not a promise that scanners, browser history or extensions retain nothing.
+
+Canary Kit (ForgeSworn), its established GitHub privacy/report contact, OpenAI
+Sites recipient/processor facts and the owner's approved legitimate-interest
+purpose/basis remain unchanged. Ordinary public asset/update request metadata,
+automatic provider statistics, retention/region uncertainty and security-cookie
+facts remain as previously recorded; local nickname agreement does not add a
+hosting consent basis or a new controller identity. No external approval,
+contact, paid resource or publication was performed for this review.
+
+The candidate's public privacy text must distinguish signed shared names from
+private aliases, disclose keeper presentation and recipient copying/retention,
+and distinguish default encrypted QR scan-back from advanced raw-secret
+recovery. Exact deployed bytes, notice, headers and live flow need a new release
+receipt; previous Sites version 9 proves only that release. This review uses
+the GB note verified 28 September 2026 (review by 28 March 2027), with the
+previously recorded partial 23 October refresh. It does not establish physical
+phone acceptance, independent review or blanket compliance.
+
+Source recheck on 23 October 2026: the updated `local/index.html` notice now
+explains public invitation/encrypted scan-back versus advanced raw-secret
+recovery, holder-approved group nicknames versus private aliases, selected
+receipt presentation, explicit keeper review and recipient copying/retention.
+The accompanying source paths match those disclosures. This closes those source
+notice-alignment findings; built and published bytes/readback remain separate.
+
+Moving nearby naming to final comparison, simplifying show/scan/save controls
+and displaying four fixed setup-comparison words introduces no new host data
+path, metadata purpose or provider. No website NFC/bump support is asserted.
+
+Final source recheck also confirms that transient-until-kept wording is
+explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
+is saved encrypted before scan-back. The source notice-alignment gate is closed
+for this candidate. Publication readback and physical acceptance remain open
+until separately evidenced.

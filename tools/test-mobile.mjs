@@ -53,14 +53,19 @@ try {
   async function fillPassphrase(page) {
     await visible(page, '#vault-create'); await page.locator('#new-password').fill(password); await page.locator('#confirm-password').fill(password); await page.locator('#create-submit').click()
   }
-  async function qrLink(page) {
-    const c = await page.locator('#pair-qr').evaluate(c => ({ width: c.width, height: c.height, data: [...c.getContext('2d').getImageData(0, 0, c.width, c.height).data] }))
+  async function manualPair(page, name, needsPassword = false) {
+    await page.locator('#show-join').click();
+    await page.locator('#manual-join').evaluate(el=>el.open=true); await page.locator('#setup-input').fill('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'); await page.locator('#join-form button').click();
+    await page.locator('#quick-name').fill(name); await page.locator('#keep-person').click(); if(needsPassword)await fillPassphrase(page); await visible(page,'#confirm-pair');await page.locator('#confirm-pair').click();
+  }
+  async function qrLink(page, id = '#connect-qr') {
+    const c = await page.locator(id).evaluate(c => ({ width: c.width, height: c.height, data: [...c.getContext('2d').getImageData(0, 0, c.width, c.height).data] }))
     const decoded = jsQR(new Uint8ClampedArray(c.data), c.width, c.height)
     assert.ok(decoded?.data); return decoded.data
   }
   async function screenshot(page, file, words = false) {
     // Never persist generated secrets or words in visual evidence.
-    if (words) await page.evaluate(() => { for (const [id,text] of [['say','gentle river'],['hear','copper dawn'],['signal','—'],['exchange-reference','1234 abcd 5678']]) document.getElementById(id).textContent = text })
+    if (words) await page.evaluate(() => { for (const [id,text] of [['say','gentle river'],['hear','copper dawn'],['signal','—'],['exchange-reference','copper lantern meadow river']]) document.getElementById(id).textContent = text })
     await page.screenshot({ path: join(root, 'local/evidence', file), fullPage: true })
   }
   const a = await phone()
@@ -69,35 +74,46 @@ try {
   await a.locator('#install-welcome').click(); await visible(a, '#install-guide')
   await a.locator('#install-iphone').click(); assert.equal(await a.locator('#install-steps-iphone').isVisible(), true)
   await screenshot(a, 'mobile-install.png'); await a.locator('#install-back').click()
-  // In-person: encrypt the maker's progress before showing any secret QR.
-  await a.locator('#welcome-spoken-check').click(); await a.locator('#create').click(); await visible(a, '#pair-setup')
+  // A public QR and an encrypted scan-back, with protected progress on both phones.
+  await a.locator('#create').click(); await visible(a, '#connect-share')
   const link = await qrLink(a)
-  assert.ok(link.startsWith(address + '#pair='))
+  assert.ok(link.startsWith(address + '#connect='))
+  assert.equal(JSON.parse(decodeURIComponent(new URL(link).hash.slice(9))).type, 'offer')
   const makerRecord = await a.evaluate(() => localStorage.getItem('canary.encrypted-vault.v1'))
-  assert.ok(makerRecord); assert.equal(makerRecord.includes(link.split(':').at(-1)), false)
-  const scanner = await phone()
-  const frame = await a.locator('#pair-qr').evaluate(c => ({width:c.width,height:c.height,data:[...c.getContext('2d').getImageData(0,0,c.width,c.height).data]}))
-  await scanner.evaluate(qr => {
-    const canvas=document.createElement('canvas');canvas.width=qr.width;canvas.height=qr.height
-    canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(qr.data),qr.width,qr.height),0,0)
-    Object.defineProperty(navigator.mediaDevices,'getUserMedia',{configurable:true,value:async constraints=>{
-      window.testConstraints=constraints;const stream=canvas.captureStream(0);window.testTracks=stream.getTracks()
-      canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(qr.data),qr.width,qr.height),0,0);stream.getVideoTracks()[0].requestFrame();return stream
-    }})
-  },frame)
-  await scanner.locator('#welcome-spoken-check').click(); await scanner.locator('#show-join').click(); await scanner.clock.runFor(500); await visible(scanner,'#paired')
-  assert.equal(await scanner.evaluate(()=>window.testConstraints.audio),false)
-  assert.equal(await scanner.evaluate(()=>window.testTracks.every(t=>t.readyState==='ended')),true)
-  const b = await phone(link)
-  await visible(b, '#paired'); assert.equal(b.url(), address)
-  await a.locator('#finish-exchange').click()
-  const code = await a.locator('#exchange-reference').innerText()
-  assert.equal(code, await b.locator('#exchange-reference').innerText())
-  assert.equal(await a.locator('#say').innerText(), await b.locator('#hear').innerText())
-  assert.equal(await b.locator('#say').innerText(), await a.locator('#hear').innerText())
-  await a.locator('#quick-name').fill('Friend B'); await a.locator('#confirm-pair').click()
-  await b.locator('#quick-name').fill('Friend A'); await b.locator('#keep-person').click(); await visible(b, '#confirm-pair'); await b.locator('#confirm-pair').click()
-  for (const page of [a,b]) { assert.equal(await page.locator('#keep-card').isVisible(), false); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true) }
+  assert.ok(makerRecord); assert.equal(makerRecord.includes('New person'), false)
+  await background(a); await unlock(a); await a.locator('#pending-connections .person-card').click()
+  assert.equal(await a.locator('#connect-output').inputValue(),link)
+  async function cameraQr(page, source, start) {
+    const frame = await source.locator('#connect-qr').evaluate(c => ({width:c.width,height:c.height,data:[...c.getContext('2d').getImageData(0,0,c.width,c.height).data]}))
+    await page.evaluate(qr => {
+      const canvas=document.createElement('canvas');canvas.width=qr.width;canvas.height=qr.height
+      canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(qr.data),qr.width,qr.height),0,0)
+      Object.defineProperty(navigator.mediaDevices,'getUserMedia',{configurable:true,value:async constraints=>{
+        window.testConstraints=constraints;const stream=canvas.captureStream(0);window.testTracks=stream.getTracks()
+        canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(qr.data),qr.width,qr.height),0,0);stream.getVideoTracks()[0].requestFrame();return stream
+      }})
+    },frame)
+    await start(); await page.clock.runFor(500)
+  }
+  const b=await phone()
+    await cameraQr(b,a,()=>b.locator('#show-join').click());await visible(b,'#connect-start');await screenshot(b,'mobile-receive.png')
+  assert.equal(await b.evaluate(()=>window.testConstraints.audio),false)
+  assert.equal(await b.evaluate(()=>window.testTracks.every(t=>t.readyState==='ended')),true)
+  const normalCamera=await phone(link);await visible(normalCamera,'#connect-start');assert.equal(normalCamera.url(),address)
+  await b.locator('#connect-accept-nearby').click();await visible(b,'#connect-share')
+  const inPersonReply=await qrLink(b)
+  assert.equal(JSON.parse(decodeURIComponent(new URL(inPersonReply).hash.slice(9))).type,'reply')
+  await background(b);await unlock(b);await b.locator('.person-card').filter({hasText:'New person'}).click();await b.locator('#resend-reply').click()
+  assert.equal(await b.locator('#connect-output').inputValue(),inPersonReply)
+  await cameraQr(a,b,()=>a.locator('#connect-scan-reply').click());await visible(a,'#paired')
+  await b.locator('#connect-read-code').click()
+  const code=await a.locator('#exchange-reference').innerText()
+  assert.equal(code,await b.locator('#exchange-reference').innerText());assert.equal(code.split(' ').length,4);await screenshot(b,'mobile-pair-confirm.png',true)
+  for(const page of [a,b])assert.equal(await page.locator('#words-grid').isVisible(),false)
+  await a.locator('#quick-name').fill('Friend B');await a.locator('#confirm-pair').click();await b.locator('#quick-name').fill('Friend A');await b.locator('#confirm-pair').click()
+  assert.equal(await a.locator('#say').innerText(),await b.locator('#hear').innerText())
+  assert.equal(await b.locator('#say').innerText(),await a.locator('#hear').innerText())
+  for(const page of [a,b]){assert.equal(await page.locator('#keep-card').isVisible(),false);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)}
   // Panic path: reload -> device unlock -> one named person -> words/check.
   await a.reload(); await visible(a, '#locked'); await unlock(a); await a.locator('.person-card').filter({ hasText: 'Friend B' }).click()
   assert.equal(await a.locator('#pair-title').innerText(), 'Friend B')
@@ -135,17 +151,17 @@ try {
   await a.goto(reply); await a.locator('#error').filter({ hasText: 'No matching invitation' }).waitFor()
   // Passphrase fallback, wrong-password refusal, portable backup/recovery.
   const d = await phone(address, { prf: false })
-  await d.locator('#welcome-spoken-check').click(); await d.locator('#create').click(); await fillPassphrase(d); await visible(d, '#pair-setup'); await d.locator('#finish-exchange').click(); await d.locator('#quick-name').fill('Passphrase friend'); await d.locator('#confirm-pair').click(); await d.locator('.home').filter({ visible: true }).click()
+  await manualPair(d,'Passphrase friend',true); await d.locator('.home').filter({ visible: true }).click()
   await d.locator('#vault-settings > summary').click(); const download = d.waitForEvent('download'); await d.locator('#backup').click(); const backupPath = join(scratch, 'backup.json'); await (await download).saveAs(backupPath)
   const backup = await readFile(backupPath,'utf8'); assert.equal(backup.includes('Passphrase friend'), false); assert.equal(JSON.parse(backup).device, undefined)
   await d.reload(); await d.locator('#unlock-password').fill('incorrect'); await d.locator('#unlock-form button').click(); await d.locator('#error').filter({ hasText: 'Could not unlock' }).waitFor(); await unlock(d)
   const recovered = await phone(); await recovered.locator('#restore-file').setInputFiles(backupPath); await visible(recovered, '#locked'); await unlock(recovered); await recovered.locator('.person-card').filter({ hasText:'Passphrase friend' }).click(); await visible(recovered,'#say')
   // Storage failures never claim successful pairing/progress.
-  const failed = await phone(); await failed.evaluate(() => { Storage.prototype.setItem = () => { throw new Error('Storage unavailable') } }); await failed.locator('#welcome-spoken-check').click(); await failed.locator('#create').click(); await failed.locator('#error').filter({ hasText:'Storage unavailable' }).waitFor(); assert.equal(await failed.locator('#pair-setup').isVisible(), false)
+  const failed = await phone(); await failed.evaluate(() => { Storage.prototype.setItem = () => { throw new Error('Storage unavailable') } }); await failed.locator('#create').click(); await failed.locator('#error').filter({ hasText:'Storage unavailable' }).waitFor(); assert.equal(await failed.locator('#connect-share').isVisible(), false)
   // Late native credential/camera callbacks cannot revive a manually locked app.
   const late = await phone()
   await late.evaluate(() => Object.defineProperty(navigator.credentials,'create',{configurable:true,value:()=>new Promise(resolve=>{window.finishCredential=resolve})}))
-  await late.locator('#welcome-spoken-check').click(); await late.locator('#create').click(); await late.waitForFunction(()=>!!window.finishCredential); await late.locator('#lock').click()
+  await late.locator('#create').click(); await late.waitForFunction(()=>!!window.finishCredential); await late.locator('#lock').click()
   await late.evaluate(()=>window.finishCredential({rawId:new Uint8Array([1,4,9]).buffer,getClientExtensionResults:()=>({prf:{results:{first:new Uint8Array(32).fill(82).buffer}}})}))
   await late.waitForFunction(()=>!document.body.hasAttribute('aria-busy'))
   assert.equal(await late.locator('#welcome').isVisible(),true);assert.equal(await late.evaluate(()=>localStorage.length),0)
@@ -153,11 +169,11 @@ try {
     const canvas=document.createElement('canvas');canvas.width=canvas.height=20;window.lateStream=canvas.captureStream(0)
     Object.defineProperty(navigator.mediaDevices,'getUserMedia',{configurable:true,value:()=>new Promise(resolve=>{window.finishCamera=resolve})})
   })
-  await late.locator('#welcome-spoken-check').click(); await late.locator('#show-join').click();await late.waitForFunction(()=>!!window.finishCamera);await late.locator('#scan-stop').click();await late.evaluate(()=>window.finishCamera(window.lateStream));await late.waitForFunction(()=>window.lateStream.getTracks().every(t=>t.readyState==='ended'))
+  await late.locator('#show-join').click();await late.waitForFunction(()=>!!window.finishCamera);await late.locator('#scan-stop').click();await late.evaluate(()=>window.finishCamera(window.lateStream));await late.waitForFunction(()=>window.lateStream.getTracks().every(t=>t.readyState==='ended'))
   // A standalone download still runs without a server or install step.
   if (!live) {
     const file = await phone(pathToFileURL(join(root, 'canary-local.html')).href)
-    await file.locator('#welcome-spoken-check').click(); await file.locator('#create').click(); await fillPassphrase(file); await visible(file, '#pair-setup'); await file.locator('#finish-exchange').click(); await file.locator('#confirm-pair').click(); await visible(file, '#say')
+    await manualPair(file,'File friend',true);await visible(file,'#say')
     assert.equal(await file.locator('#say').isVisible(), true)
   }
   // Exercise actual service-worker install and offline reload, locally and live.
@@ -174,7 +190,7 @@ try {
   }
   const offline = await phone(offlineUrl,{serviceWorkers:'allow'})
   await offline.waitForFunction(()=>!!navigator.serviceWorker.controller, { polling: 100 }, { timeout: 15000 })
-  await offline.locator('#welcome-spoken-check').click(); await offline.locator('#create').click(); await visible(offline,'#pair-setup'); await offline.locator('#finish-exchange').click(); await offline.locator('#confirm-pair').click(); await offline.context().setOffline(true); await offline.reload(); await visible(offline,'#locked'); await unlock(offline); await offline.locator('.person-card').click(); await visible(offline,'#say')
+  await manualPair(offline,'Offline friend'); await offline.context().setOffline(true); await offline.reload(); await visible(offline,'#locked'); await unlock(offline); await offline.locator('.person-card').click(); await visible(offline,'#say')
   const cacheKeys=await offline.evaluate(async()=>{const keys=[];for(const name of await caches.keys())for(const request of await (await caches.open(name)).keys())keys.push(request.url);return keys})
   assert.ok(cacheKeys.length === 5); assert.equal(cacheKeys.some(url=>url.includes('#')||url.includes('connect=')||url.includes('pair=')),false)
   console.log('Actual service worker installed; offline reload/unlock/words passed. Cache contains only five public shell files.')
@@ -182,7 +198,7 @@ try {
   assert.equal(requests.some(r=>/#|CANARY-LOCAL|connect=|trust=/.test(r.url)),false)
   assert.deepEqual(requests.filter(r=>!r.url.startsWith(address)&&!r.url.startsWith('http://127.0.0.1:')&&!r.url.startsWith('file:')),[])
   assert.deepEqual(errors,[])
-  const report={ verified:new Date().toISOString(),address,deviceUnlock:'PRF stub, not physical biometrics',mobilePanicPath:true,publicInviteEncryptedReply:true,encryptedProgressSurvivesBackgroundAndReload:true,replyReplayRejected:true,passphraseFallbackAndRecovery:true,offlineShell:true,physicalPhoneAcceptance:false,browserErrors:errors,standaloneDownload:!live,appRequests:requests.filter(r=>!r.url.startsWith('file:')).map(r=>({method:r.method,path:new URL(r.url).pathname})) }
+  const report={ verified:new Date().toISOString(),address,deviceUnlock:'PRF stub, not physical biometrics',mobilePanicPath:true,publicInviteEncryptedReply:true,inPersonPublicQrEncryptedScanBack:true,fourFixedComparisonWords:true,nearbyRecipientHasNoNameForm:true,normalCameraOpensPublicInvitation:true,encryptedProgressSurvivesBackgroundAndReload:true,replyReplayRejected:true,passphraseFallbackAndRecovery:true,offlineShell:true,physicalPhoneAcceptance:false,browserErrors:errors,standaloneDownload:!live,appRequests:requests.filter(r=>!r.url.startsWith('file:')).map(r=>({method:r.method,path:new URL(r.url).pathname})) }
   await writeFile(join(root,'local/evidence',live?'mobile-live.json':'mobile-journey.json'),JSON.stringify(report,null,2)+'\n')
   console.log('Mobile setup, quick check, normal/duress/mismatch, remote exchange/resume/replay, lock, fallback and recovery passed.')
 } finally {

@@ -1,15 +1,16 @@
 # Privacy facts and hosting inputs
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code `1ac118f5c4287159f08a72989c77d288c45207b7`.
+Code: working tree based on `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a`.
 Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 23 October 2026 against primary sources.**
 
-Current factual delta reviewed on 23 October 2026 against the working tree based
-on app commit `621b6ae5b4da6f8703b863bfeef9af4aeb8f7476` and the modified
-`../canary-words-site` publishing source. Earlier commit/readback references
-below record the earlier release, not production verification of this candidate.
-No deployment or public readback was performed for this gap review.
+Latest factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
+`../canary-words-site` wrapper. The final signed-name/concurrent-exchange section
+in each document governs this candidate; preceding release sections are dated
+history. Earlier publication receipts do not verify this candidate. No deployment
+or public readback was performed for this gap review.
 
 
 These facts apply to the local app and the public static-response site at
@@ -21,9 +22,9 @@ See [hosting record](hosting-proposal.md) and [production evidence](../evidence/
 
 Starting a new in-person pair or remote exchange now first creates or unlocks
 the encrypted vault (`local/main.ts`, `create` handler and `ensureTrustVault`;
-`local/connect-ui.ts`, `mountConnect`). The in-person creator's pair and remote
-exchange progress are encrypted before their outgoing link is displayed. An
-incoming local QR/manual pair can still be transient until explicitly kept.
+`local/connect-ui.ts`, `mountConnect`). The in-person creator's invitation
+private key and remote exchange progress are encrypted before their outgoing link is displayed. An
+incoming legacy raw-secret QR/manual pair can still be transient until explicitly kept.
 Unsaved pairs are cleared on backgrounding or five-minute inactivity; both
 people need their own saved copy for future calls. No publisher account exists.
 Pair setup words, roles and user-chosen nicknames are held in memory while
@@ -57,8 +58,13 @@ passphrase, erase remote copies or revoke another offline pair holder.
 
 ## Setup links, camera and passkey providers
 
-On HTTPS, the displayed QR is a private link containing the pair secret in its
-fragment (`local/model.ts:59`), so a normal camera can open the app. The fragment
+The default in-person QR contains a public invitation; the recipient returns
+a NIP-44-encrypted scan-back QR (`local/connect.ts`, `beginConnect`,
+`acceptConnect`; `local/connect-ui.ts`, `nearby`, `present`). The shared pair
+seed is inside the encrypted reply, not the default invitation. On HTTPS both
+packets use `#connect=` links. The advanced older-pair recovery QR instead
+contains the raw shared secret in its fragment (`local/model.ts:59`), so a
+normal camera can open the app. For either kind of link, the fragment
 is outside the HTTP request URL. An early, CSP-hashed script removes it from the
 current history entry (`local/index.html:12`) and the app consumes the transient
 value (`local/main.ts:519`). Same-tab fragment navigation is supported too.
@@ -81,8 +87,9 @@ physical phone-camera acceptance remains unverified.
 the user's action (`local/qr.ts:46`). Frames are decoded in memory by bundled
 JavaScript. They are not recorded, exported, uploaded or passed to a remote SDK.
 Capture stops after success, cancellation, navigation, backgrounding or timeout;
-late permission grants are stopped too (`local/qr.ts:31`). Setup QR and displayed
-words remain secrets that another person's camera or screen capture could copy.
+late permission grants are stopped too (`local/qr.ts:31`). Advanced raw-secret recovery QR and displayed words remain secrets that
+another person's camera or screen capture could copy; default invitations are
+public and default replies are encrypted.
 
 Optional device unlock asks the browser and the user's chosen authenticator/
 passkey provider for a user-verified credential and PRF output
@@ -355,3 +362,103 @@ separate shared secret and are not linked automatically to group keys. The
 publisher, origin, hosting purpose/basis and existing GitHub privacy route are
 unchanged. Publication/notice alignment and live release readback must be
 verified for this candidate; earlier publication evidence does not do that.
+
+## Signed names, selected receipts and concurrent state — 23 October 2026 candidate
+
+A voucher can propose a known-as nickname of up to 40 characters for one group
+(`trust.ts`, `beginCheck`, `claimName`). It is a shared personal-data statement,
+not the private device alias. Before replying, the holder sees the group/name,
+that the name may be shown to the keeper, and an explicit “Agree this name &
+reply” action (`trust-ui.ts`, challenge processing). The holder's signed reply
+references the fresh signed challenge ID and nonce; it does not repeat the name
+in a separate reply field. Issuance rechecks that exact challenge and places the
+same name and claim version in the signed vouch (`inspectProof`, `issueVouch`).
+This records the voucher's judgement and holder's agreement to the group name;
+it does not certify civil identity, age or messaging-account ownership. The UI
+agreement is a protocol/disclosure action, not a new legal-basis decision for
+the publisher or a guarantee of consent under data-protection law.
+
+The holder can choose which current received vouch to present to the keeper;
+only that selected receipt is attached to the encrypted proof. The keeper sees
+the signed group name, voucher, method and dates before explicitly keeping the
+check as evidence (`trust-ui.ts`, credential selector and proof review).
+Private device labels are stored separately in `Group.people`, are not copied
+into the signed known-as statement, and do not grant voucher authority. The
+keeper's last-check record can retain the agreed name and user-supplied account
+observation. Joining a group or keeping evidence does not admit a platform
+account or connect to another service.
+
+The signed name, key/group links, dated evidence and concurrent exchange state
+are inside the encrypted vault and encrypted recovery backup (`vault.ts`,
+`sealEntries`). There are up to eight pending checks and sixteen saved handoffs
+per group, including peer keys, exchange references and titles. Ten-minute
+challenge expiry limits acceptance, not deletion: expired state, prior backups
+and recipients' evidence can remain until separately removed. Cancelling a
+request or removing a handoff does not erase copies elsewhere. New v5 saves
+preserve the collections; this app still reads older arrays/v2–v4 payloads.
+The reviewed older v4 build rejects v5, so users need a current build to open a
+newly saved vault. This is compatibility handling, not secure erasure or sync.
+
+Names and proofs are recipient-encrypted in app handoffs, but recipients can
+copy, screenshot, retain or disclose decrypted material. Signed statements are
+not technically confined to a keeper after receipt. Changes to private labels,
+expiry, withdrawal or local deletion cannot amend or retrieve old signed copies.
+User-selected chat/clipboard/scanner/browser services may retain public packets,
+ciphertext and metadata under their own settings; a public envelope can expose
+recipient/sender keys or exchange IDs and size even when its content is encrypted.
+Users should agree an appropriate group nickname and share only the needed
+receipt. No cross-group identity link or public trust directory is introduced.
+
+Default nearby setup now saves an invitation private key encrypted before
+showing a public QR (`connect-ui.ts`, `nearby`). The other device saves its pair
+and encrypted reply before showing a scan-back QR; the initiator opens it with
+the matching invitation key (`connect.ts`, `acceptConnect`, `finishConnect`).
+Both compare the fixed pair code in person or on an independently trusted call.
+The offer/reply exposes public keys, random invitation ID and method; the reply
+also exposes ciphertext/size, while the shared seed is inside that ciphertext.
+An invitation key alone is not proof of the person's identity. Unfinished
+invitations still have no automatic expiry. Advanced older-pair recovery can
+still deliberately display a raw-secret QR or accept setup words; that is a
+separate exposure requiring privacy, not the default nearby invitation. Fragment
+stripping, scanner/history retention, live-relay and compromised-device limits
+continue to apply. There is no publisher content transport or new network call.
+
+Publisher/contact, adopted legitimate-interest purpose/basis and host request
+metadata/statistics are unchanged. This candidate needs an aligned public notice
+and exact release readback; earlier Sites version 9 is not its publication proof.
+Physical phone/QR/passkey acceptance and independent review are not established.
+Law note verified 28 September 2026, review by 28 March 2027, with the existing
+partial 23 October refresh; this factual check adds no fresh law research.
+
+Source recheck on 23 October 2026: the updated `local/index.html` notice now
+explains public invitation/encrypted scan-back versus advanced raw-secret
+recovery, holder-approved group nicknames versus private aliases, selected
+receipt presentation, explicit keeper review and recipient copying/retention.
+The accompanying source paths match those disclosures. This closes those source
+notice-alignment findings; built and published bytes/readback remain separate.
+
+The simplified nearby journey presents “Show my code” and “Scan their code” on
+the home screen, with group controls inside details (`local/index.html`). A
+nearby recipient explicitly chooses “Save our check on this phone”; the
+remote-only name/checkbox form is hidden for that path (`connect-ui.ts`,
+`start`, `acceptNearby`). Both nearby copies initially use a placeholder label;
+a private contact name can be added at the final comparison (`main.ts`,
+`openPerson`, confirm-pair handler). This UI action requests encrypted saving;
+it is not an identity check, an admissions decision or a new hosting consent.
+
+The fixed comparison now consists of four Spoken Token words, derived using
+Canary Kit `deriveToken` with the separate `:setup-comparison` namespace and
+counter zero (`model.ts`, `pairComparison`). Four 11-bit word indices give a
+44-bit comparison space; this is a truncated human comparison, not 44-bit
+identity assurance or the encryption-key size. It is role-independent and
+separate from the unchanged stored `pairReference`, rotating two-word call
+checks and 30-second interval. The code is useful only when humans compare it
+through their trusted meeting/call; it does not prevent real-time forwarding.
+No NFC/bump pairing is implemented by this website or covered by this check;
+the separately reported MySignet native Android feature is outside this scope.
+
+Final source recheck also confirms that transient-until-kept wording is
+explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
+is saved encrypted before scan-back. The source notice-alignment gate is closed
+for this candidate. Publication readback and physical acceptance remain open
+until separately evidenced.

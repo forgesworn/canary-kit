@@ -1,13 +1,14 @@
 # Draft UK legal cover: static local-processing app
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code: `1ac118f5c4287159f08a72989c77d288c45207b7`.**
+Code: working tree based on `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a`.**
 
-Current factual delta reviewed on 23 October 2026 against the working tree based
-on app commit `621b6ae5b4da6f8703b863bfeef9af4aeb8f7476` and the modified
-`../canary-words-site` publishing source. Earlier commit/readback references
-below record the earlier release, not production verification of this candidate.
-No deployment or public readback was performed for this gap review.
+Latest factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
+`../canary-words-site` wrapper. The final signed-name/concurrent-exchange section
+in each document governs this candidate; preceding release sections are dated
+history. Earlier publication receipts do not verify this candidate. No deployment
+or public readback was performed for this gap review.
 
 
 **Today:** publisher of a public static-response HTTPS site at
@@ -133,3 +134,44 @@ states that no Signet service/account adapter is connected. Exact public-file,
 live vouch/mobile/offline/device-copy and old-artifact upgrade checks passed;
 see `../evidence/publication.json` and its linked reports. These close the release
 readback/notice gate, not physical-phone, independent review or [U] legal scope.
+
+## Signed group names and concurrent exchanges — 23 October 2026 candidate
+
+The latest working-tree delta adds a holder-approved, signed known-as nickname
+for a particular group, explicit receipt choice and keeper evidence review,
+eight concurrent pending checks and sixteen saved handoffs per group. Private
+device aliases remain separate. Vault payload v5 preserves this state and reads
+older array/v2–v4 payloads; older reviewed builds reject v5 rather than silently
+resaving an incomplete vault. Default nearby pairing now uses a public invitation
+QR and a recipient-encrypted QR scan-back. Raw-secret QR remains an explicit
+advanced older-pair recovery action. See the latest inventory/privacy sections.
+
+This does not add a network, relay, directory, synchronisation, bot, platform
+account-binding endpoint or automated admissions. The publisher/contact,
+legitimate-interest hosting basis and static-publisher assessment `[U]` remain
+unchanged. Law note verified 28 September 2026, review by 28 March 2027; the
+previously recorded partial 23 October refresh is retained without fresh law
+research. Candidate notice alignment and exact release readback must accompany
+publication; Sites version 9 is historical evidence. Physical phone acceptance
+and independent security/legal review remain separate. No blanket clearance,
+new owner approval, external contact or publication is recorded by this review.
+
+Source recheck on 23 October 2026: the updated `local/index.html` notice now
+explains public invitation/encrypted scan-back versus advanced raw-secret
+recovery, holder-approved group nicknames versus private aliases, selected
+receipt presentation, explicit keeper review and recipient copying/retention.
+The accompanying source paths match those disclosures. This closes those source
+notice-alignment findings; built and published bytes/readback remain separate.
+
+The latest nearby UX uses two primary show/scan actions, explicit encrypted
+saving on the joining phone and naming at final comparison. A fixed four-word
+setup comparison replaces the displayed hexadecimal comparison; stored pair
+references and rotating two-word call checks are unchanged. This website has
+no implemented NFC/bump pairing. See the source evidence and limits in the
+latest inventory/privacy sections.
+
+Final source recheck also confirms that transient-until-kept wording is
+explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
+is saved encrypted before scan-back. The source notice-alignment gate is closed
+for this candidate. Publication readback and physical acceptance remain open
+until separately evidenced.

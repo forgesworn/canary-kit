@@ -96,6 +96,10 @@ function withSeed<T>(pair: Pair, fn: (seed: Uint8Array) => T): T {
 export function pairReference(pair: Pair): string {
   return withSeed(pair, seed => bytesToHex(sha256(seed)).slice(0, 12).match(/.{4}/g)!.join(' '))
 }
+/** Fixed, role-independent comparison for the meeting, separate from rotating call words. */
+export function pairComparison(pair: Pair): string {
+  return withSeed(pair, seed => deriveToken(seed, CONTEXT + ':setup-comparison', 0, { format: 'words', count: 4 }))
+}
 
 export function wordsAt(pair: Pair, nowSec: number) {
   const counter = counterAt(nowSec)

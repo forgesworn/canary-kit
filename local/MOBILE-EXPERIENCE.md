@@ -11,10 +11,11 @@ only evidence of the shared secret. No emergency alert is sent.
    using that app. iPhone instructions use the browser Share menu. Android uses
    its install prompt or menu; browsers without Google services may offer a
    shortcut. There is no compulsory browser or platform account.
-2. Together in person, one person shows the private QR, the other scans. The
-   creator protects and saves their progress before displaying the QR. The
-   receiver keeps their copy. Each compares the fixed pair code, names the other
-   person and finishes setup. Rotating words appear afterwards.
+2. Together in person, one person shows a public invitation QR, the other scans
+   and saves an encrypted reply. The creator scans that reply back. Both read the
+   same four fixed comparison words, name each other and finish on their own
+   phone. Rotating call words appear afterwards. Both sides save progress before
+   showing a QR; the recipient has no name form or install requirement first.
 3. On an already trusted live call, use **send an invite**. Send the public offer
    through the existing chat. The recipient protects their phone and sends a
    recipient-encrypted reply. Open/paste the reply in the original Canary app;
@@ -45,8 +46,8 @@ Install first or use an encrypted backup to migrate.
   Signet's broader account/relay vault is not imported into this private tool.
 - Pending remote exchange private keys, invitations, labels, pending encrypted
   replies, pair seeds and recovery data live inside the same encrypted vault.
-  Incoming private QR pairs remain transient until explicitly kept. New saves use
-  encrypted payload version 4: original arrays and versions 2/3 are read and upgraded;
+  Legacy raw-secret QR/manual pairs remain transient until explicitly kept. New saves use
+  encrypted payload version 5: original arrays and versions 2/3/4 are read and upgraded;
   older app builds refuse the new payload rather than dropping pending state. Background
   locking clears the displayed QR, words, names, transfer fields and in-memory
   vault; saved exchanges can be resumed after unlock.
@@ -99,3 +100,12 @@ Installation copy was checked against [Apple’s iPhone web app instructions](ht
 [WebKit’s home-screen app guidance](https://webkit.org/blog/13878/), and
 [Apple’s explanation of separate home-screen storage](https://developer.apple.com/videos/play/wwdc2023/10120/).
 These explain platform behaviour; the physical acceptance gate above remains.
+
+## Simplified meeting and named vouch update
+
+See [SIGNET-VOUCH.md](SIGNET-VOUCH.md) for the current two-action home, public
+invitation plus encrypted QR reply, one-action nearby recipient, four fixed
+comparison words and holder-approved group-name statements. Pending group checks
+and outgoing handoffs are independent per exchange. Payload v5 reads legacy
+arrays/v2/v3/v4; older builds refuse new saves. Group introductions remain optional,
+and native My Signet Android phone tapping is not implemented by this website.

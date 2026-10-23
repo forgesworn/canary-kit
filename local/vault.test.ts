@@ -1,13 +1,32 @@
 import { describe, expect, it } from 'vitest'
 import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, sealEntries, parseVault, closeVault, enableDeviceUnlock, unlockWithDevice, exportVault } from './vault.js'
 import { createPair } from './model.js'
-import { newGroup, groupCard, joinGroup, publicKey } from './trust.js'
+import { newGroup, groupCard, joinGroup, publicKey, beginCheck, pendingChecks, saveHandoff, answerCheck, issueVouch } from './trust.js'
+import { sealTransfer } from './trust-wire.js'
 import { beginConnect, acceptConnect, finishConnect } from './connect.js'
 import { newDeviceRequest, makeDeviceCopy } from './device-transfer.js'
 
 const password = 'a sufficiently long test passphrase'
 
 describe('encrypted local vault', () => {
+  it('recovers independent named requests and exact outgoing handoffs without losing the other person on completion', async () => {
+    const now=1_800_000_000,vault=await createVault(password),keeper=newGroup('Private circle',now)
+    const alice=joinGroup(groupCard(keeper,now),now),bob=joinGroup(groupCard(keeper,now),now)
+    const first=beginCheck(keeper,publicKey(alice),'vouch','',now,'Alice')
+    const second=beginCheck(first.group,publicKey(bob),'vouch','',now,'Bob')
+    const a=await sealTransfer(second.group,publicKey(alice),{kind:'challenge',event:first.event})
+    const b=await sealTransfer(second.group,publicKey(bob),{kind:'challenge',event:second.event})
+    const group=saveHandoff(saveHandoff(second.group,a,'Waiting for Alice',first.event.id,publicKey(alice)),b,'Waiting for Bob',second.event.id,publicKey(bob))
+    vault.trust={v:1,groups:[group]};const record=await sealEntries(vault,[])
+    for(const privateText of ['Private circle','Alice','Bob',group.secret,JSON.stringify(a)])expect(JSON.stringify(record)).not.toContain(privateText)
+    const restored=await unlockVault(parseVault(exportVault(record)),password),saved=restored.trust.groups[0]
+    expect(pendingChecks(saved)).toHaveLength(2);expect(saved.handoffs).toEqual(group.handoffs)
+    const finished=issueVouch(saved,answerCheck(alice,first.event,now),{method:'in-person',days:30},now)
+    const reloaded=await unlockVault(await sealEntries(restored,[],{v:1,groups:[finished.group]}),password)
+    expect(pendingChecks(reloaded.trust.groups[0]).map(e=>e.id)).toEqual([second.event.id])
+    expect(reloaded.trust.groups[0].handoffs?.map(h=>h.transfer)).toEqual([b])
+    closeVault(vault);closeVault(restored);closeVault(reloaded)
+  })
   it('keeps device-copy progress encrypted and portable while preserving it on unrelated saves', async () => {
     const vault = await createVault(password), entries = [{id:'friend',label:'Private name',pair:createPair()}]
     const receive = newDeviceRequest(), sent = makeDeviceCopy(receive.request,entries)
@@ -26,7 +45,7 @@ describe('encrypted local vault', () => {
     const vault = await createVault(password)
     const entries = [{ id: 'old-pair', label: 'Existing friend', pair: createPair() }]
     const key = await crypto.subtle.importKey('raw', new Uint8Array(vault.master).buffer, 'AES-GCM', false, ['encrypt', 'decrypt'])
-    for (const payload of [entries, { v: 2, entries, trust: { v: 1, groups: [] } }, { v: 3, entries, trust: { v: 1, groups: [] }, exchanges: [] }]) {
+    for (const payload of [entries, { v: 2, entries, trust: { v: 1, groups: [] } }, { v: 3, entries, trust: { v: 1, groups: [] }, exchanges: [] }, { v: 4, entries, trust: { v: 1, groups: [] }, exchanges: [], devices: {} }]) {
       const iv = crypto.getRandomValues(new Uint8Array(12))
       const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(`canary:vault:1:${vault.record.id}:data`) }, key, new TextEncoder().encode(JSON.stringify(payload)))
       const old = { ...vault.record, data: { iv: btoa(String.fromCharCode(...iv)), ciphertext: btoa(String.fromCharCode(...new Uint8Array(ciphertext))) } }
@@ -35,7 +54,7 @@ describe('encrypted local vault', () => {
       const upgraded = await sealEntries(reopened, entries)
       const decode = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0))
       const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decode(upgraded.data.iv), additionalData: new TextEncoder().encode(`canary:vault:1:${vault.record.id}:data`) }, key, decode(upgraded.data.ciphertext))
-      expect(JSON.parse(new TextDecoder().decode(plaintext)).v).toBe(4)
+      expect(JSON.parse(new TextDecoder().decode(plaintext)).v).toBe(5)
       closeVault(reopened)
     }
     closeVault(vault)

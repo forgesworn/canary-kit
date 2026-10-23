@@ -63,9 +63,9 @@ substitution. This application profile has local tests, not independent audit.
 
 ## Saved progress and commits
 
-Vault payload version 4 adds one pending receive request/private key and one
+Vault payload version 5 retains one pending receive request/private key and one
 outgoing encrypted file/count. Arrays and v2/v3 payloads remain readable. Saving
-v4 makes older app builds fail closed rather than discard transfer state. Normal
+v5 makes older app builds fail closed rather than discard transfer state. Normal
 people/trust/exchange data retains its 160,000-byte limit; the total payload may
 use 600,000 bytes and the encoded record 1 MiB to retain a ciphertext handoff.
 Device-copy state is included in a passphrase-encrypted recovery backup.
@@ -97,3 +97,12 @@ uses `CANARY_DEVICE_URL` for deployed verification. Screenshot codes are dummy
 values. PRF credentials and OS sharing are stubs; local passphrase/NIP-44 crypto
 runs normally. Physical camera/biometrics, actual AirDrop/chat file handoff and
 phone/desktop call usability remain separate owner acceptance gates.
+
+## Simplified meeting and named vouch update
+
+See [SIGNET-VOUCH.md](SIGNET-VOUCH.md) for the current two-action home, public
+invitation plus encrypted QR reply, one-action nearby recipient, four fixed
+comparison words and holder-approved group-name statements. Pending group checks
+and outgoing handoffs are independent per exchange. Payload v5 reads legacy
+arrays/v2/v3/v4; older builds refuse new saves. Group introductions remain optional,
+and native My Signet Android phone tapping is not implemented by this website.

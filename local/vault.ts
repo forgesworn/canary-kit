@@ -88,7 +88,7 @@ async function opened(record: VaultRecord, master: Uint8Array): Promise<Vault> {
     try {
       const parsed = JSON.parse(decoder.decode(data))
       if (Array.isArray(parsed)) return { record, master, entries: readEntries(parsed), trust: emptyTrust() }
-      if (!parsed || ![2, 3, 4].includes(parsed.v)) throw new Error('Unsupported encrypted vault payload.')
+      if (!parsed || ![2, 3, 4, 5].includes(parsed.v)) throw new Error('Unsupported encrypted vault payload.')
       if (parsed.exchanges !== undefined && (!Array.isArray(parsed.exchanges) || parsed.exchanges.length > 16)) throw new Error('Invalid saved connections.')
       const exchanges = (parsed.exchanges ?? []).map(readExchange) as Exchange[]
       if (new Set(exchanges.map(e => e.id)).size !== exchanges.length) throw new Error('Duplicate saved connections.')
@@ -132,7 +132,7 @@ export async function sealEntries(vault: Vault, entries: Entry[], trust = vault.
   // exchange keys or unconfirmed setup state on their next save.
   const contents = { entries: checked, trust: readTrust(trust), exchanges: checkedExchanges }
   if (encoder.encode(JSON.stringify(contents)).length > 160_000) throw new Error('This local vault is full. Back up your data before removing old records.')
-  const data = encoder.encode(JSON.stringify({ v: 4, ...contents, devices: readDevices(vault.devices) }))
+  const data = encoder.encode(JSON.stringify({ v: 5, ...contents, devices: readDevices(vault.devices) }))
   if (data.length > 600_000) { data.fill(0); throw new Error('Finish or remove the previous device copy before saving another.') }
   try { return { ...vault.record, data: await encrypt(await aes(vault.master), data, vault.record.id, 'data') } }
   finally { data.fill(0) }

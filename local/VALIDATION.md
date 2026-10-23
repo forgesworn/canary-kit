@@ -363,3 +363,38 @@ The deployed URL was opened in Google Chrome. Task preview server, automation
 browsers, scratch archive and installed dependencies were cleaned up afterwards.
 Close existing app windows and reopen to activate a downloaded PWA update; the
 app does not force a refresh during a call or unfinished setup.
+
+## Simpler meeting and agreed identity statements — 23 October 2026 candidate
+
+The first screen now offers only Show my code / Scan their code, with group
+introductions in details. The nearby recipient sees the purpose and one Save
+our check action; naming moves to the four-word fixed comparison. Invitations
+are public and replies are recipient-encrypted. Both sides save before handing
+off and resume exact pending progress. Call words, pair references, origin, PWA
+identity and credentials are preserved. Native My Signet Android NFC tapping is
+separate; no browser bump is claimed.
+
+A new named vouch binds the holder-approved group nickname to the signed request
+and issued receipt. Private aliases stay separate, the holder selects a receipt,
+and the keeper explicitly reviews the introduction before keeping evidence.
+Independent checks/handoffs survive encrypted recovery; completing one leaves
+another intact. New writes use payload v5, while arrays/v2/v3/v4 remain readable.
+
+**750 tests / 33 files passed**, with global/local TypeScript and standalone build.
+Local browser checks passed public/encrypted QR scan-back with actual decoder and
+canvas camera, normal-camera link opening, one-action recipient, fixed comparison,
+lock/reload/resume, call normal/duress/mismatch, remote setup, fallback/backup,
+actual offline-shell reload, private vouch/name agreement/receipt selection/review,
+replay/withdrawal refusal and device-copy selection/merge/failure recovery.
+
+The old committed app fixture (599058f) opens the same vault in the new app with
+identical call words, group keeper and encrypted record/credential slots after
+read. Its first deliberate new save preserves the words; loading the actual old
+build afterwards refuses v5 without rewriting the saved record. The new build
+then reopens it successfully. Providers are fixtures, not real biometrics.
+
+Owner feedback on the earlier flow was a failed clarity gate. The new flow still
+needs a fresh real-phone/novice trial, including the person who found it confusing.
+PHONE-ACCEPTANCE.md records the tasks and unqualified physical/timing gates.
+Independent security/legal review remains separate. Candidate checks do not by
+themselves verify published bytes; the next publication receipt records release.

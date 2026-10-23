@@ -1,15 +1,16 @@
 # Position and applicable duties
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code `1ac118f5c4287159f08a72989c77d288c45207b7`.
+Code: working tree based on `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a`.
 Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 23 October 2026 against primary sources.**
 
-Current factual delta reviewed on 23 October 2026 against the working tree based
-on app commit `621b6ae5b4da6f8703b863bfeef9af4aeb8f7476` and the modified
-`../canary-words-site` publishing source. Earlier commit/readback references
-below record the earlier release, not production verification of this candidate.
-No deployment or public readback was performed for this gap review.
+Latest factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
+`../canary-words-site` wrapper. The final signed-name/concurrent-exchange section
+in each document governs this candidate; preceding release sections are dated
+history. Earlier publication receipts do not verify this candidate. No deployment
+or public readback was performed for this gap review.
 
 
 ## Position today / intended position
@@ -47,8 +48,9 @@ verified 28 September 2026.
 
 ## Already in place
 
-The HTTPS QR can open a new browser directly into the pair. Its fragment secret
-is consumed locally after early address replacement (`local/model.ts:59`,
+The default HTTPS QR opens a public invitation, followed by an encrypted QR
+scan-back and code comparison. Advanced older-pair recovery can still open a
+raw-secret pair link. Incoming fragment data is consumed locally after early address replacement (`local/model.ts:59`,
 `local/index.html:12`, `local/main.ts:519`). Native scanner/history/sync software
 can still copy the original link; the notice now explains that separate exposure.
 No single-use/expiry/revocation promise is made. The public site now serves this behavior; readback and anonymous browser
@@ -211,3 +213,50 @@ prior legal, physical-device and independent-review limits remain.
 A source review does not establish deployed bytes, notices, headers, host
 behaviour or phone usability. Those release and acceptance gates must be
 recorded separately; Sites version 8 readbacks concern the earlier release.
+
+## Signed-name and nearby-pairing delta — 23 October 2026 candidate
+
+A holder-approved known-as statement per group, selected receipt presentation,
+explicit keeper review and resumable concurrent checks change the local data
+facts, documented in the latest privacy/inventory sections. Human recognition,
+fresh key control, voucher acceptance and admissions remain separate. Default
+nearby pairing uses a public invitation and NIP-44-encrypted QR scan-back;
+advanced older-pair raw-secret QR/manual recovery remains available. A fixed
+pair code still requires human comparison, and real-time forwarding remains a
+limit. Vault payload v5 preserves the new collections and reads older formats;
+reviewed old readers reject v5 rather than discard its state on save.
+
+The selected static software-publisher position under GB note §2.2 `[U]` is
+retained: no network service, relay, directory, sync, bot, account-binding
+endpoint or admissions automation is added. The same fixed-response host serves
+public assets only. The publisher/contact and adopted legitimate-interest basis
+for ordinary hosting metadata/statistics are unchanged. A signed nickname can
+be personal data in holders' copies; the absence of a publisher content endpoint
+does not decide every individual/group user's processing responsibilities.
+No civil identity, age, global revocation or blanket legal clearance follows.
+
+Law note verified 28 September 2026, review by 28 March 2027; existing partial
+23 October refresh and `[U]` provider/IPA/telecom limits remain. No new identified
+service deadline, fee, public identity, legal-basis or owner approval decision
+is introduced. Current notice/build/public readback, physical phone acceptance
+and independent security/legal review remain separate evidence gates. This
+review publishes nothing and makes no external contact.
+
+Source recheck on 23 October 2026: the updated `local/index.html` notice now
+explains public invitation/encrypted scan-back versus advanced raw-secret
+recovery, holder-approved group nicknames versus private aliases, selected
+receipt presentation, explicit keeper review and recipient copying/retention.
+The accompanying source paths match those disclosures. This closes those source
+notice-alignment findings; built and published bytes/readback remain separate.
+
+The simplified show/scan/save/name journey and four-word fixed setup comparison
+add no new recipient or service. The comparison is a 44-bit truncated human
+comparison in a separate namespace, not identity certification. Stored pair
+references and rotating call checks remain unchanged. NFC/bump functionality
+reported for a separate native app is outside this website's scope.
+
+Final source recheck also confirms that transient-until-kept wording is
+explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
+is saved encrypted before scan-back. The source notice-alignment gate is closed
+for this candidate. Publication readback and physical acceptance remain open
+until separately evidenced.

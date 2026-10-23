@@ -1,15 +1,16 @@
 # Inventory and gap check
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code `1ac118f5c4287159f08a72989c77d288c45207b7`.
+Code: working tree based on `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a`.
 Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 23 October 2026 against primary sources.**
 
-Current factual delta reviewed on 23 October 2026 against the working tree based
-on app commit `621b6ae5b4da6f8703b863bfeef9af4aeb8f7476` and the modified
-`../canary-words-site` publishing source. Earlier commit/readback references
-below record the earlier release, not production verification of this candidate.
-No deployment or public readback was performed for this gap review.
+Latest factual delta reviewed on 23 October 2026 against the working tree based
+on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
+`../canary-words-site` wrapper. The final signed-name/concurrent-exchange section
+in each document governs this candidate; preceding release sections are dated
+history. Earlier publication receipts do not verify this candidate. No deployment
+or public readback was performed for this gap review.
 
 
 The legal-cover inventory helper was rerun on tracked `local/`: fourteen
@@ -224,3 +225,54 @@ phone acceptance must be evidenced separately. Earlier version 8 evidence
 does not verify this candidate. Independent legal/security review, host-internal
 retention/region, other platforms and individual users' processing remain outside
 this check.
+
+## Signed-name and concurrent-exchange gap check — 23 October 2026 candidate
+
+Reviewed actual `local/trust.ts`, `trust-ui.ts`, `connect.ts`, `connect-ui.ts`,
+`main.ts` and `vault.ts`, with `trust-wire.ts`, entry validation, source notice
+and the separate fixed-response wrapper. Key-holder answer: the unlocked user
+browser holds vault, group and invitation private keys; this delta gives the
+publisher no content key. The repository helper was rerun; larger networked
+`app/`, generated historical artifacts and recording tools remain out of scope.
+
+| Gap or claim tested | Source evidence | Note / finding |
+|---|---|---|
+| Shared nickname could be mistaken for a private alias. | `trust.ts`, `claimName`, `beginCheck`, `inspectProof`, `issueVouch`; `trust-ui.ts`, `personView`, challenge processing, `vouchPreview`. | §§3.1–3.2: the proposed 40-character known-as name and `known-person:v1` claim are signed in a fresh group challenge. Holder explicitly agrees and signs a reply bound to that challenge ID/nonce; the issued vouch carries the same name. Private `Group.people` labels are separate and not put in that statement. |
+| Holder might present more evidence than chosen, or proof might imply admissions. | `trust-ui.ts`, challenge credential selector and proof review; `trust.ts`, `currentVouches`, `answerCheck`, `inspectProof`, `acceptProof`. | §§2.2, 3.2: holder chooses one current receipt. Keeper sees signed name/method/date/expiry and expressly keeps a historical check as evidence; accepting a voucher remains separate. No platform account proof or automatic group admission. |
+| Pending state might be overwritten or omitted from recovery. | `trust.ts`, `pendingChecks`, `beginCheck`, `cancelCheck`, `saveHandoff`, `readTrust`; `vault.ts`, `opened`, `sealEntries`. | §§3.2, 4: up to eight concurrent checks and sixteen saved handoffs per group; replace/remove actions are explicit and bounds reject further saves. Encrypted v5 state/backups include names, request references, peer keys, titles and handoffs. Old arrays/v2–v4 read; the reviewed previous v4 reader rejects v5. No downgrade converter or silent-loss guarantee for arbitrary third-party software. |
+| All QR wording could imply raw shared-secret disclosure. | `main.ts`, create and show-pair-qr handlers; `connect-ui.ts`, `nearby`, `present`, `receive`; `connect.ts`, `beginConnect`, `acceptConnect`, `finishConnect`. | §3.2: default nearby invitation is public ID/key/method; scan-back contains public reply ID/key and NIP-44 ciphertext. Seed is inside encrypted reply. Both compare fixed pair code. Advanced raw-secret recovery QR/manual import remains; no civil identity or live-relay guarantee. |
+| Hosting or recipients could have changed. | `../canary-words-site/worker/index.js`, `fetch`; `trust-wire.ts`, `sealTransfer`; `connect-ui.ts`, explicit share/copy handlers. | §§2.2, 3.2: wrapper still serves fixed public GET/HEAD assets, consumes no request body and adds no application content API/store/logging. Hosting request metadata and provider statistics remain under the adopted notice/basis. External apps/scanners may retain packets; recipients can retain/copy decrypted evidence. |
+
+Law source remains verified 28 September 2026, review by 28 March 2027, with the
+recorded partial 23 October refresh. Watch list was read; no fresh primary-law
+research, shared-note date change, new fee/deadline or new owner decision was
+needed for this bounded factual delta. Controller-wide ICO fee status remains
+unverified (note §3.4: tier 1 if due £52/year, £5 direct-debit discount).
+No payment, registration, contact or publication was performed. Candidate source
+notice/build/readback alignment is a release gate, distinct from physical phone
+acceptance, independent review, host-internal retention/region and foreign law.
+
+Source recheck on 23 October 2026: the updated `local/index.html` notice now
+explains public invitation/encrypted scan-back versus advanced raw-secret
+recovery, holder-approved group nicknames versus private aliases, selected
+receipt presentation, explicit keeper review and recipient copying/retention.
+The accompanying source paths match those disclosures. This closes those source
+notice-alignment findings; built and published bytes/readback remain separate.
+
+Additional UX source evidence: `index.html` keeps the two primary nearby actions
+and puts group actions inside details. `connect-ui.ts`, `start`,
+`acceptNearby`, hides the remote form for nearby input and saves an encrypted
+placeholder-labelled pair on explicit “Save our check”. `main.ts`,
+`openPerson`, confirm-pair handler, saves the final private name. `model.ts`,
+`pairComparison`, uses `deriveToken` in `canary:local-pair:v1:setup-comparison`,
+counter zero, four 11-bit Spoken Token words (44-bit comparison space). The
+stored `pairReference`, call-word namespace/count and 30-second interval are
+unchanged. This changes human comparison/display, not secret transport,
+identity guarantees, admissions or the host data path. No website NFC/bump
+implementation was found or inferred from the separate MySignet native app.
+
+Final source recheck also confirms that transient-until-kept wording is
+explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
+is saved encrypted before scan-back. The source notice-alignment gate is closed
+for this candidate. Publication readback and physical acceptance remain open
+until separately evidenced.

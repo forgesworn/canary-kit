@@ -50,7 +50,7 @@ try {
   }
   const keeper = await phone(), witness = await phone(), member = await phone()
   assert.equal(await keeper.locator('#open-private-groups').count(), 1, 'Private vouches need a usable phone interface')
-  await keeper.locator('#open-private-groups').click()
+  await keeper.locator('.welcome-more > summary').click(); await keeper.locator('#open-private-groups').click()
   await keeper.locator('#trust-group-name').fill('Private coffee group')
   await keeper.locator('#trust-create-group').click()
   await keeper.locator('#trust-share-group').click()
@@ -64,8 +64,9 @@ try {
   await member.locator('#trust-my-key').click()
   const memberCard = await transfer(member)
   await open(witness, memberCard)
-  await witness.locator('#trust-start-vouch').click()
+  await witness.locator('#trust-known-as').fill('Sam'); await witness.locator('#trust-start-vouch').click()
   await open(member, await transfer(witness))
+  assert.ok((await member.locator('#private-trust').innerText()).includes('Sam'));
   await member.locator('#trust-answer-check').click()
   await open(witness, await transfer(member))
   await witness.locator('#trust-method').selectOption('in-person')
@@ -73,6 +74,7 @@ try {
   await witness.locator('#trust-issue-vouch').click()
   const receipt = await transfer(witness)
   await open(member, receipt)
+  assert.ok((await member.locator('#private-trust').innerText()).includes('Signed name for this group: Sam'));
   await member.locator('#trust-issuer-name').fill('Known witness'); await member.locator('#trust-keep-vouch').click()
   await member.locator('#trust-show-vouches').click(); await member.locator('[data-vouch-state=active]').waitFor();
   await member.screenshot({ path: 'local/evidence/private-vouch-mobile.png', fullPage: true });
@@ -81,7 +83,7 @@ try {
   console.log('Private groups: fresh key proof and deliberate vouch delivered encrypted.')
   // A saved person can be checked again without scanning another holder card.
   await witness.locator('#trust-back-group').click(); await witness.locator('.vouch-person').filter({hasText:'Known coffee friend'}).click();
-  await witness.locator('#trust-start-vouch').click(); await open(member,await transfer(witness)); await member.locator('#trust-answer-check').click(); await open(witness,await transfer(member));
+  await witness.locator('#trust-known-as').fill('Sam'); await witness.locator('#trust-start-vouch').click(); await open(member,await transfer(witness)); await member.locator('#trust-answer-check').click(); await open(witness,await transfer(member));
   await witness.locator('#trust-method').selectOption('in-person'); await witness.locator('#trust-issue-vouch').click();
   console.log('Vouch UX: saved-person action required a fresh response before re-vouching.')
   await open(keeper, memberCard)
@@ -95,7 +97,7 @@ try {
   await witness.locator('#trust-back-group').click()
   await witness.locator('#trust-my-key').click()
   await open(keeper, await transfer(witness))
-  keeper.once('dialog',dialog=>dialog.accept()); await keeper.locator('#trust-check-voucher').click()
+  await keeper.locator('#trust-check-voucher').click()
   await open(witness, await transfer(keeper))
   await witness.locator('#trust-answer-check').click()
   await open(keeper, await transfer(witness))
@@ -105,22 +107,22 @@ try {
 
   await open(keeper, memberCard)
   await keeper.locator('#trust-account-context').fill('WhatsApp contact checked in person')
-  await keeper.locator('#trust-check-member').click()
+  keeper.once('dialog',dialog=>dialog.accept()); await keeper.locator('#trust-check-member').click()
   const challenge = await transfer(keeper)
   await keeper.reload(); await keeper.locator('#unlock-device').click(); await keeper.locator('#people-private-groups').click()
   await keeper.getByRole('button', { name: 'Private coffee group', exact: true }).click()
-  await keeper.locator('#trust-resume').click()
+  await keeper.locator('.saved-exchanges .trust-card').filter({hasText:'Waiting for their reply'}).filter({hasText:'Key '}).last().getByRole('button',{name:'Continue exchange',exact:true}).click()
   assert.equal(await transfer(keeper), challenge, 'Pending exchanges survive reload in the encrypted vault')
   await open(member, challenge)
   await member.locator('#trust-answer-check').click()
   const response = await transfer(member)
   await open(keeper, response)
-  await keeper.locator('#trust-last-check').filter({ hasText: 'Key proof checked' }).waitFor()
+  await keeper.locator('#trust-keep-check').click(); await keeper.locator('#trust-last-check').filter({ hasText: 'Key proof checked' }).waitFor()
   assert.ok((await keeper.locator('#trust-last-check').innerText()).includes('Known witness'))
   assert.ok((await keeper.locator('#trust-last-check').innerText()).includes('WhatsApp contact checked in person'))
   await keeper.screenshot({ path: 'local/evidence/private-check-mobile.png', fullPage: true })
   await open(keeper, response)
-  await keeper.locator('#error').filter({ hasText: 'no pending check' }).waitFor()
+  await keeper.locator('#error').filter({ hasText: 'pending check' }).waitFor()
   console.log('Private groups: pending request survived reload; holder proof matched; replay rejected.')
 
   await witness.locator('#trust-back-group').click()
@@ -143,7 +145,7 @@ try {
   assert.equal(requests.some(url => url.includes('CANARY-TRUST') || url.includes('#trust=')), false)
   assert.deepEqual(requests.filter(url => !url.startsWith(address)), [])
   assert.deepEqual(errors, [])
-  const report = { vouchUx:true, savedPersonRequiresFreshProof:true, openCardExpiryUpdates:true, withdrawalBadge:true, privateIssuerAliasDoesNotGrantKeeperAuthority:true, verified: new Date().toISOString(), live: !!live, independentGroupKeys: true, encryptedVouchRoundTrip: true, untrustedVoucherRejected: true, voucherTrustRequiresExplicitFreshCheck: true, holderChallengePassed: true, pendingSurvivesReload: true, replayRejected: true, withdrawalHonoured: true, qrRoundTrips: true, noPrivateTransferInRequests: true, encryptedLocalStorage: true, noExternalRequests: true, browserErrors: errors }
+  const report = { agreedNameBoundToHolderReply:true, holderChoosesVouch:true, keeperExplicitlyReviewsIntroduction:true, vouchUx:true, savedPersonRequiresFreshProof:true, openCardExpiryUpdates:true, withdrawalBadge:true, privateIssuerAliasDoesNotGrantKeeperAuthority:true, verified: new Date().toISOString(), live: !!live, independentGroupKeys: true, encryptedVouchRoundTrip: true, untrustedVoucherRejected: true, voucherTrustRequiresExplicitFreshCheck: true, holderChallengePassed: true, pendingSurvivesReload: true, replayRejected: true, withdrawalHonoured: true, qrRoundTrips: true, noPrivateTransferInRequests: true, encryptedLocalStorage: true, noExternalRequests: true, browserErrors: errors }
   await writeFile(`local/evidence/private-trust${live ? '-live' : ''}.json`, JSON.stringify(report, null, 2) + '\n')
   console.log('Private group browser flow passed: encrypted vouch, explicit voucher trust, fresh holder proof, reload recovery, replay/withdrawal rejection, real QR decoding and local-only storage/network.')
 } finally {

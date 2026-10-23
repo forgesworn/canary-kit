@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { generateMnemonic } from '@scure/bip39'
+import { wordlist } from '@scure/bip39/wordlists/english.js'
 import { chromium } from 'playwright'
 import jsQR from 'jsqr'
 import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises'
@@ -35,9 +37,9 @@ try {
   }
   async function person(page,name) {
     if(await page.locator('#people').isVisible())await page.locator('#add-person').click()
-    await page.locator('#welcome-spoken-check').click();await page.locator('#create').click()
+    await page.locator('#show-join').click();await page.locator('#manual-join').evaluate(el=>el.open=true);await page.locator('#setup-input').fill(generateMnemonic(wordlist));await page.locator('#join-form button').click();await page.locator('#quick-name').fill(name);await page.locator('#keep-person').click()
     if(await page.locator('#vault-create').isVisible()){await page.locator('#new-password').fill(password);await page.locator('#confirm-password').fill(password);await page.locator('#create-submit').click()}
-    await visible(page,'#pair-setup');await page.locator('#finish-exchange').click();await page.locator('#quick-name').fill(name);await page.locator('#confirm-pair').click();await page.locator('.home').filter({visible:true}).click();await visible(page,'#people')
+    await visible(page,'#paired');await page.locator('#confirm-pair').click();await page.locator('.home').filter({visible:true}).click();await visible(page,'#people')
   }
   async function request(page) {
     if(await page.locator('#people').isVisible())await page.locator('#devices-people').click()

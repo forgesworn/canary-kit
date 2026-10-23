@@ -1,5 +1,6 @@
 import { beginConnect, acceptConnect, finishConnect, connectInput, connectLink, readConnect, type Exchange } from './connect.js'
 import { type Entry, type Vault } from './vault.js'
+import { drawQr } from './qr.js'
 
 interface Host {
   vault(): Vault | null
@@ -10,27 +11,55 @@ interface Host {
   show(view: string): void
   open(entry: Entry): void
   home(): void
+  scan(): void
   error(message: string): void
 }
 export function mountConnect(host: Host) {
   const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
   let incoming: string | undefined, output: string | undefined, epoch = 0
-  function clear() { epoch++; incoming = output = undefined; get<HTMLInputElement>('connect-name').value = ''; get<HTMLTextAreaElement>('connect-paste').value = ''; get<HTMLTextAreaElement>('connect-output').value = '' }
+  function clear() { epoch++; incoming = output = undefined; get<HTMLInputElement>('connect-name').value = ''; get<HTMLTextAreaElement>('connect-paste').value = ''; get<HTMLTextAreaElement>('connect-output').value = ''; const qr=get<HTMLCanvasElement>('connect-qr');qr.width=qr.height=1 }
   function start(input?: string) {
     clear(); incoming = input
-    get('connect-intro').textContent = input ? 'Someone sent you an invitation. Only continue with a person you know, face to face or on a separately trusted live call.' : 'Send an invitation in WhatsApp, Signal, Telegram or any private chat. They send one encrypted reply back.'
+    const nearby=input&&readConnect(input).method==='in-person'
+    get('connect-start-title').textContent=nearby?'Keep a check together.':'Set up over a trusted call.'
+    get('connect-intro').textContent=nearby?'Save a private check with the person beside you. On future calls, you can check each other’s two words.':'A new pair cannot verify an unexpected caller. Continue only with someone you already know, using an independently trusted meeting or call.'
+    get('connect-accept-nearby').hidden=!nearby
+    get('connect-form').hidden=!!nearby
+    get('install-connect').hidden=!!nearby
+    get('connect-technical').hidden=!!nearby
+    get('connect-start-eyebrow').textContent=nearby?'Together now. Ready for future calls.':'Set up once · over a trusted call'
     get<HTMLInputElement>('connect-known').checked = false
     host.show('connect-start')
   }
   function present(packet: string, reply = false) {
-    output = connectLink(packet, location.origin + location.pathname)
+    const parsed=readConnect(packet),nearby=parsed.method==='in-person'
+    output = location.protocol==='https:'?connectLink(packet, location.origin + location.pathname):packet
     get<HTMLTextAreaElement>('connect-output').value = output
-    get('connect-share-title').textContent = reply ? 'Send your reply.' : 'Send your invitation.'
-    get('connect-share-hint').textContent = reply ? 'Send this back in your private chat. Then both compare the fixed pair code on a trusted call.' : 'They open this link, protect their phone, then send you a reply. Open their reply here to finish.'
+    get('connect-share-title').textContent = nearby?(reply?'Let them scan back.':'Let them scan this.'):(reply ? 'Send your reply.' : 'Send your invitation.')
+    get('connect-share-hint').textContent = nearby?(reply?'Your copy is saved encrypted. They scan this encrypted reply, then you both compare the fixed code.':'This QR contains a public invitation. They scan, protect their copy and show an encrypted reply for you to scan back.'):(reply ? 'Send this back in your private chat. Then both compare the fixed pair code on a trusted call.' : 'They open this link, protect their phone, then send you a reply. Open their reply here to finish.')
+    get('connect-qr-frame').hidden=!nearby
+    if(nearby)drawQr(get<HTMLCanvasElement>('connect-qr'),output,'L')
+    get('connect-scan-reply').hidden=reply||!nearby
+    get('connect-send').hidden=location.protocol!=='https:'
     get('connect-read-code').hidden = !reply
     get('connect-share-status').textContent = 'Progress is saved encrypted. You can safely switch apps and unlock to continue.'
     host.show('connect-share')
   }
+  function nearby() { host.ensure(async()=>{
+    const active=host.vault();if(!active)return
+    const exchange=beginConnect('New person','in-person')
+    await host.save(active.entries,[...(active.exchanges??[]),exchange]);present(exchange.invite)
+  }) }
+  async function acceptNearby(packet:string){
+    const active=host.vault(),stamp=epoch;if(!active)return
+    const existing=active.entries.find(e=>e.setup?.invite===packet&&e.setup.reply)
+    if(existing){present(existing.setup!.reply!,true);return}
+    const accepted=acceptConnect(packet),entry:Entry={id:crypto.randomUUID(),label:'New person',pair:accepted.pair,setup:{method:'in-person',reply:accepted.reply,invite:packet}}
+    await host.save([...active.entries,entry],active.exchanges??[])
+    if(stamp===epoch)present(accepted.reply,true)
+  }
+  get('connect-accept-nearby').addEventListener('click',()=>{const packet=incoming;if(packet)host.ensure(()=>acceptNearby(packet))})
+  get('connect-scan-reply').addEventListener('click',()=>host.scan())
   get('remote-start').addEventListener('click', () => start())
   get('connect-back').addEventListener('click', () => { clear(); host.home() })
   get('connect-share-back').addEventListener('click', () => { clear(); host.home() })
@@ -42,8 +71,10 @@ export function mountConnect(host: Host) {
       const active = host.vault(), stamp = epoch
       if (!active) return
       if (packet) {
+        const existing=active.entries.find(e=>e.setup?.invite===packet&&e.setup.reply)
+        if(existing){present(existing.setup!.reply!,true);return}
         const accepted = acceptConnect(packet)
-        const entry: Entry = { id: crypto.randomUUID(), label, pair: accepted.pair, setup: { method: 'trusted-call', reply: accepted.reply } }
+        const entry: Entry = { id: crypto.randomUUID(), label, pair: accepted.pair, setup: { method: readConnect(packet).method??'trusted-call', reply: accepted.reply, invite:packet } }
         await host.save([...active.entries, entry], active.exchanges ?? [])
         if (stamp === epoch) present(accepted.reply, true)
       } else {
@@ -69,7 +100,7 @@ export function mountConnect(host: Host) {
         const exchange = active?.exchanges?.find(item => item.id === parsed.id)
         if (!active || !exchange) throw new Error('No matching invitation on this browser. Open Signet Vouch where you made the invitation. If using the home-screen app, paste the reply there.')
         const pair = finishConnect(exchange, packet)
-        const entry: Entry = { id: crypto.randomUUID(), label: exchange.label, pair, setup: { method: 'trusted-call' } }
+        const entry: Entry = { id: crypto.randomUUID(), label: exchange.label, pair, setup: { method: readConnect(exchange.invite).method??'trusted-call' } }
         await host.save([...active.entries, entry], active.exchanges!.filter(item => item.id !== exchange.id))
         host.open(entry)
       })
@@ -115,5 +146,5 @@ export function mountConnect(host: Host) {
     }
   }
   function resend(entry: Entry) { if (entry.setup?.reply) present(entry.setup.reply, true) }
-  return { receive, clear, list, resend }
+  return { receive, clear, list, resend, nearby }
 }

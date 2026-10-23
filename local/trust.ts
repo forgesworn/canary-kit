@@ -8,13 +8,14 @@ export type Method = 'in-person' | 'online'
 export type Purpose = 'member' | 'voucher' | 'vouch'
 export interface Proof { kind: 'proof'; event: Signed; credential?: Signed }
 export type Transfer = { kind: 'group'; event: Signed } | { kind: 'key'; event: Signed } | { kind: 'sealed'; from: string; to: string; content: string }
+export interface Handoff { id: string; title: string; peer?: string; transfer: Transfer }
 export interface Group {
   id: string; name: string; keeper: string; secret: string
   trusted: { pubkey: string; label: string }[]
   people?: { pubkey: string; label: string }[]
   issued: Signed[]; received: Signed[]; withdrawals: Signed[]
-  pending?: Signed; outgoing?: Transfer
-  lastCheck?: { subject: string; issuer?: string; at: number; account: string; purpose: Purpose }
+  pending?: Signed; checks?: Signed[]; outgoing?: Transfer; handoffs?: Handoff[]
+  lastCheck?: { subject: string; issuer?: string; at: number; account: string; purpose: Purpose; knownAs?: string }
 }
 export interface TrustState { v: 1; groups: Group[] }
 const PREFIX = 'canary:group:v1:'
@@ -47,6 +48,30 @@ function tag(event: Signed, name: string): string {
   const values = event.tags.filter(t => t[0] === name)
   if (values.length !== 1 || values[0].length !== 2) fail(`Missing or ambiguous ${name} in the signed proof.`)
   return values[0][1]
+}
+export function claimName(event: Signed): string | undefined {
+  const claims = event.tags.filter(t => t[0] === 'claim'), names = event.tags.filter(t => t[0] === 'known-as')
+  if (!claims.length && !names.length) return undefined
+  if (tag(event, 'claim') !== 'known-person:v1') fail('This identity statement is unsupported.')
+  return text(tag(event, 'known-as'), 40)
+}
+export function pendingChecks(group: Group): Signed[] {
+  const checks = [...(group.checks ?? [])]
+  if (group.pending && !checks.some(e => e.id === group.pending!.id)) checks.push(group.pending)
+  return checks
+}
+function withChecks(group: Group, checks: Signed[]): Group { return { ...group, checks, pending: checks.at(-1) } }
+export function cancelCheck(group: Group, id: string): Group {
+  const checks = pendingChecks(group), request = checks.find(e => e.id === id)
+  if (!request) fail('This check has already finished or been removed.')
+  if (request.pubkey !== publicKey(group)) fail('This request belongs to another key.')
+  return { ...withChecks(group, checks.filter(e => e.id !== id)), handoffs: group.handoffs?.filter(h => h.id !== id) }
+}
+export function saveHandoff(group: Group, transfer: Transfer, title: string, id: string, peer?: string): Group {
+  const legacy=group.outgoing&&!group.handoffs?.some(h=>h.id==='legacy')?[{id:'legacy',title:'Continue your saved exchange.',transfer:group.outgoing}]:[]
+  const handoffs = [...(group.handoffs ?? []).filter(h => h.id !== id),...legacy, { id: text(id, 80), title: text(title, 100), ...(peer ? { peer: hex(peer, 64) } : {}), transfer: readTransfer(transfer) }]
+  if (handoffs.length > 16) fail('Finish or remove a saved exchange before starting another. No saved exchange was removed.')
+  return { ...group, handoffs, outgoing: undefined }
 }
 export function signed(raw: unknown): Signed {
   if (!raw || typeof raw !== 'object') fail('This signed proof is invalid.')
@@ -106,16 +131,17 @@ export function issueVouch(group: Group, request: unknown, options: { method: Me
   const result = inspectProof(group, request as Proof, now)
   if (result.purpose !== 'vouch') fail('A fresh key check specifically for this vouch is required.')
   if (!['in-person', 'online'].includes(options.method) || !Number.isInteger(options.days) || options.days < 1 || options.days > 90) fail('Choose how you checked and an expiry from 1 to 90 days.')
-  const event = sign(group, 'vouch', result.subject, [['method', options.method], ['occurred_at', String(now)], ['expiration', String(now + options.days * 86400)]], '', now)
+  const event = sign(group, 'vouch', result.subject, [['method', options.method], ['occurred_at', String(now)], ['expiration', String(now + options.days * 86400)], ...(result.knownAs ? [['claim', 'known-person:v1'], ['known-as', result.knownAs]] : [])], '', now)
   const issued = group.issued.filter(old => tag(old, 'p') !== result.subject)
   if (issued.length >= 32) fail('This group has reached its local vouch limit.')
   let people = group.people ?? []
   if (options.label?.trim()) people = [...people.filter(p => p.pubkey !== result.subject), { pubkey: result.subject, label: text(options.label, 40) }]
   if (people.length > 64) fail('This group has reached its saved-name limit.')
-  return { group: { ...group, people, pending: undefined, issued: [...issued, event] }, event }
+  return { group: { ...cancelCheck(group, result.requestId), people, issued: [...issued, event] }, event }
 }
 function vouch(group: Group, raw: unknown, now: number): Signed {
   const event = scoped(group, raw, 'vouch'); fresh(event, now)
+  claimName(event)
   hex(tag(event, 'p'), 64)
   if (event.pubkey === tag(event, 'p') || tag(event, 'd') !== 'vouch:' + tag(event, 'p')) fail('A vouch must be for another holder and use the expected claim address.')
   if (!['in-person', 'online'].includes(tag(event, 'method'))) fail('The vouch method is unsupported.')
@@ -132,41 +158,53 @@ export function receiveVouch(group: Group, raw: unknown, now = timeNow()): Group
   if (received.length >= 16) fail('This group has reached its received-vouch limit.')
   return { ...group, received: [...received, event] }
 }
-export function beginCheck(group: Group, subject: string, purpose: Purpose, account = '', now = timeNow()) {
+export function beginCheck(group: Group, subject: string, purpose: Purpose, account = '', now = timeNow(), knownAs?: string) {
   if (purpose !== 'vouch') keeperOnly(group)
   hex(subject, 64)
   if (!['member', 'voucher', 'vouch'].includes(purpose) || subject === publicKey(group)) fail('Choose another holder to check.')
+  if (knownAs !== undefined && purpose !== 'vouch') fail('Only a vouch request can propose an agreed group name.')
+  const claim = knownAs === undefined ? [] : [['claim', 'known-person:v1'], ['known-as', text(knownAs, 40)]]
+  const checks = pendingChecks(group).filter(e => !(tag(e, 'p') === subject && tag(e, 'purpose') === purpose))
+  if (checks.length >= 8) fail('Finish or remove a pending check before starting another.')
   const nonce = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
-  const event = sign(group, 'canary-check', subject, [['purpose', purpose], ['nonce', nonce], ['expiration', String(timestamp(now) + 600)]], text(account, 100, true), now)
-  return { group: { ...group, pending: event }, event }
+  const event = sign(group, 'canary-check', subject, [['purpose', purpose], ['nonce', nonce], ['expiration', String(timestamp(now) + 600)], ...claim], text(account, 100, true), now)
+  const replaced = pendingChecks(group).filter(e => tag(e, 'p') === subject && tag(e, 'purpose') === purpose).map(e => e.id)
+  return { group: { ...withChecks(group, [...checks, event]), handoffs: group.handoffs?.filter(h => !replaced.includes(h.id)) }, event }
 }
 export function readChallenge(group: Group, raw: unknown, now = timeNow()): Signed {
   const challenge = scoped(group, raw, 'canary-check'); fresh(challenge, now)
   const purpose = tag(challenge, 'purpose')
   if ((purpose !== 'vouch' && challenge.pubkey !== group.keeper) || challenge.pubkey === publicKey(group) || tag(challenge, 'p') !== publicKey(group) || !['member', 'voucher', 'vouch'].includes(purpose) || !/^[0-9a-f]{32}$/.test(tag(challenge, 'nonce')) || Number(tag(challenge, 'expiration')) > challenge.created_at + 600) fail('This check is not from your saved keeper, or is addressed to another holder.')
   text(challenge.content, 100, true)
+  const knownAs = claimName(challenge)
+  if (knownAs && purpose !== 'vouch') fail('This check has an unexpected identity statement.')
   return challenge
 }
-export function answerCheck(group: Group, raw: unknown, now = timeNow()): Proof {
+export function currentVouches(group: Group, now = timeNow()): Signed[] {
+  return [...group.received].sort((a, b) => Number(b.pubkey === group.keeper) - Number(a.pubkey === group.keeper) || b.created_at - a.created_at).filter(event => { try { vouch(group, event, now); return true } catch { return false } })
+}
+export function answerCheck(group: Group, raw: unknown, now = timeNow(), credentialId?: string): Proof {
   const challenge = readChallenge(group, raw, now)
   let credential: Signed | undefined
   if (tag(challenge, 'purpose') === 'member') {
-    credential = [...group.received].sort((a, b) => Number(b.pubkey === group.keeper) - Number(a.pubkey === group.keeper) || b.created_at - a.created_at).find(event => { try { vouch(group, event, now); return true } catch { return false } })
+    credential = currentVouches(group, now).find(event => !credentialId || event.id === credentialId)
     if (!credential) fail('There is no current, unwithdrawn vouch to present. Ask someone to vouch for you.')
   }
   const event = sign(group, 'canary-proof', challenge.pubkey, [['request', challenge.id], ['nonce', tag(challenge, 'nonce')], ['purpose', tag(challenge, 'purpose')], ...(credential ? [['credential', credential.id]] : [])], challenge.content, now)
   return { kind: 'proof', event, ...(credential ? { credential } : {}) }
 }
 export function inspectProof(group: Group, packet: Proof, now = timeNow()) {
-  if (!group.pending) fail('There is no pending check. Start a fresh check; old responses cannot be reused.')
-  const pending = scoped(group, group.pending, 'canary-check'); fresh(pending, now)
+  const event = scoped(group, packet.event, 'canary-proof')
+  const request = pendingChecks(group).find(e => e.id === tag(event, 'request'))
+  if (!request) fail('There is no matching pending check. Start a fresh check; old responses cannot be reused.')
+  const pending = scoped(group, request, 'canary-check'); fresh(pending, now)
   const purpose = tag(pending, 'purpose') as Purpose
   if (!['member', 'voucher', 'vouch'].includes(purpose) || Number(tag(pending, 'expiration')) > pending.created_at + 600) fail('The saved challenge has an invalid purpose or lifetime.')
   if (purpose !== 'vouch') keeperOnly(group)
   if (pending.pubkey !== publicKey(group)) fail('The saved challenge was not signed by this phone.')
-  const event = scoped(group, packet.event, 'canary-proof')
   if (tag(event, 'p') !== publicKey(group) || tag(event, 'request') !== pending.id || tag(event, 'nonce') !== tag(pending, 'nonce') || tag(event, 'purpose') !== tag(pending, 'purpose') || event.pubkey !== tag(pending, 'p') || event.content !== pending.content || event.created_at < pending.created_at - 30 || event.created_at > now + 30) fail('This response does not match the pending holder, account context or challenge.')
   let issuer: string | undefined
+  let knownAs = claimName(pending)
   if (purpose === 'member') {
     const credential = vouch(group, packet.credential, now)
     if (tag(event, 'credential') !== credential.id || tag(credential, 'p') !== event.pubkey) fail('The holder response does not match its vouch.')
@@ -174,8 +212,9 @@ export function inspectProof(group: Group, packet: Proof, now = timeNow()) {
     const latest = group.issued.find(old => old.pubkey === credential.pubkey && tag(old, 'p') === event.pubkey)
     if (latest && latest.id !== credential.id && latest.created_at >= credential.created_at) fail('A newer vouch is known to this keeper. Ask for the updated one.')
     issuer = credential.pubkey
+    knownAs = claimName(credential)
   } else if (packet.credential) fail('A voucher-key check must not carry a membership credential.')
-  return { subject: event.pubkey, issuer, purpose, at: timestamp(now), account: pending.content }
+  return { subject: event.pubkey, issuer, purpose, at: timestamp(now), account: pending.content, requestId: pending.id, ...(knownAs ? { knownAs } : {}) }
 }
 export function trustVoucher(group: Group, pubkey: string, label: string): Group {
   keeperOnly(group); hex(pubkey, 64); label = text(label, 40)
@@ -191,7 +230,7 @@ export function acceptProof(group: Group, packet: Proof, label = '', now = timeN
   const result = inspectProof(group, packet, now)
   if (result.purpose === 'vouch') fail('Choose how you checked the person, then explicitly sign the vouch.')
   const next = result.purpose === 'voucher' ? trustVoucher(group, result.subject, label) : group
-  return { ...next, pending: undefined, outgoing: undefined, lastCheck: result }
+  return { ...cancelCheck(next, result.requestId), lastCheck: result }
 }
 export function withdrawVouch(group: Group, id: string, now = timeNow()) {
   const original = group.issued.find(event => event.id === id && event.pubkey === publicKey(group))
@@ -238,8 +277,18 @@ export function readTrust(raw: unknown): TrustState {
     group.received = g.received.map(e => { const event = scoped(group, e, 'vouch'); if (tag(event, 'p') !== publicKey(group)) fail('Saved receipt belongs to another key.'); return event })
     group.withdrawals = g.withdrawals.map(e => { const event = scoped(group, e, 'vouch'); if (tag(event, 'status') !== 'revoked') fail('Invalid saved withdrawal.'); return event })
     if (g.pending) { group.pending = scoped(group, g.pending, 'canary-check'); if (tag(group.pending, 'purpose') !== 'vouch') keeperOnly(group); if (group.pending.pubkey !== publicKey(group)) fail('Invalid saved challenge.') }
+    if (g.checks !== undefined) {
+      if (!Array.isArray(g.checks) || g.checks.length > 8) fail('Invalid saved checks.')
+      group.checks = g.checks.map(raw => { const check = scoped(group, raw, 'canary-check'); if (check.pubkey !== publicKey(group) || !['member', 'voucher', 'vouch'].includes(tag(check, 'purpose'))) fail('Invalid saved challenge.'); if (tag(check, 'purpose') !== 'vouch') keeperOnly(group); claimName(check); return check })
+      if (new Set(group.checks.map(e => e.id)).size !== group.checks.length || pendingChecks(group).length > 8) fail('Duplicated or excessive saved checks.')
+    }
     if (g.outgoing) group.outgoing = readTransfer(g.outgoing)
-    if (g.lastCheck) group.lastCheck = { subject: hex(g.lastCheck.subject, 64), ...(g.lastCheck.issuer ? { issuer: hex(g.lastCheck.issuer, 64) } : {}), at: timestamp(g.lastCheck.at), purpose: g.lastCheck.purpose === 'voucher' ? 'voucher' : g.lastCheck.purpose === 'member' ? 'member' : fail('Invalid check purpose.'), account: text(g.lastCheck.account, 100, true) }
+    if (g.handoffs !== undefined) {
+      if (!Array.isArray(g.handoffs) || g.handoffs.length > 16) fail('Invalid saved exchanges.')
+      group.handoffs = g.handoffs.map(h => ({ id: text(h.id, 80), title: text(h.title, 100), ...(h.peer ? { peer: hex(h.peer, 64) } : {}), transfer: readTransfer(h.transfer) }))
+      if (new Set(group.handoffs.map(h => h.id)).size !== group.handoffs.length) fail('Duplicated saved exchanges.')
+    }
+    if (g.lastCheck) group.lastCheck = { subject: hex(g.lastCheck.subject, 64), ...(g.lastCheck.issuer ? { issuer: hex(g.lastCheck.issuer, 64) } : {}), at: timestamp(g.lastCheck.at), purpose: g.lastCheck.purpose === 'voucher' ? 'voucher' : g.lastCheck.purpose === 'member' ? 'member' : fail('Invalid check purpose.'), account: text(g.lastCheck.account, 100, true), ...(g.lastCheck.knownAs ? { knownAs: text(g.lastCheck.knownAs, 40) } : {}) }
     return group
   })
   return { v: 1, groups }

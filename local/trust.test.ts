@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { newGroup, groupCard, joinGroup, keyCard, issueVouch, beginCheck, answerCheck, inspectProof, acceptProof, receiveVouch, withdrawVouch, receiveWithdrawal, trustVoucher, forgetVoucher, readTrust, emptyTrust, publicKey, type Group } from './trust.js'
+import { newGroup, groupCard, joinGroup, keyCard, issueVouch, beginCheck, answerCheck, inspectProof, acceptProof, receiveVouch, withdrawVouch, receiveWithdrawal, trustVoucher, forgetVoucher, readTrust, emptyTrust, publicKey, pendingChecks, cancelCheck, claimName, type Group } from './trust.js'
 import { sealTransfer, openTransfer, packTransfer, unpackTransfer } from './trust-wire.js'
 import { finalizeEvent } from 'nostr-tools/pure'
 import { hexToBytes } from '../src/crypto.js'
@@ -13,6 +13,47 @@ function ceremony() {
   return { keeper: issued.group, member: receiveVouch(member, issued.event, now), credential: issued.event }
 }
 describe('private group vouches', () => {
+  it('binds the agreed group name into the holder-approved request and the signed vouch', () => {
+    const keeper = newGroup('Friends', now), holder = joinGroup(groupCard(keeper, now), now)
+    const request = beginCheck(keeper, publicKey(holder), 'vouch', 'Our existing chat', now, 'Sam')
+    expect(claimName(request.event)).toBe('Sam')
+    const proof = answerCheck(holder, request.event, now)
+    const issued = issueVouch(request.group, proof, { method: 'in-person', days: 30, label: 'My private nickname' }, now)
+    expect(claimName(issued.event)).toBe('Sam')
+    expect(JSON.stringify(issued.event)).not.toContain('My private nickname')
+    const received = receiveVouch(holder, issued.event, now)
+    const check = beginCheck(issued.group, publicKey(holder), 'member', 'WhatsApp conversation', now)
+    expect(inspectProof(check.group, answerCheck(received, check.event, now), now).knownAs).toBe('Sam')
+    const changed = beginCheck(keeper, publicKey(holder), 'vouch', 'Our existing chat', now, 'Someone else')
+    expect(() => issueVouch(changed.group, proof, { method: 'in-person', days: 30 }, now)).toThrow()
+    expect(() => beginCheck(keeper, publicKey(holder), 'vouch', '', now, 'Sam\u202e')).toThrow()
+    expect(() => beginCheck(keeper, publicKey(holder), 'member', '', now, 'Sam')).toThrow()
+  })
+  it('keeps overlapping checks independent across replies, cancellation, reload and expiry', () => {
+    const keeper = newGroup('Friends', now), a = joinGroup(groupCard(keeper, now), now), b = joinGroup(groupCard(keeper, now), now)
+    const first = beginCheck(keeper, publicKey(a), 'vouch', '', now, 'Alice')
+    const second = beginCheck(first.group, publicKey(b), 'vouch', '', now + 1, 'Bob')
+    const loaded = readTrust({ v: 1, groups: [second.group] }).groups[0]
+    expect(pendingChecks(loaded)).toHaveLength(2)
+    const result = issueVouch(loaded, answerCheck(a, first.event, now + 2), { method: 'in-person', days: 30 }, now + 2)
+    expect(pendingChecks(result.group).map(e => e.id)).toEqual([second.event.id])
+    expect(() => inspectProof(result.group, answerCheck(a, first.event, now + 2), now + 2)).toThrow()
+    const cancelled = cancelCheck(result.group, second.event.id)
+    expect(pendingChecks(cancelled)).toHaveLength(0)
+    expect(() => inspectProof(cancelled, answerCheck(b, second.event, now + 2), now + 2)).toThrow()
+    expect(() => inspectProof(loaded, answerCheck(a, first.event, now + 2), now + 601)).toThrow()
+  })
+  it('lets the holder choose which valid credential to present', () => {
+    const { keeper, member, credential } = ceremony()
+    const witness = joinGroup(groupCard(keeper, now), now)
+    const request = beginCheck(witness, publicKey(member), 'vouch', '', now + 1, 'Sam')
+    const issued = issueVouch(request.group, answerCheck(member, request.event, now + 1), { method: 'online', days: 30 }, now + 1)
+    const holder = receiveVouch(member, issued.event, now + 1)
+    const check = beginCheck(keeper, publicKey(member), 'member', '', now + 2)
+    expect(answerCheck(holder, check.event, now + 2, issued.event.id).credential?.id).toBe(issued.event.id)
+    expect(answerCheck(holder, check.event, now + 2, credential.id).credential?.id).toBe(credential.id)
+    expect(() => answerCheck(holder, check.event, now + 2, '0'.repeat(64))).toThrow()
+  })
   it('creates independent group-scoped keys without an account or shared-word seed', () => {
     const a = newGroup('Friends', now), b = newGroup('Friends', now)
     const member = joinGroup(groupCard(a, now), now)

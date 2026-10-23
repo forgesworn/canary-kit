@@ -9,7 +9,7 @@ age, professional identity, government-ID or global reputation assertion.
 
 ## Separate experiences
 
-Ordinary personal pairing still needs one QR scan and explicit encrypted Keep.
+Ordinary personal pairing exchanges a public invitation QR and recipient-encrypted scan-back, followed by fixed-word comparison and an explicit save on each phone.
 Contact details can record the user's meeting method, observed accounts and last
 matching word check. These are private notes, not independent proof of platform
 account control. Merely displaying words does not record a successful comparison.
@@ -47,7 +47,7 @@ its own signer as its subject.
 Group keys, names, selected vouchers, local aliases, issued/received vouches,
 withdrawals, pending challenges and the latest outgoing transfer are in the
 existing AES-GCM encrypted vault. The outer vault format remains version 1;
-the decrypted payload is version 4. Legacy arrays and version 2/3 payloads remain readable.
+the decrypted payload is version 5. Legacy arrays and version 2/3/4 payloads remain readable.
 Saving/renaming contacts preserves group state. Portable encrypted backups carry
 the group keys and pending exchanges; device-only vaults still need a recovery
 passphrase before export. Existing backups are not silently retrofitted.
@@ -126,3 +126,12 @@ rescanning a holder card, but the existing fresh challenge/response is required
 before issuing a vouch; replacing an active unfinished request asks explicitly.
 Expired verification cards are regenerated on Continue; expired pending requests
 lead to a new check, never acceptance of the old proof.
+
+## Simplified meeting and named vouch update
+
+See [SIGNET-VOUCH.md](SIGNET-VOUCH.md) for the current two-action home, public
+invitation plus encrypted QR reply, one-action nearby recipient, four fixed
+comparison words and holder-approved group-name statements. Pending group checks
+and outgoing handoffs are independent per exchange. Payload v5 reads legacy
+arrays/v2/v3/v4; older builds refuse new saves. Group introductions remain optional,
+and native My Signet Android phone tapping is not implemented by this website.

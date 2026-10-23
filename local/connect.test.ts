@@ -1,8 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { beginConnect, acceptConnect, finishConnect, readConnect, readExchange } from './connect.js'
-import { wordsAt, pairReference } from './model.js'
+import { wordsAt, pairReference, pairComparison } from './model.js'
 
 describe('private app-to-app pairing over an existing messenger', () => {
+  it('uses the encrypted exchange for in-person QR pairing without exposing the seed', () => {
+    const draft = beginConnect('Sam', 'in-person')
+    const offer = readConnect(draft.invite)
+    expect(offer.method).toBe('in-person')
+    const result = acceptConnect(draft.invite)
+    const first = finishConnect(draft, result.reply)
+    expect(pairReference(first)).toBe(pairReference(result.pair))
+    expect(pairComparison(first)).toBe(pairComparison(result.pair))
+    expect(pairComparison(first).split(' ')).toHaveLength(4)
+    expect(result.reply).not.toContain(first.mnemonic)
+    expect(draft.invite).not.toContain(draft.secret)
+    expect(readExchange(JSON.parse(JSON.stringify(draft)))).toEqual(draft)
+  })
   it('exchanges only a public invitation and recipient-encrypted response, deriving opposite sides', () => {
     const draft = beginConnect('Alice')
     const accepted = acceptConnect(draft.invite)

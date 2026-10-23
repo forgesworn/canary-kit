@@ -1,12 +1,12 @@
 import './style.css'
-import { createPair, joinPair, joinInvite, makeInvite, inviteLink, joinLink, joinFragment, pairReference, wordsAt, checkWords, INTERVAL, type Pair } from './model.js'
+import { joinPair, joinInvite, makeInvite, inviteLink, joinLink, joinFragment, pairReference, pairComparison, wordsAt, checkWords, INTERVAL, type Pair } from './model.js'
 import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, parseVault, sealEntries, closeVault, enableDeviceUnlock, unlockWithDevice, deviceUnlockPossible, exportVault, MAX_VAULT_BYTES, type Vault, type VaultRecord, type Entry } from './vault.js'
 import { drawQr, QrScanner } from './qr.js'
 import { mountTrust } from './trust-ui.js'
 import type { TrustState } from './trust.js'
 import { mountInstall } from './install.js'
 import { mountConnect } from './connect-ui.js'
-import type { Exchange } from './connect.js'
+import { readConnect, type Exchange } from './connect.js'
 import { mountDevices } from './device-ui.js'
 import type { Devices } from './device-transfer.js'
 
@@ -31,6 +31,8 @@ let connectUi: ReturnType<typeof mountConnect> | undefined
 let devicesUi: ReturnType<typeof mountDevices> | undefined
 
 const scanner = new QrScanner(get<HTMLVideoElement>('scan-video'), data => {
+  if(data.includes('#connect=')){stopScan();void connectUi!.receive(data);return}
+  if(data.startsWith('{')){try{readConnect(data);stopScan();void connectUi!.receive(data);return}catch{ /* Try the existing device-request parser below. */ }}
   if (data.includes('#device=') || data.startsWith('CANARY-DEVICE:') || data.startsWith('{')) { stopScan(); devicesUi!.receive(data); return }
   if (data.startsWith('CANARY-TRUST:') || data.includes('#trust=')) { stopScan(); trustUi!.receive(data); return }
   try { setupPair(data.startsWith('CANARY-LOCAL:') ? joinInvite(data) : joinLink(data, location.origin + location.pathname), false) }
@@ -183,19 +185,19 @@ function openPerson(entry: Entry) {
   const saved = isSaved()
   const settingUp = !saved || !!entry.setup
   get('pair-title').textContent = entry.label || (saved ? 'Our words.' : 'Keep this pair.')
-  get('paired-intro').textContent = saved && !entry.setup ? 'Ask for their words. Compare, then say yours.' : 'Compare your fixed pair code together. No rush.'
+  get('paired-intro').textContent = saved && !entry.setup ? 'Ask for their words. If they asked first, read only “You say”.' : 'Read this code to each other. Same code? Name each other and finish on both phones.'
   get('check-guidance').hidden = !saved || !!entry.setup
   get('keep-card').hidden = saved && !entry.setup
   if (saved && !entry.setup) get('words-end').after(get('keep-card'))
   else get('words-grid').before(get('keep-card'))
-  get<HTMLInputElement>('quick-name').value = entry.label
+  get<HTMLInputElement>('quick-name').value = entry.setup && entry.label==='New person' ? '' : entry.label
   get('setup-name').hidden = saved && !entry.setup
   get('confirm-pair').hidden = !saved || !entry.setup
   get('resend-reply').hidden = !entry.setup?.reply
   for (const id of ['words-grid', 'word-timer', 'progress', 'words-end', 'open-check', 'check', 'duress']) get(id).hidden = settingUp
   get<HTMLInputElement>('person-name').value = entry.label
   get('reference').textContent = pairReference(entry.pair)
-  get('exchange-reference').textContent = pairReference(entry.pair)
+  get('exchange-reference').textContent = pairComparison(entry.pair)
   get('side').textContent = entry.pair.role === 'first' ? 'you showed the QR' : 'you scanned the QR'
   renderContactEvidence(entry)
   get('save-state').textContent = saved ? (entry.setup ? 'Saved encrypted. Finish the code check together.' : 'Saved encrypted on this phone.') : 'Keep your copy before switching apps.'
@@ -293,7 +295,7 @@ async function savePairs(entries: Entry[], exchanges: Exchange[]) {
   if (stamp !== generation || active !== vault || document.hidden) throw new Error('Canary was locked. Unlock to continue your saved setup.')
   persist(next); active.record = next; active.entries = entries; active.exchanges = exchanges
 }
-connectUi = mountConnect({ vault: () => vault, hasRecord: () => !!record, device: input => devicesUi!.receive(input), ensure: ensureTrustVault, save: savePairs, show, open: openPerson, home, error })
+connectUi = mountConnect({ vault: () => vault, hasRecord: () => !!record, device: input => devicesUi!.receive(input), ensure: ensureTrustVault, save: savePairs, show, open: openPerson, home, error, scan:()=>{show('join');startScan()} })
 devicesUi = mountDevices(get('devices'), {
   vault: () => vault, hasRecord: () => !!record, ensure: ensureTrustVault,
   async save(entries: Entry[], devices: Devices) {
@@ -318,7 +320,9 @@ get('open-check').addEventListener('click', () => {
 get('resend-reply').addEventListener('click', () => { if (selected) connectUi?.resend(selected) })
 get('confirm-pair').addEventListener('click', () => {
   if (!selected?.setup || !vault) return
-  const entry: Entry = { ...selected, label: get<HTMLInputElement>('quick-name').value.trim() || selected.label, evidence: { method: selected.setup.method, at: Math.floor(Date.now() / 1000) } }
+  const label=get<HTMLInputElement>('quick-name').value.trim()
+  if(!label){error('Add their name so you can find this check on your next call.');get('quick-name').focus();return}
+  const entry: Entry = { ...selected, label, evidence: { method: selected.setup.method, at: Math.floor(Date.now() / 1000) } }
   delete entry.setup
   void action(async () => {
     const active = vault!
@@ -333,7 +337,6 @@ function openVouches(intent:'groups'|'vouch'|'show'='groups') {
 for(const id of ['open-private-groups','people-private-groups'])get(id).addEventListener('click',()=>openVouches())
 get('start-vouch').addEventListener('click',()=>openVouches('vouch'))
 get('show-vouches-welcome').addEventListener('click',()=>openVouches('show'))
-get('welcome-spoken-check').addEventListener('click',()=>{get<HTMLDetailsElement>('setup-options').open=true;get('setup-options').scrollIntoView({behavior:'instant',block:'start'})})
 function tick() {
   if ((vault || selected || draft || pendingTrustTask) && Date.now() - lastActivity > 300_000) { lock('Locked after five minutes without interaction. Unlock to continue saved setup.'); return }
   trustUi?.tick()
@@ -469,12 +472,7 @@ get('restore-file').addEventListener('change', () => {
   })
 })
 get('add-person').addEventListener('click', () => { selected = draft = null; wipeUi(); show('welcome'); get<HTMLDetailsElement>('setup-options').open=true; get('setup-options').scrollIntoView({behavior:'instant',block:'start'}) })
-get('create').addEventListener('click', () => ensureTrustVault(async () => {
-  const active = vault!
-  const entry: Entry = { id: crypto.randomUUID(), label: `Person ${active.entries.length + 1}`, pair: createPair(), setup: { method: 'in-person' } }
-  await savePairs([...active.entries, entry], active.exchanges ?? [])
-  selected = entry; draft = null; showPairQr(entry.pair)
-}))
+get('create').addEventListener('click', () => connectUi!.nearby())
 function startScan() {
   const stamp = generation
   get('scanner').hidden = false; get('scan-start').hidden = true

@@ -1,7 +1,7 @@
-import { signed, publicKey, keyCode, type Group, type Signed } from './trust.js'
+import { signed, publicKey, keyCode, claimName, type Group, type Signed } from './trust.js'
 export const claimField=(event:Signed,name:string)=>event.tags.find(t=>t[0]===name)?.[1]??''
 export function personName(group:Group,key:string) {return group.people?.find(p=>p.pubkey===key)?.label||group.trusted.find(p=>p.pubkey===key)?.label||`Key ${keyCode(key).split(' ').slice(0,2).join(' ')}`}
-export interface VouchSummary {state:'active'|'expired'|'withdrawn'|'invalid';label:string;method:string;at:number;expires:number}
+export interface VouchSummary {state:'active'|'expired'|'withdrawn'|'invalid';label:string;method:string;at:number;expires:number;knownAs?:string}
 export function vouchSummary(group:Group,raw:Signed,now:number):VouchSummary {
  const invalid:VouchSummary={state:'invalid',label:'Unusable signed claim',method:'',at:0,expires:0}
  try{
@@ -9,7 +9,8 @@ export function vouchSummary(group:Group,raw:Signed,now:number):VouchSummary {
   const subject=field('p'),expires=Number(field('expiration')),method=field('method')
   if(field('type')!=='vouch'||field('context')!=='canary:group:v1:'+group.id||field('keeper')!==group.keeper||field('d')!=='vouch:'+subject||!/^[0-9a-f]{64}$/.test(subject)||subject===event.pubkey||!['in-person','online'].includes(method)||!Number.isSafeInteger(expires)||expires<=event.created_at||expires>event.created_at+90*86400||event.created_at>now+30)return invalid
   const withdrawn=group.withdrawals.some(w=>w.pubkey===event.pubkey&&claimField(w,'p')===subject&&w.created_at>=event.created_at)
-  return{state:withdrawn?'withdrawn':expires<=now?'expired':'active',label:personName(group,event.pubkey),method:method==='in-person'?'Met in person':'Trusted live call',at:event.created_at,expires}
+  const knownAs=claimName(event)
+  return{state:withdrawn?'withdrawn':expires<=now?'expired':'active',label:personName(group,event.pubkey),method:method==='in-person'?'Met in person':'Trusted live call',at:event.created_at,expires,...(knownAs?{knownAs}:{})}
  }catch{return invalid}
 }
 export function knownPeople(group:Group,now:number) {

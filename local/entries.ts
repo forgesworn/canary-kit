@@ -6,7 +6,7 @@ export interface Entry {
   evidence?: { method: 'in-person' | 'trusted-call'; at: number }
   accounts?: { service: string; account: string; observedAt: number }[]
   lastCheck?: number
-  setup?: { method: 'in-person' | 'trusted-call'; reply?: string }
+  setup?: { method: 'in-person' | 'trusted-call'; reply?: string; invite?: string }
 }
 export function readEntries(raw: unknown): Entry[] {
   if (!Array.isArray(raw) || raw.length > 200) throw new Error('Invalid vault contents.')
@@ -31,7 +31,8 @@ export function readEntries(raw: unknown): Entry[] {
     if (value.lastCheck !== undefined) result.lastCheck = checkedTime(value.lastCheck)
     if (value.setup !== undefined) {
       if (!['in-person', 'trusted-call'].includes(value.setup.method) || (value.setup.reply !== undefined && (typeof value.setup.reply !== 'string' || value.setup.reply.length > 3000))) throw new Error('Invalid saved setup.')
-      result.setup = { method: value.setup.method, ...(value.setup.reply ? { reply: value.setup.reply } : {}) }
+      if(value.setup.invite!==undefined&&(typeof value.setup.invite!=='string'||value.setup.invite.length>3000))throw new Error('Invalid saved invitation.')
+      result.setup = { method: value.setup.method, ...(value.setup.reply ? { reply: value.setup.reply } : {}), ...(value.setup.invite ? { invite: value.setup.invite } : {}) }
     }
     return result
   })
