@@ -1,3 +1,11 @@
+## 2.12.2 (2026-10-23)
+
+### Bug Fixes
+
+- support the branded Signet Vouch address
+
+
+
 ## 2.12.1 (2026-10-23)
 
 ### Bug Fixes
