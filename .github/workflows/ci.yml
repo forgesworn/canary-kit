@@ -23,10 +23,21 @@ jobs:
       - run: npm run check:signet-conformance
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run typecheck:local
       - run: npm run build
       - run: npm run build:app
       - run: npx vitest run --coverage
       - run: npx playwright install --with-deps chromium webkit
+      - name: Build Vouch web fixtures
+        run: npm run build:local -- --fixtures
+      - name: Check moving QR setup and encrypted copies
+        run: node tools/test-optical-vouch.mjs
+      - name: Build Vouch native web bundle
+        run: npm run build:local -- --native
+      - name: Check native bridge fixtures
+        run: node tools/test-native-vouch.mjs
+      - name: Check native package validation
+        run: python3 native/test_check_builds.py
       - name: Run Signet NostrConnect browser regression
         run: npm run test:e2e:signet
       - name: Run Signet WebKit regression
