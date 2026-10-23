@@ -1,5 +1,5 @@
 {
-  "verified": "2026-10-23T10:19:22.696Z",
+  "verified": "2026-10-23T10:56:43.417Z",
   "url": "https://canary-words.cocoacod256.chatgpt.site/",
   "exactPublicAssets": true,
   "noTransform": true,
@@ -7,8 +7,8 @@
   "assets": [
     {
       "path": "/",
-      "bytes": 416074,
-      "sha256": "acabf3caba45c175709a82dc11966db99a39dbf4a5d1dead605f6d8ef873a3f0",
+      "bytes": 437036,
+      "sha256": "fe2437a6f82d64968d4499f7a761b72c461c1dcd8a367d6367dffc45f47c681d",
       "type": "text/html; charset=utf-8",
       "cookies": [
         "__cf_bm"
@@ -17,7 +17,7 @@
     {
       "path": "/sw.js",
       "bytes": 1712,
-      "sha256": "8a35a9768c08046f33f96e21c5890b45ca062b9f7233a21b7946cacd2d6a6984",
+      "sha256": "5c7780f7cf03e6a53be5a908d22ed6e5b295e8c99b1d67f8d63a79d2ede250f4",
       "type": "application/javascript; charset=utf-8",
       "cookies": [
         "__cf_bm"

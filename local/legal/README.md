@@ -93,3 +93,11 @@ the gap table in `inventory.md` records the subsequent completed source UI,
 fragment, lock-clearing and atomic-save review. Release checks remain distinct. Earlier version 6 public evidence does
 not verify this new candidate. No device-copy deployment, physical phone, real
 AirDrop or passkey/QR acceptance is claimed by this review.
+
+The encrypted device-copy candidate was subsequently published as Sites version
+7 on the same origin. The exact-source public readback and live device-copy and
+mobile/offline journeys passed; see `../evidence/publication.json`,
+`device-copy-live.json`, `mobile-live.json` and `mobile-hosting.json`. Its new
+file/storage explanation is included in the published privacy notice. This
+closes the publication/notice alignment gate above, not physical handoff,
+independent security/legal review or the [U] scope interpretation.

@@ -137,7 +137,7 @@ export function mountDevices(root: HTMLElement, host: Host) {
       // Keep the download alive if the OS opens another app; it contains only ciphertext.
       setTimeout(()=>{URL.revokeObjectURL(url);urls.delete(url)},60_000)
     },canShare?'secondary wide':'primary wide'))
-    note('Choose AirDrop, your usual chat or a file transfer. Only the device that showed the QR can decrypt this file. No recovery passphrase is needed for this copy.')
+    note('Choose AirDrop, your usual chat or a file transfer. The file is encrypted for the device that showed the QR. No recovery passphrase is needed for this copy.')
     root.append(button('device-finish-send','I’ve finished on the other device',()=>host.ensure(async()=>{const active=host.vault()!;const devices={...active.devices};delete devices.send;await host.save(active.entries,devices);base('Your original\npeople are kept.','The copy has been removed from this app. Your existing people are unchanged.');note('This does not delete a file already saved or shared. Each device works independently; changes do not sync automatically.');root.append(button('device-sender-done','Back to my people',host.home,'primary wide'))})))
     note('You can switch apps and unlock Canary to continue this same copy. Only finish here after checking that the receiving device saved your people.')
   }

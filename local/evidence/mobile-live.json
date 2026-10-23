@@ -1,5 +1,5 @@
 {
-  "verified": "2026-10-23T10:19:37.028Z",
+  "verified": "2026-10-23T10:57:01.598Z",
   "address": "https://canary-words.cocoacod256.chatgpt.site/",
   "deviceUnlock": "PRF stub, not physical biometrics",
   "mobilePanicPath": true,
@@ -114,10 +114,6 @@
     },
     {
       "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
       "path": "/manifest.webmanifest"
     },
     {
@@ -135,6 +131,10 @@
     {
       "method": "GET",
       "path": "/apple-touch-icon.png"
+    },
+    {
+      "method": "GET",
+      "path": "/"
     },
     {
       "method": "GET",
@@ -182,15 +182,15 @@
     },
     {
       "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
       "path": "/icon-512.png"
     },
     {
       "method": "GET",
       "path": "/apple-touch-icon.png"
-    },
-    {
-      "method": "GET",
-      "path": "/"
     },
     {
       "method": "GET",
@@ -206,11 +206,11 @@
     },
     {
       "method": "GET",
-      "path": "/"
+      "path": "/manifest.webmanifest"
     },
     {
       "method": "GET",
-      "path": "/manifest.webmanifest"
+      "path": "/"
     },
     {
       "method": "GET",
@@ -262,11 +262,11 @@
     },
     {
       "method": "GET",
-      "path": "/"
+      "path": "/manifest.webmanifest"
     },
     {
       "method": "GET",
-      "path": "/manifest.webmanifest"
+      "path": "/"
     },
     {
       "method": "GET",
@@ -274,19 +274,19 @@
     },
     {
       "method": "GET",
-      "path": "/sw.js"
-    },
-    {
-      "method": "GET",
       "path": "/icon-512.png"
     },
     {
       "method": "GET",
-      "path": "/"
+      "path": "/apple-touch-icon.png"
     },
     {
       "method": "GET",
-      "path": "/apple-touch-icon.png"
+      "path": "/sw.js"
+    },
+    {
+      "method": "GET",
+      "path": "/"
     },
     {
       "method": "GET",

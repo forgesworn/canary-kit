@@ -284,3 +284,24 @@ See `DEVICE-COPY.md`, `tools/test-device-copy.mjs` and `evidence/device-copy.jso
 The following publication record, when present, names the release that passed
 live checks; earlier v6 receipts do not validate this candidate. Physical phone
 and actual native share/AirDrop acceptance remain open.
+
+### Device-copy publication
+
+Sites version **7** deployed successfully on the same public origin. Website
+source is `3a8371c7b1bb85358d08d28eefb0d94584726ff4`; app feature implementation
+is `c27b67a1f2ab9ebd6cf34b3b35001a4d5c3b0599`. The v6 receipt is retained, and
+`evidence/publication.json` names the current exact source/build hashes.
+
+`evidence/device-copy-live.json` records the live scanner/selected encrypted
+copy/resume/import journey, including a failed-storage retry and preservation of
+existing contacts and unlock slots. `mobile-live.json` records the existing live
+pairing/check/recovery journey and actual offline reload. `mobile-hosting.json`
+matched all six public files byte for byte with required headers. Local private
+vouch regression passed on the candidate code; no new server route was added.
+These results qualify deployed browser behaviour with the stated stubs; physical
+camera, biometrics and actual OS/AirDrop/chat handoff remain unqualified.
+
+Canary was opened in Google Chrome. Temporary preview and automation servers,
+archive and this task's installed dependencies were removed after evidence was
+recorded. Existing installed app windows need to close and reopen to activate a
+downloaded update; there is no forced refresh during a call or setup.
