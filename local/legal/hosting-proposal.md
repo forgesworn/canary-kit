@@ -1,14 +1,14 @@
 # Adopted hosting record — minimal static page
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-App code `0ba43087ca2c701a143d85ba31464ca3f55a367e`.**
+App code `5b38644f1e9c88d6bb53f88e2650377406f3c375`.**
 
 ## Published deployment
 
 The separate Site is public at
 `https://canary-words.cocoacod256.chatgpt.site/`, published 23 October 2026.
 The standalone source checkout is `../canary-words-site` beside this repository,
-commit `393c4750c688613d18cd78cc3cc307363bb2b170`.
+commit `1cf56957bce742d80d55efc523f348259fc0fa62`.
 [Publication metadata](../evidence/publication.json),
 [HTTP readback](../evidence/hosting.json) and
 [live browser check](../evidence/live-browser.json) record the actual gates.
@@ -19,7 +19,7 @@ body and adds no logging, database, uploads, accounts, application API or remote
 pair store. This response wrapper is needed because the provider's initial
 static-file delivery ignored `_headers` and injected bot JavaScript. The app's
 strict CSP blocked that injection; the failed readback is retained as
-`hosting-v1.json`. The corrected wrapper serves the exact 264,969-byte app with
+`hosting-v1.json`. The corrected wrapper serves the exact 266,531-byte app with
 CSP/framing/transport/permissions headers and `Cache-Control: no-transform`.
 That cache directive prevents Cloudflare JavaScript injection under its
 [documented policy](https://developers.cloudflare.com/cloudflare-challenges/challenge-types/javascript-detections/).

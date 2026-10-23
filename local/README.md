@@ -13,8 +13,10 @@ When meeting someone:
 1. On the HTTPS website, one person taps **Show my QR**.
 2. The other uses their **normal phone camera**, taps its link, and Canary opens
    directly into their words. The creator taps **They’ve scanned · show our words**.
-   Say yours and listen for theirs. The receiver does not need Canary open first.
-3. Each taps **Keep on this phone** for future calls. A supported device credential
+   The receiver does not need Canary open first. Compare the fixed **pair code**
+   shown on both phones; it stays the same when the spoken words refresh.
+3. Each taps **Keep on this phone** for future calls. There is no 30-second
+   deadline to save; that countdown only refreshes spoken words. A supported device credential
    protects the saved pair without a custom passphrase. Unsupported browsers and
    local files ask for a vault passphrase only at this point. Existing vaults
    unlock here instead; an already unlocked vault saves with one tap.
@@ -26,7 +28,14 @@ Canary on the other device. A Mac's local file address cannot open that file on
 someone else's phone. Use the live HTTPS page for normal-camera linking. Its QR-link opening was
 verified in fresh browsers; the physical iPhone scan is still an owner check.
 
-The pair reference remains available in details. Names are optional and can be
+If either phone needs to resume, the one still holding the pair opens it and taps
+**Show this pair’s QR again**. The other phone scans that QR; it restores the
+same pair and correct speaking side. A saved pair survives reload/device lock;
+unlock it under **Your people** first. Repeated scans reuse an existing saved
+pair after unlock, preserving its name. If neither phone kept the pair and both
+cleared it, exchange a new QR. Unsaved data still clears on leaving/idle.
+
+The fixed pair code is also the reference available in details. Names are optional and can be
 added afterwards under **Name & pair details**. Without a name, saved pairs get
 numbered labels. Agree together what the separate duress signal means and what
 human response to make on hearing it.

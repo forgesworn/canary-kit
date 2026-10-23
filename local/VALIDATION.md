@@ -1,14 +1,14 @@
 # Verification record
 
-23 October 2026. Code `0ba43087ca2c701a143d85ba31464ca3f55a367e`.
+23 October 2026. Code `5b38644f1e9c88d6bb53f88e2650377406f3c375`.
 
-Artifact: `canary-local.html`, 264,969 bytes. SHA-256:
+Artifact: `canary-local.html`, 266,531 bytes. SHA-256:
 
 ```text
-13c82ad849bf9dd0c6e0b8ed05a4d3bb945a4cbb5eff98a77352bb03d7525ec6
+533b8901e4dbc4dc172dd12c98228a5760a301551dd6c0293725c31cc8e74ff1
 ```
 
-- `npm test -- --maxWorkers=2 --testTimeout=30000`: **722 passed across 29 files**. The fourteen local
+- `npm test -- --maxWorkers=2 --testTimeout=30000`: **723 passed across 29 files**. The local
   model/vault tests cover setup abbreviation/checksum, directional normal/duress
   words, rotation/drift, encrypted round-trip, wrong passwords, tamper rejection,
   fresh nonces, key clearing and PRF wrapping. New cases cover device-only vault
@@ -62,7 +62,7 @@ fixture nickname. The updated HTML was opened in **Google Chrome** for owner rev
 
 [Live Canary](https://canary-words.cocoacod256.chatgpt.site/) is public, with no
 visitor sign-in. Standalone source `../canary-words-site` commit
-`393c4750c688613d18cd78cc3cc307363bb2b170`; Site/version/deployment IDs are in
+`1cf56957bce742d80d55efc523f348259fc0fa62`; Site/version/deployment IDs are in
 [evidence/publication.json](evidence/publication.json). Native deployment status
 succeeded, followed by independent HTTP and real-browser checks.
 
@@ -84,7 +84,7 @@ no cookie values are retained. The owner adopted the minimal hosting basis.
 without route interception or authentication. Two isolated browsers opened the
 page, decoded its QR into a real link, and matched directional words. The receiver
 needed no in-app scanner, typing or storage. The fragment and transient value
-were removed; no pair persisted before Keep. Only two page GETs were observed,
+were removed; no pair persisted before Keep. Only three page GETs were observed,
 with no secret, external application request or browser/CSP error. See
 [live-browser.json](evidence/live-browser.json),
 [live mobile](evidence/live-mobile.png) and [live desktop](evidence/live-desktop.png).
@@ -109,3 +109,35 @@ and deployed; the main implementation branch remains local. The shared law-note
 correction was pushed as
 [jurisdiction-kit PR #35](https://github.com/forgesworn/jurisdiction-kit/pull/35),
 with 97 tests and typecheck passing; no merge is claimed.
+
+## Pair setup and recovery correction
+
+The owner reported that words refreshed before both people finished. Setup now
+uses the fixed pair reference, with Keep above the rotating words for unsaved
+pairs. The countdown continues refreshing spoken tokens; it does not end setup.
+Either holder can deliberately show that same pair's QR again, including after
+saving/reloading. The recipient gets the opposite speaking role. Existing version
+1 links remain valid; recovery from the original receiver uses an explicit role
+in a version 2 invite. Resaving an existing secret/role preserves the saved name
+and avoids a duplicate entry. Background and five-minute idle locking remain.
+
+TDD evidence: the new model test first failed because a receiver's invite restored
+the wrong speaking role; the new browser check first failed because setup had
+no fixed code. Both pass after the change. All 723 tests, global/local typechecks,
+build and full Chromium fixture flow passed. The browser harness now fixes dates
+per context and advances dates explicitly with timers, avoiding real-time clock
+drift on a busy machine; cleanup closes all contexts even after failure.
+
+The fixture checks fixed-code survival across multiple rotations, Keep remaining
+available, idle clearing on one phone, restoration from the other saved/reloaded
+phone, matching directional words, and reuse of an existing encrypted record.
+The actual public check independently verifies fixed-code survival after refresh,
+Keep fitting on the 390 × 844 viewport, reverse-role QR recovery and no secret
+in server requests. No browser/CSP errors occurred; exact production bytes and
+security headers passed. [Pairing layout](evidence/pairing-mobile.png) uses
+explicit dummy code/phrases, not the generated test pair's values.
+
+Publication v3 retains the same public origin and storage format; source/deploy
+identifiers are in `evidence/publication.json`. No broader messaging service or
+new hosting-data category was introduced. The owner reported partial physical
+pairing; completion of the revised flow on their phones remains owner acceptance.

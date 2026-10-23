@@ -1,7 +1,7 @@
 # Draft UK legal cover: static local-processing app
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code: `0ba43087ca2c701a143d85ba31464ca3f55a367e`.**
+Code: `5b38644f1e9c88d6bb53f88e2650377406f3c375`.**
 
 **Today:** publisher of a public static-response HTTPS site at
 [Canary](https://canary-words.cocoacod256.chatgpt.site/), with a local HTML copy.

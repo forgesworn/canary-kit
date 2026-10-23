@@ -1,7 +1,7 @@
 # Privacy facts and hosting inputs
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code `0ba43087ca2c701a143d85ba31464ca3f55a367e`.
+Code `5b38644f1e9c88d6bb53f88e2650377406f3c375`.
 Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 23 October 2026 against primary sources.**
 
@@ -16,7 +16,7 @@ Pairing starts in memory without a vault or account (`local/main.ts:121`). No
 persistent pair record is written until **Keep on this phone**. The receiver
 reaches rotating words directly after scanning, and naming is optional. Unsaved
 pairs are cleared on backgrounding or five-minute inactivity; both people must
-keep their own copy for future calls (`local/main.ts:63`, `local/main.ts:195`).
+keep their own copy for future calls (`local/main.ts:63`, `local/main.ts:209`).
 Pair setup words, roles and user-chosen nicknames are held in memory while
 unlocked. Encrypted payloads and wrapped master keys are stored in this browser's
 localStorage (`local/main.ts:73`; `local/vault.ts:124`). Plaintext nicknames or
@@ -38,10 +38,10 @@ The user can add one later; until then portable backup export is refused
 (`local/vault.ts:171`, `local/vault.ts:117`, `local/vault.ts:193`). Loss of the
 credential or browser data without recovery can lose all saved pairs. Existing
 passphrase vaults are still supported. Saved nicknames may be default numbered
-labels until the user optionally renames them (`local/main.ts:182`).
+labels until the user optionally renames them (`local/main.ts:190`).
 
 **Save encrypted backup** downloads encrypted JSON without the device credential
-slot (`local/main.ts:301`; `local/vault.ts:193`). Backups remain wherever the user
+slot (`local/main.ts:315`; `local/vault.ts:193`). Backups remain wherever the user
 saves them until deleted. Files, browser stores and backups may be copied by
 device backup/sync settings. The publisher cannot recover a forgotten vault
 passphrase, erase remote copies or revoke another offline pair holder.
@@ -49,11 +49,15 @@ passphrase, erase remote copies or revoke another offline pair holder.
 ## Setup links, camera and passkey providers
 
 On HTTPS, the displayed QR is a private link containing the pair secret in its
-fragment (`local/model.ts:55`), so a normal camera can open the app. The fragment
+fragment (`local/model.ts:59`), so a normal camera can open the app. The fragment
 is outside the HTTP request URL. An early, CSP-hashed script removes it from the
 current history entry (`local/index.html:12`) and the app consumes the transient
-value (`local/main.ts:412`). Same-tab fragment navigation is supported too.
-This is not a one-use, expiring or revocable invitation. Camera/scanner software,
+value (`local/main.ts:429`). Same-tab fragment navigation is supported too.
+Either holder can intentionally re-show the same pair’s QR to restore the
+other side. The recovery invite identifies the recipient’s speaking role; it
+does not rotate the shared secret or revoke previous copies. Resaving the same
+secret/role reuses the existing local record. This is not a one-use, expiring or
+revocable invitation. Camera/scanner software,
 browser history sync, extensions or platform backups could retain the original
 link. Address replacement is not a guarantee against those copies. If exposed,
 create a fresh pair. This native software is outside Canary's app request monitor
@@ -87,7 +91,7 @@ passphrase is not silently created for a device-only vault.
 The bundled app does not connect to Signal, Kithmoot, WhatsApp, a relay, an agent,
 analytics or a remote backup. Users independently choose to speak words or use
 other messaging apps; those apps' data handling is separate. A duress match is
-an on-device result, not an alert or location report (`local/main.ts:376`).
+an on-device result, not an alert or location report (`local/main.ts:393`).
 The application installs no cookie, tracker, service worker or account system.
 The existing `SECURITY.md` describes repository security-report routes; this
 change adds no form, inbox endpoint or report upload service.

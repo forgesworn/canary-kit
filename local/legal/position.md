@@ -1,7 +1,7 @@
 # Position and applicable duties
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code `0ba43087ca2c701a143d85ba31464ca3f55a367e`.
+Code `5b38644f1e9c88d6bb53f88e2650377406f3c375`.
 Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 23 October 2026 against primary sources.**
 
@@ -9,11 +9,11 @@ Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 
 Publisher of a public static-response site today, delivered by a minimal
 Worker wrapper at a separate origin (publishing source
-`../canary-words-site`, commit `393c4750c688613d18cd78cc3cc307363bb2b170`,
+`../canary-words-site`, commit `1cf56957bce742d80d55efc523f348259fc0fa62`,
 `worker/index.js:1`, `scripts/build-worker.mjs:1`). The owner chose a static phone-first HTTPS website
 with encrypted browser storage and optional device unlock. Both keep the shared
 secret on the devices. `local/main.ts:73` writes ciphertext to localStorage;
-`local/main.ts:301` exports encrypted JSON; `local/qr.ts:46` captures local video
+`local/main.ts:315` exports encrypted JSON; `local/qr.ts:46` captures local video
 with audio disabled. `tools/build-local.mjs:17` blocks application connections;
 `:40` writes a static hosting candidate. No account, directory, upload, chat,
 relay, discovery endpoint or default remote server is introduced.
@@ -30,7 +30,7 @@ verified 28 September 2026.
 | Regime | Scoped finding |
 |---|---|
 | Online Safety Act, §§2.1–2.2 | The statutory user-to-user definition is `[P]`. No user content reaches another through an operator-hosted endpoint here. Pairing is a private QR/read-back exchange; the HTTPS setup secret is in a URL fragment that is not sent to the static host. The note's no-infrastructure static-software publisher reading remains `[U]`, not Ofcom approval. The ordinary static-site position does not import OSA assessments or age assurance from messaging platforms. `local/model.ts:36`, `local/qr.ts:46`, `tools/build-local.mjs:17`. |
-| Investigatory powers, §§5.1–5.2 | The Home Office Code §§2.3–2.8 expressly includes website owners `[P]`; no-chat/static hosting is not a guarantee against the IPA operator definition. IPA §66 concerns duties under a notice/authorisation with practicability limits, and §87 provides conditional retention notices `[P]`. The inference that these provisions create no blanket twelve-month logging duty on every site is `[U]`. No IPA immunity is claimed. App code receives no secret in HTTP requests (`local/model.ts:55`, `local/index.html:12`), but that does not settle duties under a future notice. |
+| Investigatory powers, §§5.1–5.2 | The Home Office Code §§2.3–2.8 expressly includes website owners `[P]`; no-chat/static hosting is not a guarantee against the IPA operator definition. IPA §66 concerns duties under a notice/authorisation with practicability limits, and §87 provides conditional retention notices `[P]`. The inference that these provisions create no blanket twelve-month logging duty on every site is `[U]`. No IPA immunity is claimed. App code receives no secret in HTTP requests (`local/model.ts:59`, `local/index.html:12`), but that does not settle duties under a future notice. |
 | Ofcom telecoms regulation, §7 | Communications Act §32(2)–(2B), (7) has a different definition and content-service exclusion `[P]`. The selected software page provides no internet access, phone numbers, calls, messages or signal-transport service (`local/main.ts:1`, `tools/build-local.mjs:17`). The project assessment is that this static software page is not providing that regulated communications service `[U]`; do not conflate it with the broader IPA label. |
 | Data protection, §§3.1–3.2 | App data is held on the devices, not received by the publisher. Nicknames may be personal data, but no recipient/controller server is introduced for them. The note's controller examples are `[U]`, Article 13 notice contents `[P]`. Any real hosting request data must be assessed separately: collection/roles, retention, recipients and transfers cannot be inferred from a static build. `local/vault.ts:80`, `local/main.ts:73`. |
 | Device storage and PECR, §4 | The statute/exception list is `[P]`; the note's necessary-app-storage reading is `[U]`. Encrypted localStorage is now used expressly to save the service the user requests. There are no analytics or advertising stores. Explain it accurately; no tracking banner is added. Camera capture and optional passkey prompts are user initiated. `local/main.ts:73`, `local/qr.ts:46`, `local/vault.ts:148`. |
@@ -41,8 +41,8 @@ verified 28 September 2026.
 ## Already in place
 
 The HTTPS QR can open a new browser directly into the pair. Its fragment secret
-is consumed locally after early address replacement (`local/model.ts:55`,
-`local/index.html:12`, `local/main.ts:412`). Native scanner/history/sync software
+is consumed locally after early address replacement (`local/model.ts:59`,
+`local/index.html:12`, `local/main.ts:429`). Native scanner/history/sync software
 can still copy the original link; the notice now explains that separate exposure.
 No single-use/expiry/revocation promise is made. The public site now serves this behavior; readback and anonymous browser
 pairing are recorded in `../evidence/publication.json`.
@@ -60,11 +60,11 @@ credential metadata and remain encrypted. The camera is optional, local-only and
 bounded; no microphone/location is requested. Device unlock uses actual PRF key
 material with user verification, not a public credential identifier. Unsupported
 providers cannot produce a falsely enabled state. See `local/vault.ts:148`,
-`local/vault.ts:193`, `local/qr.ts:31`, `local/main.ts:395`.
+`local/vault.ts:193`, `local/qr.ts:31`, `local/main.ts:412`.
 
 The UI describes shared-secret knowledge, a human duress plan and practical
 limits instead of claiming identity certification, safety or automatic dispatch
-(`local/main.ts:376`). No law or security assertion is justified by marketing copy.
+(`local/main.ts:393`). No law or security assertion is justified by marketing copy.
 
 Primary sources for the partial refresh (read 23 October 2026):
 [Home Office Code §§2.3–2.8](https://www.gov.uk/government/publications/communications-data-code-of-practice/communications-data-code-of-practice-accessible--2),
