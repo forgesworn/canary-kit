@@ -426,3 +426,57 @@ are not connected to this website or its spoken pairs.
 Task-owned preview server, automation browsers, dependency installation and scratch
 publication archive were removed after validation. No task service is left running.
 The Google Chrome review tab is left open intentionally.
+
+## Fully offline Connect — 23 October 2026
+
+The owner chose fully offline setup across iPhone, Android and desktop, rather
+than an automatic online rendezvous. The new default is one Connect action on
+both prepared devices, front-camera reading of public QR updates, four fixed
+comparison words, then a name and separate confirmation on each device. A
+camera-less desktop has an explicit public-file return step. The old nearby
+invitation/encrypted reply remains under Other ways to connect.
+
+`meet.ts` is a new commit/reveal application profile using existing secp256k1
+ECDH/HKDF, SHA-256/HMAC and BIP39 primitives. Peer cards must be pinned and saved
+before local nonce release; both contributions enter local seed derivation.
+Public QR/files contain no pair seed, private key or name. No new dependency,
+NFC, microphone, socket, relay, WebRTC signalling, account or transfer server is
+introduced. This is not the My Signet native NFC protocol or an inherited audit
+of the whole exchange. See OFFLINE-CONNECT.md for wire/state/security boundaries.
+
+Source candidate gates passed:
+
+- **757 tests / 34 files**, including the independent Node/OpenSSL ECDH/HMAC
+  reference transcript, role/word agreement, commitment/recipient/tamper rejection,
+  bounded saved sessions and v6 persistence/cleanup/old-format reads.
+- Global and local TypeScript checks, production local build and diff checks.
+- `test-offline-meet.mjs`: browser networking disabled after the shell is loaded;
+  actual QR pixels decoded through local front-camera streams in both directions,
+  mirrored frame, slower peer, fixed words, reciprocal call words, camera pause
+  and same-session retry, and encrypted lock/resume. Storage failure before peer
+  pin prevents nonce release. A camera-less desktop imports a public reply file
+  and the phone reads its updated QR. Late permission grants after Lock stop.
+  The next-person action returns to the primary Connect button.
+- Existing mobile/offline, private-vouch and selected-pair device-copy browser
+  regressions passed. Actual service-worker offline reload/unlock/words passed;
+  its cache retains only the five allowlisted public shell files.
+- The actual committed older app (`599058f`) still opens in the new app with
+  identical call words/group keeper and no rewrite on read. The first deliberate
+  save writes v6; the old build refuses it without overwriting it, and the new
+  build reopens it. Unit coverage separately reads v5 payloads.
+
+The current source footer matches the reviewed offline processing and the five
+UK legal-cover documents. The static-publisher interpretation remains `[U]`,
+with law notes verified 28 September 2026 and the recorded partial 23 October
+updates. This closes source notice alignment, not blanket legal clearance.
+The approved publisher/contact and minimal hosting purpose/basis are unchanged.
+
+Evidence is in `offline-meet.json`, `mobile-journey.json`, `private-trust.json`,
+`device-copy.json`, `vouch-upgrade.json` and the named screenshots. PRF and camera
+streams are fixtures. Screenshots use dummy words/relationships. No physical
+iPhone/GrapheneOS front-camera optics, real webcam, passkey provider/biometrics,
+offline OS file handoff, novice one-minute or panic acceptance, or independent
+cryptographic audit is established. PHONE-ACCEPTANCE.md records the fresh owner
+trial still needed after the earlier failed clarity result. Both devices must
+already have the public shell to perform fully offline setup. Public release
+and exact-byte readback are recorded separately below when complete.

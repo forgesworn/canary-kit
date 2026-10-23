@@ -1,28 +1,34 @@
 # Signet Vouch: a simple call check and deliberate group introductions
 
 The public product remains Signet Vouch on the same origin, with the same PWA ID,
-encrypted vault, publisher and privacy contact. The default experience is for two
-people who already know each other: **Show my code / Scan their code**, save a
-check together, then use rotating words on later calls. Group vouches are under
-separate details and an unlocked People navigation entry.
+encrypted vault, publisher and privacy contact. The default is for two people
+who already know each other: **Connect → face screens together → compare four
+words → name and save**. Optional group vouches remain separate.
 
 ## A meeting people can follow
 
-The creator protects/saves a public invitation, the recipient scans and taps
-**Save our check on this phone**, then shows an encrypted reply to scan back.
-There is no name form, installation requirement or protocol checkbox on the
-nearby recipient's opening screen. Both read four fixed comparison words,
-name each other for future use and finish on their own phones. Neither phone
-claims to know that the other finished saving. Both sides retain encrypted
-progress, and the recipient can resend the exact reply.
+Both devices open Connect. Protect/unlock if prompted, then face their screens
+towards each other. Front cameras read public QR updates automatically. The
+codes stay visible until both have the same four fixed words; compare them,
+name each other and save on both devices. There is no setup deadline. Camera
+capture pauses after a minute and **Read codes again** resumes the same session.
+Interrupted progress survives encrypted lock/reload; neither phone claims to
+prove the other's final save. Both must already have the app available offline.
 
-The existing NIP-44 `connect.ts` protocol supplies encryption. Its optional
-in-person hint is bound inside the encrypted reply and checked against the saved
-offer; it is a transport hint, not proof that a meeting happened. The public QR
-never directly contains the pair seed. The older secret-bearing QR/manual path
-remains an explicit recovery option. The comparison is four Spoken Token words
-in a separate fixed setup namespace (44-bit space); stored references and
-30-second, two-word call phrases remain unchanged.
+A desktop webcam uses the same flow. A camera-less desktop shows its code to
+the phone, imports the phone's deliberately transferred public reply file, then
+lets the phone read its updated QR. Choose an offline file transfer for fully
+offline setup. There is no transparent browser NFC bump, microphone, account,
+relay, rendezvous or other application connection.
+
+[OFFLINE-CONNECT.md](OFFLINE-CONNECT.md) specifies the new application profile:
+save both public commitments before releasing local random contributions; derive
+the pair seed locally with existing secp256k1 ECDH/HKDF and HMAC primitives.
+Public codes contain no seed/private key. This profile needs independent review;
+reusing primitives does not inherit an audit of the whole exchange. The previous
+NIP-44 invitation/encrypted reply and raw-secret recovery remain under advanced
+options. Old pair references, the four-word comparison's separate namespace
+(44-bit space) and 30-second two-word call phrases stay unchanged.
 
 For ordinary checks, open Vouch, unlock and tap a person. If you asked for the
 check, listen first; if they asked, read only You say. A mismatch offers a pause
@@ -59,8 +65,10 @@ confirmation. Sixteen separately named outgoing handoffs can be saved per group;
 capacity is rejected before saving, with no silent eviction. Legacy pending and
 outgoing slots remain readable. Ciphertext is persisted before QR/share display.
 
-Vault payload version 5 reads arrays and v2/v3/v4. Older builds refuse v5 rather
-than silently lose independent requests, approved names or saved replies. The
+Vault payload version 6 reads arrays and v2/v3/v4/v5. Older builds refuse v6 rather
+than silently lose independent requests, approved names, saved replies or
+unfinished offline session keys/nonces. Session completion/removal changes the
+active vault, not backups or copies elsewhere. The
 outer envelope and credential slots stay unchanged. Group signing keys remain
 independent of shared spoken-word seeds. Device copy transfers completed pairs;
 group keys still need whole-vault recovery and are not silently cloned.

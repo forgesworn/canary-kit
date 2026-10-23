@@ -7,7 +7,7 @@ Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 
 Latest factual delta reviewed on 23 October 2026 against the working tree based
 on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
-`../canary-words-site` wrapper. The final signed-name/concurrent-exchange section
+`../canary-words-site` wrapper. The final Offline Connect source-candidate section
 in each document governs this candidate; preceding release sections are dated
 history. Earlier publication receipts do not verify this candidate. No deployment
 or public readback was performed for this gap review.
@@ -462,3 +462,84 @@ explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
 is saved encrypted before scan-back. The source notice-alignment gate is closed
 for this candidate. Publication readback and physical acceptance remain open
 until separately evidenced.
+
+
+## Offline Connect — 23 October 2026 source candidate
+
+This section supersedes earlier default nearby invitation/encrypted-scan-back
+and vault-v5 descriptions for this candidate. Those descriptions remain history
+or advanced compatibility behaviour, not the new Connect default. The source
+review covers the current working tree, including `local/meet.ts` and
+`local/meet-ui.ts`; it is not a deployment/readback or independent security audit.
+The GB note remains verified 28 September 2026, review by 28 March 2027, with
+the already recorded partial 23 October updates. No fresh law research, new
+provider selection, external contact or publication was performed.
+
+Connect first creates/unlocks encrypted local storage and saves a fresh session
+private key, random identifier and random nonce before displaying its public
+card (`local/meet-ui.ts:28`). The card contains the session ID, ephemeral public
+key and a nonce commitment. After reading and saving a particular peer's full
+card, the display adds the released nonce and recipient session ID
+(`local/meet-ui.ts:52`, `local/meet.ts:30`). These cards/reveals are public
+protocol material: they contain no private key, name or shared seed. They can
+link observations of the same exchange; no anonymity promise is made.
+
+Each device derives the shared seed locally using both contributions and its
+own private session key (`local/meet.ts:48`). Four fixed comparison words appear
+only after the peer reveal is validated. Both humans must compare them together
+and confirm separately before treating the saved check as agreed. A matching
+code is a truncated human comparison, not civil identity, age, safety or proof
+that the other person checked their screen. It cannot rule out real-time
+forwarding, a compromised endpoint or tampered app code.
+
+The encrypted vault now includes up to eight unfinished sessions, their private
+keys/nonces, pinned peer cards/reveals and any derived unconfirmed pair. Payload
+v6 reads the existing array/v2–v5 formats and validates session/pending-pair
+consistency (`local/vault.ts:23`, `local/vault.ts:95`, `local/vault.ts:147`).
+Recovery backups include this encrypted state. Setup has no automatic expiry;
+remove abandoned sessions. Completion, restart or explicit removal rewrites the
+active vault without the removed session; it does not erase old encrypted
+backups, browser/OS remnants or the other device's state. No secure memory or
+storage-erasure guarantee is made (`local/meet-ui.ts:86`, `:122`, `:128`).
+
+The front camera is preferred, with a camera-switch option. Frames are decoded
+locally with audio disabled and no recording/upload path. Capture stops on view
+change, locking or leaving; a scan pauses after 60 seconds without expiring the
+saved setup (`local/qr.ts:31`, `:43`; `local/main.ts:53`, `:605`). The QR remains
+visible after this device obtains its words so the other device can catch up.
+These source facts do not establish real phone optics or webcam usability.
+
+A camera-less device can display its QR and explicitly import the other device's
+public code/reveal file, then let the phone read its updated QR. Saving, opening,
+dropping or sharing that file is an explicit OS/user action; the exported token
+contains public card/reveal material only (`local/meet-ui.ts:106`). A released
+one-time nonce is not a private key. OS share sheets can offer networked apps;
+the app does not force an offline destination or promise those apps retain
+nothing. Use an offline transfer for fully offline setup. Temporary download URL
+revocation after 30 seconds does not delete an exported file.
+
+#meet data stays outside HTTP requests and is consumed locally after address
+replacement (`local/meet.ts:89`, `local/index.html:18`). Camera apps, screenshots,
+browser history/sync, extensions and chosen file-transfer apps can still copy
+public cards/reveals. Removing the address fragment does not erase their copies.
+The exchange needs no application network transport once the public app shell
+is available. Initial loading and ordinary shell/update requests still expose
+the existing hosting metadata; browser/passkey-provider networking is separate.
+No account, relay, directory, microphone, Bluetooth, NFC, cloud pair store or
+publisher transfer API is introduced.
+
+The existing approved publisher/contact and static-hosting purpose/basis stay
+unchanged. The corrected source footer distinguishes this default from retained
+advanced invitation/encrypted-reply and raw-secret recovery paths. Its source
+notice-alignment gate is closed. Older source or publication receipts do not
+establish this candidate's published notice/public bytes;
+physical camera/passkey acceptance and independent review remain unestablished.
+
+Final source notice recheck on 23 October 2026: `local/index.html:103` matches
+the reviewed offline commit/reveal flow, local seed derivation, fixed comparison,
+encrypted pending state and backup limits, no setup expiry versus the one-minute
+scan pause, public files and user-chosen OS transfer, and retained advanced paths.
+Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
+fields and adds no processing recipient or networking. Only source notice
+alignment is closed here; publication/readback, physical camera/credential-provider
+acceptance and independent review are unchanged separate gates.

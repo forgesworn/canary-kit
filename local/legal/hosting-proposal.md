@@ -5,7 +5,7 @@ App code: working tree based on `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a`.**
 
 Latest factual delta reviewed on 23 October 2026 against the working tree based
 on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
-`../canary-words-site` wrapper. The final signed-name/concurrent-exchange section
+`../canary-words-site` wrapper. The final Offline Connect source-candidate section
 in each document governs this candidate; preceding release sections are dated
 history. Earlier publication receipts do not verify this candidate. No deployment
 or public readback was performed for this gap review.
@@ -215,3 +215,49 @@ explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
 is saved encrypted before scan-back. The source notice-alignment gate is closed
 for this candidate. Publication readback and physical acceptance remain open
 until separately evidenced.
+
+
+## Offline Connect — 23 October 2026 source candidate
+
+This section supersedes earlier default nearby invitation/encrypted-scan-back
+and vault-v5 descriptions for this candidate. Those descriptions remain history
+or advanced compatibility behaviour, not the new Connect default. The source
+review covers the current working tree, including `local/meet.ts` and
+`local/meet-ui.ts`; it is not a deployment/readback or independent security audit.
+The GB note remains verified 28 September 2026, review by 28 March 2027, with
+the already recorded partial 23 October updates. No fresh law research, new
+provider selection, external contact or publication was performed.
+
+The owner chose fully offline Connect rather than a relay/default or an owned
+rendezvous. Per-session public cards and recipient-bound public nonce reveals
+are scanned locally or explicitly transferred as public files. Shared seeds
+are derived on each device and unfinished state is encrypted in the local vault
+(`local/meet.ts:30`, `:48`; `local/meet-ui.ts:28`, `:52`, `:106`). There is no
+new publisher upload, socket, relay, API, DO, content store or server-side key
+holder. The six-asset fixed-response wrapper remains the existing hosting
+architecture (`../canary-words-site/worker/index.js:5`).
+
+The existing publisher/contact, hosting recipients, legitimate-interest purpose
+and basis, traffic-statistics/security-cookie disclosures and retention/region
+limits are retained. Fully offline refers to the exchange after the shell is
+available; it does not promise that initial page loads, updates, OS sharing or
+passkey-provider activity never use networking. #meet fragments are not HTTP
+request data, while external scanners/history/sync/transfer tools can retain
+the public code (`local/index.html:18`, `local/meet.ts:89`).
+
+The corrected app source footer describes this commit/reveal default and its
+saved session state, while preserving the older encrypted-reply/manual recovery
+paths as compatibility features. This source notice-alignment finding is closed
+for this candidate. This review neither
+changes the served wrapper assets nor verifies a deployment. Browser camera
+fixtures, exact public release bytes/readback, physical phone/webcam and actual
+credential-provider acceptance, and independent review remain distinct gates.
+
+Final source notice recheck on 23 October 2026: `local/index.html:103` matches
+the reviewed offline commit/reveal flow, local seed derivation, fixed comparison,
+encrypted pending state and backup limits, no setup expiry versus the one-minute
+scan pause, public files and user-chosen OS transfer, and retained advanced paths.
+Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
+fields and adds no processing recipient or networking. Only source notice
+alignment is closed here; publication/readback, physical camera/credential-provider
+acceptance and independent review are unchanged separate gates.

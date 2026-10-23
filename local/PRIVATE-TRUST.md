@@ -47,7 +47,7 @@ its own signer as its subject.
 Group keys, names, selected vouchers, local aliases, issued/received vouches,
 withdrawals, pending challenges and the latest outgoing transfer are in the
 existing AES-GCM encrypted vault. The outer vault format remains version 1;
-the decrypted payload is version 5. Legacy arrays and version 2/3/4 payloads remain readable.
+the decrypted payload is version 6. Legacy arrays and v2–v5 remain readable.
 Saving/renaming contacts preserves group state. Portable encrypted backups carry
 the group keys and pending exchanges; device-only vaults still need a recovery
 passphrase before export. Existing backups are not silently retrofitted.
@@ -129,9 +129,8 @@ lead to a new check, never acceptance of the old proof.
 
 ## Simplified meeting and named vouch update
 
-See [SIGNET-VOUCH.md](SIGNET-VOUCH.md) for the current two-action home, public
-invitation plus encrypted QR reply, one-action nearby recipient, four fixed
-comparison words and holder-approved group-name statements. Pending group checks
-and outgoing handoffs are independent per exchange. Payload v5 reads legacy
-arrays/v2/v3/v4; older builds refuse new saves. Group introductions remain optional,
-and native My Signet Android phone tapping is not implemented by this website.
+See [SIGNET-VOUCH.md](SIGNET-VOUCH.md) for the current single Connect action and
+[OFFLINE-CONNECT.md](OFFLINE-CONNECT.md) for the fully offline optical exchange.
+Holder-approved group-name statements and independent pending group handoffs are
+unchanged. Payload v6 reads legacy arrays/v2–v5; older builds refuse new saves.
+Native My Signet Android phone tapping is a separate implementation.

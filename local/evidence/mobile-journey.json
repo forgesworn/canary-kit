@@ -1,10 +1,12 @@
 {
-  "verified": "2026-10-23T13:15:59.781Z",
+  "verified": "2026-10-23T14:57:05.372Z",
   "address": "https://canary.mobile.test/",
   "deviceUnlock": "PRF stub, not physical biometrics",
   "mobilePanicPath": true,
   "publicInviteEncryptedReply": true,
   "inPersonPublicQrEncryptedScanBack": true,
+  "fourFixedComparisonWords": true,
+  "nearbyRecipientHasNoNameForm": true,
   "normalCameraOpensPublicInvitation": true,
   "encryptedProgressSurvivesBackgroundAndReload": true,
   "replyReplayRejected": true,

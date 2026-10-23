@@ -26,11 +26,11 @@ try{
  upgraded=true;await page.reload();assert.ok((await page.title()).startsWith('Signet Vouch'));await page.locator('#unlock-device').click();await page.locator('.person-card').filter({hasText:'Existing friend'}).click();assert.equal(await page.locator('#say').innerText(),words)
  await page.locator('.home').filter({visible:true}).click();await page.locator('#people-private-groups').click();await page.getByRole('button',{name:'Existing private group',exact:true}).click();assert.equal(await page.locator('#private-trust .compare strong').first().innerText(),keeperCode)
  assert.equal(await page.evaluate(()=>localStorage.getItem('canary.encrypted-vault.v1')),stored,'A UI upgrade must not rewrite credentials, IDs, keys or vault data')
- // The first deliberate save upgrades to v5. A real old build must refuse it without overwriting.
+ // The first deliberate save upgrades to v6. A real old build must refuse it without overwriting.
  await page.locator('.brand').click();await page.locator('.person-card').filter({hasText:'Existing friend'}).click();await page.locator('#person-details > summary').click();await page.locator('#person-name').fill('Existing friend renamed');await page.locator('#rename-form button').click();await page.locator('#pair-title').filter({hasText:'Existing friend renamed'}).waitFor()
- const savedV5=await page.evaluate(()=>localStorage.getItem('canary.encrypted-vault.v1'));assert.notEqual(savedV5,stored)
+ const savedV6=await page.evaluate(()=>localStorage.getItem('canary.encrypted-vault.v1'));assert.notEqual(savedV6,stored)
  upgraded=false;await page.reload();await page.locator('#unlock-device').click();await page.locator('#error').filter({hasText:'Unsupported encrypted vault payload'}).waitFor()
- assert.equal(await page.evaluate(()=>localStorage.getItem('canary.encrypted-vault.v1')),savedV5)
+ assert.equal(await page.evaluate(()=>localStorage.getItem('canary.encrypted-vault.v1')),savedV6)
  upgraded=true;await page.reload();await page.locator('#unlock-device').click();await page.locator('.person-card').filter({hasText:'Existing friend renamed'}).click();assert.equal(await page.locator('#say').innerText(),words)
  assert.deepEqual(errors,[]);await writeFile(join(root,'local/evidence/vouch-upgrade.json'),JSON.stringify({verified:new Date().toISOString(),previousAppCommit:previous,sameOrigin:true,savedPairWordsPreserved:true,savedGroupKeeperPreserved:true,encryptedRecordByteForByteUnchanged:true,firstSaveUpgradePreservesWords:true,oldBuildRefusesNewPayloadWithoutOverwrite:true,credentialProvider:'PRF stub',physicalDeviceAcceptance:false,browserErrors:errors},null,2)+'\n')
  console.log('Upgrade passed: previous committed app vault reopens in Signet Vouch with identical words, group keeper and unchanged encrypted record/credentials.');await context.close()

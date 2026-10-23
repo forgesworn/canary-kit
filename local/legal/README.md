@@ -5,7 +5,7 @@ Code: working tree based on `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a`.**
 
 Latest factual delta reviewed on 23 October 2026 against the working tree based
 on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
-`../canary-words-site` wrapper. The final signed-name/concurrent-exchange section
+`../canary-words-site` wrapper. The final Offline Connect source-candidate section
 in each document governs this candidate; preceding release sections are dated
 history. Earlier publication receipts do not verify this candidate. No deployment
 or public readback was performed for this gap review.
@@ -185,3 +185,42 @@ notice matched source with expected security headers (`../evidence/publication.j
 `mobile-hosting.json`). Live browser journeys passed. This closes the candidate
 publication/notice-alignment gate; it does not change the dated law review, [U]
 scope interpretations or outstanding physical/independent acceptance gates.
+
+
+## Offline Connect — 23 October 2026 source candidate
+
+This section supersedes earlier default nearby invitation/encrypted-scan-back
+and vault-v5 descriptions for this candidate. Those descriptions remain history
+or advanced compatibility behaviour, not the new Connect default. The source
+review covers the current working tree, including `local/meet.ts` and
+`local/meet-ui.ts`; it is not a deployment/readback or independent security audit.
+The GB note remains verified 28 September 2026, review by 28 March 2027, with
+the already recorded partial 23 October updates. No fresh law research, new
+provider selection, external contact or publication was performed.
+
+The owner chose fully offline setup. Both devices open Connect after obtaining
+the public app shell, automatically read each other's public session codes,
+then compare four fixed words and explicitly save on each device. The shared
+seed is derived locally rather than sent in a QR or encrypted reply
+(`local/meet.ts:48`, `local/meet-ui.ts:70`). Public nonce reveals are part of the
+exchange; they are not private keys or the shared seed. Optional explicit public
+code files support a device without a camera (`local/meet-ui.ts:106`). The app
+adds no relay, account, messaging endpoint or other transfer backend.
+
+The selected static-publisher assessment under GB note §2.2 `[U]`, adopted
+publisher/contact and minimal hosting legitimate-interest purpose/basis remain
+unchanged. Encrypted vault payload v6 holds resumable session state; completion
+or explicit removal changes the active vault, not old backups. The corrected source footer describes this new default and preserves the older
+exchange as compatibility behaviour; its source notice-alignment gate is closed. Shell availability, browser/OS credential-provider
+behaviour, physical camera/passkey acceptance, exact public release readback and
+independent review are separate gates. Earlier publication and browser-fixture
+receipts do not close them for this protocol candidate.
+
+Final source notice recheck on 23 October 2026: `local/index.html:103` matches
+the reviewed offline commit/reveal flow, local seed derivation, fixed comparison,
+encrypted pending state and backup limits, no setup expiry versus the one-minute
+scan pause, public files and user-chosen OS transfer, and retained advanced paths.
+Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
+fields and adds no processing recipient or networking. Only source notice
+alignment is closed here; publication/readback, physical camera/credential-provider
+acceptance and independent review are unchanged separate gates.

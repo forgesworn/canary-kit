@@ -5,10 +5,26 @@ import { newGroup, groupCard, joinGroup, publicKey, beginCheck, pendingChecks, s
 import { sealTransfer } from './trust-wire.js'
 import { beginConnect, acceptConnect, finishConnect } from './connect.js'
 import { newDeviceRequest, makeDeviceCopy } from './device-transfer.js'
+import { newMeeting, matchMeeting, meetingCard, meetingMessage, pairFromMeeting } from './meet.js'
 
 const password = 'a sufficiently long test passphrase'
 
 describe('encrypted local vault', () => {
+  it('protects and recovers an unfinished optical connection and removes only its session key on completion', async () => {
+    const vault=await createVault(password),a=newMeeting(),b=newMeeting(),other=newMeeting()
+    const first=matchMeeting(a,meetingCard(b)),otherPinned=matchMeeting(b,meetingMessage(first)),meeting=matchMeeting(first,meetingMessage(otherPinned)),pair=pairFromMeeting(meeting)
+    const entry={id:meeting.id,label:'Still connecting',pair,setup:{method:'in-person' as const,meeting:meeting.id}}
+    vault.meetings=[meeting,other]
+    const record=await sealEntries(vault,[entry])
+    expect(JSON.stringify(record)).not.toContain(meeting.secret);expect(JSON.stringify(record)).not.toContain(pair.mnemonic)
+    const restored=await unlockVault(parseVault(exportVault(record)),password)
+    expect(restored.meetings).toEqual([meeting,other]);expect(restored.entries).toEqual([entry])
+    const completed={id:entry.id,label:'Saved friend',pair}
+    const finished=await unlockVault(await sealEntries({...restored,meetings:[other]},[completed]),password)
+    expect(finished.meetings).toEqual([other]);expect(finished.entries[0].pair).toEqual(pair)
+    await expect(sealEntries({...restored,meetings:[]},[entry])).rejects.toThrow()
+    closeVault(vault);closeVault(restored);closeVault(finished);expect(vault.meetings).toEqual([])
+  })
   it('recovers independent named requests and exact outgoing handoffs without losing the other person on completion', async () => {
     const now=1_800_000_000,vault=await createVault(password),keeper=newGroup('Private circle',now)
     const alice=joinGroup(groupCard(keeper,now),now),bob=joinGroup(groupCard(keeper,now),now)
@@ -45,7 +61,7 @@ describe('encrypted local vault', () => {
     const vault = await createVault(password)
     const entries = [{ id: 'old-pair', label: 'Existing friend', pair: createPair() }]
     const key = await crypto.subtle.importKey('raw', new Uint8Array(vault.master).buffer, 'AES-GCM', false, ['encrypt', 'decrypt'])
-    for (const payload of [entries, { v: 2, entries, trust: { v: 1, groups: [] } }, { v: 3, entries, trust: { v: 1, groups: [] }, exchanges: [] }, { v: 4, entries, trust: { v: 1, groups: [] }, exchanges: [], devices: {} }]) {
+    for (const payload of [entries, { v: 2, entries, trust: { v: 1, groups: [] } }, { v: 3, entries, trust: { v: 1, groups: [] }, exchanges: [] }, { v: 4, entries, trust: { v: 1, groups: [] }, exchanges: [], devices: {} }, {v:5,entries,trust:{v:1,groups:[]},exchanges:[],devices:{}}]) {
       const iv = crypto.getRandomValues(new Uint8Array(12))
       const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(`canary:vault:1:${vault.record.id}:data`) }, key, new TextEncoder().encode(JSON.stringify(payload)))
       const old = { ...vault.record, data: { iv: btoa(String.fromCharCode(...iv)), ciphertext: btoa(String.fromCharCode(...new Uint8Array(ciphertext))) } }
@@ -54,7 +70,7 @@ describe('encrypted local vault', () => {
       const upgraded = await sealEntries(reopened, entries)
       const decode = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0))
       const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decode(upgraded.data.iv), additionalData: new TextEncoder().encode(`canary:vault:1:${vault.record.id}:data`) }, key, decode(upgraded.data.ciphertext))
-      expect(JSON.parse(new TextDecoder().decode(plaintext)).v).toBe(5)
+      expect(JSON.parse(new TextDecoder().decode(plaintext)).v).toBe(6)
       closeVault(reopened)
     }
     closeVault(vault)

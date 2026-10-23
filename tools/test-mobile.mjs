@@ -54,7 +54,7 @@ try {
     await visible(page, '#vault-create'); await page.locator('#new-password').fill(password); await page.locator('#confirm-password').fill(password); await page.locator('#create-submit').click()
   }
   async function manualPair(page, name, needsPassword = false) {
-    await page.locator('#show-join').click();
+    await page.locator('#setup-options').evaluate(el=>el.open=true);await page.locator('#show-join').click();
     await page.locator('#manual-join').evaluate(el=>el.open=true); await page.locator('#setup-input').fill('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'); await page.locator('#join-form button').click();
     await page.locator('#quick-name').fill(name); await page.locator('#keep-person').click(); if(needsPassword)await fillPassphrase(page); await visible(page,'#confirm-pair');await page.locator('#confirm-pair').click();
   }
@@ -75,7 +75,7 @@ try {
   await a.locator('#install-iphone').click(); assert.equal(await a.locator('#install-steps-iphone').isVisible(), true)
   await screenshot(a, 'mobile-install.png'); await a.locator('#install-back').click()
   // A public QR and an encrypted scan-back, with protected progress on both phones.
-  await a.locator('#create').click(); await visible(a, '#connect-share')
+  await a.locator('#setup-options').evaluate(el=>el.open=true);await a.locator('#legacy-nearby').click(); await visible(a, '#connect-share')
   const link = await qrLink(a)
   assert.ok(link.startsWith(address + '#connect='))
   assert.equal(JSON.parse(decodeURIComponent(new URL(link).hash.slice(9))).type, 'offer')
@@ -96,7 +96,7 @@ try {
     await start(); await page.clock.runFor(500)
   }
   const b=await phone()
-    await cameraQr(b,a,()=>b.locator('#show-join').click());await visible(b,'#connect-start');await screenshot(b,'mobile-receive.png')
+    await cameraQr(b,a,async()=>{await b.locator('#setup-options').evaluate(el=>el.open=true);await b.locator('#show-join').click()});await visible(b,'#connect-start');await screenshot(b,'mobile-receive.png')
   assert.equal(await b.evaluate(()=>window.testConstraints.audio),false)
   assert.equal(await b.evaluate(()=>window.testTracks.every(t=>t.readyState==='ended')),true)
   const normalCamera=await phone(link);await visible(normalCamera,'#connect-start');assert.equal(normalCamera.url(),address)
@@ -131,7 +131,7 @@ try {
   }
   await background(a); await unlock(a)
   // Recipient-encrypted remote setup, saved before leaving for a chat.
-  await a.locator('#add-person').click(); await a.locator('#remote-start').click(); await a.locator('#connect-name').fill('Remote friend'); await a.locator('#connect-known').check(); await a.locator('#connect-form button').click(); await visible(a, '#connect-share')
+  await a.locator('#add-person').click(); await a.locator('#setup-options').evaluate(el=>el.open=true); await a.locator('#remote-start').click(); await a.locator('#connect-name').fill('Remote friend'); await a.locator('#connect-known').check(); await a.locator('#connect-form button').click(); await visible(a, '#connect-share')
   const offer = await a.locator('#connect-output').inputValue()
   await background(a); await unlock(a); await a.locator('#pending-connections .person-card').click()
   assert.equal(await a.locator('#connect-output').inputValue(), offer)
@@ -157,7 +157,7 @@ try {
   await d.reload(); await d.locator('#unlock-password').fill('incorrect'); await d.locator('#unlock-form button').click(); await d.locator('#error').filter({ hasText: 'Could not unlock' }).waitFor(); await unlock(d)
   const recovered = await phone(); await recovered.locator('#restore-file').setInputFiles(backupPath); await visible(recovered, '#locked'); await unlock(recovered); await recovered.locator('.person-card').filter({ hasText:'Passphrase friend' }).click(); await visible(recovered,'#say')
   // Storage failures never claim successful pairing/progress.
-  const failed = await phone(); await failed.evaluate(() => { Storage.prototype.setItem = () => { throw new Error('Storage unavailable') } }); await failed.locator('#create').click(); await failed.locator('#error').filter({ hasText:'Storage unavailable' }).waitFor(); assert.equal(await failed.locator('#connect-share').isVisible(), false)
+  const failed = await phone(); await failed.evaluate(() => { Storage.prototype.setItem = () => { throw new Error('Storage unavailable') } }); await failed.locator('#create').click(); await failed.locator('#error').filter({ hasText:'Storage unavailable' }).waitFor(); assert.equal(await failed.locator('#meet').isVisible(), false)
   // Late native credential/camera callbacks cannot revive a manually locked app.
   const late = await phone()
   await late.evaluate(() => Object.defineProperty(navigator.credentials,'create',{configurable:true,value:()=>new Promise(resolve=>{window.finishCredential=resolve})}))
@@ -169,7 +169,7 @@ try {
     const canvas=document.createElement('canvas');canvas.width=canvas.height=20;window.lateStream=canvas.captureStream(0)
     Object.defineProperty(navigator.mediaDevices,'getUserMedia',{configurable:true,value:()=>new Promise(resolve=>{window.finishCamera=resolve})})
   })
-  await late.locator('#show-join').click();await late.waitForFunction(()=>!!window.finishCamera);await late.locator('#scan-stop').click();await late.evaluate(()=>window.finishCamera(window.lateStream));await late.waitForFunction(()=>window.lateStream.getTracks().every(t=>t.readyState==='ended'))
+  await late.locator('#setup-options').evaluate(el=>el.open=true);await late.locator('#show-join').click();await late.waitForFunction(()=>!!window.finishCamera);await late.locator('#scan-stop').click();await late.evaluate(()=>window.finishCamera(window.lateStream));await late.waitForFunction(()=>window.lateStream.getTracks().every(t=>t.readyState==='ended'))
   // A standalone download still runs without a server or install step.
   if (!live) {
     const file = await phone(pathToFileURL(join(root, 'canary-local.html')).href)

@@ -7,7 +7,7 @@ Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 
 Latest factual delta reviewed on 23 October 2026 against the working tree based
 on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
-`../canary-words-site` wrapper. The final signed-name/concurrent-exchange section
+`../canary-words-site` wrapper. The final Offline Connect source-candidate section
 in each document governs this candidate; preceding release sections are dated
 history. Earlier publication receipts do not verify this candidate. No deployment
 or public readback was performed for this gap review.
@@ -276,3 +276,51 @@ explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
 is saved encrypted before scan-back. The source notice-alignment gate is closed
 for this candidate. Publication readback and physical acceptance remain open
 until separately evidenced.
+
+
+## Offline Connect — 23 October 2026 source candidate
+
+This section supersedes earlier default nearby invitation/encrypted-scan-back
+and vault-v5 descriptions for this candidate. Those descriptions remain history
+or advanced compatibility behaviour, not the new Connect default. The source
+review covers the current working tree, including `local/meet.ts` and
+`local/meet-ui.ts`; it is not a deployment/readback or independent security audit.
+The GB note remains verified 28 September 2026, review by 28 March 2027, with
+the already recorded partial 23 October updates. No fresh law research, new
+provider selection, external contact or publication was performed.
+
+| Fact checked | Source evidence |
+|---|---|
+| Random per-session private key, 128-bit ID and 32-byte nonce; public ID/key/nonce commitment | `local/meet.ts:18`, `local/meet.ts:25`, `local/meet.ts:34` |
+| Peer full card is pinned; mismatched peer/reveal/recipient rejected; commitment verified | `local/meet.ts:19`, `local/meet.ts:38` |
+| New state saved before first card display; peer state saved before showing own recipient-bound reveal | `local/meet-ui.ts:28`, `local/meet-ui.ts:52`, `local/main.ts:300` |
+| NIP-44 ECDH conversation key and domain-separated HMAC over ordered complete cards and both nonce reveals derive a 128-bit seed locally | `local/meet.ts:48` |
+| Public QR remains visible when local fixed comparison words are ready; explicit name and comparison confirmation complete local save | `local/meet-ui.ts:70`, `local/meet-ui.ts:86` |
+| Public card/reveal file export, import, drag/drop and optional OS file share; no private key/shared seed in token | `local/meet.ts:85`, `local/meet-ui.ts:106` |
+| At most eight saved sessions; no setup expiry; v6 encrypted payload reads legacy array/v2–v5 and validates pending pair/session consistency | `local/meet.ts:69`, `local/vault.ts:23`, `local/vault.ts:95`, `local/vault.ts:147` |
+| Local camera with audio disabled, preferred front/rear camera switching, local QR decoding and 60-second capture pause | `local/qr.ts:31`, `local/qr.ts:43`, `local/meet-ui.ts:95` |
+| Capture stopped on view change and vault/UI clearing; hidden tab locks, page exit locks active state | `local/main.ts:53`, `local/main.ts:71`, `local/main.ts:605` |
+| Local completion/restart/removal drops active session state; no backup erasure or other-device revocation | `local/meet-ui.ts:86`, `local/meet-ui.ts:122`, `local/meet-ui.ts:128` |
+| Public links use #meet fragments consumed after early address replacement | `local/meet.ts:89`, `local/index.html:18` |
+
+No fetch, socket, relay, microphone, Bluetooth or NFC path was found in the
+new meeting modules. Nostr cryptographic primitives do not create a Nostr
+account or contact a relay. The unchanged wrapper remains fixed public-asset
+GET/HEAD handling (`../canary-words-site/worker/index.js:5`). This bounded source
+check does not establish every dependency or browser/OS network behaviour.
+
+Final source-notice recheck: `local/index.html:103` now describes commit/reveal
+Connect as default, encrypted pending state, public file fallback and deliberate
+OS transfer, while preserving the old exchange as compatibility behaviour. The
+source notice-alignment gap is closed for this candidate; public release bytes,
+physical acceptance and independent review are separate and remain unverified
+by this check.
+
+Final source notice recheck on 23 October 2026: `local/index.html:103` matches
+the reviewed offline commit/reveal flow, local seed derivation, fixed comparison,
+encrypted pending state and backup limits, no setup expiry versus the one-minute
+scan pause, public files and user-chosen OS transfer, and retained advanced paths.
+Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
+fields and adds no processing recipient or networking. Only source notice
+alignment is closed here; publication/readback, physical camera/credential-provider
+acceptance and independent review are unchanged separate gates.

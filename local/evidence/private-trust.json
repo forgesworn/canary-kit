@@ -7,7 +7,7 @@
   "openCardExpiryUpdates": true,
   "withdrawalBadge": true,
   "privateIssuerAliasDoesNotGrantKeeperAuthority": true,
-  "verified": "2026-10-23T13:17:47.126Z",
+  "verified": "2026-10-23T14:59:02.341Z",
   "live": false,
   "independentGroupKeys": true,
   "encryptedVouchRoundTrip": true,

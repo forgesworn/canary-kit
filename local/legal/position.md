@@ -7,7 +7,7 @@ Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
 
 Latest factual delta reviewed on 23 October 2026 against the working tree based
 on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
-`../canary-words-site` wrapper. The final signed-name/concurrent-exchange section
+`../canary-words-site` wrapper. The final Offline Connect source-candidate section
 in each document governs this candidate; preceding release sections are dated
 history. Earlier publication receipts do not verify this candidate. No deployment
 or public readback was performed for this gap review.
@@ -260,3 +260,53 @@ explicitly limited to legacy raw-secret QR/manual pairing; new nearby pairing
 is saved encrypted before scan-back. The source notice-alignment gate is closed
 for this candidate. Publication readback and physical acceptance remain open
 until separately evidenced.
+
+
+## Offline Connect — 23 October 2026 source candidate
+
+This section supersedes earlier default nearby invitation/encrypted-scan-back
+and vault-v5 descriptions for this candidate. Those descriptions remain history
+or advanced compatibility behaviour, not the new Connect default. The source
+review covers the current working tree, including `local/meet.ts` and
+`local/meet-ui.ts`; it is not a deployment/readback or independent security audit.
+The GB note remains verified 28 September 2026, review by 28 March 2027, with
+the already recorded partial 23 October updates. No fresh law research, new
+provider selection, external contact or publication was performed.
+
+The owner selected fully offline Connect and rejected automatic relay setup.
+The new default is a local public-card commit/reveal exchange, followed by local
+shared-seed derivation and explicit human comparison, not hosted message carriage
+(`local/meet.ts:18`, `:38`, `:48`; `local/meet-ui.ts:52`, `:86`). Nostr Tools is
+used for cryptographic primitives only. No account, relay default, publisher
+rendezvous endpoint, directory or admission-control service is introduced.
+The fixed-response public-asset wrapper remains unchanged
+(`../canary-words-site/worker/index.js:5`). Optional public file transfers are
+chosen through the OS; online destinations remain possible user choices.
+
+This retains the static software-publisher assessment under GB note §2.2 `[U]`,
+not a regulator determination. Data protection notice facts (§§3.1–3.2) and
+necessary device-storage reasoning (§4 `[U]`) now include encrypted unfinished
+session keys, nonce material and derived unconfirmed pairs, as detailed in
+`privacy.md` and `inventory.md`. Public optical cards/reveals are not encrypted
+messages or identity certificates. The stored in-person evidence is the user's
+record of their confirmation, not independently established proof of a meeting.
+The approved project/contact and legitimate-interest static-hosting basis remain
+unchanged. No new service deadline, provider selection, fee, age gate or identity
+disclosure decision is identified from this offline functionality.
+
+No blanket security or legal clearance follows from the commit/reveal design.
+The public shell must already be available for offline operation. Local source
+and browser fixtures cannot establish actual iPhone/Android front-camera optics,
+webcam usability, credential-provider support, owner acceptance or an independent
+cryptographic assessment. The corrected source footer now describes the default
+protocol accurately; this candidate's source notice-alignment gate is closed.
+Exact built and published bytes/readback remain separate from this source review.
+
+Final source notice recheck on 23 October 2026: `local/index.html:103` matches
+the reviewed offline commit/reveal flow, local seed derivation, fixed comparison,
+encrypted pending state and backup limits, no setup expiry versus the one-minute
+scan pause, public files and user-chosen OS transfer, and retained advanced paths.
+Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
+fields and adds no processing recipient or networking. Only source notice
+alignment is closed here; publication/readback, physical camera/credential-provider
+acceptance and independent review are unchanged separate gates.

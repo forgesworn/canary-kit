@@ -63,9 +63,10 @@ substitution. This application profile has local tests, not independent audit.
 
 ## Saved progress and commits
 
-Vault payload version 5 retains one pending receive request/private key and one
-outgoing encrypted file/count. Arrays and v2/v3 payloads remain readable. Saving
-v5 makes older app builds fail closed rather than discard transfer state. Normal
+Vault payload version 6 retains one pending receive request/private key and one
+outgoing encrypted file/count, along with unfinished optical connection state.
+Arrays and v2–v5 remain readable. Saving v6 makes older app builds fail closed
+rather than discard state. Normal
 people/trust/exchange data retains its 160,000-byte limit; the total payload may
 use 600,000 bytes and the encoded record 1 MiB to retain a ciphertext handoff.
 Device-copy state is included in a passphrase-encrypted recovery backup.
@@ -100,9 +101,8 @@ phone/desktop call usability remain separate owner acceptance gates.
 
 ## Simplified meeting and named vouch update
 
-See [SIGNET-VOUCH.md](SIGNET-VOUCH.md) for the current two-action home, public
-invitation plus encrypted QR reply, one-action nearby recipient, four fixed
-comparison words and holder-approved group-name statements. Pending group checks
-and outgoing handoffs are independent per exchange. Payload v5 reads legacy
-arrays/v2/v3/v4; older builds refuse new saves. Group introductions remain optional,
-and native My Signet Android phone tapping is not implemented by this website.
+See [SIGNET-VOUCH.md](SIGNET-VOUCH.md) for the current single Connect action and
+[OFFLINE-CONNECT.md](OFFLINE-CONNECT.md) for the fully offline optical exchange.
+Holder-approved group-name statements and independent pending group handoffs are
+unchanged. Payload v6 reads legacy arrays/v2–v5; older builds refuse new saves.
+Native My Signet Android phone tapping is a separate implementation.

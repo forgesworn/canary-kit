@@ -8,30 +8,35 @@ The static hosting candidate is generated in ignored `local-site/`.
 
 ## In practice
 
-The opening screen explains the purpose: save a private check with someone you
-know, then compare your two spoken words on a future call. It offers **Show my
-code** and **Scan their code**. Group introductions are under a separate details
-panel. There is no Nostr account, group choice or terminology to learn for pairing.
+The opening screen explains the purpose: keep a private check with someone you
+know, then compare your two spoken words on a future call. It offers one primary
+**Connect** button. Group introductions and other setup methods stay separate.
+There is no Nostr account or group choice to learn for pairing.
 
 Together in person:
 
-1. One person taps **Show my code**, protecting their phone if needed. Progress
-   is saved encrypted before a public invitation QR is displayed.
-2. The other scans using their normal camera on HTTPS, or Vouch's scanner. Their
-   screen explains why and offers **Save our check on this phone**. Protection is
-   through a supported device credential or strong passphrase fallback. No name
-   form, install requirement or protocol checkbox interrupts this step.
-3. They show the recipient-encrypted reply QR. The first phone scans it back.
-   Both read the same **four fixed setup comparison words**, name the other
-   person so they can find them later, and tap **Same code · save our check**.
-   Each saves on their own phone; neither can certify the other's final save.
-4. The two different call phrases appear only after confirmation. They rotate
-   every 30 seconds. Setup comparison words do not rotate.
+1. Both open **Connect**. Protect/unlock each device if prompted. Each saves its
+   temporary session encrypted before displaying a public QR.
+2. Face the screens towards each other. Front cameras read the codes and their
+   updates automatically. Keep a gap so each camera can see the other code.
+3. Both compare the same **four fixed words**, name the other person for future
+   use, then tap **Same words · save our check** on their own device. Leave the
+   code visible until both have their words. Neither phone proves the other saved.
+4. The two different call phrases appear afterwards and rotate every 30 seconds.
+   Setup words do not rotate. Setup has no countdown: a paused camera can read
+   again using the same saved connection, including after lock/unlock.
 
-Both sides can unlock and resume saved progress after switching apps. The
-receiver can re-show the exact encrypted reply. Failed storage never claims
-success. Setting up a new pair does not validate an unexpected caller or replace
-an existing saved person. Use an already trusted meeting/call to establish trust.
+Both devices must already have the app available for fully offline setup. No
+internet, microphone, relay or shared-secret transfer is used by the exchange.
+A desktop with a webcam uses the same flow. Without a camera, show the desktop
+code to the phone, explicitly transfer the phone's public reply file back using
+an offline method, open it on the desktop, then let the phone read its updated
+code. OS share targets may use the internet; the app does not select one for you.
+
+Progress is saved before a code/reveal is displayed. A failed save never claims
+success or releases an unpersisted commitment. Starting a new relationship does
+not validate an unexpected caller or replace a saved person. Use an already
+trusted meeting/call to establish trust.
 
 Later: **home-screen icon → unlock → person → words**. If you requested the
 check, listen first. If the other person asked, read **You say**. Never read their
@@ -50,22 +55,27 @@ unchanged. Call phrases retain two words, 30-second intervals and ±1 tolerance.
 They remain replayable during their accepted window, and live relay is possible.
 
 One-minute setup and panic usability are physical-person acceptance targets,
-not measured claims. A local file can exchange raw public/encrypted codes using
-the in-app scanner; normal-camera links need the stable HTTPS site. The existing
-My Signet Android app has native NFC/nearby handshake code. This website has no
-phone-bump feature; browser NFC does not supply that native transport.
+not measured claims. My Signet Android has a separate native NFC/nearby
+handshake. This website uses optical exchange and does not perform phone bumps.
 
-## Public invitations and private recovery
+## Public connection codes and private recovery
 
-Default in-person and trusted-call setup use the existing `connect.ts` NIP-44
-invitation/reply protocol. The invitation contains an ephemeral public key, not
-the shared pair seed; the reply encrypts that seed for the invitation key. Compare
-the fixed words through the trusted encounter to detect substitution.
+Default Connect uses the [offline commit/reveal profile](OFFLINE-CONNECT.md).
+Public session keys, commitments and released random contributions are exchanged;
+each device derives the pair seed locally using existing Nostr Tools ECDH/HKDF
+and Canary Kit / Spoken Token SHA-256/HMAC helpers. Pinning and saving the peer's
+commitment before revealing the local contribution prevents choosing that
+contribution after seeing the peer's. Comparing the fixed four words together is
+still essential. This new application profile is not independently audited.
 
-HTTPS `#connect=` fragments are removed before module loading and do not enter
-HTTP requests. Camera/history/clipboard/chosen apps may retain links. The advanced
-**Recover an older shared-secret pair** QR/manual flow remains secret-bearing:
-keep it private. Removing a fragment does not erase other software's copies.
+**Other ways to connect** retains the prior nearby invitation/encrypted reply
+and trusted-call chat flow (`connect.ts`, existing NIP-44 encryption). The older
+**Recover an older shared-secret pair** QR/manual path remains secret-bearing:
+keep it private. Default connection QR/files contain no shared seed.
+
+HTTPS `#meet=` and `#connect=` fragments are removed before module loading and
+do not enter HTTP requests. Camera/history/clipboard/chosen apps may retain
+links or public files. Removing a fragment does not erase their copies.
 
 ## Keeping pairs for the future
 
@@ -74,8 +84,11 @@ backgrounding, reload, manual lock, Escape or five minutes without interaction.
 The screen explicitly distinguishes a transient pair from a saved one. Failed
 storage does not claim success. Both people must keep their own copy.
 
-The vault saves nicknames, setup secrets and roles as encrypted browser storage.
-It locks on reload, backgrounding, Escape, manual lock and five minutes without
+The vault saves nicknames, pair secrets/roles, and unfinished Connect session
+keys, nonces, pinned public cards and unconfirmed pairs as encrypted browser storage.
+Payload v6 reads arrays and v2–v5; older apps refuse new saves. Finishing or
+removing a session changes the active vault, not old backups/copies. The vault
+locks on reload, backgrounding, Escape, manual lock and five minutes without
 interaction. Local master-key bytes are zeroed on lock as a best effort; JavaScript
 and the browser do not provide guaranteed secure memory erasure.
 
@@ -93,8 +106,9 @@ Normal use needs a stable, isolated HTTPS origin: browser storage and passkeys
 belong to an origin. Do not share an origin with the larger relay-enabled app or
 other applications. The HTML also works directly in Chrome, but device unlock
 is disabled for `file://` and local-file storage behaviour is browser-dependent.
-No service worker is installed. Local operations work after the page is loaded;
-future offline navigation to a hosted page is not promised.
+The HTTPS app caches its public shell with a service worker; close all its windows
+and reopen to apply a downloaded update. The standalone HTML does not install a
+service worker. Obtain the shell on both devices before going offline.
 
 Earlier prototype private HTML copies remain **unencrypted**. This change does
 not delete or protect them. Retire those copies and create fresh pairs where
@@ -116,7 +130,8 @@ appropriate; importing their old setup words does not revoke an exposed old copy
 - QR decoding is bundled JavaScript, not a remote service. The camera requests
   no audio, stops on success/cancellation/background/navigation and after one
   minute, and stops late permission-granted streams too. Frames are not recorded
-  or uploaded. The displayed QR contains the setup secret: keep it private.
+  or uploaded. Default Connect codes contain public material only; the advanced older-pair
+  recovery QR contains its shared secret and must stay private.
 - Application connections, forms and external resources are blocked by CSP.
   The live host serves additional framing, transport, MIME and permissions
   headers; actual readback matches the artifact. A minimal response wrapper
@@ -174,7 +189,7 @@ A holder shows **My verification QR**. The other person selects **Check their ke
 before vouching**, sends a fresh challenge, and receives the holder's response.
 They then explicitly choose the meeting/call method and sign a private vouch.
 The holder scans the encrypted handoff and chooses Keep. Return steps are needed;
-ordinary personal pairing stays independent, using a public QR and encrypted scan-back.
+ordinary personal pairing stays independent, using offline Connect.
 
 A keeper can check a private vouch or check a voucher key before explicitly
 accepting that person's vouches. Fresh proofs bind the group, holder, checker,

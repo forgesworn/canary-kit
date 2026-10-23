@@ -39,11 +39,11 @@ export class QrScanner {
     this.canvas.width = this.canvas.height = 1
   }
 
-  async start(): Promise<void> {
+  async start(facing:'user'|'environment'='environment'): Promise<void> {
     this.stop()
     const revision = this.revision
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera scanning is unavailable here. Type the setup words below.')
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } })
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } } })
     // Permission can finish after cancellation, tab hiding or navigation.
     if (revision !== this.revision) { stream.getTracks().forEach(track => track.stop()); return }
     this.stream = stream

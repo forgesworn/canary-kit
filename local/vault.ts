@@ -3,6 +3,7 @@ export type { Entry } from './entries.js'
 import { emptyTrust, readTrust, type TrustState } from './trust.js'
 import { readExchange, type Exchange } from './connect.js'
 import { readDevices, type Devices } from './device-transfer.js'
+import { readMeetings, pairFromMeeting, type Meeting } from './meet.js'
 
 const ROUNDS = 600_000
 export const MAX_VAULT_BYTES = 1_048_576
@@ -17,7 +18,17 @@ export interface VaultRecord {
   device?: { credential: string; input: string; origin: string; box: Box }
   data: Box
 }
-export interface Vault { record: VaultRecord; master: Uint8Array; entries: Entry[]; trust: TrustState; exchanges?: Exchange[]; devices?: Devices }
+export interface Vault { record: VaultRecord; master: Uint8Array; entries: Entry[]; trust: TrustState; exchanges?: Exchange[]; devices?: Devices; meetings?: Meeting[] }
+
+function checkMeetings(entries:Entry[],meetings:Meeting[]) {
+  for(const entry of entries)if(entry.setup?.meeting){
+    const meeting=meetings.find(m=>m.id===entry.setup!.meeting)
+    if(!meeting?.peerReveal||meeting.id!==entry.id)throw new Error('The saved connection does not match its pending pair.')
+    const pair=pairFromMeeting(meeting)
+    if(pair.mnemonic!==entry.pair.mnemonic||pair.role!==entry.pair.role)throw new Error('The saved connection does not match its pending pair.')
+  }
+  for(const meeting of meetings)if(meeting.peerReveal&&!entries.some(e=>e.id===meeting.id&&e.setup?.meeting===meeting.id))throw new Error('An unfinished connection is missing its saved pair.')
+}
 
 function random(size: number): Uint8Array { return crypto.getRandomValues(new Uint8Array(size)) }
 function bytes(input: Uint8Array): ArrayBuffer { return new Uint8Array(input).buffer }
@@ -88,11 +99,12 @@ async function opened(record: VaultRecord, master: Uint8Array): Promise<Vault> {
     try {
       const parsed = JSON.parse(decoder.decode(data))
       if (Array.isArray(parsed)) return { record, master, entries: readEntries(parsed), trust: emptyTrust() }
-      if (!parsed || ![2, 3, 4, 5].includes(parsed.v)) throw new Error('Unsupported encrypted vault payload.')
+      if (!parsed || ![2, 3, 4, 5, 6].includes(parsed.v)) throw new Error('Unsupported encrypted vault payload.')
       if (parsed.exchanges !== undefined && (!Array.isArray(parsed.exchanges) || parsed.exchanges.length > 16)) throw new Error('Invalid saved connections.')
       const exchanges = (parsed.exchanges ?? []).map(readExchange) as Exchange[]
       if (new Set(exchanges.map(e => e.id)).size !== exchanges.length) throw new Error('Duplicate saved connections.')
-      return { record, master, entries: readEntries(parsed.entries), trust: readTrust(parsed.trust), exchanges, devices: readDevices(parsed.devices) }
+      const entries=readEntries(parsed.entries),meetings=readMeetings(parsed.meetings);checkMeetings(entries,meetings)
+      return { record, master, entries, trust: readTrust(parsed.trust), exchanges, devices: readDevices(parsed.devices), meetings }
     }
     finally { data.fill(0) }
   } catch (e) { master.fill(0); throw e }
@@ -132,12 +144,13 @@ export async function sealEntries(vault: Vault, entries: Entry[], trust = vault.
   // exchange keys or unconfirmed setup state on their next save.
   const contents = { entries: checked, trust: readTrust(trust), exchanges: checkedExchanges }
   if (encoder.encode(JSON.stringify(contents)).length > 160_000) throw new Error('This local vault is full. Back up your data before removing old records.')
-  const data = encoder.encode(JSON.stringify({ v: 5, ...contents, devices: readDevices(vault.devices) }))
+  const meetings=readMeetings(vault.meetings);checkMeetings(checked,meetings)
+  const data = encoder.encode(JSON.stringify({ v: 6, ...contents, devices: readDevices(vault.devices),meetings }))
   if (data.length > 600_000) { data.fill(0); throw new Error('Finish or remove the previous device copy before saving another.') }
   try { return { ...vault.record, data: await encrypt(await aes(vault.master), data, vault.record.id, 'data') } }
   finally { data.fill(0) }
 }
-export function closeVault(vault: Vault): void { vault.master.fill(0); vault.entries = []; vault.trust = emptyTrust(); vault.exchanges = []; vault.devices = {} }
+export function closeVault(vault: Vault): void { vault.master.fill(0); vault.entries = []; vault.trust = emptyTrust(); vault.exchanges = []; vault.devices = {};vault.meetings=[] }
 
 export function deviceUnlockPossible(): boolean {
   return typeof window !== 'undefined' && window.isSecureContext && location.protocol !== 'file:'

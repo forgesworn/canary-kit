@@ -9,6 +9,8 @@ import { mountConnect } from './connect-ui.js'
 import { readConnect, type Exchange } from './connect.js'
 import { mountDevices } from './device-ui.js'
 import type { Devices } from './device-transfer.js'
+import { mountMeet } from './meet-ui.js'
+import type { Meeting } from './meet.js'
 
 const STORE = 'canary.encrypted-vault.v1'
 const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -29,8 +31,10 @@ let pendingTrustTask: (() => Promise<void>) | null = null
 let trustUi: ReturnType<typeof mountTrust> | undefined
 let connectUi: ReturnType<typeof mountConnect> | undefined
 let devicesUi: ReturnType<typeof mountDevices> | undefined
+let meetUi: ReturnType<typeof mountMeet> | undefined
 
 const scanner = new QrScanner(get<HTMLVideoElement>('scan-video'), data => {
+  if(data.includes('#meet=')||data.startsWith('CANARY-MEET:')){stopScan();meetUi!.receive(data);return}
   if(data.includes('#connect=')){stopScan();void connectUi!.receive(data);return}
   if(data.startsWith('{')){try{readConnect(data);stopScan();void connectUi!.receive(data);return}catch{ /* Try the existing device-request parser below. */ }}
   if (data.includes('#device=') || data.startsWith('CANARY-DEVICE:') || data.startsWith('{')) { stopScan(); devicesUi!.receive(data); return }
@@ -49,6 +53,7 @@ function stopScan() {
 function show(name: string) {
   stopScan()
   trustUi?.stopScan()
+  meetUi?.stopScan()
   document.querySelectorAll<HTMLElement>('.view').forEach(element => { element.hidden = element.id !== name })
   get('lock').hidden = !vault && !selected && !draft && !pendingTrustTask
   get('your-people').hidden = !record
@@ -67,6 +72,7 @@ function wipeUi() {
   trustUi?.clear()
   connectUi?.clear()
   devicesUi?.clear()
+  meetUi?.clear()
   for (const id of ['say', 'hear', 'signal']) get(id).textContent = '—'
   for (const id of ['setup-words', 'setup-reference', 'exchange-reference', 'reference', 'side', 'check-result', 'save-state']) get(id).textContent = ''
   for (const id of ['setup-input', 'person-name', 'heard-input', 'new-password', 'confirm-password', 'unlock-password']) {
@@ -82,6 +88,7 @@ function wipeUi() {
   get<HTMLInputElement>('quick-name').value = ''
   get<HTMLInputElement>('people-search').value = ''
   get('pending-connections').replaceChildren()
+  get('pending-meetings').replaceChildren()
   get('vouch-overview').replaceChildren()
   renderedCounter = resultCounter = -1
 }
@@ -135,6 +142,7 @@ function people() {
     get('people-list').append(button)
   }
   connectUi?.list(get('pending-connections'))
+  meetUi?.list(get('pending-meetings'))
   if(vault.trust.groups.length){
     for(const [title,hint,intent]of [['Your vouches',`${vault.trust.groups.length} private ${vault.trust.groups.length===1?'group':'groups'} · signed evidence`,'show'],['Vouch for someone','Check a key. Record what happened.','vouch']] as const){
       const button=document.createElement('button'),label=document.createElement('strong'),caption=document.createElement('small');label.textContent=title;caption.textContent=hint;button.append(label,caption);button.addEventListener('click',()=>trustUi!.home(intent));get('vouch-overview').append(button)
@@ -181,6 +189,7 @@ function finishExchange() {
 }
 function isSaved() { return !!selected && !!vault?.entries.some(entry => entry.id === selected!.id) }
 function openPerson(entry: Entry) {
+  if(entry.setup?.meeting){selected=null;meetUi!.resume(entry.setup.meeting);return}
   selected = entry
   const saved = isSaved()
   const settingUp = !saved || !!entry.setup
@@ -198,7 +207,7 @@ function openPerson(entry: Entry) {
   get<HTMLInputElement>('person-name').value = entry.label
   get('reference').textContent = pairReference(entry.pair)
   get('exchange-reference').textContent = pairComparison(entry.pair)
-  get('side').textContent = entry.pair.role === 'first' ? 'you showed the QR' : 'you scanned the QR'
+  get('side').textContent = entry.pair.role === 'first' ? 'call side 1' : 'call side 2'
   renderContactEvidence(entry)
   get('save-state').textContent = saved ? (entry.setup ? 'Saved encrypted. Finish the code check together.' : 'Saved encrypted on this phone.') : 'Keep your copy before switching apps.'
   get('keep-person').hidden = saved
@@ -288,13 +297,18 @@ trustUi = mountTrust(get('private-trust'), {
   },
   show: () => show('private-trust'), home, error, status,
 })
-async function savePairs(entries: Entry[], exchanges: Exchange[]) {
+async function savePairs(entries: Entry[], exchanges: Exchange[], meetings?:Meeting[]) {
   const active = vault, stamp = generation
   if (!active || document.hidden) throw new Error('Unlock your phone’s Canary vault first.')
-  const next = await sealEntries({ ...active, exchanges }, entries)
+  const next = await sealEntries({ ...active, exchanges,meetings:meetings??active.meetings }, entries)
   if (stamp !== generation || active !== vault || document.hidden) throw new Error('Canary was locked. Unlock to continue your saved setup.')
   persist(next); active.record = next; active.entries = entries; active.exchanges = exchanges
+  if(meetings!==undefined)active.meetings=meetings
 }
+meetUi=mountMeet(get('meet'),{
+  vault:()=>vault,ensure:ensureTrustVault,show:()=>show('meet'),home,open:openPerson,error,
+  save:async(entries,meetings)=>{await savePairs(entries,vault?.exchanges??[],meetings)},
+})
 connectUi = mountConnect({ vault: () => vault, hasRecord: () => !!record, device: input => devicesUi!.receive(input), ensure: ensureTrustVault, save: savePairs, show, open: openPerson, home, error, scan:()=>{show('join');startScan()} })
 devicesUi = mountDevices(get('devices'), {
   vault: () => vault, hasRecord: () => !!record, ensure: ensureTrustVault,
@@ -471,8 +485,9 @@ get('restore-file').addEventListener('change', () => {
     restoring = imported; show('locked'); updateUnlock(); get('unlock-password').focus()
   })
 })
-get('add-person').addEventListener('click', () => { selected = draft = null; wipeUi(); show('welcome'); get<HTMLDetailsElement>('setup-options').open=true; get('setup-options').scrollIntoView({behavior:'instant',block:'start'}) })
-get('create').addEventListener('click', () => connectUi!.nearby())
+get('add-person').addEventListener('click', () => { selected = draft = null; wipeUi(); get<HTMLDetailsElement>('setup-options').open=false; show('welcome') })
+get('create').addEventListener('click', () => meetUi!.start())
+get('legacy-nearby').addEventListener('click',()=>connectUi!.nearby())
 function startScan() {
   const stamp = generation
   get('scanner').hidden = false; get('scan-start').hidden = true
@@ -609,6 +624,9 @@ function consumeIncoming() {
   let incoming = incomingWindow.canaryIncoming
   delete incomingWindow.canaryIncoming
   if (!incoming) return
+  if(incoming.startsWith('#meet=')){
+    generation++;pendingKeep=false;pendingTrustTask=null;restoring=null;draft=selected=null;wipeUi();show('welcome');meetUi!.receive(location.origin+location.pathname+incoming);return
+  }
   if (incoming.startsWith('#device=')) {
     generation++; pendingKeep = false; pendingTrustTask = null; restoring = null
     draft = selected = null; wipeUi(); show(record && !vault ? 'locked' : 'welcome')

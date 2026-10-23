@@ -6,7 +6,7 @@ export interface Entry {
   evidence?: { method: 'in-person' | 'trusted-call'; at: number }
   accounts?: { service: string; account: string; observedAt: number }[]
   lastCheck?: number
-  setup?: { method: 'in-person' | 'trusted-call'; reply?: string; invite?: string }
+  setup?: { method: 'in-person' | 'trusted-call'; reply?: string; invite?: string; meeting?: string }
 }
 export function readEntries(raw: unknown): Entry[] {
   if (!Array.isArray(raw) || raw.length > 200) throw new Error('Invalid vault contents.')
@@ -32,7 +32,8 @@ export function readEntries(raw: unknown): Entry[] {
     if (value.setup !== undefined) {
       if (!['in-person', 'trusted-call'].includes(value.setup.method) || (value.setup.reply !== undefined && (typeof value.setup.reply !== 'string' || value.setup.reply.length > 3000))) throw new Error('Invalid saved setup.')
       if(value.setup.invite!==undefined&&(typeof value.setup.invite!=='string'||value.setup.invite.length>3000))throw new Error('Invalid saved invitation.')
-      result.setup = { method: value.setup.method, ...(value.setup.reply ? { reply: value.setup.reply } : {}), ...(value.setup.invite ? { invite: value.setup.invite } : {}) }
+      if(value.setup.meeting!==undefined&&(typeof value.setup.meeting!=='string'||!/^[0-9a-f]{32}$/.test(value.setup.meeting)))throw new Error('Invalid saved meeting.')
+      result.setup = { method: value.setup.method, ...(value.setup.reply ? { reply: value.setup.reply } : {}), ...(value.setup.invite ? { invite: value.setup.invite } : {}),...(value.setup.meeting?{meeting:value.setup.meeting}:{}) }
     }
     return result
   })
