@@ -163,3 +163,32 @@ The independent live check is `node tools/test-hosted-local.mjs` (same Chromium
 override). It opens the real public site anonymously and records no secret values.
 
 See [validation](VALIDATION.md) and [draft UK legal cover](legal/README.md).
+
+## Optional private contacts and vouches
+
+Contact details can save your meeting method and observed account labels inside
+the encrypted vault. These notes do not independently prove platform account
+control. Successful typed normal-word checks can record a local check date;
+displaying words alone does not count.
+
+Open **Private groups & vouches** to create or keep a group. No Nostr account or
+relay is required. Compare the keeper code before keeping the group. Each phone
+uses a separate signing key for each group, protected by the existing vault.
+
+A holder shows **My verification QR**. The other person selects **Check their key
+before vouching**, sends a fresh challenge, and receives the holder's response.
+They then explicitly choose the meeting/call method and sign a private vouch.
+The holder scans the encrypted handoff and chooses Keep. Return steps are needed;
+ordinary personal pairing stays independent and one-scan.
+
+A keeper can check a private vouch or check a voucher key before explicitly
+accepting that person's vouches. Fresh proofs bind the group, holder, checker,
+purpose, nonce, account-context text and expiry. A passed proof is local evidence
+for a human admission decision; no messaging membership changes automatically.
+The keeper chooses trusted issuers, with no automatic friends-of-friends trust.
+
+Outgoing exchanges and pending checks save before displaying their QR. After
+locking/reloading, reopen the group and use **Continue exchange**. Expired
+requests need a new check. Group keys travel in your encrypted recovery backup.
+Withdrawals must reach each relevant phone separately; no global status service
+is claimed. See [protocol and limits](PRIVATE-TRUST.md).

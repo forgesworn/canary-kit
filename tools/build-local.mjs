@@ -22,6 +22,10 @@ const thirdParty = [
   ['Scure BIP39', 'node_modules/@scure/bip39/LICENSE'],
   ['Scure Base', 'node_modules/@scure/base/LICENSE'],
   ['Noble Hashes', 'node_modules/@noble/hashes/LICENSE'],
+  ['Noble Curves', 'node_modules/@noble/curves/LICENSE'],
+  ['Noble Ciphers', 'node_modules/@noble/ciphers/LICENSE'],
+  ['Nostr Tools (offline signing and encryption only)', 'node_modules/nostr-tools/LICENSE'],
+  ['Nostr Attestations (offline data format)', 'node_modules/nostr-attestations/LICENSE'],
   ['QR Code Generator', 'node_modules/qrcode-generator/dist/qrcode.js'],
   ['jsQR (Apache-2.0)', 'node_modules/jsqr/LICENSE'],
 ]

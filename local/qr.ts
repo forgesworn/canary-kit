@@ -1,8 +1,8 @@
 import qrcode from 'qrcode-generator'
 import jsQR from 'jsqr'
 
-export function drawQr(canvas: HTMLCanvasElement, payload: string): void {
-  const qr = qrcode(0, 'M')
+export function drawQr(canvas: HTMLCanvasElement, payload: string, correction: 'L' | 'M' = 'M'): void {
+  const qr = qrcode(0, correction)
   qr.addData(payload)
   qr.make()
   const scale = 8

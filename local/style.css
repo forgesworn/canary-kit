@@ -107,3 +107,15 @@ footer { margin-top: 35px; }
   #pair-setup .lead { margin-bottom: 16px; }
   #pair-setup .qr-frame { margin-top: 18px; }
 }
+
+/* Optional private vouches stay separate from one-scan personal pairing. */
+select { display:block; width:100%; padding:14px; font:16px/1.6 Arial,sans-serif; border:1px solid #bac7b5; border-radius:8px; background:#fffef9; color:var(--ink); }
+.trust-card { padding:18px; border:1px solid var(--line); border-radius:14px; margin:16px 0; background:#fffdf7; overflow-wrap:anywhere; }
+.trust-qr { max-width:380px; padding:8px; }
+#trust-qr { display:block; width:100%; height:auto; image-rendering:pixelated; }
+#trust-output { font-size:12px; overflow-wrap:anywhere; }
+.trust-video { width:100%; max-height:340px; object-fit:cover; border-radius:14px; }
+#private-trust .compare strong { font-size:clamp(18px,5.7vw,25px); letter-spacing:1px; overflow-wrap:anywhere; }
+#open-private-groups { display:block; }
+
+#private-trust { overflow-wrap:anywhere; }

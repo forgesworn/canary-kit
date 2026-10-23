@@ -1,0 +1,17 @@
+{
+  "verified": "2026-10-23T02:09:15.647Z",
+  "live": false,
+  "independentGroupKeys": true,
+  "encryptedVouchRoundTrip": true,
+  "untrustedVoucherRejected": true,
+  "voucherTrustRequiresExplicitFreshCheck": true,
+  "holderChallengePassed": true,
+  "pendingSurvivesReload": true,
+  "replayRejected": true,
+  "withdrawalHonoured": true,
+  "qrRoundTrips": true,
+  "noPrivateTransferInRequests": true,
+  "encryptedLocalStorage": true,
+  "noExternalRequests": true,
+  "browserErrors": []
+}

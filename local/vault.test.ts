@@ -1,10 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import { createVault, createDeviceVault, addRecoveryPassphrase, unlockVault, sealEntries, parseVault, closeVault, enableDeviceUnlock, unlockWithDevice, exportVault } from './vault.js'
 import { createPair } from './model.js'
+import { newGroup, groupCard, joinGroup, publicKey } from './trust.js'
 
 const password = 'a sufficiently long test passphrase'
 
 describe('encrypted local vault', () => {
+  it('preserves private group keys, pending exchanges and contact evidence across saving and portable recovery', async () => {
+    const vault = await createVault(password)
+    const keeper = newGroup('Private friends')
+    const group = joinGroup(groupCard(keeper))
+    vault.trust = { v: 1, groups: [group] }
+    const entries = [{ id: 'pair-1', label: 'Friend', pair: createPair(), evidence: { method: 'in-person' as const, at: 1_790_000_000 }, accounts: [{ service: 'WhatsApp', account: '+44 test only', observedAt: 1_790_000_000 }], lastCheck: 1_790_000_000 }]
+    vault.record = await sealEntries(vault, entries)
+    const stored = exportVault(vault.record)
+    expect(stored).not.toContain(group.secret)
+    expect(stored).not.toContain('Private friends')
+    expect(stored).not.toContain('+44 test only')
+    const restored = await unlockVault(parseVault(stored), password)
+    expect(restored.entries).toEqual(entries)
+    expect(publicKey(restored.trust.groups[0])).toBe(publicKey(group))
+    const savedAgain = await sealEntries(restored, restored.entries)
+    expect((await unlockVault(savedAgain, password)).trust.groups[0].secret).toBe(group.secret)
+    closeVault(vault); closeVault(restored)
+    expect(restored.trust.groups).toHaveLength(0)
+  })
   it('can keep a pair with device encryption first and add portable recovery later', async () => {
     const credential = () => ({ rawId: new Uint8Array([7, 8]).buffer, getClientExtensionResults: () => ({ prf: { results: { first: new Uint8Array(32).fill(42).buffer } } }) })
     const provider = { create: async () => credential(), get: async () => credential() } as unknown as CredentialsContainer
