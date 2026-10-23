@@ -1,12 +1,14 @@
 # Privacy facts and hosting inputs
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code `3fc6a02c1d14f1cd57240efd6b59f16b23a9c0ba`.
-Law note verified 28 September 2026.**
+Code `0ba43087ca2c701a143d85ba31464ca3f55a367e`.
+Law note verified 28 September 2026; §§5.1–5.2 and 7 partially refreshed
+23 October 2026 against primary sources.**
 
-These facts apply to the local app and static hosting candidate, not a completed
-privacy notice for an unverified public host. The in-file privacy facts are
-`local/index.html:59`. They now describe storage and camera access accurately.
+These facts apply to the local app and the public static-response site at
+`https://canary-words.cocoacod256.chatgpt.site/`. The deployed notice is in
+`local/index.html:59`, including the owner-adopted hosting basis and contact.
+See [hosting record](hosting-proposal.md) and [production evidence](../evidence/publication.json).
 
 ## Device processing
 
@@ -58,8 +60,8 @@ create a fresh pair. This native software is outside Canary's app request monito
 and local-frame handling. Keep setup links private; do not share them in groups.
 
 The local-file preview still displays an opaque QR for the in-app scanner;
-it cannot make a private Mac file accessible to another phone. No hosted link
-is presented as live or proved usable by a normal physical camera yet.
+it cannot make a private Mac file accessible to another phone. The hosted QR now contains the live HTTPS link. Browser opening passed;
+physical phone-camera acceptance remains unverified.
 
 
 **Scan their QR** requests camera video, with audio disabled, only on
@@ -92,9 +94,23 @@ change adds no form, inbox endpoint or report upload service.
 
 A hosted download necessarily exposes ordinary connection/request metadata to
 its host. The app request monitor and `connect-src 'none'` do not prove that a
-web host retains no logs. No hosted retention or controller role is asserted here.
+web host retains no logs. Hosting processing is described below; no fixed log lifetime or UK-only
+location is asserted.
 
-## Resolve before publication
+## Published host
+
+A separate OpenAI Sites origin is public; the response wrapper only serves the
+baked app with fixed headers and rejects other paths/methods. The platform's
+[automatic traffic metrics](https://learn.chatgpt.com/docs/sites/managing-a-site#review-site-analytics)
+and [applicable processor terms](https://openai.com/en-GB/policies/chatgpt-sites-data-processing-addendum/)
+were read on 23 October 2026. Those facts require a host-specific notice; the
+app's lack of its own analytics SDK does not mean hosting has no statistics.
+See `hosting-proposal.md` for the origin, retention criteria, recipient/transfer
+caveats and owner decisions. Those facts were adopted in the deployed notice.
+Public readback found the `__cf_bm` security cookie, now disclosed in the page;
+app trackers and injected scripts were absent on the corrected delivery.
+
+## Adopted facts and continuing limits
 
 Minimise first: an isolated static HTTPS origin; no analytics, forms, account
 backend or application endpoints; host logs disabled/minimised where available.
@@ -102,12 +118,17 @@ Hosting somebody else operates is an option, not proof that every data-protectio
 question disappears. Publishing under a consistent project pseudonym is not
 treated as a defect requiring incorporation or a natural person's name.
 
-- `[INPUT: chosen static host and origin; who controls ordinary request data;
-  data categories, logs available to the publisher, retention, recipients and
-  international transfers, verified against actual settings and provider terms.]`
-- `[DECISION: collection minimisation and any resulting controller contact,
-  purposes/legal basis and rights/complaint route, only once the role and actual
-  processing are known. Do not invent a natural person or a legal basis.]`
+The initial controller/contact/basis placeholders are resolved for this selected
+host: the existing Canary Kit (ForgeSworn) project identity and private GitHub
+report route are used, and the owner explicitly approved the proposed minimal
+legitimate-interest hosting purpose on 23 October. No person's name, invented
+company or new inbox has been supplied. GitHub private reporting is enabled;
+that external contact route requires GitHub sign-in. No data request is filed
+by this task. The page contains the same hosting facts and rights/contact text.
+
+The host's automatic statistics and DPA terms are described, with duration
+criteria rather than an invented fixed retention setting. Public headers, cookies, network behaviour and page bytes were checked; see
+`../evidence/hosting.json` and `../evidence/live-browser.json`. No UK-only hosting region is asserted.
 
 The Article 13 notice list is in the
 [GB note §3.2](https://github.com/forgesworn/jurisdiction-kit/blob/main/law/gb/online-services.md#32-the-privacy-notice)

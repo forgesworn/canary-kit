@@ -1,6 +1,7 @@
 # Canary — your people, your words
 
-A phone-first static website candidate, with a self-contained
+A phone-first website at [Canary](https://canary-words.cocoacod256.chatgpt.site/),
+with a self-contained
 [HTML copy](../canary-local.html) for local review in **Chrome**. There are no
 application accounts, message servers, directories, relays or secret-sync APIs.
 The static hosting candidate is generated in ignored `local-site/`.
@@ -22,8 +23,8 @@ No vault setup, typing, nickname or reference checkbox is required to exchange.
 Camera and native device prompts still depend on the browser and operating system.
 The local HTML file is a preview: its QR still requires **Scan their QR** inside
 Canary on the other device. A Mac's local file address cannot open that file on
-someone else's phone. Normal-camera linking becomes usable when this same build
-is actually served at a stable HTTPS address; no public host is deployed yet.
+someone else's phone. Use the live HTTPS page for normal-camera linking. Its QR-link opening was
+verified in fresh browsers; the physical iPhone scan is still an owner check.
 
 The pair reference remains available in details. Names are optional and can be
 added afterwards under **Name & pair details**. Without a name, saved pairs get
@@ -113,8 +114,11 @@ appropriate; importing their old setup words does not revoke an exposed old copy
   minute, and stops late permission-granted streams too. Frames are not recorded
   or uploaded. The displayed QR contains the setup secret: keep it private.
 - Application connections, forms and external resources are blocked by CSP.
-  The deployment candidate includes additional framing, transport, MIME and
-  permissions headers; a real host must be checked for actually serving them.
+  The live host serves additional framing, transport, MIME and permissions
+  headers; actual readback matches the artifact. A minimal response wrapper
+  delivers the page without a message API or remote vault. The host processes
+  request metadata, aggregate traffic statistics and a bot-protection cookie;
+  the page includes the adopted hosting/privacy notice.
 - Encryption protects a locked vault or copied backup. It cannot protect an
   unlocked compromised phone, malicious extension, screen capture, compromised
   passkey provider, tampered served code or live relay. Anyone with the pair
@@ -145,5 +149,8 @@ npm run test:local
 Set `CANARY_CHROMIUM_EXECUTABLE` to reuse an installed compatible Chromium
 instead of downloading one. Browser checks create their own localhost fixture,
 close it and the browser, and delete temporary encrypted backups afterwards.
+
+The independent live check is `node tools/test-hosted-local.mjs` (same Chromium
+override). It opens the real public site anonymously and records no secret values.
 
 See [validation](VALIDATION.md) and [draft UK legal cover](legal/README.md).

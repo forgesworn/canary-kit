@@ -1,14 +1,14 @@
 # Verification record
 
-23 October 2026. Code `3fc6a02c1d14f1cd57240efd6b59f16b23a9c0ba`.
+23 October 2026. Code `0ba43087ca2c701a143d85ba31464ca3f55a367e`.
 
-Artifact: `canary-local.html`, 262,975 bytes. SHA-256:
+Artifact: `canary-local.html`, 264,969 bytes. SHA-256:
 
 ```text
-0c03fc4681ea3b32aaff55eb63b0a85632d4503e85eec2cd67662e0f700ecdb7
+13c82ad849bf9dd0c6e0b8ed05a4d3bb945a4cbb5eff98a77352bb03d7525ec6
 ```
 
-- `npm test -- --maxWorkers=2`: **722 passed across 29 files**. The fourteen local
+- `npm test -- --maxWorkers=2 --testTimeout=30000`: **722 passed across 29 files**. The fourteen local
   model/vault tests cover setup abbreviation/checksum, directional normal/duress
   words, rotation/drift, encrypted round-trip, wrong passwords, tamper rejection,
   fresh nonces, key clearing and PRF wrapping. New cases cover device-only vault
@@ -25,8 +25,8 @@ Artifact: `canary-local.html`, 262,975 bytes. SHA-256:
   opens words immediately; the creator taps to finish. Storage remains empty
   until explicit Keep. The scanner stops its tracks and requests no audio.
 - Normal-camera opening is tested by generating the HTTPS QR, decoding its URL
-  and opening that URL in a fresh isolated browser. The HTTPS address is a locally
-  fulfilled fixture, not a real deployment. The receiver reaches words without
+  and opening that URL in a fresh isolated browser. This part uses a locally
+  fulfilled fixture; the independent production check is recorded below. The receiver reaches words without
   opening an in-app camera or creating storage. Word direction matches the maker.
   The early inline script removes the fragment from the current history entry;
   the app consumes its transient copy. Reusing an existing tab works too. A bad
@@ -58,21 +58,54 @@ Welcome screenshots show HTTPS mode served by the local fixture. These contain
 no pair secrets or actual user names; the people screenshot uses a
 fixture nickname. The updated HTML was opened in **Google Chrome** for owner review.
 
-Owner confirmed the failure was using a normal phone camera on the opaque local
-QR. HTTPS mode now generates a private setup link for normal cameras; local-file
-mode explicitly remains an in-app scanner preview. No hosted address is live yet,
-so the Mac file cannot demonstrate cross-phone normal-camera opening. The
-separate camera-downsampling regression was fixed as well. Native scanner apps,
-history sync or extensions could retain the private link despite early address
-replacement. No one-use/expiry/revocation or perfect erasure is claimed.
+## Public HTTPS delivery
+
+[Live Canary](https://canary-words.cocoacod256.chatgpt.site/) is public, with no
+visitor sign-in. Standalone source `../canary-words-site` commit
+`393c4750c688613d18cd78cc3cc307363bb2b170`; Site/version/deployment IDs are in
+[evidence/publication.json](evidence/publication.json). Native deployment status
+succeeded, followed by independent HTTP and real-browser checks.
+
+The first static-only publication ignored `_headers` and added Cloudflare bot
+JavaScript. Strict CSP blocked it. That failed readback is retained in
+[hosting-v1.json](evidence/hosting-v1.json), not claimed as a passing build.
+The corrected Worker ESM delivery returns only baked HTML plus fixed headers,
+rejects non-GET/HEAD and non-root paths, and has no request-body processing,
+logging, storage or outgoing calls. Its build/artifact checks and static-response
+contract checks passed. `Cache-Control: no-transform` suppresses the injected
+script under Cloudflare's documented policy.
+
+[HTTP readback](evidence/hosting.json) now matches the exact local SHA/bytes above,
+with the intended CSP (including frame-ancestors), HSTS, MIME, referrer and
+permissions headers. The security cookie `__cf_bm` is present and disclosed;
+no cookie values are retained. The owner adopted the minimal hosting basis.
+
+`node tools/test-hosted-local.mjs` passed against the actual public HTTPS URL,
+without route interception or authentication. Two isolated browsers opened the
+page, decoded its QR into a real link, and matched directional words. The receiver
+needed no in-app scanner, typing or storage. The fragment and transient value
+were removed; no pair persisted before Keep. Only two page GETs were observed,
+with no secret, external application request or browser/CSP error. See
+[live-browser.json](evidence/live-browser.json),
+[live mobile](evidence/live-mobile.png) and [live desktop](evidence/live-desktop.png).
+Those screenshots show welcome screens only, with no pair secrets.
+
+The live URL was opened in **Google Chrome**. The owner can now test the normal
+iPhone camera on the live page's QR; the local-file opaque QR is a separate
+in-app-scanner preview. Native scanner/history/sync software may retain private
+links despite address replacement. No one-use/expiry/revocation is promised.
 
 Not evidenced: independent audit, physical GrapheneOS/iPhone camera or passkey
-support, measured human one-minute pairing, actual HTTPS hosting headers/logs,
-public deployment, hosted CI, PR or release. Native camera/device prompts remain
+support, measured human one-minute pairing, provider-internal log retention/region,
+main-repository hosted CI, merge or release. Native camera/device prompts remain
 platform-dependent. The WebKit executable is unavailable; no WebKit pass is claimed.
 
 No test server, fixture, emulator, browser automation process or native camera
 is left running. Owner-review Chrome remains open. Task-installed dependencies,
 temporary backups, scripts and inventories are removed at handover. The named
 static hosting candidate in `local-site/` is retained for review and can be
-regenerated with `npm run build:local`. No push or deployment was performed.
+regenerated with `npm run build:local`. The separate publishing source was pushed
+and deployed; the main implementation branch remains local. The shared law-note
+correction was pushed as
+[jurisdiction-kit PR #35](https://github.com/forgesworn/jurisdiction-kit/pull/35),
+with 97 tests and typecheck passing; no merge is claimed.

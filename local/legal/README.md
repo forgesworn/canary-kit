@@ -1,13 +1,16 @@
 # Draft UK legal cover: static local-processing app
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code: `3fc6a02c1d14f1cd57240efd6b59f16b23a9c0ba`.**
+Code: `0ba43087ca2c701a143d85ba31464ca3f55a367e`.**
 
-**Today:** software publisher; a local HTML file and static hosting candidate
-exist. No new service has been deployed. **Owner's intended position:** a
-phone-first static HTTPS website with encrypted device storage and optional
-device unlock. No accounts, directory, message carriage, shared server storage
-or relay defaults. A real host and its data handling have not been selected or verified.
+**Today:** publisher of a public static-response HTTPS site at
+[Canary](https://canary-words.cocoacod256.chatgpt.site/), with a local HTML copy.
+The owner selected and approved minimal hosting with encrypted device storage
+and optional device unlock. No application accounts, directory, message carriage,
+shared pair store or relay. Hosting processes request metadata and aggregate
+traffic statistics; the adopted basis and notice are in `hosting-proposal.md`.
+Production bytes, security headers and anonymous browser pairing were verified
+on 23 October; [publication evidence](../evidence/publication.json).
 
 Scope is `local/`, its bundled dependency graph and generated artifact. It does
 not assess the larger `app/`, other hosted Canary services, other messaging
@@ -20,20 +23,27 @@ A `[P]` mark is not a legal opinion. The note remains within its review date.
 
 - [Position, regimes and outstanding work](position.md)
 - [Inventory and corrected document gaps](inventory.md)
-- [Privacy facts and conditional hosting inputs](privacy.md)
+- [Privacy facts and adopted hosting notice](privacy.md)
+- [Adopted host, provider facts and owner decisions](hosting-proposal.md)
 
 The design is assessed as an ordinary static software site, not a user-to-user
 message service. This is a scope assessment, not a claim of compliance with all
 UK law. No regulated-service risk assessment, age gate, registration, natural
 person's public identity or company formation is invented for this position.
 
-**Before publishing:** resolve the actual host/logging/role inputs in the privacy
-draft and adopt accurate hosted privacy wording. The code provides no backend
-that would need to be removed to reach the chosen position. A separate stable
-HTTPS origin is needed for vault/passkey isolation. Deploying behind a larger
-networked app is not evidence that the wider service is outside scope.
+The existing public project identity/report route is retained. The owner
+explicitly approved the minimal hosting basis before publication; the deployed
+page includes that notice. No paid resource, company registration, regulator
+contact or minimum age was selected. The source is on a separate publishing
+checkout/origin; the larger networked app is outside this assessment.
 
-No funds spent, registration made, regulator contacted, push or deployment
-performed. No operator identity, minimum age or legal basis has been chosen for
-the owner. The drafted host identity/role inputs are conditional; they are not a
-requirement to identify a natural person merely to publish ordinary software.
+This is a scoped finding, not blanket UK-law clearance. The note was partially
+refreshed on 23 October for IPA and Communications Act scope; the proposed
+shared-note correction is [PR #35](https://github.com/forgesworn/jurisdiction-kit/pull/35).
+Physical phone-camera/passkey acceptance and independent review remain separate.
+
+On the owner's telecoms question: the broader IPA website-owner definition can
+apply even without messaging; the Communications Act test is different. The
+partial 23 October primary-source refresh is recorded in `position.md`. No
+blanket promise of being outside all telecoms law, or of immunity from notices,
+is made. Classification is not itself a prohibition on publishing this tool.
