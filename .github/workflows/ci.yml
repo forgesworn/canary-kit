@@ -46,15 +46,21 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:app
+      # The key is accepted only by rrsync, write-only, into this site's folder.
       - name: Deploy to canary.trotters.cc
         env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
+          SITE_DEPLOY_HOST: ${{ secrets.SITE_DEPLOY_HOST }}
+          SITE_DEPLOY_KNOWN_HOSTS: ${{ secrets.SITE_DEPLOY_KNOWN_HOSTS }}
         run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H 144.126.230.165 >> ~/.ssh/known_hosts
-          rsync -avz --delete -e "ssh -i ~/.ssh/deploy_key" docs/ deploy@144.126.230.165:/opt/trotters/canary/
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SITE_DEPLOY_KEY" > ~/.ssh/site_deploy
+          printf '%s\n' "$SITE_DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/site_deploy ~/.ssh/known_hosts
+          rsync -rlz --delete --chmod=D755,F644 \
+            -e "ssh -i ~/.ssh/site_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            docs/ "site-deploy@${SITE_DEPLOY_HOST}:/"
       - run: npx playwright install --with-deps chromium
       - name: Run live Canary and Signet smoke
         run: npm run test:e2e:live-smoke
