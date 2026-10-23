@@ -1,5 +1,5 @@
 {
-  "verified": "2026-10-23T18:10:54.241839+00:00",
+  "verified": "2026-10-23T18:28:42.010760+00:00",
   "applicationId": "dev.forgesworn.vouch.prototype",
   "devices": [
     {
@@ -42,16 +42,17 @@
     "androidInstalledReadbackMatches": true
   },
   "remainingAcceptance": [
-    "Diagnose and fix one-way BLE exchange; repeat on physical phones",
+    "Repeat physical BLE exchange after Android full-attribute MTU response fix; previous trial failed",
     "New UI and duress recognition on actual phones",
     "Separate save/reopen and reciprocal call check after latest update",
     "Physical BLE exchange",
+    "Moving QR setup and selected-person copying over a real trusted video call; both directions",
     "Real system-authentication fallback, background and recovery/file-provider cases",
     "Android-to-Android NFC and iPhone-to-iPhone BLE",
     "No-Play GrapheneOS qualification",
     "Independent security review"
   ],
-  "publication": "local development installation only; public website remains v11",
+  "publication": "Public static website v12 deployed; see ../../local/evidence/publication.json. Native prototypes remain local development installations, without app-store publication.",
   "bluetoothTrial": {
     "artifacts": "artifacts.json",
     "mode": "normal launches; no NFC tap",
@@ -76,6 +77,8 @@
     "acceptance": "physical retry unavailable",
     "androidInstallerSucceeded": true,
     "iosInstallerSucceeded": true,
-    "latestRuntimeLaunch": "Not accepted: owner cannot test; iPhone is locked."
+    "latestRuntimeLaunch": "Not accepted: owner cannot test; iPhone is locked.",
+    "androidInstalledReadbackMatches": true,
+    "androidInstalledReadbackSha256": "ba611c6fd8ffeb2c9967c2ed93334665e980583d1849a6561b0ed870b74efae3"
   }
 }

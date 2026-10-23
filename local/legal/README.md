@@ -1,14 +1,15 @@
 # Draft UK legal cover: static local-processing app
 
 **Draft — 23 October 2026. Not legal advice; not reviewed by a lawyer.
-Code: working tree based on `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a`.**
+Published app: `4335636c2fa7621c7961619cc69f8ea90d3cbc91`.**
 
-Latest factual delta reviewed on 23 October 2026 against the working tree based
-on app commit `30634ca5dadca7fb3ad34990c4c191d7b7b4f64a` and the fixed-response
-`../canary-words-site` wrapper. The final Offline Connect source-candidate section
-in each document governs this candidate; preceding release sections are dated
-history. Earlier publication receipts do not verify this candidate. No deployment
-or public readback was performed for this gap review.
+The latest factual delta is the Listen/Speak and trusted-video QR review below,
+followed by version 12's publication readback. Earlier review and release sections
+are dated history. The published fixed-response wrapper is
+`9bf8b1218b98f0fda8f5be1c120c40c3405722d2`; exact deployment and anonymous
+six-file readback are recorded in [publication evidence](../evidence/publication.json).
+Publication does not settle the documented legal interpretation or physical
+device and usability acceptance gates.
 
 
 **Today:** publisher of a public static-response HTTPS site at
@@ -322,17 +323,35 @@ file imports are bounded and parsed as supported public/encrypted packets only.
 Native link sharing uses a deliberate OS chooser, whose destinations may network.
 
 The existing software-publisher `[U]` position, contact and approved static-hosting
-basis remain. Public v11 is the recorded live release; intended v12 through the
-same Sites project/audience requires its own exact publication readback. The
+basis remain. At source-review time public v11 was live, with intended v12 through
+the same Sites project/audience awaiting its own exact publication readback. The
 expanded source notice-alignment gate is now closed after inspecting the web and
 native privacy paragraphs and the transfer-screen warning: they cover optical
 video exposure, second-screen/fallback limits, integrity versus authenticity,
 scan timing, local imports and visible duress. See the
 [native candidate review](../../native/LEGAL.md). This closes source wording only;
-v12 publication and the changed flows' physical acceptance remain separate.
+v12 publication and the changed flows' physical acceptance are separate gates.
 
 The physical receipt records the older NFC matching-four-words pass and a later
 one-way BLE failure, not full BLE interoperability. A subsequent Android MTU fix
 and these newer UI/video-transfer changes have no owner physical retest. Do not
 carry the earlier pass to newer binaries or infer single-phone live QR usability,
 separate saves/recovery, no-Play GrapheneOS or independent-review acceptance.
+
+### Version 12 publication readback — 23 October 2026
+
+Version 12 deployed successfully through the existing Sites project and public
+audience. An anonymous browser, without a preview bypass token, retrieved all six
+public files byte for byte against the reviewed build and verified the restrictive
+security headers (`../evidence/v12-public-readback.json`). The live optical journey
+passed new-contact setup and encrypted selected-person copying in both directions
+(`../evidence/optical-transfer-live.json`). Camera and credential providers are
+fixtures; local QR decoding and encryption are real.
+
+The prior v11 receipt is preserved as `../evidence/publication-v11.json`. This
+closes v12's publication and notice-alignment gate. The approved publisher,
+contact, static-hosting purpose and basis are unchanged. The dated `[U]` software-
+publisher interpretation and outstanding legal questions remain; this is not
+lawyer approval or a general UK compliance guarantee. Physical Bluetooth retry,
+real video-call QR transfer, changed UI, authentication and novice/panic acceptance
+remain open. Native installations are development prototypes, not store releases.

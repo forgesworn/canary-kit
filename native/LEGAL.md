@@ -228,9 +228,9 @@ network, retain links or expose metadata (`../local/native.ts:94`, iOS
 
 This retains the software-publisher assessment `[U]`: no publisher relay,
 video service, server/account, new automated recipient or hosting purpose/basis
-is introduced. The owner's existing Sites project/audience is intended to carry
-the same shared UI, but public v11 remains the recorded live release at this
-review. Candidate v12 source/build work is not publication readback. No additional
+is introduced. The owner's existing Sites project/audience was intended to carry
+the same shared UI, with public v11 the recorded live release at source-review
+time. Candidate v12 source/build work was not publication readback. No additional
 owner approval, provider adoption or new legal research is identified here.
 
 **Source notice recheck:** `../local/index.html:126` and `PRIVACY.html:5`
@@ -254,3 +254,21 @@ have owner physical acceptance. Build/fixture checks, changed installed artifact
 NFC pass, incomplete BLE, and owner confirmation remain distinct evidence gates.
 No general interoperability, effortless single-phone video QR or independent
 security/legal review is claimed.
+
+### Publication follow-up — 23 October 2026
+
+The shared web UI is now published as website version 12 from Canary Kit commit
+`4335636c2fa7621c7961619cc69f8ea90d3cbc91` and static wrapper commit
+`9bf8b1218b98f0fda8f5be1c120c40c3405722d2`. Anonymous six-file exact-byte and
+security-header readback passed, alongside the live browser QR setup/copy journey
+in both directions. See `../local/evidence/publication.json` and its linked
+readbacks. This supersedes the publication-pending status at the source-review
+time above; the source notices and approved hosting facts remain unchanged.
+
+The latest signed iOS prototype and Android APK are installed on the same phones.
+The installed Pixel APK hash matches `evidence/artifacts.json`. The iPhone was
+locked for launch; no unlock was bypassed. The owner cannot retest now. These
+installation facts do not establish BLE, new UI, real video QR, biometric or
+human acceptance. The earlier NFC pass remains tied to its recorded binaries.
+No app-store publication, new publisher messaging service, independent audit or
+blanket legal clearance is implied.

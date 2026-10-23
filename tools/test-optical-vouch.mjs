@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import {readFile,writeFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
-const address='https://vouch.optical.test/',browser=await chromium.launch({headless:true,executablePath:process.env.CANARY_CHROMIUM_EXECUTABLE})
+const live=process.env.CANARY_OPTICAL_URL,address=live||'https://vouch.optical.test/',browser=await chromium.launch({headless:true,executablePath:process.env.CANARY_CHROMIUM_EXECUTABLE})
 const contexts=[],errors=[],requests=[]
 let decodedFrames=0
 try{
  async function device(){
   const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});contexts.push(context)
-  await context.route(address+'**',async route=>{const file=new URL(route.request().url()).pathname.slice(1)||'index.html';await route.fulfill({contentType:file.endsWith('.png')?'image/png':file.endsWith('.webmanifest')?'application/manifest+json':'text/html',body:await readFile('local-site/'+file)})})
+  if(!live)await context.route(address+'**',async route=>{const file=new URL(route.request().url()).pathname.slice(1)||'index.html';await route.fulfill({contentType:file.endsWith('.png')?'image/png':file.endsWith('.webmanifest')?'application/manifest+json':'text/html',body:await readFile('local-site/'+file)})})
   context.on('request',r=>requests.push(r.url()))
   await context.addInitScript(()=>{
    const credential=()=>({rawId:new Uint8Array([19,8,4]).buffer,getClientExtensionResults:()=>({prf:{results:{first:new Uint8Array(32).fill(71).buffer}}})})
@@ -65,6 +65,6 @@ try{
  assert.equal(after.id,before.id);assert.deepEqual(after.device,before.device);assert.deepEqual(await a.locator('.person-card strong').allTextContents(),['Video friend'])
  for(const page of [a,b,other])assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
  assert.deepEqual(errors,[]);assert.deepEqual(requests.filter(url=>!url.startsWith(address)),[])
- await writeFile('local/evidence/optical-transfer.json',JSON.stringify({verified:new Date().toISOString(),publicOfferAndEncryptedReply:true,fixedComparison:true,originalWordProfile:true,ownDuressVisibleInSpeak:true,animatedReceivingRequest:true,animatedEncryptedPeopleCopy:true,reverseDirection:true,duplicateMergeAndUnlockPreserved:true,actualQrPixelsThroughCameraDecoder:true,fixtureFrames:decodedFrames,cameraProvider:'local canvas stream; not physical video-call acceptance',credentialProvider:'PRF stub; real local encryption',noExtraNetwork:true,browserErrors:errors},null,2)+'\n')
+ await writeFile(live?'local/evidence/optical-transfer-live.json':'local/evidence/optical-transfer.json',JSON.stringify({verified:new Date().toISOString(),address,publicOfferAndEncryptedReply:true,fixedComparison:true,originalWordProfile:true,ownDuressVisibleInSpeak:true,animatedReceivingRequest:true,animatedEncryptedPeopleCopy:true,reverseDirection:true,duplicateMergeAndUnlockPreserved:true,actualQrPixelsThroughCameraDecoder:true,fixtureFrames:decodedFrames,cameraProvider:'local canvas stream; not physical video-call acceptance',credentialProvider:'PRF stub; real local encryption',noExtraNetwork:true,browserErrors:errors},null,2)+'\n')
  console.log('Moving QR passed: actual QR pixels through local camera decoder, public offer/encrypted reply, fixed comparison and encrypted people copying in both directions. Camera and credential providers are fixtures.')
 }finally{await Promise.allSettled(contexts.map(c=>c.close()));await browser.close()}

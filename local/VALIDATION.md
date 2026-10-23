@@ -543,3 +543,38 @@ and installed, with a physical retry unavailable. Both differ from browser
 stubs. Source privacy alignment is closed for the expanded notices; UK-law
 application uncertainties and independent review remain as documented. Website
 publication/live readback is recorded separately in `evidence/publication.json`.
+
+### Version 12 publication and device status
+
+Version **12** deployed successfully from app commit
+`4335636c2fa7621c7961619cc69f8ea90d3cbc91` and managed website source
+`9bf8b1218b98f0fda8f5be1c120c40c3405722d2`. All six public files matched the
+build byte for byte through an anonymous browser without a preview bypass token;
+restrictive headers passed. A plain HTTP client hit the host's bot filter, so
+readback used the ordinary browser delivery path. Exact IDs and hashes are in
+`evidence/publication.json`; v11 is preserved as `publication-v11.json`.
+
+The published moving-QR browser journey passed public invitation/encrypted reply,
+fixed comparison, directly visible own duress, selected-person copying in both
+directions and duplicate merge/unlock preservation. It decoded actual QR pixels
+through a canvas stream with real local encryption and a PRF credential stub.
+`evidence/optical-transfer-live.json` records no extra network requests or browser
+errors. This does not test video compression, a physical camera, OS biometrics or
+one-minute human usability.
+
+Both latest native prototypes installed successfully. The installed Pixel APK
+hash matches the retained candidate; iPhone launch was refused while locked.
+No unlock was bypassed. The owner cannot test now, so the Bluetooth patch, latest
+Listen/Speak/duress flow and actual video-call QR transfer remain unaccepted.
+The earlier NFC pass remains specific to its recorded binaries. The public site
+was opened in Google Chrome. Close all older Vouch tabs/PWA windows and reopen
+to apply an already downloaded service-worker update.
+
+Task cleanup stopped the preview server and removed generated dependencies,
+native build folders, bundled scratch HTML, the unused browser profile, local
+logs/publication archive and the M4 installation scratch directory. About 370 MiB
+of generated directory blocks were removed. Named installable APK/iPhone archives,
+screenshots and receipts remain in `native/evidence/` for the next phone test.
+No task test server or emulator is left running; pre-existing M4 emulator/ADB
+services and unrelated projects were preserved. The Chrome public review tab is
+left open intentionally. No worktree was created or removed.
