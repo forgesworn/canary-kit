@@ -1,5 +1,5 @@
 {
-  "verified": "2026-10-23T13:22:22.944Z",
+  "verified": "2026-10-23T15:03:46.439Z",
   "address": "https://canary-words.cocoacod256.chatgpt.site/",
   "deviceUnlock": "PRF stub, not physical biometrics",
   "mobilePanicPath": true,
@@ -126,99 +126,11 @@
     },
     {
       "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-192.png"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-512.png"
-    },
-    {
-      "method": "GET",
-      "path": "/apple-touch-icon.png"
-    },
-    {
-      "method": "GET",
-      "path": "/sw.js"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/sw.js"
-    },
-    {
-      "method": "GET",
-      "path": "/manifest.webmanifest"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-192.png"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-512.png"
-    },
-    {
-      "method": "GET",
-      "path": "/apple-touch-icon.png"
-    },
-    {
-      "method": "GET",
-      "path": "/manifest.webmanifest"
-    },
-    {
-      "method": "GET",
       "path": "/icon-192.png"
     },
     {
       "method": "GET",
       "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-512.png"
-    },
-    {
-      "method": "GET",
-      "path": "/apple-touch-icon.png"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/sw.js"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/"
-    },
-    {
-      "method": "GET",
-      "path": "/manifest.webmanifest"
-    },
-    {
-      "method": "GET",
-      "path": "/icon-192.png"
     },
     {
       "method": "GET",
@@ -258,6 +170,26 @@
     },
     {
       "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/apple-touch-icon.png"
+    },
+    {
+      "method": "GET",
+      "path": "/manifest.webmanifest"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-192.png"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-512.png"
+    },
+    {
+      "method": "GET",
       "path": "/apple-touch-icon.png"
     },
     {
@@ -267,6 +199,46 @@
     {
       "method": "GET",
       "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/sw.js"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/manifest.webmanifest"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-192.png"
+    },
+    {
+      "method": "GET",
+      "path": "/sw.js"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-512.png"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/apple-touch-icon.png"
     },
     {
       "method": "GET",
@@ -291,6 +263,34 @@
     {
       "method": "GET",
       "path": "/apple-touch-icon.png"
+    },
+    {
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "method": "GET",
+      "path": "/manifest.webmanifest"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-192.png"
+    },
+    {
+      "method": "GET",
+      "path": "/icon-512.png"
+    },
+    {
+      "method": "GET",
+      "path": "/apple-touch-icon.png"
+    },
+    {
+      "method": "GET",
+      "path": "/sw.js"
+    },
+    {
+      "method": "GET",
+      "path": "/"
     },
     {
       "method": "GET",

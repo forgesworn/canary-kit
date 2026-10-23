@@ -480,3 +480,31 @@ cryptographic audit is established. PHONE-ACCEPTANCE.md records the fresh owner
 trial still needed after the earlier failed clarity result. Both devices must
 already have the public shell to perform fully offline setup. Public release
 and exact-byte readback are recorded separately below when complete.
+
+### Offline Connect publication and live checks
+
+Site version **11** deployed successfully from managed website source
+`256835334481154bc34dc47e68ac7e5b56bc95de`, app implementation
+`e0857bc2a5a085d358a0a629f6109928424a3f96`. All six public files matched the
+committed source byte for byte, with the required types/security headers and
+no-transform. The same origin, PWA ID, storage key, publisher/contact and hosting
+basis remain. `evidence/publication.json` records the exact version, deployment,
+source and archive hashes; the previous receipt is `publication-v10.json`.
+
+All four live browser journeys passed: fully offline Connect after shell loading,
+mobile/offline and legacy pairing, private vouches, and device copy. The Connect
+run covered camera pause, storage failure before reveal, mirrored frames, the
+slower peer, fixed comparison, lock/resume, reciprocal words, next-person default,
+camera-less public-file fallback and stopped late capture. No application socket,
+external request or private code in a server request was observed. The existing
+private-group and device-copy acceptance boundaries remain unchanged.
+
+The public site was opened in Google Chrome. Users with a running older service
+worker must close all Signet Vouch tabs/PWA windows and reopen to apply the
+downloaded update. Both devices need the public shell before going offline.
+The next gate is the real-phone/webcam and novice trial in PHONE-ACCEPTANCE.md;
+browser PRF/camera fixtures do not qualify those devices or an independent audit.
+
+Task-owned preview, automation browsers, dependencies, generated scratch builds
+and publication archive were removed after validation. No task service is left
+running. The Google Chrome public review tab is left open intentionally.

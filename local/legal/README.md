@@ -224,3 +224,11 @@ Compact base64url encoding (`local/meet.ts:76`, `:85`) carries the same public
 fields and adds no processing recipient or networking. Only source notice
 alignment is closed here; publication/readback, physical camera/credential-provider
 acceptance and independent review are unchanged separate gates.
+
+### Offline Connect release evidence
+
+Version 11's publication and six-file exact-byte/header readback are now recorded
+in `../evidence/publication.json`, `mobile-hosting.json` and the four live browser
+reports named by the receipt. The public source footer matches this source review.
+This closes that release's publication/readback gate; it does not upgrade the
+`[U]` legal interpretation, physical-device acceptance or independent review.
