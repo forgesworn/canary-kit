@@ -111,8 +111,8 @@ do not assume an earlier hash establishes every later installed source change.
 
 The owner subsequently confirmed matching four setup words on both real phones
 via NFC for the earlier installed binary. Separate human save, reciprocal call
-checks and acceptance of the later call-check UI remain unconfirmed. BLE was not
-tested. Android/Android NFC,
+checks and acceptance of the later call-check UI remain unconfirmed. A later BLE trial received iOS frames on Android but did not establish the
+reverse direction; it is not a BLE pass. Android/Android NFC,
 iPhone/iPhone BLE, range behaviour, no-Play GrapheneOS, actual device-authentication
 flows, lifecycle stop behaviour and recovery remain distinct acceptance work.
 No app-store or website publication, foreign-law assessment, independent
@@ -177,3 +177,80 @@ subsequent device evidence must be recorded separately; no future physical.json
 receipt is presumed by this review. Source notice alignment remains closed;
 new UI owner acceptance, reciprocal call checks, BLE and independent review
 remain separate gates.
+
+
+## Listen/Speak and optical video handoff — 23 October 2026 candidate
+
+This later section supersedes preceding source-notice and pending-test statements
+where the candidate has changed. The shared call UI now presents Listen and Speak
+panels with two phrase cards each. Speak displays the user's normal and duress
+words together, without the previous hidden-duress control; Listen offers local
+human confirmation of the peer's normal/duress phrase. The existing manual check,
+rotation and persistent duress result remain (`../local/index.html:83`,
+`../local/main.ts:369`, `../local/main.ts:417`). This is not automatic speech
+capture, identity proof, incident transmission or an assurance of concealment.
+Screen capture/sharing can expose both phrases. Show only the transfer QR during
+a call, never the call-word, private vault or raw-secret recovery screen.
+
+The new optical wrapper carries canonical public connection invitations/device
+requests, recipient-encrypted connection replies and recipient-encrypted device
+copies. It does not replace those existing crypto protocols. `../local/optical.ts:1`
+records the MIT source adaptation; separate Vouch prefixes/domain, bounded Base45
+frames and a complete SHA-256 assembly digest separate this carrier from the
+native NFC/BLE token profile. At most 128 frames and a three-minute camera/
+assembly window are accepted (`optical.ts`, `createOpticalFrameReader`;
+`../local/optical-ui.ts`, `scan`). The digest detects assembly inconsistency; it
+is not sender authentication or fresh encryption. Larger transfers must use the
+existing encrypted file route or fewer selected contacts. Camera/assembly pause
+is separate from the existing device-request acceptance expiry and no-expiry
+connection invitations; no remote deletion follows from any expiry.
+
+A live video-call participant/provider or recording can observe/copy public
+requests, ephemeral sender/recipient keys, exchange identifiers, timing/size and
+ciphertext shown on camera or screen. The shared pair seed and selected contact
+contents remain inside the existing recipient-encrypted reply/copy rather than
+plaintext optical fields (`../local/device-transfer.ts:43`). Only established
+trusted-call comparison and the receiving-device/import checks provide the
+existing human assurance; a video image or frame digest alone does not identify
+the peer. Use the fixed pair code for a new contact and the device-copy comparison
+code before importing a copy. Recipients still can retain decrypted material.
+
+Video QR needs a second screen visible to the scanning camera. Explicit chat/link
+or encrypted-file transfer is the single-phone fallback; Vouch does not operate
+the video/chat provider (`../local/optical-ui.ts`, `alternatives`). The generic
+selected-file path bounds files to 400,000 bytes and parses only the supported
+public/request/recipient-encrypted packet forms; browser .json/.txt filters are
+picker hints, not content validation (`../local/main.ts:344`). Raw-secret recovery
+and vault backups are not the moving-QR payload profile. Native shareText is an
+explicit OS sheet for fixed-origin #connect/#device links; the destination may
+network, retain links or expose metadata (`../local/native.ts:94`, iOS
+`WebHost.swift`, Android `MainActivity.java`, shareText).
+
+This retains the software-publisher assessment `[U]`: no publisher relay,
+video service, server/account, new automated recipient or hosting purpose/basis
+is introduced. The owner's existing Sites project/audience is intended to carry
+the same shared UI, but public v11 remains the recorded live release at this
+review. Candidate v12 source/build work is not publication readback. No additional
+owner approval, provider adoption or new legal research is identified here.
+
+**Source notice recheck:** `../local/index.html:126` and `PRIVACY.html:5`
+now explain moving QR through a chosen video-call service, both public/encrypted
+transfer directions, provider/participant/recording copies, the second-screen
+requirement and one-phone link/file fallback. They distinguish frame consistency
+from authenticity and three-minute optical scanning from the one-minute ordinary
+Connect/radio pause, require fixed-code comparison and disclose visible Speak
+duress without a concealment promise. `../local/optical-ui.ts:45` also instructs
+users to share only the transfer QR, keeping vault/call/recovery screens private.
+Local text/JSON decoding and review of decrypted imported people match the source.
+The expanded candidate's source notice-alignment gap is closed. This is not v12
+publication readback or physical acceptance of the changed UI/video transfers.
+
+`evidence/physical.json` records the earlier owner-confirmed NFC matching-four-
+words pass against its artifact hashes. It also records a one-way BLE failure:
+Android received iOS public BLE frames; iOS receipt was not established. A later
+Android MTU response fix was installed according to the task, but no repeat was
+available. Neither that fix nor latest Listen/Speak/video QR/device-copy changes
+have owner physical acceptance. Build/fixture checks, changed installed artifacts,
+NFC pass, incomplete BLE, and owner confirmation remain distinct evidence gates.
+No general interoperability, effortless single-phone video QR or independent
+security/legal review is claimed.

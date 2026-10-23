@@ -1,6 +1,7 @@
 import { drawQr } from './qr.js'
 import { newDeviceRequest, makeDeviceCopy, openDeviceCopy, deviceCode, deviceLink, deviceToken, deviceInput, mergePeople, DEVICE_FILE_LIMIT, type DeviceRequest, type Devices } from './device-transfer.js'
 import type { Vault, Entry } from './vault.js'
+import { encodeOptical, type OpticalPayload } from './optical.js'
 interface Host {
   vault(): Vault | null
   hasRecord(): boolean
@@ -10,6 +11,7 @@ interface Host {
   scan(): void
   home(): void
   error(message: string): void
+  qr?(payload:OpticalPayload,back:()=>void,next?:{label:string;task:()=>void}):void
 }
 const now = () => Math.floor(Date.now()/1000)
 export function mountDevices(root: HTMLElement, host: Host) {
@@ -67,6 +69,7 @@ export function mountDevices(root: HTMLElement, host: Host) {
     const layout=node('div','','device-receive-grid'),left=node('div'),right=node('div');layout.append(left,right);root.append(layout)
     const frame=node('div','','qr-frame device-qr'), canvas=node('canvas');canvas.id='device-request-qr';canvas.setAttribute('aria-label','Public request for an encrypted copy to this device');frame.append(canvas);left.append(frame);drawQr(canvas,link,'L')
     left.append(node('p','This QR contains a public receiving key, not your people. It lasts 15 minutes; there is no race against the spoken words.','small'))
+    if(host.qr)left.append(button('device-show-request-qr','Show a moving QR for a call',()=>host.qr!({kind:'device-request',value:deviceToken(receive.request)},receiving,{label:'Read their encrypted copy',task:host.scan})))
     const details=node('details'),summary=node('summary','Copy the request link'),input=node('textarea');input.id='device-request-link';input.value=link;input.readOnly=true;input.rows=3;details.append(summary,input,button('device-copy-request','Copy request',()=>{
       void navigator.clipboard.writeText(link).catch(()=>host.error('Select the request link above and copy it.'))
     }));left.append(details)
@@ -126,6 +129,10 @@ export function mountDevices(root: HTMLElement, host: Host) {
     if(now()>packet.expires){base('This copy has expired.','Show a new QR on the receiving device, then make a fresh copy. Your original people are unchanged.');root.append(button('device-clear-expired','Remove expired copy',()=>host.ensure(async()=>{const active=host.vault()!;const devices={...active.devices};delete devices.send;await host.save(active.entries,devices);home()})));return}
     base('Send your\nencrypted copy.',`${send.count} ${send.count===1?'person is':'people are'} ready. Share this file to your other device. Open it there, then compare the code below on both screens.`)
     code(send.file)
+    if(host.qr){
+      try{const payload:OpticalPayload={kind:'device-copy',value:send.file};encodeOptical(payload);root.append(button('device-show-copy-qr','Show encrypted copy as a moving QR',()=>host.qr!(payload,sending,{label:'Compare the import code',task:sending}),'primary wide'))}
+      catch{note('This copy is too large for a moving QR. Share the encrypted file below, or choose fewer people.')}
+    }
     const file=new File([send.file],'canary-people-copy.canary.json',{type:'application/json'})
     let canShare=false;try{canShare=!!navigator.canShare?.({files:[file]})}catch{}
     if(canShare)root.append(button('device-share-file','Share encrypted copy',()=>{
@@ -177,6 +184,10 @@ export function mountDevices(root: HTMLElement, host: Host) {
     root.append(button('device-preview-back','Choose a different file',()=>{incoming=undefined;receiving()},'text-button'))
   }
   for(const id of ['devices-welcome','devices-people'])document.getElementById(id)!.addEventListener('click',()=>{clear();home()})
-  return {home,receive,clear}
+  function receiveCopy(file:string){
+    if(!host.vault()&&!host.hasRecord()){host.error('This device has no receiving request. Choose Bring my people here first.');return}
+    host.ensure(async()=>preview(file))
+  }
+  return {home,receive,receiveCopy,clear}
 }
 import { nativeAvailable, nativeSaveFile, vouchAddress } from './native.js'

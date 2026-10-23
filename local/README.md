@@ -39,7 +39,7 @@ not validate an unexpected caller or replace a saved person. Use an already
 trusted meeting/call to establish trust.
 
 Later: **home-screen icon → unlock → person → words**. If you requested the
-check, listen first. If the other person asked, read **You say**. Never read their
+check, listen first. If the other person asked, read **Speak → Your normal words**. Never read their
 expected **Listen for** words aloud. A normal match is knowledge of the shared
 secret, not a guarantee of identity or safety. For unexpected words, use the
 private checker. It shows large normal and duress choices to compare without

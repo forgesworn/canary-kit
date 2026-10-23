@@ -300,3 +300,39 @@ listener/duress interaction, separate saves and reciprocal call checks. Exact
 artifact/device receipts must preserve that distinction. No public-site/app-store
 publication, new legal basis, automatic incident response or independent review
 is inferred.
+
+
+### Listen/Speak and trusted-video QR candidate — 23 October 2026
+
+The call screen now has separate Listen/Speak panels, with the user's duress
+phrase always visible alongside normal words in Speak. Listener confirmation is
+still a human statement of what was heard, not speech capture or identity proof.
+No automatic alert/message or new data recipient is added. Screen sharing the
+call screen can reveal both phrases; show only the dedicated transfer QR.
+
+The shared moving-QR carrier (`../optical.ts`, `../optical-ui.ts`) transports
+canonical public invitations/device requests and existing recipient-encrypted
+replies/device copies over a user-chosen trusted video call. Base45 and the
+SHA-256-bound assembly are framing/integrity checks, not new authentication or
+encryption. The carrier allows at most 128 frames and a three-minute camera/
+assembly window. Live scanning requires another screen; explicit link/chat or
+encrypted-file handoff remains the one-phone fallback. Video/chat providers and
+recordings may retain public codes, ciphertext and timing/size metadata. Selected
+file imports are bounded and parsed as supported public/encrypted packets only.
+Native link sharing uses a deliberate OS chooser, whose destinations may network.
+
+The existing software-publisher `[U]` position, contact and approved static-hosting
+basis remain. Public v11 is the recorded live release; intended v12 through the
+same Sites project/audience requires its own exact publication readback. The
+expanded source notice-alignment gate is now closed after inspecting the web and
+native privacy paragraphs and the transfer-screen warning: they cover optical
+video exposure, second-screen/fallback limits, integrity versus authenticity,
+scan timing, local imports and visible duress. See the
+[native candidate review](../../native/LEGAL.md). This closes source wording only;
+v12 publication and the changed flows' physical acceptance remain separate.
+
+The physical receipt records the older NFC matching-four-words pass and a later
+one-way BLE failure, not full BLE interoperability. A subsequent Android MTU fix
+and these newer UI/video-transfer changes have no owner physical retest. Do not
+carry the earlier pass to newer binaries or infer single-phone live QR usability,
+separate saves/recovery, no-Play GrapheneOS or independent-review acceptance.

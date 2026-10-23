@@ -87,6 +87,10 @@ public final class MainActivity extends Activity {
      case "radioStop":radios.stop(args.getString("session"));reply(id,object());break;
      case "nfcRead":radios.readNfc(args.getString("session"));reply(id,object());break;
      case "shareFile":share(args);reply(id,object());break;
+     case "shareText":{
+      String text=args.getString("text");if(text.length()>6000||!text.matches("https://canary-words\\.cocoacod256\\.chatgpt\\.site/#(connect|device)=.+"))throw new Exception("Unsupported public Vouch link.");
+      startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,text),"Continue our Vouch setup"));reply(id,object());break;
+     }
      default:throw new Exception("Unsupported device operation.");
     }
    }catch(Exception e){if(id>0)fail(id,e.getMessage()!=null?e.getMessage():"The device operation did not finish.");}});

@@ -176,3 +176,34 @@ select { display:block; width:100%; padding:14px; font:16px/1.6 Arial,sans-serif
 #paired .paired-lead {font-size:17px;line-height:1.5}
 @media(max-width:650px){#paired .word-card,#paired .word-card.listen{padding:14px 16px}#paired .word-card .word{margin:8px 0}#paired .word-card .card-hint{font-size:13px}#paired #words-end{font-size:13px}#paired #check-guidance{font-size:15px}#paired #pair-title{font-size:34px}#paired .paired-lead{font-size:16px}}
 .meet-words{font-size:clamp(30px,6.4vw,36px)}
+
+.call-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#e8ecdf;border-radius:14px;padding:5px;margin:10px 0 22px}
+#paired .call-tabs button{background:transparent;color:var(--muted);font-size:18px;min-height:48px;border-radius:10px;margin:0}
+#paired .call-tabs button[aria-selected=true]{background:var(--ink);color:white}
+#paired #check{margin:0}
+#paired .check-instruction{font-size:16px;line-height:1.4;margin:0 0 16px}
+#paired .heard-choice{padding:14px 18px;gap:6px}
+#paired .heard-choice .choice-words{font-size:clamp(36px,7vw,42px)}
+#paired .heard-choice .choice-action{font-size:14px}
+#paired .check-choices{margin:0;gap:12px}
+#paired .check-local-note{font-size:14px;margin:14px 0}
+#paired #check-manual{border:0;padding:8px 0;margin:0}
+#paired #check-manual>summary{font-size:15px;min-height:40px}
+#paired #words-grid{grid-template-columns:1fr;gap:14px;margin:0}
+#paired .word-card-duress{background:#fcf0e5;border:2px solid #c48b60;color:#673c24}
+#paired #signal{margin:10px 0 0}
+#paired #words-end{margin:0;font-size:15px}
+#paired #word-timer{margin-top:18px}
+#paired #person-options{margin-top:24px}
+#paired #pair-title{margin-bottom:20px}
+#paired .back{margin-bottom:12px}
+
+#optical .qr-frame{max-width:400px;margin:20px auto;padding:14px}
+#optical canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+#optical video{display:block;width:100%;max-height:48vh;object-fit:cover;background:var(--ink);border-radius:16px}
+#optical .wide{margin:10px 0}
+#optical-back{background:transparent;color:var(--muted);padding-left:0;margin-bottom:18px}
+#optical h1{font-size:40px;margin-bottom:18px}
+#optical .lead{font-size:17px;line-height:1.5}
+#optical textarea{font-size:16px}
+#welcome #remote-start,#welcome #optical-read-welcome{margin:12px 0;width:100%;font-size:16px}

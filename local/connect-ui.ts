@@ -1,4 +1,5 @@
-import { nativeAvailable, vouchAddress } from './native.js'
+import { nativeAvailable, nativeShareText, vouchAddress } from './native.js'
+import type { OpticalPayload } from './optical.js'
 import { beginConnect, acceptConnect, finishConnect, connectInput, connectLink, readConnect, type Exchange } from './connect.js'
 import { type Entry, type Vault } from './vault.js'
 import { drawQr } from './qr.js'
@@ -14,6 +15,7 @@ interface Host {
   home(): void
   scan(): void
   error(message: string): void
+  qr?(payload:OpticalPayload,back:()=>void,next?:{label:string;task:()=>void}):void
 }
 export function mountConnect(host: Host) {
   const get = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -61,6 +63,11 @@ export function mountConnect(host: Host) {
   }
   get('connect-accept-nearby').addEventListener('click',()=>{const packet=incoming;if(packet)host.ensure(()=>acceptNearby(packet))})
   get('connect-scan-reply').addEventListener('click',()=>host.scan())
+  get('connect-optical').addEventListener('click',()=>{
+    if(!output)return
+    const packet=connectInput(output,vouchAddress()),reply=readConnect(packet).type==='reply'
+    host.qr?.({kind:'connection',value:packet},()=>present(packet,reply),reply?{label:'Compare our four words',task:()=>get('connect-read-code').click()}:undefined)
+  })
   get('remote-start').addEventListener('click', () => start())
   get('connect-back').addEventListener('click', () => { clear(); host.home() })
   get('connect-share-back').addEventListener('click', () => { clear(); host.home() })
@@ -118,7 +125,8 @@ export function mountConnect(host: Host) {
     const link = output
     if (!link) return
     try {
-      if (id === 'connect-send' && navigator.share) await navigator.share({ title: 'Our Signet Vouch setup', text: 'Open this in Signet Vouch to continue our private setup.', url: link })
+      if (id === 'connect-send' && nativeAvailable()) await nativeShareText(link)
+      else if (id === 'connect-send' && navigator.share) await navigator.share({ title: 'Our Signet Vouch setup', text: 'Open this in Signet Vouch to continue our private setup.', url: link })
       else await navigator.clipboard.writeText(link)
       // Sharing can background and lock the app. Never redisplay data afterwards.
       if (output === link) get('connect-share-status').textContent = 'Ready. Continue in your private chat.'

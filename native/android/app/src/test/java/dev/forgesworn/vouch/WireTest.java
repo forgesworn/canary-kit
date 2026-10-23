@@ -11,6 +11,13 @@ public class WireTest {
   assertTrue(m.find());return m.group(1);
  }
  private String hex(byte[] bytes){return HexFormat.of().formatHex(bytes);}
+ @Test public void readResponseDoesNotGuessThePeerMtu()throws Exception {
+  String reveal=field("reveal");
+  assertEquals(reveal,new String(PublicCode.readResponse(reveal,0),StandardCharsets.US_ASCII));
+  assertEquals(reveal.substring(22),new String(PublicCode.readResponse(reveal,22),StandardCharsets.US_ASCII));
+  assertEquals(0,PublicCode.readResponse(reveal,reveal.length()).length);
+  assertThrows(IllegalArgumentException.class,()->PublicCode.readResponse(reveal,-1));
+ }
  @Test public void completedReaderMustDeliverItsOwnFinalCode()throws Exception {
   String card=field("card"),reveal=field("reveal");var delivery=new NfcDelivery();
   assertFalse(delivery.delivered(card));delivery.finishAfterSending(reveal);

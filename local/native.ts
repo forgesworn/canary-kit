@@ -1,4 +1,6 @@
 import { meetingInput } from './meet.js'
+import { connectInput, connectLink } from './connect.js'
+import { deviceInput, deviceLink } from './device-transfer.js'
 
 type Endpoint={postMessage(value:string):void}
 type NativeWindow=Window&{VouchNative?:Endpoint;webkit?:{messageHandlers?:{Vouch?:Endpoint}};__vouchNativeReceive?:(value:unknown)=>void}
@@ -90,4 +92,10 @@ export async function openNativeRadio(code:string,onCode:(code:string)=>void,onS
 export async function nativeSaveFile(name:string,contents:string,mime:string){
  if(!/^[a-zA-Z0-9_.-]{1,80}$/.test(name)||new TextEncoder().encode(contents).length>1_048_576)throw new Error('This export is too large or has an invalid filename.')
  await request('shareFile',{name,contents,mime})
+}
+export async function nativeShareText(text:string){
+ const address='https://canary-words.cocoacod256.chatgpt.site/'
+ if(typeof text!=='string'||text.length>6000||!/^https:\/\/canary-words\.cocoacod256\.chatgpt\.site\/#(?:connect|device)=/.test(text))throw new Error('Only a public Vouch invitation or receiving request can be shared here.')
+ const safe=new URL(text).hash.startsWith('#connect=')?connectLink(connectInput(text,address),address):deviceLink(deviceInput(text,address),address)
+ await request('shareText',{text:safe})
 }

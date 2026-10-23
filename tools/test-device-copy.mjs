@@ -105,7 +105,7 @@ try {
   // Source retains its people; no automatic move or destination passphrase sharing.
   await source.locator('#device-back').click();assert.deepEqual((await source.locator('.person-card strong').allTextContents()).sort(),['Alice','Bob'])
   // Finish a second copy with one duplicate and one new person; destination name wins.
-  await destination.locator('.person-card').filter({hasText:'Alice'}).click();await destination.locator('#person-details > summary').click();await destination.locator('#person-name').fill('My Alice');await destination.locator('#rename-form button').click();await destination.locator('.home').filter({visible:true}).click()
+  await destination.locator('.person-card').filter({hasText:'Alice'}).click();await destination.locator('#person-options > summary').click();await destination.locator('#person-details > summary').click();await destination.locator('#person-name').fill('My Alice');await destination.locator('#rename-form button').click();await destination.locator('.home').filter({visible:true}).click()
   const secondLink=await request(destination);await giveRequest(source,secondLink);await source.locator('#device-make-copy').click();await visible(source,'#device-code');const second=await download(source,'second.json')
   await destination.locator('#device-copy-file').setInputFiles(second);await visible(destination,'#device-codes-match');assert.ok((await destination.locator('#devices').innerText()).includes('1 to add · 1 already here'))
   // Evidence uses fixture names and a dummy comparison code.

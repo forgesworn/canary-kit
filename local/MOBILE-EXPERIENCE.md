@@ -5,7 +5,7 @@ then say your words**. Setup, recovery and group keeper controls stay out of tha
 path. A mismatch says to pause and use a known contact route; a match remains
 only evidence of the shared secret. No emergency alert is sent.
 
-The listener can open **Check the words I heard**, compare their spoken phrase
+The listener can open **Listen**, compare their spoken phrase
 against the large normal/duress choices, and select the one they actually heard.
 **Neither matches** gives the pause/recontact advice immediately. This needs no
 typing and records the listener's own comparison, not a received remote verdict.

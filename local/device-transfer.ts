@@ -39,6 +39,8 @@ export function deviceCode(file: string): string {
   const p = packet(file)
   return hash(JSON.stringify([PURPOSE,p.id,p.to,p.from,p.created,p.expires,p.digest,p.parts])).slice(0,12).match(/.{4}/g)!.join(' ')
 }
+/** Canonical recipient-encrypted packet; never a vault or plaintext pair. */
+export function publicDeviceCopy(file: string): string { return JSON.stringify(packet(file)) }
 function people(raw: unknown): Entry[] {
   const entries = readEntries(raw)
   if (!entries.length || entries.some(e => e.setup)) throw new Error('Choose saved people whose setup is complete.')

@@ -1,5 +1,5 @@
 {
-  "verified": "2026-10-23T16:54:24.519117+00:00",
+  "verified": "2026-10-23T18:10:54.241839+00:00",
   "applicationId": "dev.forgesworn.vouch.prototype",
   "devices": [
     {
@@ -57,6 +57,25 @@
     "mode": "normal launches; no NFC tap",
     "androidReceivedPublicBleFrames": true,
     "iosReceivedPublicBleFramesObserved": false,
-    "ownerOutcome": "Bluetooth not working between Android and iPhone; not a pass."
+    "ownerOutcome": "Bluetooth not working between Android and iPhone; not a pass.",
+    "androidApkSha256": "c087a46297e9738d9e78c5b823609fe641ca18a363d3fe6065d003177cfcd71a",
+    "iosExecutableSha256": "8d507fe42757d81934d20b41aab608caab60ba3739ed1fc97793b89d06669f6a"
+  },
+  "mtuPatch": {
+    "androidApkSha256": "4635f08df109e9809add0d7d3e22c153c6714481145bd198d7476e6149237046",
+    "installed": true,
+    "physicalRetry": "owner cannot test now; no pass claimed"
+  },
+  "latestCandidate": {
+    "artifacts": "artifacts.json",
+    "ui": "Listen/Speak; two cards; own duress visible",
+    "optical": "existing public requests and recipient-encrypted replies/copies",
+    "androidApkSha256": "ba611c6fd8ffeb2c9967c2ed93334665e980583d1849a6561b0ed870b74efae3",
+    "iosExecutableSha256": "efc09835ff5b54ff406ba925e73a0da331a2f6321aa910fdd1d8c62f6916b062",
+    "iosLaunch": "device locked; owner interaction not bypassed",
+    "acceptance": "physical retry unavailable",
+    "androidInstallerSucceeded": true,
+    "iosInstallerSucceeded": true,
+    "latestRuntimeLaunch": "Not accepted: owner cannot test; iPhone is locked."
   }
 }

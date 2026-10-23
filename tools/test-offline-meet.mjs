@@ -48,7 +48,7 @@ try{
   },{frame,mirror});await page.clock.runFor(800)
  }
  async function words(page){await page.locator('#meet-words').waitFor();return page.locator('#meet-words').innerText()}
- async function save(page,name){await page.locator('#meet-name').fill(name);await page.locator('#meet-save').click();await page.locator('#say').waitFor()}
+ async function save(page,name){await page.locator('#meet-name').fill(name);await page.locator('#meet-save').click();await page.locator('#paired').waitFor()}
  async function unlock(page){await page.locator('#unlock-device').click();await page.locator('#people').waitFor()}
  const phone=await device(),desktop=await device({width:1120,height:920})
  // Both browsers have the shell. Browser networking is disabled from this point.

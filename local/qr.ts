@@ -3,7 +3,7 @@ import jsQR from 'jsqr'
 
 export function drawQr(canvas: HTMLCanvasElement, payload: string, correction: 'L' | 'M' = 'M'): void {
   const qr = qrcode(0, correction)
-  qr.addData(payload)
+  qr.addData(payload,/^[0-9A-Z $%*+./:-]+$/.test(payload)?'Alphanumeric':'Byte')
   qr.make()
   const scale = 8
   const margin = 4
@@ -39,7 +39,8 @@ export class QrScanner {
     this.canvas.width = this.canvas.height = 1
   }
 
-  async start(facing:'user'|'environment'='environment'): Promise<void> {
+  async start(facing:'user'|'environment'='environment',limitMs=60_000): Promise<void> {
+    if(!Number.isInteger(limitMs)||limitMs<1000||limitMs>180_000)throw new Error('Invalid camera activity limit.')
     this.stop()
     const revision = this.revision
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera scanning is unavailable here. Type the setup words below.')
@@ -48,7 +49,7 @@ export class QrScanner {
     if (revision !== this.revision) { stream.getTracks().forEach(track => track.stop()); return }
     this.stream = stream
     try {
-      this.timeout = setTimeout(() => { this.stop(); this.failed('Scan paused after a minute. Try again or type the setup words.') }, 60_000)
+      this.timeout = setTimeout(() => { this.stop(); this.failed('Camera paused. Your saved setup is kept. Read again when both screens are ready.') }, limitMs)
       this.video.srcObject = stream
       await this.video.play()
       if (revision !== this.revision) return

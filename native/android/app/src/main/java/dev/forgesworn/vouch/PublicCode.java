@@ -15,6 +15,10 @@ final class PublicCode {
  }
  private static boolean decoded(String value,int length){try{byte[] bytes=Base64.getUrlDecoder().decode(value);return bytes.length==length&&Base64.getUrlEncoder().withoutPadding().encodeToString(bytes).equals(value);}catch(IllegalArgumentException e){return false;}}
  static byte[] select(){return SELECT.clone();}
+ static byte[] readResponse(String code,int offset){
+  if(!valid(code)||offset<0||offset>code.length())throw new IllegalArgumentException("Invalid public read offset");
+  return Arrays.copyOfRange(code.getBytes(StandardCharsets.US_ASCII),offset,code.length());
+ }
  static byte[] exchange(String code){
   if(!valid(code))throw new IllegalArgumentException("Invalid public code");byte[] value=code.getBytes(StandardCharsets.US_ASCII),out=new byte[value.length+6];
   out[0]=(byte)0x80;out[1]=0x10;out[4]=(byte)value.length;System.arraycopy(value,0,out,5,value.length);return out;

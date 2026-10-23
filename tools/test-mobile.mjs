@@ -123,7 +123,7 @@ try {
   await screenshot(a, 'mobile-quick-check.png', true)
   // Regenerate the true words before checking.
   await a.clock.runFor(30000); await a.clock.setFixedTime(new Date('2026-10-23T12:00:36Z')); await b.clock.setFixedTime(new Date('2026-10-23T12:00:36Z')); await a.clock.runFor(250); await b.clock.runFor(250)
-  await a.locator('#duress > summary').click(); await a.clock.runFor(250)
+  await a.locator('#call-speak').click(); await a.clock.runFor(250)
   const say = await a.locator('#say').innerText(), duress = await a.locator('#signal').innerText()
   await b.locator('#open-check').click()
   for (const [input,expected] of [[say,'normal words match'],[duress,'Duress signal recognised'],['not valid','Pause.']]) {
@@ -157,7 +157,7 @@ try {
   await d.locator('#vault-settings > summary').click(); const download = d.waitForEvent('download'); await d.locator('#backup').click(); const backupPath = join(scratch, 'backup.json'); await (await download).saveAs(backupPath)
   const backup = await readFile(backupPath,'utf8'); assert.equal(backup.includes('Passphrase friend'), false); assert.equal(JSON.parse(backup).device, undefined)
   await d.reload(); await d.locator('#unlock-password').fill('incorrect'); await d.locator('#unlock-form button').click(); await d.locator('#error').filter({ hasText: 'Could not unlock' }).waitFor(); await unlock(d)
-  const recovered = await phone(); await recovered.locator('#restore-file').setInputFiles(backupPath); await visible(recovered, '#locked'); await unlock(recovered); await recovered.locator('.person-card').filter({ hasText:'Passphrase friend' }).click(); await visible(recovered,'#say')
+  const recovered = await phone(); await recovered.locator('#restore-file').setInputFiles(backupPath); await visible(recovered, '#locked'); await unlock(recovered); await recovered.locator('.person-card').filter({ hasText:'Passphrase friend' }).click(); await visible(recovered,'#hear')
   // Storage failures never claim successful pairing/progress.
   const failed = await phone(); await failed.evaluate(() => { Storage.prototype.setItem = () => { throw new Error('Storage unavailable') } }); await failed.locator('#create').click(); await failed.locator('#error').filter({ hasText:'Storage unavailable' }).waitFor(); assert.equal(await failed.locator('#meet').isVisible(), false)
   // Late native credential/camera callbacks cannot revive a manually locked app.
@@ -175,7 +175,7 @@ try {
   // A standalone download still runs without a server or install step.
   if (!live) {
     const file = await phone(pathToFileURL(join(root, 'canary-local.html')).href)
-    await manualPair(file,'File friend',true);await visible(file,'#say')
+    await manualPair(file,'File friend',true);await visible(file,'#hear')
     assert.equal(await file.locator('#say').isVisible(), true)
   }
   // Exercise actual service-worker install and offline reload, locally and live.
@@ -192,7 +192,7 @@ try {
   }
   const offline = await phone(offlineUrl,{serviceWorkers:'allow'})
   await offline.waitForFunction(()=>!!navigator.serviceWorker.controller, { polling: 100 }, { timeout: 15000 })
-  await manualPair(offline,'Offline friend'); await offline.context().setOffline(true); await offline.reload(); await visible(offline,'#locked'); await unlock(offline); await offline.locator('.person-card').click(); await visible(offline,'#say')
+  await manualPair(offline,'Offline friend'); await offline.context().setOffline(true); await offline.reload(); await visible(offline,'#locked'); await unlock(offline); await offline.locator('.person-card').click(); await visible(offline,'#hear')
   const cacheKeys=await offline.evaluate(async()=>{const keys=[];for(const name of await caches.keys())for(const request of await (await caches.open(name)).keys())keys.push(request.url);return keys})
   assert.ok(cacheKeys.length === 5); assert.equal(cacheKeys.some(url=>url.includes('#')||url.includes('connect=')||url.includes('pair=')),false)
   console.log('Actual service worker installed; offline reload/unlock/words passed. Cache contains only five public shell files.')

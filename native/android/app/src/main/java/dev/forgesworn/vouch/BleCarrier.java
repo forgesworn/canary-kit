@@ -14,7 +14,6 @@ final class BleCarrier {
  private volatile int revision;
  private final Map<String,BluetoothGatt> links=new HashMap<>();
  private final Map<String,String> snapshots=new java.util.concurrent.ConcurrentHashMap<>();
- private final Map<String,Integer> mtus=new java.util.concurrent.ConcurrentHashMap<>();
  private final Set<String> incoming=java.util.concurrent.ConcurrentHashMap.newKeySet();
  private final Set<Runnable> timers=new HashSet<>();
  BleCarrier(Radios owner){this.owner=owner;manager=owner.host.getSystemService(BluetoothManager.class);adapter=manager==null?null:manager.getAdapter();}
@@ -23,14 +22,15 @@ final class BleCarrier {
   running=reading=true;final int generation=revision;
   try{
    server=manager.openGattServer(owner.host,new BluetoothGattServerCallback(){
-    @Override public void onConnectionStateChange(BluetoothDevice device,int status,int state){if(!running||revision!=generation)return;if(state==BluetoothProfile.STATE_CONNECTED){if(incoming.size()>=2&&!incoming.contains(device.getAddress())){if(server!=null)server.cancelConnection(device);}else incoming.add(device.getAddress());}else{incoming.remove(device.getAddress());snapshots.remove(device.getAddress());mtus.remove(device.getAddress());}}
-    @Override public void onMtuChanged(BluetoothDevice device,int mtu){if(running&&revision==generation)mtus.put(device.getAddress(),mtu);}
+    @Override public void onConnectionStateChange(BluetoothDevice device,int status,int state){if(!running||revision!=generation)return;if(state==BluetoothProfile.STATE_CONNECTED){if(incoming.size()>=2&&!incoming.contains(device.getAddress())){if(server!=null)server.cancelConnection(device);}else incoming.add(device.getAddress());}else{incoming.remove(device.getAddress());snapshots.remove(device.getAddress());}}
     @Override public void onCharacteristicReadRequest(BluetoothDevice device,int request,int offset,BluetoothGattCharacteristic characteristic){
      BluetoothGattServer active=server;if(!running||active==null||revision!=generation)return;
      if(!CARD.equals(characteristic.getUuid())){active.sendResponse(device,request,BluetoothGatt.GATT_READ_NOT_PERMITTED,offset,null);return;}
      if(offset==0){String value=owner.code;if(!PublicCode.valid(value)){active.sendResponse(device,request,BluetoothGatt.GATT_FAILURE,offset,null);return;}snapshots.put(device.getAddress(),value);}
      String value=snapshots.get(device.getAddress());if(value==null||offset>value.length()){active.sendResponse(device,request,BluetoothGatt.GATT_INVALID_OFFSET,offset,null);return;}
-     byte[] bytes=value.getBytes(StandardCharsets.US_ASCII);int end=Math.min(bytes.length,offset+Math.max(22,mtus.getOrDefault(device.getAddress(),23)-1));active.sendResponse(device,request,BluetoothGatt.GATT_SUCCESS,offset,Arrays.copyOfRange(bytes,offset,end));
+     // Android's stack applies the negotiated ATT MTU. Guessing 23 when its
+     // callback was not observed sends a short value that iOS treats as complete.
+     active.sendResponse(device,request,BluetoothGatt.GATT_SUCCESS,offset,PublicCode.readResponse(value,offset));
     }
     @Override public void onServiceAdded(int status,BluetoothGattService service){owner.host.main.post(()->{if(!running||revision!=generation||status!=BluetoothGatt.GATT_SUCCESS)return;adapter.getBluetoothLeAdvertiser().startAdvertising(new AdvertiseSettings.Builder().setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY).setConnectable(true).setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_LOW).build(),new AdvertiseData.Builder().addServiceUuid(new ParcelUuid(SERVICE)).build(),advertising);});}
    });
@@ -60,5 +60,5 @@ final class BleCarrier {
  private void close(BluetoothGatt value,String address){links.remove(address);value.disconnect();value.close();}
  private void later(long ms,Runnable action){final Runnable[] wrapped=new Runnable[1];wrapped[0]=()->{timers.remove(wrapped[0]);action.run();};timers.add(wrapped[0]);owner.host.main.postDelayed(wrapped[0],ms);}
  void finishReading(){reading=false;if(scanning&&adapter!=null){try{adapter.getBluetoothLeScanner().stopScan(scan);}catch(Exception ignored){}scanning=false;}for(var value:links.values()){value.disconnect();value.close();}links.clear();for(var timer:timers)owner.host.main.removeCallbacks(timer);timers.clear();}
- void stop(){revision++;running=false;finishReading();if(adapter!=null)try{if(adapter.getBluetoothLeAdvertiser()!=null)adapter.getBluetoothLeAdvertiser().stopAdvertising(advertising);}catch(Exception ignored){}if(server!=null){server.close();server=null;}snapshots.clear();mtus.clear();incoming.clear();}
+ void stop(){revision++;running=false;finishReading();if(adapter!=null)try{if(adapter.getBluetoothLeAdvertiser()!=null)adapter.getBluetoothLeAdvertiser().stopAdvertising(advertising);}catch(Exception ignored){}if(server!=null){server.close();server=null;}snapshots.clear();incoming.clear();}
 }

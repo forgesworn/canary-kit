@@ -508,3 +508,38 @@ browser PRF/camera fixtures do not qualify those devices or an independent audit
 Task-owned preview, automation browsers, dependencies, generated scratch builds
 and publication archive were removed after validation. No task service is left
 running. The Google Chrome public review tab is left open intentionally.
+
+
+## Listen/Speak and moving QR candidate — 23 October 2026
+
+The call view now shows two large normal/duress cards in the selected Listen or
+Speak panel. Listener selection is a human comparison with no typing; the
+explicit red duress result stays until a fresh check/person change/lock. Normal
+results expire at rotation. The existing word derivation, vault schema, storage
+key and origin stay unchanged.
+
+The dedicated optical carrier reuses My Signet coarse Base45/frame assembly
+with separate Vouch prefixes/domain and canonical public/encrypted packet types.
+Browser evidence in `evidence/optical-transfer.json` covers actual QR pixels
+through a canvas camera stream: public invitation, encrypted reply, fixed
+comparison and own-device copying in both directions. It checks duplicate merge
+and unlock preservation with real local cryptography and a PRF provider stub.
+There is no physical video-call, codec/compression or novice timing acceptance.
+
+Checks passed: 771 unit tests across 37 files; project/local type checks; native
+bridge/real-crypto browser journey; mobile setup, normal/duress/mismatch,
+recovery and actual service-worker offline reload; selected-person copying and
+old-artifact upgrade without changing the saved record/credentials. JVM public
+code/APDU/read-response checks, portable Swift vectors, three package checker
+regressions, signed iOS build and Android APK build also passed. Restrictive
+Worker headers, exact assets, build-bound service worker and rejection of
+non-static requests passed in the publication checkout. See native receipts
+for package hashes and installation status.
+
+The earlier exact-hash iPhone/Pixel NFC trial received public frames on both
+phones and the owner confirmed matching four words. The later Bluetooth trial
+was one-way and failed human pairing. The Android MTU response patch is built
+and installed, with a physical retry unavailable. Both differ from browser
+stubs. Source privacy alignment is closed for the expanded notices; UK-law
+application uncertainties and independent review remain as documented. Website
+publication/live readback is recorded separately in `evidence/publication.json`.

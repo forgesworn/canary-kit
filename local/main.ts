@@ -7,8 +7,11 @@ import { mountTrust } from './trust-ui.js'
 import type { TrustState } from './trust.js'
 import { mountInstall } from './install.js'
 import { mountConnect } from './connect-ui.js'
-import { readConnect, type Exchange } from './connect.js'
+import { readConnect, connectInput, type Exchange } from './connect.js'
 import { mountDevices } from './device-ui.js'
+import { mountOptical } from './optical-ui.js'
+import { readOptical, type OpticalPayload } from './optical.js'
+import { deviceInput, publicDeviceCopy } from './device-transfer.js'
 import type { Devices } from './device-transfer.js'
 import { mountMeet } from './meet-ui.js'
 import type { Meeting } from './meet.js'
@@ -28,6 +31,7 @@ let renderedCounter = -1
 let resultCounter = -1
 let resultKind: 'match' | 'signal' | 'different' | null = null
 let checkChoices: ReturnType<typeof wordsToHear> | null = null
+let callMode: 'listen' | 'speak' = 'listen'
 let pendingKeep = false
 let recoveryMode = false
 let pendingTrustTask: (() => Promise<void>) | null = null
@@ -35,6 +39,7 @@ let trustUi: ReturnType<typeof mountTrust> | undefined
 let connectUi: ReturnType<typeof mountConnect> | undefined
 let devicesUi: ReturnType<typeof mountDevices> | undefined
 let meetUi: ReturnType<typeof mountMeet> | undefined
+let opticalUi: ReturnType<typeof mountOptical> | undefined
 
 const scanner = new QrScanner(get<HTMLVideoElement>('scan-video'), data => {
   if(data.includes('#meet=')||data.startsWith('CANARY-MEET:')){stopScan();meetUi!.receive(data);return}
@@ -54,6 +59,7 @@ function stopScan() {
   get('scan-start').hidden = false
 }
 function show(name: string) {
+  if(name!=='optical')opticalUi?.stop()
   stopScan()
   trustUi?.stopScan()
   if(name!=='meet')meetUi?.stopScan()
@@ -72,6 +78,7 @@ function updateUnlock() {
   get('unlock-message').textContent = restoring ? 'Unlock your encrypted backup. Your current saved vault is not changed yet.' : pendingTrustTask ? 'Unlock to continue your saved setup on this phone.' : pendingKeep ? 'Unlock to keep this pair with your saved people.' : 'Your saved people are ready on this phone.'
 }
 function wipeUi() {
+  opticalUi?.clear()
   trustUi?.clear()
   connectUi?.clear()
   devicesUi?.clear()
@@ -85,7 +92,7 @@ function wipeUi() {
   get('pair-title').textContent = 'Our words.'
   const qr = get<HTMLCanvasElement>('pair-qr')
   qr.width = qr.height = 1
-  for (const id of ['setup-details', 'duress', 'check', 'manual-join', 'vault-settings', 'person-details']) get<HTMLDetailsElement>(id).open = false
+  for (const id of ['setup-details', 'manual-join', 'vault-settings', 'person-details', 'person-options']) get<HTMLDetailsElement>(id).open = false
   for (const input of document.querySelectorAll<HTMLInputElement>('#person-evidence-form input')) input.value = ''
   get('person-evidence-summary').textContent = ''
   get<HTMLInputElement>('quick-name').value = ''
@@ -97,6 +104,7 @@ function wipeUi() {
   resultKind = null; checkChoices = null
   resetCheckResult()
   for(const id of ['check-choice-normal','check-choice-duress'])get(id).querySelector('.choice-words')!.textContent='—'
+  setCallMode('listen')
 }
 function lock(message = '') {
   generation++
@@ -201,15 +209,16 @@ function openPerson(entry: Entry) {
   const settingUp = !saved || !!entry.setup
   get('pair-title').textContent = entry.label || (saved ? 'Our words.' : 'Keep this pair.')
   get('paired-intro').textContent = saved && !entry.setup ? 'Ask for their words. If they asked first, read only “You say”.' : 'Read this code to each other. Same code? Name each other and finish on both phones.'
-  get('check-guidance').hidden = !saved || !!entry.setup
+  get('check-guidance').hidden = true
+  get('paired-intro').hidden = !settingUp
+  get('paired').querySelector<HTMLElement>('.eyebrow')!.hidden = !settingUp
   get('keep-card').hidden = saved && !entry.setup
-  if (saved && !entry.setup) get('words-end').after(get('keep-card'))
-  else get('words-grid').before(get('keep-card'))
   get<HTMLInputElement>('quick-name').value = entry.setup && entry.label==='New person' ? '' : entry.label
   get('setup-name').hidden = saved && !entry.setup
   get('confirm-pair').hidden = !saved || !entry.setup
   get('resend-reply').hidden = !entry.setup?.reply
-  for (const id of ['words-grid', 'word-timer', 'progress', 'words-end', 'open-check', 'check', 'duress']) get(id).hidden = settingUp
+  get('call-main').hidden = settingUp
+  setCallMode('listen')
   get<HTMLInputElement>('person-name').value = entry.label
   get('reference').textContent = pairReference(entry.pair)
   get('exchange-reference').textContent = pairComparison(entry.pair)
@@ -219,7 +228,7 @@ function openPerson(entry: Entry) {
   get('keep-person').hidden = saved
   get('keep-hint').textContent = saved ? (vault!.record.password ? 'Ready for your next call.' : 'Add recovery in Your people to protect against losing device unlock.') : 'Each of you keeps your own copy for future calls.'
   get('remove-person').hidden = !saved
-  get<HTMLDetailsElement>('duress').open = get<HTMLDetailsElement>('check').open = get<HTMLDetailsElement>('person-details').open = false
+  get<HTMLDetailsElement>('person-details').open = get<HTMLDetailsElement>('person-options').open = false
   get<HTMLDetailsElement>('repair-pair').open = false
   get('check-result').textContent = ''
   resetCheckResult()
@@ -316,7 +325,10 @@ meetUi=mountMeet(get('meet'),{
   vault:()=>vault,ensure:ensureTrustVault,show:()=>show('meet'),home,open:openPerson,error,
   save:async(entries,meetings)=>{await savePairs(entries,vault?.exchanges??[],meetings)},
 })
-connectUi = mountConnect({ vault: () => vault, hasRecord: () => !!record, device: input => devicesUi!.receive(input), ensure: ensureTrustVault, save: savePairs, show, open: openPerson, home, error, scan:()=>{show('join');startScan()} })
+const showTransfer=(payload:OpticalPayload,back:()=>void,next?:{label:string;task:()=>void})=>{
+  try{opticalUi!.show(payload,back,next)}catch(e){error(e instanceof Error?e.message:'Could not show this QR transfer.')}
+}
+connectUi = mountConnect({ vault: () => vault, hasRecord: () => !!record, device: input => devicesUi!.receive(input), ensure: ensureTrustVault, save: savePairs, show, open: openPerson, home, error, scan:()=>opticalUi!.scan(),qr:showTransfer })
 devicesUi = mountDevices(get('devices'), {
   vault: () => vault, hasRecord: () => !!record, ensure: ensureTrustVault,
   async save(entries: Entry[], devices: Devices) {
@@ -326,20 +338,46 @@ devicesUi = mountDevices(get('devices'), {
     if (stamp !== generation || active !== vault || document.hidden) throw new Error('Canary was locked. Unlock to continue the saved device copy.')
     persist(next); active.record = next; active.entries = entries; active.devices = devices
   },
-  show: () => show('devices'), scan: () => { show('join'); startScan() }, home, error,
+  show: () => show('devices'), scan: () => opticalUi!.scan(), home, error,qr:showTransfer,
 })
+function checkedTransfer(raw:string):OpticalPayload {
+  if(raw.startsWith('VQP1:'))return readOptical(raw)
+  try{return{kind:'connection',value:connectInput(raw,vouchAddress())}}catch{}
+  try{return{kind:'device-request',value:JSON.stringify(deviceInput(raw,vouchAddress()))}}catch{}
+  return{kind:'device-copy',value:publicDeviceCopy(raw)}
+}
+function receiveTransferPayload(payload:OpticalPayload) {
+  if(payload.kind==='connection'){void connectUi!.receive(payload.value);return}
+  if(payload.kind==='device-request'){devicesUi!.receive(payload.value);return}
+  devicesUi!.receiveCopy(payload.value)
+}
+function receiveTransfer(raw:string) {
+  try{receiveTransferPayload(checkedTransfer(raw))}
+  catch{error('Open a public Vouch request or recipient-encrypted reply. This is not a supported transfer.')}
+}
+opticalUi=mountOptical(get('optical'),{show:()=>show('optical'),home,receive:receiveTransfer,error,openFile:()=>get<HTMLInputElement>('optical-file').click()})
+get('optical-read-welcome').addEventListener('click',()=>opticalUi!.scan())
+get('optical-file').addEventListener('change',()=>{
+  const picker=get<HTMLInputElement>('optical-file'),file=picker.files?.[0];picker.value='';if(!file)return
+  if(file.size>400_000){error('This file is too large. Use a public request or encrypted people copy.');return}
+  void file.text().then(raw=>{const payload=checkedTransfer(raw);if(document.hidden){pendingTransfer=payload;return}receiveTransferPayload(payload)}).catch(()=>{if(!document.hidden)error('Open a public Vouch request or recipient-encrypted reply. This is not a supported transfer file.')})
+})
+let pendingTransfer:OpticalPayload|undefined
 mountInstall(show, home)
 get('people-search').addEventListener('input', () => {
   const query = get<HTMLInputElement>('people-search').value.trim().toLocaleLowerCase()
   get('people-list').querySelectorAll<HTMLElement>('.person-card').forEach(card => { card.hidden = !card.textContent?.toLocaleLowerCase().includes(query) })
 })
-get('open-check').after(get('check'))
+function setCallMode(mode:'listen'|'speak') {
+  callMode=mode;get('words-grid').hidden=mode!=='speak';get('check').hidden=mode!=='listen'
+  for(const [id,selected]of [['open-check',mode==='listen'],['call-speak',mode==='speak']] as const){get(id).setAttribute('aria-selected',String(selected));get(id).tabIndex=selected?0:-1}
+}
 get('open-check').addEventListener('click', () => {
-  get<HTMLDetailsElement>('check').open = true
+  setCallMode('listen')
   refreshCheckChoices()
-  get('check').scrollIntoView({ behavior: 'instant', block: 'start' })
-  get(resultKind ? 'check-result' : 'check-choice-normal').focus({preventScroll:true})
 })
+get('call-speak').addEventListener('click',()=>{setCallMode('speak');renderedCounter=-1;tick()})
+for(const id of ['open-check','call-speak'])get(id).addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();const other=get(id==='open-check'?'call-speak':'open-check');other.click();other.focus()}})
 get('resend-reply').addEventListener('click', () => { if (selected) connectUi?.resend(selected) })
 get('confirm-pair').addEventListener('click', () => {
   if (!selected?.setup || !vault) return
@@ -378,8 +416,8 @@ function tick() {
     const words = wordsAt(selected.pair, now)
     get('say').textContent = words.say
     get('hear').textContent = words.hear
-    get('signal').textContent = get<HTMLDetailsElement>('duress').open ? words.duress : '—'
-    if(get<HTMLDetailsElement>('check').open)refreshCheckChoices()
+    get('signal').textContent = words.duress
+    if(callMode==='listen')refreshCheckChoices()
     renderedCounter = counter
     error()
   } catch (e) {
@@ -583,7 +621,6 @@ get('person-evidence-form').addEventListener('submit', event => {
     renderContactEvidence(entry); status('Contact notes saved encrypted on this phone.')
   })
 })
-get('duress').addEventListener('toggle', () => { renderedCounter = -1; tick() })
 function refreshCheckChoices() {
   if(!selected)return
   checkChoices=wordsToHear(selected.pair,Math.floor(Date.now()/1000))
@@ -606,7 +643,7 @@ function showCheckResult(input:string) {
     const title=document.createElement('strong'),message=document.createElement('p'),again=document.createElement('button')
     title.className='check-result-title'
     title.textContent=result==='signal'?'Duress signal recognised':result==='match'?'Their normal words match':'Pause. Words do not match'
-    message.textContent=result==='signal'?'They are using your agreed duress words. Stay calm and follow the plan you agreed, when safe. No alert has been sent.'
+    message.textContent=result==='signal'?'You confirmed their duress words. Stay calm and follow the plan you agreed, when safe. No alert has been sent.'
       :result==='match'?'You confirmed the words you heard. A match shows knowledge of your shared secret, not proof of identity or safety.'
         :'Do not act on their request. Contact them using a number or account you already trust. You can check fresh words and phone clocks.'
     again.id='check-again';again.type='button';again.className='secondary wide';again.textContent='Check fresh words'
@@ -628,7 +665,6 @@ function showCheckResult(input:string) {
 get('check-choice-normal').addEventListener('click',()=>{if(checkChoices)showCheckResult(checkChoices.normal)})
 get('check-choice-duress').addEventListener('click',()=>{if(checkChoices)showCheckResult(checkChoices.duress)})
 get('check-neither').addEventListener('click',()=>showCheckResult(''))
-get('check').addEventListener('toggle',()=>{if(get<HTMLDetailsElement>('check').open)refreshCheckChoices()})
 get('check-form').addEventListener('submit', event => {
   event.preventDefault()
   showCheckResult(get<HTMLInputElement>('heard-input').value)
@@ -646,6 +682,7 @@ get('remove-person').addEventListener('click', () => {
 document.querySelector('.brand')!.addEventListener('click', event => { event.preventDefault(); home() })
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) lock('Locked when you left the tab. Unsaved pairing was cleared.')
+  else if(pendingTransfer){const value=pendingTransfer;pendingTransfer=undefined;receiveTransferPayload(value)}
 })
 onNativeBackground(()=>lock('Locked when the app went into the background. Unlock to resume.'))
 reportNativeReady()

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { nativeAvailable, nativeOrigin, nativeKey, nativeCreateKey, openNativeRadio, onNativeBackground, cancelNativeRadios } from './native.js'
+import { nativeAvailable, nativeOrigin, nativeKey, nativeCreateKey, openNativeRadio, onNativeBackground, cancelNativeRadios, nativeShareText } from './native.js'
 import { meetingCard, meetingToken, newMeeting } from './meet.js'
+import { beginConnect, connectLink } from './connect.js'
 
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers()})
 function host(){
@@ -11,6 +12,14 @@ function host(){
  return{w,calls,answer}
 }
 describe('native boundary',()=>{
+ it('shares public request links while refusing secret recovery and off-site links',async()=>{
+  const h=host(),address='https://canary-words.cocoacod256.chatgpt.site/',offer=beginConnect('Share fixture'),link=connectLink(offer.invite,address)
+  const sent=nativeShareText(link);expect(h.calls[0].op).toBe('shareText');h.answer(0,{});await sent
+  for(const bad of ['https://canary-words.cocoacod256.chatgpt.site/#pair=secret','https://other.test/#connect=public'])await expect(nativeShareText(bad)).rejects.toThrow()
+  expect(h.calls).toHaveLength(1)
+  const extra=address+'#connect='+encodeURIComponent(JSON.stringify({...JSON.parse(offer.invite),secret:'must-not-travel'})),clean=nativeShareText(extra)
+  expect(h.calls[1].args.text).toBe(link);h.answer(1,{});await clean
+ })
  it('does not enable a native provider on the ordinary website',()=>{
   vi.stubGlobal('window',{top:null});expect(nativeAvailable()).toBe(false)
  })

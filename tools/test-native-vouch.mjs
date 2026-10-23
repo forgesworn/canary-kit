@@ -22,6 +22,7 @@ try{
     case 'radioStop':if(d.radio?.session===message.args.session)d.radio=null;break
     case 'nfcRead':assert.equal(message.args.session,d.radio.session);break
     case 'shareFile':d.files.push(message.args);break
+    case 'shareText':d.files.push({publicLink:message.args.text});break
     default:throw new Error('Unknown native operation')
    }
    await page.evaluate(({id,result})=>window.__vouchNativeReceive({v:1,id,result}),{id:message.id,result})
@@ -59,11 +60,22 @@ try{
  }
  await android.page.locator('#lock').click();await android.page.locator('#locked').waitFor();assert.equal(await android.page.locator('#meet').textContent(),'');await settle();assert.equal(android.radio,null)
  await android.page.locator('#unlock-device').click();await android.page.locator('#people').waitFor();await android.page.locator('.person-card').filter({hasText:'New person'}).click();await waitRadio(android);assert.equal(await android.page.locator('#meet-words').innerText(),words)
- for(const [d,name]of [[android,'iPhone friend'],[iphone,'Android friend']]){await d.page.locator('#meet-name').fill(name);await d.page.locator('#meet-save').click();await d.page.locator('#say').waitFor()}
+ for(const [d,name]of [[android,'iPhone friend'],[iphone,'Android friend']]){await d.page.locator('#meet-name').fill(name);await d.page.locator('#meet-save').click();await d.page.locator('#paired').waitFor()}
  assert.equal(await android.page.locator('#say').innerText(),await iphone.page.locator('#hear').innerText())
+ await iphone.page.evaluate(()=>{document.getElementById('hear').textContent='copper dawn';document.getElementById('hear-signal').textContent='meadow river'})
+ await iphone.page.screenshot({path:'native/evidence/listen.png',fullPage:true})
+ await iphone.page.locator('#call-speak').click()
+ await iphone.page.waitForFunction(()=>!document.body.hasAttribute('aria-busy'))
+ await iphone.page.evaluate(()=>{document.getElementById('say').textContent='gentle river';document.getElementById('signal').textContent='copper meadow'})
+ await iphone.page.screenshot({path:'native/evidence/speak.png',fullPage:true})
+ await iphone.page.locator('#open-check').click()
  // The receiver can recognise normal/duress words without typing. A duress
  // result remains distinct after rotation and never goes to the sender/radio.
- await android.page.locator('#duress > summary').click();await android.page.clock.runFor(250)
+ assert.equal(await android.page.locator('#call-speak').count(),1)
+ assert.equal(await android.page.locator('#check-choice-duress').isVisible(),true)
+ assert.equal(await android.page.locator('#say').isVisible(),false)
+ await android.page.locator('#call-speak').click();await android.page.clock.runFor(250)
+ assert.equal(await android.page.locator('#signal').isVisible(),true)
  const alternative=await android.page.locator('#signal').innerText()
  await iphone.page.locator('#open-check').click()
  assert.equal(await iphone.page.locator('#check-choice-duress').count(),1)

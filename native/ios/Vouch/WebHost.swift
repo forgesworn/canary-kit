@@ -45,6 +45,7 @@ final class WebHost:NSObject,ObservableObject,WKNavigationDelegate,WKUIDelegate 
    case "radioStop":radios.stop(args["session"] as? String);done([:],nil)
    case "nfcRead":try radios.read(args["session"] as? String);done([:],nil)
    case "shareFile":try share(args,done)
+   case "shareText":try shareText(args,done)
    default:done(nil,"Unsupported device operation.")
    }
   }catch{done(nil,error.localizedDescription)}
@@ -62,6 +63,11 @@ final class WebHost:NSObject,ObservableObject,WKNavigationDelegate,WKUIDelegate 
  }
  func webView(_ view:WKWebView,requestMediaCapturePermissionFor origin:WKSecurityOrigin,initiatedByFrame frame:WKFrameInfo,type:WKMediaCaptureType,decisionHandler:@escaping(WKPermissionDecision)->Void){decisionHandler(active && frame.isMainFrame && type == .camera ? .prompt:.deny)}
  private var exportRoot:URL {FileManager.default.temporaryDirectory.appendingPathComponent("VouchExports",isDirectory:true)}
+ private func shareText(_ args:[String:Any],_ done:@escaping([String:Any]?,String?)->Void)throws {
+  guard let text=args["text"] as? String,text.utf8.count<=6000,text.range(of:"^https://canary-words\\.cocoacod256\\.chatgpt\\.site/#(connect|device)=.+$",options:.regularExpression) != nil,let url=URL(string:text),let scene=UIApplication.shared.connectedScenes.first as? UIWindowScene,let controller=scene.windows.first(where:{$0.isKeyWindow})?.rootViewController,controller.presentedViewController==nil else{throw NativeError.message("Could not share this public Vouch link.")}
+  let sheet=UIActivityViewController(activityItems:[url],applicationActivities:nil);sheet.popoverPresentationController?.sourceView=web
+  sheet.completionWithItemsHandler={_,_,_,_ in done([:],nil)};controller.present(sheet,animated:true)
+ }
  private func purgeExports(){for url in (try? FileManager.default.contentsOfDirectory(at:exportRoot,includingPropertiesForKeys:nil)) ?? [] {if let first=url.lastPathComponent.split(separator:"_").first,let created=Double(first),created<Date().timeIntervalSince1970-1800{try? FileManager.default.removeItem(at:url)}}}
  private func share(_ args:[String:Any],_ done:@escaping([String:Any]?,String?)->Void)throws {
   guard let name=args["name"] as? String,name.range(of:"^[A-Za-z0-9_.-]{1,80}$",options:.regularExpression) != nil,let text=args["contents"] as? String,text.utf8.count<=1_048_576,let mime=args["mime"] as? String,["text/plain","application/json"].contains(mime),let scene=UIApplication.shared.connectedScenes.first as? UIWindowScene,let controller=scene.windows.first(where:{$0.isKeyWindow})?.rootViewController,controller.presentedViewController==nil else{throw NativeError.message("Could not open the export sheet.")}

@@ -3,7 +3,7 @@
 The same Vouch screens, Canary Kit / Spoken Token word engine, offline
 commit/reveal pairing and v1/v6 encrypted vault are packaged in small native
 iPhone/iPad and Android apps. The public website remains the separately
-published v11 camera/file build. This prototype has no account or relay.
+published browser build. This prototype has no account or relay.
 
 ## Use it
 
@@ -12,13 +12,43 @@ Bring the phones together. They compare their public connection codes directly;
 both people compare the same four fixed words, name each other and save. Radio
 proximity alone is never confirmation. Later: unlock, person, rotating call words.
 
-On a call, **Check the words I heard** shows their normal and duress phrases in
-large type. Listen first, then choose only the phrase they actually said, or
-**Neither matches**. No typing is needed for those comparisons. A duress result
-has a distinct red heading and remains until you choose a fresh check or lock;
-normal results expire when the words rotate. The manual full-word checker is
-available for another phrase, including one interval of clock drift. These are
-human comparisons; the other app sends no check result or emergency alert.
+On a call, **Listen** shows their normal and duress phrases as two large choices.
+Choose only what they actually said, or **Neither matches**. **Speak** shows your
+own normal and duress words directly. No typing or accordion is needed. A duress
+result is red and remains until a fresh check, person change or lock; normal
+results expire at rotation. Manual full-word entry remains available for another
+phrase and one interval of drift. A choice is the listener's human comparison;
+there is no automatic incident/message/alert transmission.
+
+## QR over a trusted call
+
+Both devices need the updated app. Choose **Connect on a call**, protect the
+vault, then **Show a moving QR for a video call**. The other person chooses
+**Read a QR or open a reply** inside Vouch, protects their copy and shows the
+encrypted reply QR back. The original device reads that reply. Compare the four
+fixed words together and save separately. Only public invitations and
+recipient-encrypted replies travel optically; no new pairing cipher is added.
+
+For your own devices, the receiving device chooses **Bring my people here** and
+shows its request QR. The source reads it, selects completed people and shows
+its recipient-encrypted copy as a moving QR. The receiver reads it, compares the
+import code with the source, reviews the people and imports. Reverse these roles
+to copy in the other direction. Existing contacts and each device's unlock are
+preserved; groups/unfinished exchanges remain outside selected-person copying.
+Large copies use the existing encrypted-file fallback or fewer selected people.
+
+Live video QR needs a second screen the camera can see. On a single phone,
+use the trusted call's chat to share the public invitation/request and encrypted
+reply/file, then return to Vouch to paste/open it. Share only the transfer QR,
+never the vault, rotating call words or recovery screen. The call provider and
+participants may retain public/ciphertext frames; a digest is not identity proof.
+
+The coarse Base45/digest/frame reader is adapted from My Signet's MIT-licensed
+`handshake-optical.ts` at `335e1f6615f7db6fbcd8b5b5dfa9fdb6d0113667`, with separate
+Vouch prefixes/domain and canonical packet types. At most 128 coarse frames
+repeat at 500 ms. Transfer capture/assembly is bounded to three minutes and
+stops on leaving/lock; ordinary Connect/radios keep their one-minute activity
+pause. Selected text/JSON imports are local and bounded to 400,000 bytes.
 
 For an NFC tap, one person taps **Tap using NFC** while the other leaves Connect
 open. An iPhone is always the NFC reader, so it starts the tap against Android.
@@ -158,7 +188,7 @@ Then test NFC independently from BLE: iOS development launch argument
 `--nfc-only`, Android launch extra `--ez vouch.nfcOnly true`. These suppress BLE
 for a controlled NFC trial; normal launches use both available transports.
 Debug logs record only readiness booleans and the transport of the first three
-public frames, plus NFC reader/service state and radio pause events; never token
+public frames, plus bounded radio discovery/read/service state and pause events; never token
 contents, private keys, words or names. Check that NFC is enabled on Android.
 
 Record: iPhone/Android model and OS, exact signed artefact hash, actual NFC frame

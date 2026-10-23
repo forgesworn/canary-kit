@@ -1,5 +1,7 @@
 Native NFC SELECT/exchange framing is adapted from My Signet HandshakeApdu,
-aa663efb2455f8430538866c231ed58f1ee8c0f7.
+aa663efb2455f8430538866c231ed58f1ee8c0f7. Coarse optical frames/Base45 assembly
+is adapted from handshake-optical.ts at 335e1f6615f7db6fbcd8b5b5dfa9fdb6d0113667,
+with a separate Vouch payload/domain and bounded public/encrypted packet types.
 
 MIT License
 

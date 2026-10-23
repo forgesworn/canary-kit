@@ -27,7 +27,7 @@ try{
  await page.locator('.home').filter({visible:true}).click();await page.locator('#people-private-groups').click();await page.getByRole('button',{name:'Existing private group',exact:true}).click();assert.equal(await page.locator('#private-trust .compare strong').first().innerText(),keeperCode)
  assert.equal(await page.evaluate(()=>localStorage.getItem('canary.encrypted-vault.v1')),stored,'A UI upgrade must not rewrite credentials, IDs, keys or vault data')
  // The first deliberate save upgrades to v6. A real old build must refuse it without overwriting.
- await page.locator('.brand').click();await page.locator('.person-card').filter({hasText:'Existing friend'}).click();await page.locator('#person-details > summary').click();await page.locator('#person-name').fill('Existing friend renamed');await page.locator('#rename-form button').click();await page.locator('#pair-title').filter({hasText:'Existing friend renamed'}).waitFor()
+ await page.locator('.brand').click();await page.locator('.person-card').filter({hasText:'Existing friend'}).click();await page.locator('#person-options > summary').click();await page.locator('#person-details > summary').click();await page.locator('#person-name').fill('Existing friend renamed');await page.locator('#rename-form button').click();await page.locator('#pair-title').filter({hasText:'Existing friend renamed'}).waitFor()
  const savedV6=await page.evaluate(()=>localStorage.getItem('canary.encrypted-vault.v1'));assert.notEqual(savedV6,stored)
  upgraded=false;await page.reload();await page.locator('#unlock-device').click();await page.locator('#error').filter({hasText:'Unsupported encrypted vault payload'}).waitFor()
  assert.equal(await page.evaluate(()=>localStorage.getItem('canary.encrypted-vault.v1')),savedV6)
