@@ -154,7 +154,7 @@ audit and physical GrapheneOS/iPhone acceptance are still outstanding.
 
 `src/token.ts` and locked `spoken-token@2.1.0` supply normal/duress derivation,
 collision avoidance, HMAC-SHA256 and the spoken word list. Existing `@scure/bip39`
-supplies checksummed setup words. Existing `qrcode-generator@2.0.4` generates QR;
+supplies checksummed setup words. `@forgesworn/qr@0.1.0` generates QR;
 pinned `jsqr@1.4.0` decodes locally. Vault cryptography uses browser Web Crypto,
 not newly implemented ciphers or WASM. The bundle includes MIT and Apache-2.0
 licences and notices. Existing library protocols and `app/` remain unchanged.

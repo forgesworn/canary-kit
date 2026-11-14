@@ -231,7 +231,7 @@ function renderSharesScreen(
   qrBtn.addEventListener('click', () => {
     qrVisible = !qrVisible
     if (qrVisible) {
-      // generateQR returns sanitised SVG from qrcode-generator — safe innerHTML
+      // generateQR returns SVG built from the module grid alone, no input text — safe innerHTML
       qrArea.innerHTML = generateQR(shareText)
       qrArea.hidden = false
       qrBtn.textContent = 'Hide QR'

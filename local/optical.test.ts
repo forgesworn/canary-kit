@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import qrcode from 'qrcode-generator'
+import { encode, isDark } from '@forgesworn/qr'
 import jsQR from 'jsqr'
 import { beginConnect, acceptConnect, finishConnect } from './connect.js'
 import { newDeviceRequest, deviceToken, makeDeviceCopy, openDeviceCopy } from './device-transfer.js'
@@ -39,10 +39,10 @@ describe('bounded optical transfers adapted from Signet', () => {
     const raw=encodeOptical({kind:'connection',value:beginConnect('Video').invite}),reader=createOpticalFrameReader()
     let result:string|null=null
     for(const frame of opticalFrames(raw,true)){
-      const qr=qrcode(0,'M');qr.addData(frame,'Alphanumeric');qr.make();const modules=qr.getModuleCount()
+      const qr=encode(frame,{ecc:'M',mode:'alphanumeric'});const modules=qr.size
       expect(modules).toBeLessThanOrEqual(41)
       const size=(modules+8)*4,pixels=new Uint8ClampedArray(size*size*4).fill(255)
-      for(let y=0;y<modules;y++)for(let x=0;x<modules;x++)if(qr.isDark(y,x))for(let dy=0;dy<4;dy++)for(let dx=0;dx<4;dx++){
+      for(let y=0;y<modules;y++)for(let x=0;x<modules;x++)if(isDark(qr,x,y))for(let dy=0;dy<4;dy++)for(let dx=0;dx<4;dx++){
         const p=(((y+4)*4+dy)*size+(x+4)*4+dx)*4;pixels[p]=pixels[p+1]=pixels[p+2]=0
       }
       const decoded=jsQR(pixels,size,size);expect(decoded?.data).toBe(frame);result=reader(decoded!.data,0)

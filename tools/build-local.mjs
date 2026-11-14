@@ -37,15 +37,11 @@ const thirdParty = [
   ['Noble Ciphers', 'node_modules/@noble/ciphers/LICENSE'],
   ['Nostr Tools (offline signing and encryption only)', 'node_modules/nostr-tools/LICENSE'],
   ['Nostr Attestations (offline data format)', 'node_modules/nostr-attestations/LICENSE'],
-  ['QR Code Generator', 'node_modules/qrcode-generator/dist/qrcode.js'],
+  ['QR Code (ForgeSworn)', 'node_modules/@forgesworn/qr/LICENSE'],
   ['jsQR (Apache-2.0)', 'node_modules/jsqr/LICENSE'],
 ]
 const notices = await Promise.all(thirdParty.map(async ([name, path]) => {
   let content = await readFile(resolve(root, path), 'utf8')
-  if (name === 'QR Code Generator') {
-    const mit = await readFile(resolve(root, 'LICENSE'), 'utf8')
-    content = content.slice(0, content.indexOf('var qrcode')) + '\n' + mit.slice(mit.indexOf('Permission is hereby granted'))
-  }
   return `${name}\n${content}`
 }))
 const noticeText = notices.join('\n\n')
