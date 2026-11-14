@@ -1,22 +1,11 @@
-import qrcode from 'qrcode-generator'
+import { drawCanvas, encode } from '@forgesworn/qr'
 import jsQR from 'jsqr'
 
 export function drawQr(canvas: HTMLCanvasElement, payload: string, correction: 'L' | 'M' = 'M'): void {
-  const qr = qrcode(0, correction)
-  qr.addData(payload,/^[0-9A-Z $%*+./:-]+$/.test(payload)?'Alphanumeric':'Byte')
-  qr.make()
-  const scale = 8
-  const margin = 4
-  const count = qr.getModuleCount()
-  canvas.width = canvas.height = (count + margin * 2) * scale
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('QR display is unavailable. Use the setup words instead.')
-  ctx.fillStyle = '#fff'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = '#000'
-  for (let y = 0; y < count; y++) for (let x = 0; x < count; x++) {
-    if (qr.isDark(y, x)) ctx.fillRect((x + margin) * scale, (y + margin) * scale, scale, scale)
-  }
+  const qr = encode(payload, { ecc: correction, mode: /^[0-9A-Z $%*+./:-]+$/.test(payload) ? 'alphanumeric' : 'byte' })
+  if (!canvas.getContext('2d')) throw new Error('QR display is unavailable. Use the setup words instead.')
+  // 8 pixels a module with a 4 module quiet zone, black on white.
+  drawCanvas(canvas, qr, { width: (qr.size + 8) * 8, margin: 4, dark: '#000', light: '#fff' })
 }
 
 export class QrScanner {

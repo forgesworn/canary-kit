@@ -132,6 +132,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@forgesworn/qr": "^0.1.0",
     "@noble/curves": "^2.0.1",
     "@noble/hashes": "^2.0.1",
     "@playwright/test": "^1.58.2",
@@ -143,7 +144,6 @@
     "jsqr": "1.4.0",
     "maplibre-gl": "^6.7.0",
     "nostr-tools": "^2.23.3",
-    "qrcode-generator": "^2.0.4",
     "serve": "^14.2.6",
     "signet-login": "^0.22.0",
     "typescript": "^6.0.2",
