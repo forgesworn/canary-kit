@@ -132,7 +132,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@forgesworn/qr": "^0.1.0",
+    "@forgesworn/qr": "0.2.0",
     "@noble/curves": "^2.0.1",
     "@noble/hashes": "^2.0.1",
     "@playwright/test": "^1.58.2",
