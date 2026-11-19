@@ -7,6 +7,12 @@ GitHub: https://github.com/forgesworn/canary-kit
 
 ESM-only. Eight subpath exports: `canary-kit` (main), `canary-kit/token`, `canary-kit/encoding`, `canary-kit/session`, `canary-kit/wordlist`, `canary-kit/nostr`, `canary-kit/beacon`, `canary-kit/sync`.
 
+## ForgeSworn ecosystem
+
+- [ForgeSworn library guide](https://forgesworn.dev/llms.txt): Find related libraries, tools and integration guides by task and runtime.
+- [ForgeSworn on GitHub](https://github.com/forgesworn): Browse the organisation’s public repositories.
+- [Project source](https://github.com/forgesworn/canary-kit): Canonical source repository, documentation and release information.
+
 ## Install
 
 npm install canary-kit
